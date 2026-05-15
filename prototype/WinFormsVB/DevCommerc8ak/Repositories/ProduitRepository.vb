@@ -16,58 +16,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub AssurerColonnes()
-            Dim sql As String = "" &
-                "IF COL_LENGTH('Produits','PrixDemi') IS NULL ALTER TABLE Produits ADD PrixDemi DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('Produits','PrixAchat') IS NULL ALTER TABLE Produits ADD PrixAchat DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('Produits','PrixQuart') IS NULL ALTER TABLE Produits ADD PrixQuart DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('Produits','PrixDouzaine') IS NULL ALTER TABLE Produits ADD PrixDouzaine DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('Produits','PrixSpecial') IS NULL ALTER TABLE Produits ADD PrixSpecial DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('Produits','CoefficientGros') IS NULL ALTER TABLE Produits ADD CoefficientGros DECIMAL(18,4) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('Produits','SeuilCritique') IS NULL ALTER TABLE Produits ADD SeuilCritique DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('Produits','UnitePrincipale') IS NULL ALTER TABLE Produits ADD UnitePrincipale NVARCHAR(50) NULL; " &
-                "IF COL_LENGTH('Produits','UniteSecondaire') IS NULL ALTER TABLE Produits ADD UniteSecondaire NVARCHAR(50) NULL; " &
-                "IF COL_LENGTH('Produits','ConversionUnite') IS NULL ALTER TABLE Produits ADD ConversionUnite DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('Produits','VenteDetail') IS NULL ALTER TABLE Produits ADD VenteDetail BIT NOT NULL DEFAULT 1; " &
-                "IF COL_LENGTH('Produits','VenteDemi') IS NULL ALTER TABLE Produits ADD VenteDemi BIT NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('Produits','VenteDouzaine') IS NULL ALTER TABLE Produits ADD VenteDouzaine BIT NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('Produits','VenteGros') IS NULL ALTER TABLE Produits ADD VenteGros BIT NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('Produits','ModifierPar') IS NULL ALTER TABLE Produits ADD ModifierPar NVARCHAR(80) NULL; " &
-                "IF OBJECT_ID('HistoriquePrixProduits','U') IS NULL " &
-                "BEGIN " &
-                "CREATE TABLE HistoriquePrixProduits (" &
-                "HistoriquePrixId INT IDENTITY(1,1) PRIMARY KEY, " &
-                "ProduitId INT NOT NULL, " &
-                "AncienPrixAchat DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "NouveauPrixAchat DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "AncienPrixDetail DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "NouveauPrixDetail DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "AncienPrixDemi DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "NouveauPrixDemi DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "AncienPrixQuart DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "NouveauPrixQuart DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "AncienPrixDouzaine DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "NouveauPrixDouzaine DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "AncienPrixGros DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "NouveauPrixGros DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "AncienPrixSpecial DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "NouveauPrixSpecial DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "ModifiePar NVARCHAR(80) NULL, " &
-                "ModifieLe DATETIME2 NOT NULL DEFAULT GETDATE(), " &
-                "IdStock NVARCHAR(30) NULL" &
-                "); " &
-                "END; " &
-                "IF COL_LENGTH('HistoriquePrixProduits','AncienPrixAchat') IS NULL ALTER TABLE HistoriquePrixProduits ADD AncienPrixAchat DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('HistoriquePrixProduits','NouveauPrixAchat') IS NULL ALTER TABLE HistoriquePrixProduits ADD NouveauPrixAchat DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('HistoriquePrixProduits','AncienPrixDemi') IS NULL ALTER TABLE HistoriquePrixProduits ADD AncienPrixDemi DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('HistoriquePrixProduits','NouveauPrixDemi') IS NULL ALTER TABLE HistoriquePrixProduits ADD NouveauPrixDemi DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('HistoriquePrixProduits','AncienPrixQuart') IS NULL ALTER TABLE HistoriquePrixProduits ADD AncienPrixQuart DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('HistoriquePrixProduits','NouveauPrixQuart') IS NULL ALTER TABLE HistoriquePrixProduits ADD NouveauPrixQuart DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('HistoriquePrixProduits','AncienPrixDouzaine') IS NULL ALTER TABLE HistoriquePrixProduits ADD AncienPrixDouzaine DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('HistoriquePrixProduits','NouveauPrixDouzaine') IS NULL ALTER TABLE HistoriquePrixProduits ADD NouveauPrixDouzaine DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('HistoriquePrixProduits','AncienPrixSpecial') IS NULL ALTER TABLE HistoriquePrixProduits ADD AncienPrixSpecial DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('HistoriquePrixProduits','NouveauPrixSpecial') IS NULL ALTER TABLE HistoriquePrixProduits ADD NouveauPrixSpecial DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('HistoriquePrixProduits','IdStock') IS NULL ALTER TABLE HistoriquePrixProduits ADD IdStock NVARCHAR(30) NULL;"
-            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+            ' Schéma géré par le script SQL de déploiement.
         End Sub
 
         ' Cree un produit et retourne son identifiant.
@@ -144,16 +93,30 @@ Namespace DevCommerc8ak
 
         ' Retourne la liste des tepes ventes et prix produits sous forme de DataTable pour filtrage local.
         Public Function ListerTypeVente(produitId As Integer) As DataTable
-            Dim sql As String = "SELECT TypeVente, Prix FROM (SELECT 'D�tail' AS TypeVente, PrixDetail AS Prix, VenteDetail AS EstActif FROM Produits WHERE ProduitId = @ProduitId UNION ALL
-                                 SELECT 'Demi', PrixDemi, VenteDemi FROM Produits WHERE ProduitId = @ProduitId
-                                 UNION ALL
-                                 SELECT 'Quart', PrixQuart, 1 FROM Produits WHERE ProduitId = @ProduitId
-                                 UNION ALL
-                                 SELECT 'Gros', PrixGros, VenteGros FROM Produits WHERE ProduitId = @ProduitId
-                                 UNION ALL
-                                 SELECT 'Douzaine', PrixDouzaine, VenteDouzaine FROM Produits WHERE ProduitId = @ProduitId
-                                    ) T
-                                    WHERE EstActif = 1"
+            Dim sql As String = "
+                SELECT TypeVente, Prix
+                FROM (
+                    SELECT 'Détail' AS TypeVente, PrixDetail AS Prix, VenteDetail AS EstActif
+                    FROM Produits
+                    WHERE ProduitId = @ProduitId
+                    UNION ALL
+                    SELECT 'Demi', PrixDemi, VenteDemi
+                    FROM Produits
+                    WHERE ProduitId = @ProduitId
+                    UNION ALL
+                    SELECT 'Quart', PrixQuart, 1
+                    FROM Produits
+                    WHERE ProduitId = @ProduitId
+                    UNION ALL
+                    SELECT 'Gros', PrixGros, VenteGros
+                    FROM Produits
+                    WHERE ProduitId = @ProduitId
+                    UNION ALL
+                    SELECT 'Douzaine', PrixDouzaine, VenteDouzaine
+                    FROM Produits
+                    WHERE ProduitId = @ProduitId
+                ) T
+                WHERE EstActif = 1"
 
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@ProduitId", produitId)}
             Dim dt As DataTable = _dal.ExecuterTable(sql, CommandType.Text, p)

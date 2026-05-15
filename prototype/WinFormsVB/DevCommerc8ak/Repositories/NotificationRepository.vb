@@ -15,27 +15,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Public Sub AssurerTable()
-            Dim sql As String = "IF OBJECT_ID('Notifications','U') IS NULL " &
-                                "BEGIN " &
-                                "CREATE TABLE Notifications (" &
-                                "NotificationId INT IDENTITY(1,1) PRIMARY KEY, " &
-                                "TypeNotification NVARCHAR(30) NOT NULL DEFAULT 'Info', " &
-                                "Message NVARCHAR(500) NOT NULL, " &
-                                "CleNotification NVARCHAR(150) NULL, " &
-                                "EcranCible NVARCHAR(80) NULL, " &
-                                "DonneesCible NVARCHAR(150) NULL, " &
-                                "CompteurOccurrences INT NOT NULL DEFAULT 1, " &
-                                "EstGroupee BIT NOT NULL DEFAULT 0, " &
-                                "CreeLe DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(), " &
-                                "Lue BIT NOT NULL DEFAULT 0" &
-                                "); END; " &
-                                "IF COL_LENGTH('Notifications','TypeNotification') IS NULL ALTER TABLE Notifications ADD TypeNotification NVARCHAR(30) NOT NULL DEFAULT 'Info'; " &
-                                "IF COL_LENGTH('Notifications','CleNotification') IS NULL ALTER TABLE Notifications ADD CleNotification NVARCHAR(150) NULL; " &
-                                "IF COL_LENGTH('Notifications','EcranCible') IS NULL ALTER TABLE Notifications ADD EcranCible NVARCHAR(80) NULL; " &
-                                "IF COL_LENGTH('Notifications','DonneesCible') IS NULL ALTER TABLE Notifications ADD DonneesCible NVARCHAR(150) NULL; " &
-                                "IF COL_LENGTH('Notifications','CompteurOccurrences') IS NULL ALTER TABLE Notifications ADD CompteurOccurrences INT NOT NULL DEFAULT 1; " &
-                                "IF COL_LENGTH('Notifications','EstGroupee') IS NULL ALTER TABLE Notifications ADD EstGroupee BIT NOT NULL DEFAULT 0;"
-            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+            ' Schéma géré par le script SQL de déploiement.
         End Sub
 
         Public Sub Ajouter(message As String)

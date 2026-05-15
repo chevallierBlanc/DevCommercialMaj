@@ -293,8 +293,6 @@ Namespace DevCommerc8ak
         Private Function GenererNumeroMouvement() As String
             Dim anneeMois As String = Date.Now.ToString("yyyyMM")
             Dim sql As String = "" &
-                "IF OBJECT_ID('MouvementSequence','U') IS NULL " &
-                "BEGIN CREATE TABLE MouvementSequence (AnneeMois CHAR(6) NOT NULL PRIMARY KEY, DernierNumero INT NOT NULL); END; " &
                 "DECLARE @n INT; BEGIN TRAN; " &
                 "IF EXISTS (SELECT 1 FROM MouvementSequence WITH (UPDLOCK, HOLDLOCK) WHERE AnneeMois=@AnneeMois) " &
                 "BEGIN UPDATE MouvementSequence SET DernierNumero = DernierNumero + 1 WHERE AnneeMois=@AnneeMois; " &
@@ -310,8 +308,6 @@ Namespace DevCommerc8ak
         Private Function GenererNumeroStock(prefix As String) As String
             Dim anneeMois As String = Date.Now.ToString("yyyyMM")
             Dim sql As String = "" &
-                "IF OBJECT_ID('StockSequence','U') IS NULL " &
-                "BEGIN CREATE TABLE StockSequence (Prefix NVARCHAR(10) NOT NULL, AnneeMois CHAR(6) NOT NULL, DernierNumero INT NOT NULL, PRIMARY KEY(Prefix, AnneeMois)); END; " &
                 "DECLARE @n INT; BEGIN TRAN; " &
                 "IF EXISTS (SELECT 1 FROM StockSequence WITH (UPDLOCK, HOLDLOCK) WHERE Prefix=@Prefix AND AnneeMois=@AnneeMois) " &
                 "BEGIN UPDATE StockSequence SET DernierNumero = DernierNumero + 1 WHERE Prefix=@Prefix AND AnneeMois=@AnneeMois; " &
@@ -328,26 +324,12 @@ Namespace DevCommerc8ak
         End Function
 
         Private Sub AssurerVueStock()
-            Dim sql As String = "" &
-                "IF OBJECT_ID('dbo.vStockProduit','V') IS NULL " &
-                "EXEC('CREATE VIEW dbo.vStockProduit AS SELECT 1 AS Dummy'); " &
-                "EXEC('ALTER VIEW dbo.vStockProduit AS " &
-                "SELECT p.ProduitId, " &
-                "ISNULL(e.Entree,0) - ISNULL(s.Sortie,0) - ISNULL(pr.Perte,0) AS QuantiteStock " &
-                "FROM dbo.Produits p " &
-                "LEFT JOIN (SELECT ProduitId, SUM(QuantiteBase) AS Entree FROM dbo.StockEntree GROUP BY ProduitId) e ON e.ProduitId = p.ProduitId " &
-                "LEFT JOIN (SELECT ProduitId, SUM(QuantiteBase) AS Sortie FROM dbo.StockSortie GROUP BY ProduitId) s ON s.ProduitId = p.ProduitId " &
-                "LEFT JOIN (SELECT ProduitId, SUM(QuantiteBase) AS Perte FROM dbo.StockPerte GROUP BY ProduitId) pr ON pr.ProduitId = p.ProduitId')"
-            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+            ' Vue gÃ©rÃ©e par le script SQL de dÃ©ploiement.
         End Sub
 
 
 
-
-
-
-
-        ' --- MÉTHODES EXISTANTES (INCHANGÉES) ---
+        ' --- MÃ‰THODES EXISTANTES (INCHANGÃ‰ES) ---
 
         'Public Function EnregistrerEntree(produitId As Integer, quantiteSaisie As Decimal, unite As String, reference As String, observation As String, effectuePar As Integer, Optional prixAchatOverride As Decimal = 0D) As Integer
         '    Return EnregistrerMouvement(produitId, "ENTREE", quantiteSaisie, unite, reference, observation, Nothing, effectuePar, prixAchatOverride)
@@ -482,7 +464,7 @@ Namespace DevCommerc8ak
         '    _dal.ExecuterNonRequete(sql, CommandType.Text, p)
         'End Sub
 
-        ' --- NOUVELLES MÉTHODES (AJOUTÉES) ---
+        ' --- NOUVELLES MÃ‰THODES (AJOUTÃ‰ES) ---
 
         ''' <summary>
         ''' Enregistre une sortie manuelle (Dette, Ordre Patron, etc.)
@@ -504,7 +486,7 @@ Namespace DevCommerc8ak
                 .RefSource = clientInfo,
                 .CreePar = effectuePar
             }
-            ' Note: On utilise RefSource pour stocker le client et Motif pour le motif (si colonnes ajoutées via SQL)
+            ' Note: On utilise RefSource pour stocker le client et Motif pour le motif (si colonnes ajoutÃ©es via SQL)
             _sortieRepo.Ajouter(sortie)
 
             ' Enregistrement du mouvement
@@ -525,7 +507,7 @@ Namespace DevCommerc8ak
         End Sub
 
         ''' <summary>
-        ''' Récupère l'analyse détaillée d'un produit pour l'inventaire
+        ''' RÃ©cupÃ¨re l'analyse dÃ©taillÃ©e d'un produit pour l'inventaire
         ''' </summary>
         Public Function ObtenirAnalyseProduit(produitId As Integer) As DataTable
             Dim params As New List(Of SqlParameter) From {
@@ -534,7 +516,7 @@ Namespace DevCommerc8ak
             Return _dal.ExecuterTable("GetAnalyseStockProduit", CommandType.StoredProcedure, params)
         End Function
 
-        ' --- MÉTHODES PRIVÉES (INCHANGÉES) ---
+        ' --- MÃ‰THODES PRIVÃ‰ES (INCHANGÃ‰ES) ---
 
         'Private Function EnregistrerMouvement(produitId As Integer, typeMouvement As String, quantiteSaisie As Decimal, unite As String, reference As String, observation As String, typePerte As String, effectuePar As Integer, Optional prixAchatOverride As Decimal = 0D) As Integer
         '    Dim info As DataRow = ObtenirInfosProduit(produitId)

@@ -14,16 +14,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Public Sub AssurerTable()
-            Dim sql As String = "IF OBJECT_ID('UtilisateurSessions','U') IS NULL " &
-                                "BEGIN " &
-                                "CREATE TABLE UtilisateurSessions (" &
-                                "SessionId INT IDENTITY(1,1) PRIMARY KEY, " &
-                                "UtilisateurId INT NOT NULL, " &
-                                "Debut DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(), " &
-                                "DernierPing DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(), " &
-                                "Fin DATETIME2 NULL" &
-                                "); END"
-            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+            ' Schéma géré par le script SQL de déploiement.
         End Sub
 
         Public Function DemarrerSession(utilisateurId As Integer) As Integer

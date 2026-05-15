@@ -16,24 +16,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Public Sub AssurerTable()
-            Dim sql As String = "" &
-                "IF OBJECT_ID('dbo.StockEntree','U') IS NULL " &
-                "BEGIN " &
-                "CREATE TABLE dbo.StockEntree (" &
-                "StockEntreeId INT IDENTITY(1,1) PRIMARY KEY," &
-                "IdStock NVARCHAR(30) NOT NULL," &
-                "ProduitId INT NOT NULL," &
-                "QuantiteSaisie DECIMAL(18,2) NOT NULL," &
-                "Unite NVARCHAR(50) NULL," &
-                "QuantiteBase DECIMAL(18,2) NOT NULL," &
-                "PrixAchat DECIMAL(18,2) NOT NULL," &
-                "Devise NVARCHAR(10) NULL," &
-                "Taux DECIMAL(18,6) NOT NULL DEFAULT 0," &
-                "DateEntree DATETIME NOT NULL DEFAULT GETDATE()," &
-                "FournisseurId INT NULL," &
-                "CreePar INT NULL" &
-                "); END"
-            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+            ' Schéma géré par le script SQL de déploiement.
         End Sub
 
         Public Function Ajouter(entree As StockEntree) As Integer

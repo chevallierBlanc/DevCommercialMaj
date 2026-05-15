@@ -122,16 +122,10 @@
     <Compile Include="UI\FormulairePaiements.vb">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="UI\FormulaireStock.vb">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Include="UI\FormulaireParametres.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FormulaireStock_Final_FIXED.vb">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="UI\FormulaireStock_Final_V3.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FormulaireUtilisateurs.vb">

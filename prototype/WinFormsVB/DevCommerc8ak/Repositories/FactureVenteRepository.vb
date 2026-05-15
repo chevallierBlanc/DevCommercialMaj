@@ -17,17 +17,11 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub AssurerColonnes()
-            Dim sql As String = "IF COL_LENGTH('FacturesVente','ModifierPar') IS NULL ALTER TABLE FacturesVente ADD ModifierPar NVARCHAR(80) NULL;"
-            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+            ' Schéma géré par le script SQL de déploiement.
         End Sub
 
         Private Sub AssurerSequence()
-            Dim sql As String = "" &
-                "IF OBJECT_ID('FactureSequence','U') IS NULL " &
-                "BEGIN " &
-                "CREATE TABLE FactureSequence (AnneeMois CHAR(6) NOT NULL PRIMARY KEY, DernierNumero INT NOT NULL); " &
-                "END;"
-            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+            ' Séquence fournie par le script SQL de déploiement.
         End Sub
 
         ' Genere un numero de facture du type FAC-AAAAMM-0001.

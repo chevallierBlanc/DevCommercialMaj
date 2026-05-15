@@ -2,6 +2,7 @@ Imports System.Windows.Forms
 Imports System.Drawing
 Imports System.Configuration
 Imports System
+Imports Microsoft.VisualBasic
 
 Namespace DevCommerc8ak
     Public Class LoginForm
@@ -40,7 +41,7 @@ Namespace DevCommerc8ak
             ChargerModeSombre()
             ThemeHelper.AppliquerTheme(Me)
             IconsHelper.AppliquerIconeFormulaire(Me)
-            InitialiserComptesParDefaut()
+            InitialiserCompteAdminSiNecessaire()
         End Sub
 
         Private Sub OnLogin(sender As Object, e As EventArgs)
@@ -65,17 +66,47 @@ Namespace DevCommerc8ak
             Return service.VerifierConnexion(nomUtilisateur, motDePasse)
         End Function
 
-        Private Sub InitialiserComptesParDefaut()
+        Private Sub InitialiserCompteAdminSiNecessaire()
             Try
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
                 Dim utilisateurRepo As New UtilisateurRepository(dal)
+
+                If utilisateurRepo.Lister().Count > 0 Then
+                    Return
+                End If
+
                 Dim roleRepo As New RoleRepository(dal)
                 Dim sessionRepo As New SessionRepository(dal)
                 Dim service As New UtilisateurService(utilisateurRepo, roleRepo, sessionRepo)
-                service.EnsurerComptesParDefaut("1234", "1234", "1234")
-            Catch
-                ' Ignore l'erreur si la base n'est pas accessible.
+
+                roleRepo.AssurerRole("ADMIN")
+
+                Dim motDePasse As String = Interaction.InputBox(
+                    "Aucun compte n'existe. Saisissez le mot de passe du premier administrateur.",
+                    "Création du compte admin",
+                    "")
+                If String.IsNullOrWhiteSpace(motDePasse) Then
+                    MessageBox.Show("La création du compte administrateur est obligatoire au premier démarrage.")
+                    Me.Close()
+                    Return
+                End If
+
+                Dim confirmation As String = Interaction.InputBox(
+                    "Confirmez le mot de passe du premier administrateur.",
+                    "Création du compte admin",
+                    "")
+                If motDePasse <> confirmation Then
+                    MessageBox.Show("La confirmation ne correspond pas. Le compte administrateur n'a pas été créé.")
+                    Me.Close()
+                    Return
+                End If
+
+                service.CreerUtilisateur("admin", motDePasse, "ADMIN")
+                MessageBox.Show("Compte administrateur initial créé. Utilisez l'utilisateur 'admin'.")
+            Catch ex As Exception
+                MessageBox.Show("Impossible d'initialiser le compte administrateur initial : " & ex.Message)
+                Me.Close()
             End Try
         End Sub
 

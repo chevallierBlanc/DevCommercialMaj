@@ -16,20 +16,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub AssurerColonnes()
-            Dim sql As String = "" &
-                "IF COL_LENGTH('MouvementsStock','NumeroMouvement') IS NULL ALTER TABLE MouvementsStock ADD NumeroMouvement NVARCHAR(30) NULL; " &
-                "IF COL_LENGTH('MouvementsStock','QuantiteBase') IS NULL ALTER TABLE MouvementsStock ADD QuantiteBase DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('MouvementsStock','Unite') IS NULL ALTER TABLE MouvementsStock ADD Unite NVARCHAR(50) NULL; " &
-                "IF COL_LENGTH('MouvementsStock','StockAvant') IS NULL ALTER TABLE MouvementsStock ADD StockAvant DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('MouvementsStock','StockApres') IS NULL ALTER TABLE MouvementsStock ADD StockApres DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('MouvementsStock','Observation') IS NULL ALTER TABLE MouvementsStock ADD Observation NVARCHAR(200) NULL; " &
-                "IF COL_LENGTH('MouvementsStock','TypePerte') IS NULL ALTER TABLE MouvementsStock ADD TypePerte NVARCHAR(50) NULL; " &
-                "IF COL_LENGTH('MouvementsStock','EstAnnule') IS NULL ALTER TABLE MouvementsStock ADD EstAnnule BIT NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('MouvementsStock','AnnulePar') IS NULL ALTER TABLE MouvementsStock ADD AnnulePar INT NULL; " &
-                "IF COL_LENGTH('MouvementsStock','AnnuleLe') IS NULL ALTER TABLE MouvementsStock ADD AnnuleLe DATETIME NULL; " &
-                "IF COL_LENGTH('MouvementsStock','AnnulationRef') IS NULL ALTER TABLE MouvementsStock ADD AnnulationRef NVARCHAR(200) NULL; " &
-                "IF COL_LENGTH('MouvementsStock','ModifierPar') IS NULL ALTER TABLE MouvementsStock ADD ModifierPar NVARCHAR(80) NULL;"
-            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+            ' Schéma géré par le script SQL de déploiement.
         End Sub
 
         ' Cree un mouvement stock et retourne son identifiant.

@@ -32,24 +32,7 @@ Namespace DevCommerc8ak
             Return True
         End Function
 
-        ' Cree les comptes par defaut si aucun utilisateur.
-        Public Sub EnsurerComptesParDefaut(adminPass As String, caissierPass As String, facturierPass As String)
-            _roleRepo.AssurerRole("ADMIN")
-            _roleRepo.AssurerRole("CAISSIERE")
-            _roleRepo.AssurerRole("FACTURIER")
-
-            If _utilisateurRepo.ObtenirParNom("admin") Is Nothing Then
-                CreerUtilisateur("admin", adminPass, "ADMIN")
-            End If
-            If _utilisateurRepo.ObtenirParNom("caissier") Is Nothing Then
-                CreerUtilisateur("caissier", caissierPass, "CAISSIERE")
-            End If
-            If _utilisateurRepo.ObtenirParNom("facturier") Is Nothing Then
-                CreerUtilisateur("facturier", facturierPass, "FACTURIER")
-            End If
-        End Sub
-
-        ' Cree un utilisateur et assigne un role.
+        ' Les comptes initiaux sont créés hors application, via les scripts de déploiement.
         Public Sub CreerUtilisateur(nomUtilisateur As String, motDePasse As String, nomRole As String)
             Dim sel As Byte() = GenererSel()
             Dim hash As Byte() = HashMotDePasse(motDePasse, sel)

@@ -16,8 +16,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub AssurerColonnes()
-            Dim sql As String = "IF COL_LENGTH('Clients','ModifierPar') IS NULL ALTER TABLE Clients ADD ModifierPar NVARCHAR(80) NULL;"
-            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+            ' Schéma géré par le script SQL de déploiement.
         End Sub
 
         ' Cree un client et retourne son identifiant.

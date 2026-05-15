@@ -16,27 +16,13 @@ Namespace DevCommerc8ak
         End Sub
 
         Public Sub AssurerTable()
-            Dim sql As String = "" &
-                "IF OBJECT_ID('dbo.StockSortie','U') IS NULL " &
-                "BEGIN " &
-                "CREATE TABLE dbo.StockSortie (" &
-                "StockSortieId INT IDENTITY(1,1) PRIMARY KEY," &
-                "ProduitId INT NOT NULL," &
-                "QuantiteSaisie DECIMAL(18,2) NOT NULL," &
-                "Unite NVARCHAR(50) NULL," &
-                "QuantiteBase DECIMAL(18,2) NOT NULL," &
-                "DateSortie DATETIME NOT NULL DEFAULT GETDATE()," &
-                "Source NVARCHAR(50) NOT NULL," &
-                "RefSource NVARCHAR(50) NULL," &
-                "CreePar INT NULL" &
-                "); END"
-            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+            ' Schéma géré par le script SQL de déploiement.
         End Sub
 
         Public Function Ajouter(sortie As StockSortie) As Integer
-            Dim reference As String = "SORTM-" & DateTime.Now.ToString("yyyyMMdd-HHmmss")
-            Dim sql As String = "INSERT INTO StockSortie (ProduitId,NumeroSortie, QuantiteSaisie, Unite, QuantiteBase, DateSortie, Source, RefSource, CreePar,MotifId, ClientId) " &
-                                "VALUES (@ProduitId, @QuantiteSaisie, @Unite, @QuantiteBase, @DateSortie, @Source, @RefSource, @CreePar); " &
+            Dim numeroSortie As String = "SORTM-" & DateTime.Now.ToString("yyyyMMdd-HHmmss")
+            Dim sql As String = "INSERT INTO StockSortie (ProduitId, QuantiteSaisie, Unite, QuantiteBase, DateSortie, Source, RefSource, CreePar, NumeroSortie, ClientId, MotifId, TypeVente, PrixUnitaire, MontantLigne, StatutPaiement, MontantPaye, ResteAPayer, Observation) " &
+                                "VALUES (@ProduitId, @QuantiteSaisie, @Unite, @QuantiteBase, @DateSortie, @Source, @RefSource, @CreePar, @NumeroSortie, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL); " &
                                 "SELECT CAST(SCOPE_IDENTITY() AS INT);"
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@ProduitId", sortie.ProduitId),
@@ -46,7 +32,8 @@ Namespace DevCommerc8ak
                 New SqlParameter("@DateSortie", sortie.DateSortie),
                 New SqlParameter("@Source", sortie.Source),
                 New SqlParameter("@RefSource", If(sortie.RefSource, CType(DBNull.Value, Object))),
-                New SqlParameter("@CreePar", If(sortie.CreePar.HasValue, CType(sortie.CreePar.Value, Object), DBNull.Value))
+                New SqlParameter("@CreePar", If(sortie.CreePar.HasValue, CType(sortie.CreePar.Value, Object), DBNull.Value)),
+                New SqlParameter("@NumeroSortie", numeroSortie)
             }
             Dim v As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
             Return Convert.ToInt32(v)
@@ -75,7 +62,7 @@ Namespace DevCommerc8ak
 
         '            _dal.ExecuterNonRequete(sql, params)
 
-        '            ' Mise � jour du stock r�el
+            '            ' Mise à jour du stock réel
         '            Dim sqlStock As String = "UPDATE Produits SET StockActuel = StockActuel - @qte WHERE ProduitId = @id"
         '            Dim paramsStock As New Dictionary(Of String, Object) From {
         '                {"@qte", item.QuantiteBase},

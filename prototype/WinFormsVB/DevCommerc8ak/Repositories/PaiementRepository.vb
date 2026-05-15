@@ -16,12 +16,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub AssurerColonnes()
-            Dim sql As String = "" &
-                "IF COL_LENGTH('Paiements','ModifierPar') IS NULL ALTER TABLE Paiements ADD ModifierPar NVARCHAR(80) NULL; " &
-                "IF COL_LENGTH('Paiements','MontantRecu') IS NULL ALTER TABLE Paiements ADD MontantRecu DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('Paiements','MonnaieRendue') IS NULL ALTER TABLE Paiements ADD MonnaieRendue DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('Paiements','Devise') IS NULL ALTER TABLE Paiements ADD Devise NVARCHAR(10) NULL;"
-            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+            ' Schéma géré par le script SQL de déploiement.
         End Sub
 
         ' Cree un paiement et retourne son identifiant.

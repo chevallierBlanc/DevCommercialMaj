@@ -68,15 +68,6 @@ Namespace DevCommerc8ak
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
                     Try
-                        Using cmdAlter As New SqlCommand("" &
-                            "IF COL_LENGTH('Paiements','MontantRecu') IS NULL ALTER TABLE Paiements ADD MontantRecu DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                            "IF COL_LENGTH('Paiements','MonnaieRendue') IS NULL ALTER TABLE Paiements ADD MonnaieRendue DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                            "IF COL_LENGTH('Paiements','Devise') IS NULL ALTER TABLE Paiements ADD Devise NVARCHAR(10) NULL; " &
-                            "IF COL_LENGTH('Paiements','ModifierPar') IS NULL ALTER TABLE Paiements ADD ModifierPar NVARCHAR(80) NULL; " &
-                            "IF COL_LENGTH('FacturesVente','ModifierPar') IS NULL ALTER TABLE FacturesVente ADD ModifierPar NVARCHAR(80) NULL; ", cn, tx)
-                            cmdAlter.ExecuteNonQuery()
-                        End Using
-
                         Dim total As Decimal = 0D
                         Dim statut As String = ""
                         Dim numeroFacture As String = ""

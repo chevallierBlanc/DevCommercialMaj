@@ -16,8 +16,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub AssurerColonnes()
-            Dim sql As String = "IF COL_LENGTH('Fournisseurs','ModifierPar') IS NULL ALTER TABLE Fournisseurs ADD ModifierPar NVARCHAR(80) NULL;"
-            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+            ' Schéma géré par le script SQL de déploiement.
         End Sub
 
         ' Cree un fournisseur et retourne son identifiant.

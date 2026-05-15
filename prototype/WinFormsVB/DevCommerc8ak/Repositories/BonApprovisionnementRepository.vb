@@ -16,43 +16,7 @@ Namespace DevCommerc8ak
 
         ' Assure le schema du module approvisionnement.
         Public Sub AssurerTables()
-            Dim sql As String = "" &
-                "IF OBJECT_ID('BonsApprovisionnement','U') IS NULL " &
-                "BEGIN " &
-                "CREATE TABLE BonsApprovisionnement (" &
-                "BonId INT IDENTITY(1,1) PRIMARY KEY, " &
-                "NumeroBon NVARCHAR(20) NULL, " &
-                "DateCreation DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(), " &
-                "Statut NVARCHAR(30) NOT NULL DEFAULT 'EnAttente', " &
-                "FournisseurId INT NULL, " &
-                "TypePaiement NVARCHAR(30) NULL, " &
-                "CreePar INT NOT NULL, " &
-                "ModifierPar NVARCHAR(80) NULL " &
-                "); " &
-                "END; " &
-                "IF OBJECT_ID('BonApprovisionnementLignes','U') IS NULL " &
-                "BEGIN " &
-                "CREATE TABLE BonApprovisionnementLignes (" &
-                "BonLigneId INT IDENTITY(1,1) PRIMARY KEY, " &
-                "BonId INT NOT NULL, " &
-                "ProduitId INT NOT NULL, " &
-                "Quantite DECIMAL(18,2) NOT NULL, " &
-                "PrixAchat DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "PrixAchatPrecedent DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "TotalLigne DECIMAL(18,2) NOT NULL DEFAULT 0, " &
-                "CONSTRAINT fk_bonligne_bon FOREIGN KEY (BonId) REFERENCES BonsApprovisionnement(BonId)" &
-                "); " &
-                "END; " &
-                "IF OBJECT_ID('BonApprovisionnementSequence','U') IS NULL " &
-                "BEGIN " &
-                "CREATE TABLE BonApprovisionnementSequence (Annee CHAR(4) NOT NULL PRIMARY KEY, DernierNumero INT NOT NULL); " &
-                "END; " &
-                "IF COL_LENGTH('BonsApprovisionnement','NumeroBon') IS NULL ALTER TABLE BonsApprovisionnement ADD NumeroBon NVARCHAR(20) NULL; " &
-                "IF COL_LENGTH('BonsApprovisionnement','ModifierPar') IS NULL ALTER TABLE BonsApprovisionnement ADD ModifierPar NVARCHAR(80) NULL; " &
-                "IF COL_LENGTH('BonApprovisionnementLignes','PrixAchat') IS NULL ALTER TABLE BonApprovisionnementLignes ADD PrixAchat DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('BonApprovisionnementLignes','PrixAchatPrecedent') IS NULL ALTER TABLE BonApprovisionnementLignes ADD PrixAchatPrecedent DECIMAL(18,2) NOT NULL DEFAULT 0; " &
-                "IF COL_LENGTH('BonApprovisionnementLignes','TotalLigne') IS NULL ALTER TABLE BonApprovisionnementLignes ADD TotalLigne DECIMAL(18,2) NOT NULL DEFAULT 0;"
-            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+            ' Schéma géré par le script SQL de déploiement.
         End Sub
 
         ' Cree un bon et retourne son identifiant.
