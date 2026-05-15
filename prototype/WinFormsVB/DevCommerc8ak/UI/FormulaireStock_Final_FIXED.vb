@@ -232,10 +232,10 @@ Namespace DevCommerc8ak
             Dim tabRapportEntrees As New TabPage("Rapport Entrées") With {.BackColor = ColorBackground, .AutoScroll = True}
             ' Nouveaux Onglets
             Dim tabSortieManuelle As New TabPage("SORTIE MANUELLE") With {.BackColor = ColorBackground, .AutoScroll = True}
-            Dim tabDettes As New TabPage("DETTES & CRÉANCES") With {.BackColor = ColorBackground, .AutoScroll = True}
-            Dim tabDashboardSorties As New TabPage("DASHBOARD SORTIES") With {.BackColor = ColorBackground, .AutoScroll = True}
+            Me.tabDettes = New TabPage("DETTES & CRÉANCES") With {.BackColor = ColorBackground, .AutoScroll = True}
+            Me.tabDashboardSorties = New TabPage("DASHBOARD SORTIES") With {.BackColor = ColorBackground, .AutoScroll = True}
 
-            tabs.TabPages.AddRange(New TabPage() {tabEntree, tabSortie, tabSortieManuelle, tabDettes, tabInventaire, tabAlertes, tabPerte, tabRapportEntrees, tabDashboardSorties})
+            tabs.TabPages.AddRange(New TabPage() {tabEntree, tabSortie, tabSortieManuelle, Me.tabDettes, tabInventaire, tabAlertes, tabPerte, tabRapportEntrees, Me.tabDashboardSorties})
 
             ' --- TAB ENTREE DESIGN ---
             Dim layoutEntree As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .Padding = New Padding(10), .ColumnCount = 1, .RowCount = 2}
@@ -557,7 +557,7 @@ Namespace DevCommerc8ak
             pnlActions.Controls.AddRange({btnPayer, btnTicket})
             mainLayoutDette.Controls.Add(gridDettes, 0, 0)
             mainLayoutDette.Controls.Add(pnlActions, 0, 1)
-            tabDettes.Controls.Add(mainLayoutDette)
+            Me.tabDettes.Controls.Add(mainLayoutDette)
 
             ' --- TAB INVENTAIRE DESIGN ---
             Dim layoutInventaire As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .Padding = New Padding(20), .ColumnCount = 2, .RowCount = 3}
@@ -667,7 +667,7 @@ Namespace DevCommerc8ak
             mainLayoutDASH.Controls.Add(btnActualiserDash, 0, 0)
             mainLayoutDASH.Controls.Add(pnlKpi, 0, 1)
             mainLayoutDASH.Controls.Add(gridDetailsDashboard, 1, 1)
-            tabDashboardSorties.Controls.Add(mainLayoutDASH)
+            Me.tabDashboardSorties.Controls.Add(mainLayoutDASH)
 
 
 
@@ -718,6 +718,10 @@ Namespace DevCommerc8ak
 
             ' NOUVEAU: Handlers
             AddHandler btnEnregistrerSortie.Click, AddressOf EnregistrerSortieManuelle
+            AddHandler btnValider.Click, AddressOf ValiderSortieManuelle
+            AddHandler btnActualiserDash.Click, AddressOf ChargerDashboardSorties
+            AddHandler btnPayer.Click, AddressOf EnregistrerPaiementDette
+            AddHandler btnTicket.Click, AddressOf ImprimerTicketDette
         End Sub
 
         ' --- DESIGN HELPERS ---
@@ -783,9 +787,12 @@ Namespace DevCommerc8ak
                 'ChargerCategories()
                 ChargerProduits()
                 ChargerParametres()
+                ChargerMotifsSortie()
                 ChargerClientsActifs()
                 ' ChargerSortiesMois(Nothing, EventArgs.Empty)
                 ChargerSortiesDuMois(Nothing, EventArgs.Empty)
+                ChargerDettes(Nothing, EventArgs.Empty)
+                ChargerDashboardSorties(Nothing, EventArgs.Empty)
                 ChargerAlertes(Nothing, EventArgs.Empty)
                 BasculerProduitExistant(Nothing, EventArgs.Empty)
                 RafraichirTypesVente()
@@ -840,6 +847,22 @@ Namespace DevCommerc8ak
 
             Catch ex As Exception
                 MessageBox.Show("Erreur clients actifs: " & ex.Message)
+            End Try
+        End Sub
+
+        Private Sub ChargerMotifsSortie()
+            Try
+                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                Dim dal As New DAL(cs)
+                Dim dt As DataTable = dal.ExecuterTable("SELECT MotifId, Libelle FROM MotifSortie WHERE EstActif = 1 ORDER BY Libelle", CommandType.Text, Nothing)
+                For Each cmb As ComboBox In New ComboBox() {cmbMotif, cmbSortieManuelleMotif}
+                    cmb.DataSource = Nothing
+                    cmb.DisplayMember = "Libelle"
+                    cmb.ValueMember = "MotifId"
+                    cmb.DataSource = dt.Copy()
+                Next
+            Catch ex As Exception
+                MessageBox.Show("Erreur chargement motifs: " & ex.Message)
             End Try
         End Sub
 
@@ -1068,6 +1091,20 @@ Namespace DevCommerc8ak
 
             RafraichirPanier()
         End Sub
+
+        Private Function ObtenirMotifSelectionne() As DataRow
+            Dim row As DataRowView = TryCast(cmbMotif.SelectedItem, DataRowView)
+            If row Is Nothing Then Return Nothing
+            Return row.Row
+        End Function
+
+        Private Function CalculerTotalPanier() As Decimal
+            Dim total As Decimal = 0D
+            For Each l As PanierLigne In _panier
+                total += l.Total
+            Next
+            Return total
+        End Function
 
         Private Sub RetirerDuPanier(sender As Object, e As EventArgs)
             If gridPanier.CurrentRow Is Nothing Then Return
@@ -1395,14 +1432,14 @@ Namespace DevCommerc8ak
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
                 Dim sql As String = "" &
-                    "SELECT ss.DateSortie, ISNULL(f.NumeroFacture, ss.RefSource) AS NumeroFacture, " &
-                    "ISNULL(c.NomClient, '') AS Client, p.Libelle AS Produit, ss.QuantiteSaisie, ss.QuantiteBase, ss.Source " &
+                    "SELECT ss.NumeroSortie, ss.DateSortie, ISNULL(c.NomClient, '') AS Client, ISNULL(m.Libelle, ss.Source) AS Motif, " &
+                    "p.Libelle AS Produit, ss.QuantiteSaisie, ss.QuantiteBase, ss.TypeVente, ss.PrixUnitaire, ss.MontantLigne, ss.StatutPaiement, ss.MontantPaye, ss.ResteAPayer " &
                     "FROM StockSortie ss " &
                     "INNER JOIN Produits p ON p.ProduitId = ss.ProduitId " &
-                    "LEFT JOIN FacturesVente f ON f.NumeroFacture = ss.RefSource " &
-                    "LEFT JOIN Clients c ON c.ClientId = f.ClientId " &
+                    "LEFT JOIN Clients c ON c.ClientId = ss.ClientId " &
+                    "LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId " &
                     "WHERE CAST(ss.DateSortie AS DATE) BETWEEN @Du AND @Au " &
-                    "AND (@Recherche = '' OR ISNULL(f.NumeroFacture, ss.RefSource) LIKE @Like OR ISNULL(c.NomClient, '') LIKE @Like) " &
+                    "AND (@Recherche = '' OR ss.NumeroSortie LIKE @Like OR ISNULL(c.NomClient, '') LIKE @Like OR ISNULL(m.Libelle, ss.Source) LIKE @Like) " &
                     "ORDER BY ss.DateSortie DESC"
                 Dim recherche As String = txtRechercheSortie.Text.Trim()
                 Dim p As New List(Of System.Data.SqlClient.SqlParameter) From {
@@ -1587,6 +1624,76 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
+        Private Sub ValiderSortieManuelle(sender As Object, e As EventArgs)
+            Try
+                If _panier.Count = 0 Then
+                    MessageBox.Show("Le panier est vide.")
+                    Return
+                End If
+
+                Dim motifRow As DataRow = ObtenirMotifSelectionne()
+                If motifRow Is Nothing Then
+                    MessageBox.Show("Sélectionnez un motif.")
+                    Return
+                End If
+
+                Dim motifId As Integer = Convert.ToInt32(motifRow("MotifId"))
+                Dim motifLibelle As String = Convert.ToString(motifRow("Libelle"))
+                Dim clientId As Integer? = Nothing
+                Dim statutPaiement As String = "PAYE"
+                Dim montantPaye As Decimal = CalculerTotalPanier()
+                Dim resteAPayer As Decimal = 0D
+
+                If String.Equals(motifLibelle, "Dette Client", StringComparison.OrdinalIgnoreCase) Then
+                    If cmbSortieManuelleClient.SelectedValue Is Nothing Then
+                        MessageBox.Show("Le client est obligatoire pour une dette client.")
+                        Return
+                    End If
+                    clientId = Convert.ToInt32(cmbSortieManuelleClient.SelectedValue)
+                    statutPaiement = "IMPAYE"
+                    montantPaye = 0D
+                    resteAPayer = CalculerTotalPanier()
+                ElseIf cmbSortieManuelleClient.SelectedValue IsNot Nothing AndAlso Not TypeOf cmbSortieManuelleClient.SelectedValue Is DataRowView Then
+                    clientId = Convert.ToInt32(cmbSortieManuelleClient.SelectedValue)
+                End If
+
+                Dim lignes As New List(Of StockSortie)()
+                For Each l As PanierLigne In _panier
+                    lignes.Add(New StockSortie With {
+                        .ProduitId = l.ProduitId,
+                        .QuantiteSaisie = l.Quantite,
+                        .Unite = l.Unite,
+                        .QuantiteBase = l.QuantiteBase,
+                        .DateSortie = Date.Now,
+                        .Source = "SORTIE_MANUELLE",
+                        .RefSource = txtDescriptionSortie.Text.Trim(),
+                        .CreePar = SessionUtilisateur.UtilisateurId,
+                        .TypeVente = l.Unite,
+                        .PrixUnitaire = l.PrixUnitaire,
+                        .MontantLigne = l.Total,
+                        .StatutPaiement = statutPaiement,
+                        .MontantPaye = montantPaye,
+                        .ResteAPayer = resteAPayer,
+                        .Observation = txtDescriptionSortie.Text.Trim(),
+                        .ClientId = clientId,
+                        .MotifId = motifId
+                    })
+                Next
+
+                Dim service As StockService = ObtenirStockService()
+                Dim numeroSortie As String = service.EnregistrerSortiesManuelles(lignes, motifId, clientId, statutPaiement, montantPaye, resteAPayer, txtDescriptionSortie.Text.Trim(), SessionUtilisateur.UtilisateurId)
+
+                _panier.Clear()
+                RafraichirPanier()
+                ChargerSortiesDuMois(Nothing, EventArgs.Empty)
+                ChargerDettes(Nothing, EventArgs.Empty)
+                ChargerDashboardSorties(Nothing, EventArgs.Empty)
+                MessageBox.Show("Sortie enregistrée: " & numeroSortie)
+            Catch ex As Exception
+                MessageBox.Show("Erreur validation sortie: " & ex.Message)
+            End Try
+        End Sub
+
         'Private Sub EnregistrerSortie(sender As Object, e As EventArgs)
         '    Try
         '        If cmbProduitSortie.SelectedValue Is Nothing Then
@@ -1672,6 +1779,61 @@ Namespace DevCommerc8ak
                 ' NOUVEAU: Analyse Produit
                 ChargerAnalyseProduit(produitId)
             End If
+        End Sub
+
+        Private Sub ChargerDettes(sender As Object, e As EventArgs)
+            Try
+                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                Dim dal As New DAL(cs)
+                Dim sql As String = "" &
+                    "SELECT ss.NumeroSortie, MAX(ss.DateSortie) AS DateSortie, ISNULL(c.NomClient, '') AS Client, " &
+                    "ISNULL(m.Libelle, ss.Source) AS Motif, SUM(ISNULL(ss.MontantLigne, 0)) AS Total, " &
+                    "MAX(ISNULL(ss.MontantPaye, 0)) AS MontantPaye, MAX(ISNULL(ss.ResteAPayer, 0)) AS ResteAPayer " &
+                    "FROM StockSortie ss " &
+                    "LEFT JOIN Clients c ON c.ClientId = ss.ClientId " &
+                    "LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId " &
+                    "WHERE ss.StatutPaiement = 'IMPAYE' " &
+                    "GROUP BY ss.NumeroSortie, ISNULL(c.NomClient, ''), ISNULL(m.Libelle, ss.Source) " &
+                    "ORDER BY MAX(ss.DateSortie) DESC"
+                gridDettes.DataSource = dal.ExecuterTable(sql, CommandType.Text, Nothing)
+            Catch ex As Exception
+                MessageBox.Show("Erreur chargement dettes: " & ex.Message)
+            End Try
+        End Sub
+
+        Private Sub ChargerDashboardSorties(sender As Object, e As EventArgs)
+            Try
+                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                Dim dal As New DAL(cs)
+                Dim sql As String = "" &
+                    "SELECT TOP 20 ss.NumeroSortie, MAX(ss.DateSortie) AS DateSortie, ISNULL(c.NomClient, '') AS Client, " &
+                    "ISNULL(m.Libelle, ss.Source) AS Motif, SUM(ISNULL(ss.MontantLigne, 0)) AS Total, " &
+                    "MAX(ISNULL(ss.StatutPaiement, '')) AS StatutPaiement " &
+                    "FROM StockSortie ss " &
+                    "LEFT JOIN Clients c ON c.ClientId = ss.ClientId " &
+                    "LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId " &
+                    "GROUP BY ss.NumeroSortie, ISNULL(c.NomClient, ''), ISNULL(m.Libelle, ss.Source) " &
+                    "ORDER BY MAX(ss.DateSortie) DESC"
+                gridDetailsDashboard.DataSource = dal.ExecuterTable(sql, CommandType.Text, Nothing)
+
+                pnlKpi.Controls.Clear()
+                Dim totalSorties As Object = dal.ExecuterScalaire("SELECT COUNT(*) FROM StockSortie", CommandType.Text, Nothing)
+                Dim totalImpayes As Object = dal.ExecuterScalaire("SELECT COUNT(*) FROM StockSortie WHERE StatutPaiement='IMPAYE'", CommandType.Text, Nothing)
+                Dim montantImpaye As Object = dal.ExecuterScalaire("SELECT ISNULL(SUM(ResteAPayer),0) FROM StockSortie WHERE StatutPaiement='IMPAYE'", CommandType.Text, Nothing)
+                pnlKpi.Controls.Add(New Label() With {.AutoSize = True, .Text = "Sorties: " & Convert.ToString(totalSorties), .Padding = New Padding(10)})
+                pnlKpi.Controls.Add(New Label() With {.AutoSize = True, .Text = "Impayées: " & Convert.ToString(totalImpayes), .Padding = New Padding(10)})
+                pnlKpi.Controls.Add(New Label() With {.AutoSize = True, .Text = "Reste à payer: " & Convert.ToString(montantImpaye), .Padding = New Padding(10)})
+            Catch ex As Exception
+                MessageBox.Show("Erreur dashboard sorties: " & ex.Message)
+            End Try
+        End Sub
+
+        Private Sub EnregistrerPaiementDette(sender As Object, e As EventArgs)
+            MessageBox.Show("Fonction paiement dette à compléter.")
+        End Sub
+
+        Private Sub ImprimerTicketDette(sender As Object, e As EventArgs)
+            MessageBox.Show("Fonction ticket dette à compléter.")
         End Sub
 
         ' NOUVEAU: Analyse Produit

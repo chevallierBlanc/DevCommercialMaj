@@ -20,7 +20,7 @@ Namespace DevCommerc8ak
         End Sub
 
         ' Cree un mouvement stock et retourne son identifiant.
-        Public Function Ajouter(mouvement As MouvementStock) As Integer
+        Public Function Ajouter(mouvement As MouvementStock, Optional cn As SqlConnection = Nothing, Optional tx As SqlTransaction = Nothing) As Integer
             Dim sql As String = "INSERT INTO MouvementsStock (NumeroMouvement, ProduitId, TypeMouvement, Quantite, QuantiteBase, Unite, StockAvant, StockApres, Reference, Observation, TypePerte, EffectuePar, ModifierPar) " &
                                 "VALUES (@NumeroMouvement, @ProduitId, @TypeMouvement, @Quantite, @QuantiteBase, @Unite, @StockAvant, @StockApres, @Reference, @Observation, @TypePerte, @EffectuePar, @ModifierPar); " &
                                 "SELECT CAST(SCOPE_IDENTITY() AS INT);"
@@ -41,8 +41,16 @@ Namespace DevCommerc8ak
                 New SqlParameter("@ModifierPar", SessionUtilisateur.NomUtilisateur)
             }
 
-            Dim id As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
-            Return Convert.ToInt32(id)
+            If cn Is Nothing Then
+                Dim id As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
+                Return Convert.ToInt32(id)
+            End If
+            Using cmd As New SqlCommand(sql, cn)
+                If tx IsNot Nothing Then cmd.Transaction = tx
+                cmd.Parameters.AddRange(p.ToArray())
+                Dim id As Object = cmd.ExecuteScalar()
+                Return Convert.ToInt32(id)
+            End Using
         End Function
 
         ' Liste des mouvements stock par produit.
