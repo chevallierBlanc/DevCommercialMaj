@@ -4,6 +4,7 @@ Option Explicit On
 Imports System
 Imports System.Data
 Imports System.Data.SqlClient
+Imports System.Collections.Generic
 
 Namespace DevCommerc8ak
     Public Class ParametreRepository

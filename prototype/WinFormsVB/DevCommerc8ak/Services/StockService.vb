@@ -4,6 +4,8 @@ Option Explicit On
 Imports System
 Imports System.Data
 Imports System.Data.SqlClient
+Imports System.Collections.Generic
+Imports System.Configuration
 
 Namespace DevCommerc8ak
     Public Class StockService
@@ -338,5 +340,332 @@ Namespace DevCommerc8ak
                 "LEFT JOIN (SELECT ProduitId, SUM(QuantiteBase) AS Perte FROM dbo.StockPerte GROUP BY ProduitId) pr ON pr.ProduitId = p.ProduitId')"
             _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
         End Sub
+
+
+
+
+
+
+
+        ' --- MÉTHODES EXISTANTES (INCHANGÉES) ---
+
+        'Public Function EnregistrerEntree(produitId As Integer, quantiteSaisie As Decimal, unite As String, reference As String, observation As String, effectuePar As Integer, Optional prixAchatOverride As Decimal = 0D) As Integer
+        '    Return EnregistrerMouvement(produitId, "ENTREE", quantiteSaisie, unite, reference, observation, Nothing, effectuePar, prixAchatOverride)
+        'End Function
+
+        'Public Function EnregistrerSortie(produitId As Integer, quantiteSaisie As Decimal, unite As String, reference As String, observation As String, effectuePar As Integer) As Integer
+        '    Return EnregistrerMouvement(produitId, "SORTIE", quantiteSaisie, unite, reference, observation, Nothing, effectuePar)
+        'End Function
+
+        'Public Function EnregistrerPerte(produitId As Integer, quantiteSaisie As Decimal, unite As String, reference As String, observation As String, typePerte As String, effectuePar As Integer) As Integer
+        '    Return EnregistrerMouvement(produitId, "PERTE", quantiteSaisie, unite, reference, observation, typePerte, effectuePar)
+        'End Function
+
+        'Public Function AjusterInventaire(produitId As Integer, quantiteComptee As Decimal, unite As String, reference As String, observation As String, effectuePar As Integer) As Decimal
+        '    Dim info As DataRow = ObtenirInfosProduit(produitId)
+        '    Dim stockActuel As Decimal = ObtenirStockActuel(produitId)
+        '    Dim quantiteBase As Decimal = ConvertirEnBase(info, unite, quantiteComptee)
+        '    Dim ecart As Decimal = quantiteBase - stockActuel
+
+        '    Dim inv As New StockInventaire With {
+        '        .ProduitId = produitId,
+        '        .StockTheorique = stockActuel,
+        '        .StockReel = quantiteBase,
+        '        .Ecart = ecart,
+        '        .DateInventaire = Date.Now,
+        '        .CreePar = effectuePar,
+        '        .Observation = observation
+        '    }
+        '    _inventaireRepo.Ajouter(inv)
+
+        '    If ecart > 0D Then
+        '        Dim entree As New StockEntree With {
+        '            .IdStock = GenererNumeroStock("INV"),
+        '            .ProduitId = produitId,
+        '            .QuantiteSaisie = ecart,
+        '            .Unite = "base",
+        '            .QuantiteBase = ecart,
+        '            .PrixAchat = ObtenirPrixAchat(info),
+        '            .Devise = "CDF",
+        '            .Taux = 0D,
+        '            .DateEntree = Date.Now,
+        '            .FournisseurId = Nothing,
+        '            .CreePar = effectuePar
+        '        }
+        '        _entreeRepo.Ajouter(entree)
+        '    ElseIf ecart < 0D Then
+        '        Dim sortie As New StockSortie With {
+        '            .ProduitId = produitId,
+        '            .QuantiteSaisie = Math.Abs(ecart),
+        '            .Unite = "base",
+        '            .QuantiteBase = Math.Abs(ecart),
+        '            .DateSortie = Date.Now,
+        '            .Source = "INVENTAIRE",
+        '            .RefSource = reference,
+        '            .CreePar = effectuePar
+        '        }
+        '        _sortieRepo.Ajouter(sortie)
+        '    End If
+
+        '    Dim mouvement As New MouvementStock With {
+        '        .NumeroMouvement = GenererNumeroMouvement(),
+        '        .ProduitId = produitId,
+        '        .TypeMouvement = "INVENTAIRE",
+        '        .Quantite = quantiteComptee,
+        '        .QuantiteBase = quantiteBase,
+        '        .Unite = unite,
+        '        .StockAvant = stockActuel,
+        '        .StockApres = quantiteBase,
+        '        .Reference = reference,
+        '        .Observation = If(observation, ""),
+        '        .TypePerte = Nothing,
+        '        .EffectuePar = effectuePar
+        '    }
+        '    _mvtRepo.Ajouter(mouvement)
+
+        '    Return ecart
+        'End Function
+
+        'Public Function ListerParProduit(produitId As Integer) As List(Of MouvementStockDTO)
+        '    Return _mvtRepo.ListerParProduit(produitId)
+        'End Function
+
+        'Public Function ListerTous() As List(Of MouvementStockDTO)
+        '    Return _mvtRepo.ListerTous()
+        'End Function
+
+        'Public Function ObtenirStockActuelProduit(produitId As Integer) As Decimal
+        '    Return ObtenirStockActuel(produitId)
+        'End Function
+
+        'Public Sub AnnulerMouvement(mouvementStockId As Integer, effectuePar As Integer, motif As String)
+        '    Dim mv As MouvementStockDTO = _mvtRepo.ObtenirParId(mouvementStockId)
+        '    If mv Is Nothing Then Throw New Exception("Mouvement introuvable.")
+        '    If mv.EstAnnule Then Throw New Exception("Mouvement deja annule.")
+
+        '    Dim info As DataRow = ObtenirInfosProduit(mv.ProduitId)
+        '    If mv.TypeMouvement = "ENTREE" Then
+        '        Dim sortie As New StockSortie With {
+        '            .ProduitId = mv.ProduitId,
+        '            .QuantiteSaisie = mv.QuantiteBase,
+        '            .Unite = "base",
+        '            .QuantiteBase = mv.QuantiteBase,
+        '            .DateSortie = Date.Now,
+        '            .Source = "ANNULATION",
+        '            .RefSource = mv.NumeroMouvement,
+        '            .CreePar = effectuePar
+        '        }
+        '        _sortieRepo.Ajouter(sortie)
+        '    ElseIf mv.TypeMouvement = "SORTIE" OrElse mv.TypeMouvement = "PERTE" Then
+        '        Dim entree As New StockEntree With {
+        '            .IdStock = GenererNumeroStock("ANN"),
+        '            .ProduitId = mv.ProduitId,
+        '            .QuantiteSaisie = mv.QuantiteBase,
+        '            .Unite = "base",
+        '            .QuantiteBase = mv.QuantiteBase,
+        '            .PrixAchat = ObtenirPrixAchat(info),
+        '            .Devise = "CDF",
+        '            .Taux = 0D,
+        '            .DateEntree = Date.Now,
+        '            .FournisseurId = Nothing,
+        '            .CreePar = effectuePar
+        '        }
+        '        _entreeRepo.Ajouter(entree)
+        '    End If
+
+        '    Dim sql As String = "UPDATE MouvementsStock SET EstAnnule=1, AnnulePar=@u, AnnuleLe=GETDATE(), AnnulationRef=@r WHERE MouvementStockId=@id"
+        '    Dim p As New List(Of SqlParameter) From {
+        '        New SqlParameter("@u", effectuePar),
+        '        New SqlParameter("@r", motif),
+        '        New SqlParameter("@id", mouvementStockId)
+        '    }
+        '    _dal.ExecuterNonRequete(sql, CommandType.Text, p)
+        'End Sub
+
+        ' --- NOUVELLES MÉTHODES (AJOUTÉES) ---
+
+        ''' <summary>
+        ''' Enregistre une sortie manuelle (Dette, Ordre Patron, etc.)
+        ''' </summary>
+        Public Sub EnregistrerSortieManuelle(produitId As Integer, quantiteSaisie As Decimal, unite As String, source As String, clientInfo As String, motif As String, effectuePar As Integer)
+            Dim info As DataRow = ObtenirInfosProduit(produitId)
+            Dim stockActuel As Decimal = ObtenirStockActuel(produitId)
+            Dim quantiteBase As Decimal = ConvertirEnBase(info, unite, quantiteSaisie)
+
+            If stockActuel < quantiteBase Then Throw New Exception("Stock insuffisant pour cette sortie.")
+
+            Dim sortie As New StockSortie With {
+                .ProduitId = produitId,
+                .QuantiteSaisie = quantiteSaisie,
+                .Unite = unite,
+                .QuantiteBase = quantiteBase,
+                .DateSortie = Date.Now,
+                .Source = source,
+                .RefSource = clientInfo,
+                .CreePar = effectuePar
+            }
+            ' Note: On utilise RefSource pour stocker le client et Motif pour le motif (si colonnes ajoutées via SQL)
+            _sortieRepo.Ajouter(sortie)
+
+            ' Enregistrement du mouvement
+            Dim mouvement As New MouvementStock With {
+                .NumeroMouvement = GenererNumeroMouvement(),
+                .ProduitId = produitId,
+                .TypeMouvement = "SORTIE",
+                .Quantite = quantiteSaisie,
+                .QuantiteBase = quantiteBase,
+                .Unite = unite,
+                .StockAvant = stockActuel,
+                .StockApres = stockActuel - quantiteBase,
+                .Reference = clientInfo,
+                .Observation = motif,
+                .EffectuePar = effectuePar
+            }
+            _mvtRepo.Ajouter(mouvement)
+        End Sub
+
+        ''' <summary>
+        ''' Récupère l'analyse détaillée d'un produit pour l'inventaire
+        ''' </summary>
+        Public Function ObtenirAnalyseProduit(produitId As Integer) As DataTable
+            Dim params As New List(Of SqlParameter) From {
+                New SqlParameter("@ProduitId", produitId)
+            }
+            Return _dal.ExecuterTable("GetAnalyseStockProduit", CommandType.StoredProcedure, params)
+        End Function
+
+        ' --- MÉTHODES PRIVÉES (INCHANGÉES) ---
+
+        'Private Function EnregistrerMouvement(produitId As Integer, typeMouvement As String, quantiteSaisie As Decimal, unite As String, reference As String, observation As String, typePerte As String, effectuePar As Integer, Optional prixAchatOverride As Decimal = 0D) As Integer
+        '    Dim info As DataRow = ObtenirInfosProduit(produitId)
+        '    Dim stockActuel As Decimal = ObtenirStockActuel(produitId)
+        '    Dim quantiteBase As Decimal = ConvertirEnBase(info, unite, quantiteSaisie)
+
+        '    Dim stockApres As Decimal = stockActuel
+        '    If typeMouvement = "ENTREE" Then
+        '        stockApres = stockActuel + quantiteBase
+        '    ElseIf typeMouvement = "SORTIE" OrElse typeMouvement = "PERTE" Then
+        '        stockApres = stockActuel - quantiteBase
+        '        If stockApres < 0D Then Throw New Exception("Stock insuffisant.")
+        '    End If
+
+        '    If typeMouvement = "ENTREE" Then
+        '        Dim prixAchatUse As Decimal = If(prixAchatOverride > 0D, prixAchatOverride, ObtenirPrixAchat(info))
+        '        Dim entree As New StockEntree With {
+        '            .IdStock = GenererNumeroStock("ENT"),
+        '            .ProduitId = produitId,
+        '            .QuantiteSaisie = quantiteSaisie,
+        '            .Unite = unite,
+        '            .QuantiteBase = quantiteBase,
+        '            .PrixAchat = prixAchatUse,
+        '            .Devise = "CDF",
+        '            .Taux = 0D,
+        '            .DateEntree = Date.Now,
+        '            .FournisseurId = Nothing,
+        '            .CreePar = effectuePar
+        '        }
+        '        _entreeRepo.Ajouter(entree)
+        '    ElseIf typeMouvement = "SORTIE" Then
+        '        Dim sortie As New StockSortie With {
+        '            .ProduitId = produitId,
+        '            .QuantiteSaisie = quantiteSaisie,
+        '            .Unite = unite,
+        '            .QuantiteBase = quantiteBase,
+        '            .DateSortie = Date.Now,
+        '            .Source = "MANUEL",
+        '            .RefSource = reference,
+        '            .CreePar = effectuePar
+        '        }
+        '        _sortieRepo.Ajouter(sortie)
+        '    ElseIf typeMouvement = "PERTE" Then
+        '        Dim perte As New StockPerte With {
+        '            .ProduitId = produitId,
+        '            .QuantiteSaisie = quantiteSaisie,
+        '            .Unite = unite,
+        '            .QuantiteBase = quantiteBase,
+        '            .TypePerte = typePerte,
+        '            .Motif = observation,
+        '            .DatePerte = Date.Now,
+        '            .CreePar = effectuePar
+        '        }
+        '        _perteRepo.Ajouter(perte)
+        '    End If
+
+        '    Dim mouvement As New MouvementStock With {
+        '        .NumeroMouvement = GenererNumeroMouvement(),
+        '        .ProduitId = produitId,
+        '        .TypeMouvement = typeMouvement,
+        '        .Quantite = quantiteSaisie,
+        '        .QuantiteBase = quantiteBase,
+        '        .Unite = unite,
+        '        .StockAvant = stockActuel,
+        '        .StockApres = stockApres,
+        '        .Reference = reference,
+        '        .Observation = If(observation, ""),
+        '        .TypePerte = typePerte,
+        '        .EffectuePar = effectuePar
+        '    }
+        '    Return _mvtRepo.Ajouter(mouvement)
+        'End Function
+
+        'Private Function ObtenirInfosProduit(produitId As Integer) As DataRow
+        '    Dim sql As String = "SELECT ProduitId, Libelle, CategorieId, UnitePrincipale, UniteSecondaire, ConversionUnite, PrixAchat, PrixDetail, PrixGros FROM Produits WHERE ProduitId=@id"
+        '    Dim p As New List(Of SqlParameter) From {New SqlParameter("@id", produitId)}
+        '    Dim dt As DataTable = _dal.ExecuterTable(sql, CommandType.Text, p)
+        '    If dt.Rows.Count = 0 Then Throw New Exception("Produit introuvable.")
+        '    Return dt.Rows(0)
+        'End Function
+
+        'Private Function ObtenirStockActuel(produitId As Integer) As Decimal
+        '    Dim sql As String = "SELECT ISNULL(SUM(q), 0) FROM (" &
+        '                       "SELECT SUM(QuantiteBase) as q FROM StockEntree WHERE ProduitId = @id " &
+        '                       "UNION ALL SELECT -SUM(QuantiteBase) FROM StockSortie WHERE ProduitId = @id " &
+        '                       "UNION ALL SELECT -SUM(QuantiteBase) FROM StockPerte WHERE ProduitId = @id) t"
+        '    Dim p As New List(Of SqlParameter) From {New SqlParameter("@id", produitId)}
+        '    Return Convert.ToDecimal(_dal.ExecuterScalaire(sql, CommandType.Text, p))
+        'End Function
+
+        'Private Function ConvertirEnBase(info As DataRow, unite As String, quantite As Decimal) As Decimal
+        '    Dim conversion As Decimal = If(IsDBNull(info("ConversionUnite")), 1D, Convert.ToDecimal(info("ConversionUnite")))
+        '    If conversion <= 0D Then conversion = 1D
+        '    Dim unitePrincipale As String = If(IsDBNull(info("UnitePrincipale")), "", info("UnitePrincipale").ToString().ToLower())
+        '    If unite.ToLower() = unitePrincipale OrElse unite.ToLower() = "base" OrElse unite.ToLower() = "carton" OrElse unite.ToLower() = "sac" Then
+        '        Return quantite * conversion
+        '    End If
+        '    Return quantite
+        'End Function
+
+        'Private Function ObtenirPrixAchat(info As DataRow) As Decimal
+        '    Return If(IsDBNull(info("PrixAchat")), 0D, Convert.ToDecimal(info("PrixAchat")))
+        'End Function
+
+        'Private Function GenererNumeroStock(prefix As String) As String
+        '    Return prefix & Date.Now.ToString("yyyyMMddHHmmss")
+        'End Function
+
+        'Private Function GenererNumeroMouvement() As String
+        '    Return "MVT" & Date.Now.ToString("yyyyMMddHHmmss")
+        'End Function
+
+        'Private Sub AssurerVueStock()
+        '    ' Logique optionnelle pour assurer l'existence de vues ou tables temporaires
+        'End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     End Class
+
 End Namespace

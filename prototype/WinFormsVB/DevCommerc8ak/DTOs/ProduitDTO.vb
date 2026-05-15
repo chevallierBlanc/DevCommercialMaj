@@ -32,5 +32,6 @@ Namespace DevCommerc8ak
         Public Property VenteDemi As Boolean
         Public Property VenteDouzaine As Boolean
         Public Property VenteGros As Boolean
+
     End Class
 End Namespace

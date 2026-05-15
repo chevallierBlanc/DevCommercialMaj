@@ -4,6 +4,7 @@ Option Explicit On
 Imports System
 Imports System.IO
 Imports System.Text
+Imports System.Collections.Generic
 
 Namespace DevCommerc8ak
     Public Module PdfHelper

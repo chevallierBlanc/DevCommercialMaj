@@ -1,6 +1,7 @@
 Imports System.Windows.Forms
 Imports System.Drawing
 Imports System.Configuration
+Imports System
 
 Namespace DevCommerc8ak
     Public Class LoginForm
@@ -89,6 +90,10 @@ Namespace DevCommerc8ak
                 End If
             Catch
             End Try
+        End Sub
+
+        Private Sub LoginForm_Click(sender As Object, e As EventArgs) Handles Me.Click
+
         End Sub
     End Class
 End Namespace

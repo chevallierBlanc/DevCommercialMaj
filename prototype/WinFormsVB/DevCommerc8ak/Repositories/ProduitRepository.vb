@@ -4,6 +4,7 @@ Option Explicit On
 Imports System
 Imports System.Data
 Imports System.Data.SqlClient
+Imports System.Collections.Generic
 
 Namespace DevCommerc8ak
     Public Class ProduitRepository
@@ -123,10 +124,43 @@ Namespace DevCommerc8ak
         ' Retourne la liste des produits sous forme de DataTable pour filtrage local.
         Public Function ListerTable() As DataTable
             Dim sql As String = "SELECT p.ProduitId, p.CodeBarres, p.Libelle, p.PrixDetail, p.PrixAchat, p.PrixDemi, p.PrixQuart, p.PrixDouzaine, p.PrixGros, p.PrixSpecial, p.CoefficientGros, " &
-                                "ISNULL(s.QuantiteStock,0) AS QuantiteStock, p.SeuilCritique, p.DateExpiration, p.CategorieId, p.EstActif, p.UnitePrincipale, p.UniteSecondaire, p.ConversionUnite, " &
+                                " cast (ISNULL(s.QuantiteStock,0) as int) AS QuantiteStock, p.SeuilCritique, p.DateExpiration, p.CategorieId, p.EstActif, p.UnitePrincipale, p.UniteSecondaire, p.ConversionUnite, " &
                                 "p.VenteDetail, p.VenteDemi, p.VenteDouzaine, p.VenteGros " &
                                 "FROM Produits p LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId"
             Return _dal.ExecuterTable(sql, CommandType.Text, Nothing)
+        End Function
+
+
+        Public Function ListerQteProduit(produitId As Integer) As Integer
+            Dim sql As String = "
+                                SELECT cast (ISNULL(s.QuantiteStock,0)as int) AS QuantiteStock
+                                FROM Produits p LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId
+								where p.ProduitId=@ProduitId"
+
+            Dim p As New List(Of SqlParameter) From {New SqlParameter("@ProduitId", produitId)}
+            Dim id As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
+            Return Convert.ToInt32(id)
+        End Function
+
+        ' Retourne la liste des tepes ventes et prix produits sous forme de DataTable pour filtrage local.
+        Public Function ListerTypeVente(produitId As Integer) As DataTable
+            Dim sql As String = "SELECT TypeVente, Prix FROM (SELECT 'Détail' AS TypeVente, PrixDetail AS Prix, VenteDetail AS EstActif FROM Produits WHERE ProduitId = @ProduitId UNION ALL
+                                 SELECT 'Demi', PrixDemi, VenteDemi FROM Produits WHERE ProduitId = @ProduitId
+                                 UNION ALL
+                                 SELECT 'Quart', PrixQuart, 1 FROM Produits WHERE ProduitId = @ProduitId
+                                 UNION ALL
+                                 SELECT 'Gros', PrixGros, VenteGros FROM Produits WHERE ProduitId = @ProduitId
+                                 UNION ALL
+                                 SELECT 'Douzaine', PrixDouzaine, VenteDouzaine FROM Produits WHERE ProduitId = @ProduitId
+                                    ) T
+                                    WHERE EstActif = 1"
+
+            Dim p As New List(Of SqlParameter) From {New SqlParameter("@ProduitId", produitId)}
+            Dim dt As DataTable = _dal.ExecuterTable(sql, CommandType.Text, p)
+            If dt.Rows.Count = 0 Then
+                Return Nothing
+            End If
+            Return dt
         End Function
 
         ' Recherche par code-barres ou libelle.

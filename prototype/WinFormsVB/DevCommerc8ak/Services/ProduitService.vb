@@ -40,6 +40,9 @@ Namespace DevCommerc8ak
             Return _repo.ListerHistoriquePrixTable(produitId, dateDebut, dateFin)
         End Function
 
+        Public Function AfficherQteProduitSelect(produitId As Integer) As Integer
+            Return _repo.ListerQteProduit(produitId)
+        End Function
         Public Function TopProduitsVendus(annee As Integer) As DataTable
             Return _repo.TopProduitsVendus(annee)
         End Function

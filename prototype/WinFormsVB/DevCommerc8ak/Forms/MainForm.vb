@@ -3,63 +3,441 @@ Imports System.Drawing
 Imports System.Configuration
 Imports System.Data
 Imports System.Collections.Generic
+Imports System
 
 Namespace DevCommerc8ak
     Public Class MainForm
         Inherits Form
 
-        Private ReadOnly panelSidebar As Panel
-        Private ReadOnly panelContent As Panel
-        Private ReadOnly timer As Timer
+        'Private ReadOnly panelSidebar As Panel
+        'Private ReadOnly panelContent As Panel
+        'Private ReadOnly timer As Timer
         Private _dernierPopupNotificationId As Integer
 
+        'Public Sub New()
+        '    Me.Text = "Tableau de bord"
+        '    Me.WindowState = FormWindowState.Maximized
+
+        '    panelSidebar = New Panel() With {.Dock = DockStyle.Left, .Width = 200, .BackColor = Color.FromArgb(30, 42, 68)}
+        '    panelContent = New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.White}
+
+        '    Dim btnFact As New Button() With {.Text = "Facturier", .Width = 160, .Height = 40, .Location = New Point(20, 40)}
+        '    Dim btnCaisse As New Button() With {.Text = "Caisse", .Width = 160, .Height = 40, .Location = New Point(20, 90)}
+        '    Dim btnAdmin As New Button() With {.Text = "Admin", .Width = 160, .Height = 40, .Location = New Point(20, 140)}
+        '    Dim btnDeconnexion As New Button() With {.Text = "Deconnexion", .Width = 160, .Height = 40, .Location = New Point(20, 190)}
+
+        '    'IconsHelper.AppliquerIconeBouton(btnFact, "FACTURE")
+        '    'IconsHelper.AppliquerIconeBouton(btnCaisse, "CAISSE")
+        '    'IconsHelper.AppliquerIconeBouton(btnAdmin, "ADMIN")
+        '    'IconsHelper.AppliquerIconeBouton(btnDeconnexion, "INFO")
+
+        '    AddHandler btnFact.Click, Sub() LoadForm(New FacturationForm())
+        '    AddHandler btnCaisse.Click, Sub() LoadForm(New CaisseForm())
+        '    AddHandler btnAdmin.Click, Sub() LoadForm(New AdminForm())
+        '    AddHandler btnDeconnexion.Click, AddressOf Deconnecter
+
+        '    If SessionUtilisateur.Role = "ADMIN" Then
+        '        panelSidebar.Controls.Add(btnFact)
+        '        panelSidebar.Controls.Add(btnCaisse)
+        '        panelSidebar.Controls.Add(btnAdmin)
+        '        panelSidebar.Controls.Add(btnDeconnexion)
+        '        LoadForm(New FormulaireDashboard())
+        '    ElseIf SessionUtilisateur.Role = "FACTURIER" Then
+        '        panelSidebar.Controls.Add(btnFact)
+        '        panelSidebar.Controls.Add(btnDeconnexion)
+        '    ElseIf SessionUtilisateur.Role = "CAISSIERE" Then
+        '        panelSidebar.Controls.Add(btnCaisse)
+        '        panelSidebar.Controls.Add(btnDeconnexion)
+        '    End If
+
+        '    Me.Controls.Add(panelContent)
+        '    Me.Controls.Add(panelSidebar)
+
+        '    'ChargerModeSombre()
+        '    'ThemeHelper.AppliquerTheme(Me)
+        '    'IconsHelper.AppliquerIconeFormulaire(Me)
+
+        '    timer = New Timer() With {.Interval = 5000}
+        '    AddHandler timer.Tick, AddressOf PingSession
+        '    timer.Start()
+        'End Sub
+
+        'Private Sub LoadForm(f As Form)
+        '    panelContent.Controls.Clear()
+        '    f.TopLevel = False
+        '    f.FormBorderStyle = FormBorderStyle.None
+        '    f.Dock = DockStyle.Fill
+        '    panelContent.Controls.Add(f)
+        '    f.Show()
+        'End Sub
+
+        'Private Sub PingSession(sender As Object, e As EventArgs)
+        '    Try
+        '        Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+        '        Dim dal As New DAL(cs)
+        '        Dim repo As New SessionRepository(dal)
+        '        repo.Ping(SessionUtilisateur.SessionId)
+
+        '        Dim paramService As New ParametreService(New ParametreRepository(dal))
+        '        Dim p As ParametreDTO = paramService.Charger()
+        '        Dim seuil As Decimal = If(p Is Nothing, 0D, p.SeuilStockCritique)
+        '        Dim jours As Integer = If(p Is Nothing, 30, p.AlerteExpirationJours)
+
+        '        Dim notificationService As New NotificationService(dal)
+        '        notificationService.SynchroniserAlertesMetier(seuil, jours, SessionUtilisateur.UtilisateurId)
+
+        '        Dim dt As DataTable = notificationService.ListerNonLues()
+        '        If dt.Rows.Count > 0 Then
+        '            Dim derniereId As Integer = Convert.ToInt32(dt.Rows(0)("NotificationId"))
+        '            If derniereId > _dernierPopupNotificationId Then
+        '                Dim messages As New List(Of String)()
+        '                For Each row As DataRow In dt.Rows
+        '                    messages.Add(Convert.ToString(row("Message")))
+        '                    If messages.Count >= 3 Then
+        '                        Exit For
+        '                    End If
+        '                Next
+        '                Dim popup As New NotificationPopup(messages)
+        '                popup.Show()
+        '                _dernierPopupNotificationId = derniereId
+        '            End If
+        '        End If
+        '    Catch
+        '    End Try
+        'End Sub
+
+        'Private Sub ChargerModeSombre()
+        '    Try
+        '        Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+        '        Dim dal As New DAL(cs)
+        '        Dim paramService As New ParametreService(New ParametreRepository(dal))
+        '        Dim p As ParametreDTO = paramService.Charger()
+        '        If p IsNot Nothing Then
+        '            ThemeHelper.DefinirModeSombre(p.ModeSombre)
+        '        End If
+        '    Catch
+        '    End Try
+        'End Sub
+
+        'Private Sub Deconnecter(sender As Object, e As EventArgs)
+        '    Try
+        '        Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+        '        Dim dal As New DAL(cs)
+        '        Dim repo As New SessionRepository(dal)
+        '        repo.FermerSession(SessionUtilisateur.SessionId)
+        '    Catch
+        '    End Try
+        '    Dim login As New LoginForm()
+        '    login.Show()
+        '    Me.Close()
+        'End Sub
+
+        'Protected Overrides Sub OnFormClosing(e As FormClosingEventArgs)
+        '    Try
+        '        Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+        '        Dim dal As New DAL(cs)
+        '        Dim repo As New SessionRepository(dal)
+        '        repo.FermerSession(SessionUtilisateur.SessionId)
+        '    Catch
+        '    End Try
+        '    MyBase.OnFormClosing(e)
+        'End Sub
+
+
+        ' --- Couleurs du Thème Portail ---
+        Private ReadOnly ColorSidebar As Color = Color.FromArgb(28, 35, 49) ' Bleu Nuit Profond
+        Private ReadOnly ColorSidebarAccent As Color = Color.FromArgb(41, 128, 185) ' Bleu Action
+        Private ReadOnly ColorHeader As Color = Color.White
+        Private ReadOnly ColorBg As Color = Color.FromArgb(240, 242, 245) ' Gris Clair Moderne
+        Private ReadOnly ColorTextPrimary As Color = Color.FromArgb(44, 62, 80)
+        Private ReadOnly ColorTextSecondary As Color = Color.FromArgb(127, 140, 141)
+        Private ReadOnly ColorWhite As Color = Color.White
+
+        Private ReadOnly FontMain As New Font("Segoe UI", 10)
+        Private ReadOnly FontBold As New Font("Segoe UI", 10, FontStyle.Bold)
+        Private ReadOnly FontTitle As New Font("Segoe UI", 14, FontStyle.Bold)
+        Private ReadOnly FontMenu As New Font("Segoe UI", 11)
+
+        ' --- Composants ---
+        Private ReadOnly panelSidebar As Panel
+        Private ReadOnly panelContent As Panel
+        Private ReadOnly panelHeader As Panel
+        Private ReadOnly timer As Timer
+        Private _dernierAlerte As Date = Date.MinValue
+
+        ' Boutons de navigation
+        Private ReadOnly btnFact As Button
+        Private ReadOnly btnCaisse As Button
+        Private ReadOnly btnAdmin As Button
+        Private ReadOnly btnDeconnexion As Button
+        Private dernieBoutonSelectionne As Button
+
         Public Sub New()
-            Me.Text = "Tableau de bord"
+            ' Configuration de la Form
+            Me.Text = "Système de Gestion Commerciale - Portail Principal"
             Me.WindowState = FormWindowState.Maximized
+            Me.BackColor = ColorBg
+            Me.Font = FontMain
 
-            panelSidebar = New Panel() With {.Dock = DockStyle.Left, .Width = 200, .BackColor = Color.FromArgb(30, 42, 68)}
-            panelContent = New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.White}
+            ' --- Sidebar (Navigation Latérale) ---
+            panelSidebar = New Panel() With {
+                .Dock = DockStyle.Left,
+                .Width = 240,
+                .BackColor = ColorSidebar
+            }
 
-            Dim btnFact As New Button() With {.Text = "Facturier", .Width = 160, .Height = 40, .Location = New Point(20, 40)}
-            Dim btnCaisse As New Button() With {.Text = "Caisse", .Width = 160, .Height = 40, .Location = New Point(20, 90)}
-            Dim btnAdmin As New Button() With {.Text = "Admin", .Width = 160, .Height = 40, .Location = New Point(20, 140)}
-            Dim btnDeconnexion As New Button() With {.Text = "Deconnexion", .Width = 160, .Height = 40, .Location = New Point(20, 190)}
+            ' Logo / Titre de l'application
+            Dim pnlLogo As New Panel() With {.Dock = DockStyle.Top, .Height = 80, .BackColor = Color.FromArgb(22, 28, 40)}
+            Dim lblLogo As New Label() With {
+                .Text = "COMMERCIAL PRO",
+                .ForeColor = ColorWhite,
+                .Font = New Font("Segoe UI", 14, FontStyle.Bold),
+                .Dock = DockStyle.Fill,
+                .TextAlign = ContentAlignment.MiddleCenter
+            }
+            pnlLogo.Controls.Add(lblLogo)
 
-            IconsHelper.AppliquerIconeBouton(btnFact, "FACTURE")
-            IconsHelper.AppliquerIconeBouton(btnCaisse, "CAISSE")
-            IconsHelper.AppliquerIconeBouton(btnAdmin, "ADMIN")
-            IconsHelper.AppliquerIconeBouton(btnDeconnexion, "INFO")
 
-            AddHandler btnFact.Click, Sub() LoadForm(New FacturationForm())
-            AddHandler btnCaisse.Click, Sub() LoadForm(New CaisseForm())
-            AddHandler btnAdmin.Click, Sub() LoadForm(New AdminForm())
-            AddHandler btnDeconnexion.Click, AddressOf Deconnecter
+            ' Profil Utilisateur dans la Sidebar
+            Dim pnlUser As New Panel() With {.Dock = DockStyle.Top, .Height = 100, .Padding = New Padding(20)}
+            Dim lblUserName As New Label() With {
+                .Text = SessionUtilisateur.NomUtilisateur,
+                .ForeColor = ColorWhite,
+                .Font = FontBold,
+                .Dock = DockStyle.Top,
+                .Height = 25,
+                .TextAlign = ContentAlignment.MiddleLeft
+            }
+            Dim lblUserRole As New Label() With {
+                .Text = SessionUtilisateur.Role,
+                .ForeColor = Color.FromArgb(145, 158, 171),
+                .Font = New Font("Segoe UI", 9),
+                .Dock = DockStyle.Top,
+                .Height = 20,
+                .TextAlign = ContentAlignment.MiddleLeft
+            }
+            pnlUser.Controls.AddRange({lblUserRole, lblUserName})
 
-            If SessionUtilisateur.Role = "ADMIN" Then
-                panelSidebar.Controls.Add(btnFact)
-                panelSidebar.Controls.Add(btnCaisse)
-                panelSidebar.Controls.Add(btnAdmin)
-                panelSidebar.Controls.Add(btnDeconnexion)
-                LoadForm(New FormulaireDashboard())
-            ElseIf SessionUtilisateur.Role = "FACTURIER" Then
-                panelSidebar.Controls.Add(btnFact)
-                panelSidebar.Controls.Add(btnDeconnexion)
-            ElseIf SessionUtilisateur.Role = "CAISSIERE" Then
-                panelSidebar.Controls.Add(btnCaisse)
-                panelSidebar.Controls.Add(btnDeconnexion)
+
+            ' Séparateur
+            Dim pnlSep As New Panel() With {.Dock = DockStyle.Top, .Height = 1, .BackColor = Color.FromArgb(45, 55, 75), .Margin = New Padding(20, 0, 20, 0)}
+
+
+            ' Conteneur pour les boutons de menu
+            Dim flowPnlMenu As New Panel() With {
+                .Dock = DockStyle.Fill,
+            .AutoScroll = True,
+                .Padding = New Padding(10, 0, 10, 0)
+            }
+
+
+            ' Initialisation des boutons
+            btnFact = CreerBoutonMenu("Facturier")
+            btnCaisse = CreerBoutonMenu("Caisse")
+            btnAdmin = CreerBoutonMenu("Administration")
+            btnDeconnexion = CreerBoutonMenu("Déconnexion")
+            btnDeconnexion.ForeColor = Color.FromArgb(231, 76, 60) ' Rouge pour déconnexion
+
+
+
+            ' --- Header (Barre Supérieure) ---
+            'panelHeader = New Panel() With {
+            '    .Dock = DockStyle.Top,
+            '    .Height = 60,
+            '    .BackColor = ColorHeader
+            '}
+            'AddHandler panelHeader.Paint, Sub(s, e)
+            '                                  e.Graphics.DrawLine(New Pen(Color.FromArgb(230, 230, 230)), 0, 59, panelHeader.Width, 59)
+            '                              End Sub
+
+            'Dim lblPageTitle As New Label() With {
+            '    .Text = "Tableau de Bord Principal",
+            '    .Font = FontTitle,
+            '    .ForeColor = ColorTextPrimary,
+            '    .AutoSize = True,
+            '    .Left = 25,
+            '    .Top = 18
+            '}
+            'panelHeader.Controls.Add(lblPageTitle)
+
+            ' --- Content Area ---
+            panelContent = New Panel() With {
+                .Dock = DockStyle.Fill,
+                .BackColor = ColorBg,
+                .Padding = New Padding(10)
+            }
+
+            ' Gestion des droits d'accès
+            'If SessionUtilisateur.Role = "ADMIN" Then
+            '    flowPnlMenu.Controls.Add(btnFact)
+            '    flowPnlMenu.Controls.Add(btnCaisse)
+            '    flowPnlMenu.Controls.Add(btnAdmin)
+            '    flowPnlMenu.Controls.Add(btnDeconnexion)
+            '    LoadForm(New FormulaireDashboard())
+            'ElseIf SessionUtilisateur.Role = "FACTURIER" Then
+            '    flowPnlMenu.Controls.Add(btnFact)
+            '    flowPnlMenu.Controls.Add(btnDeconnexion)
+            '    LoadForm(New FacturationForm())
+            'ElseIf SessionUtilisateur.Role = "CAISSIERE" Then
+            '    flowPnlMenu.Controls.Add(btnCaisse)
+            '    flowPnlMenu.Controls.Add(btnDeconnexion)
+            '    LoadForm(New CaisseForm())
+            'End If
+            panelSidebar.Controls.Add(flowPnlMenu)
+            panelSidebar.Controls.Add(pnlSep)
+            panelSidebar.Controls.Add(pnlUser)
+            panelSidebar.Controls.Add(pnlLogo)
+
+            Dim y As Integer = 50
+
+            ' Bouton Recettes
+            If VerifierPermission("Facturier") Then
+                AjouterBoutonSidebar(flowPnlMenu, "Facturier", y, AddressOf AfficherFacturier)
+                y += 50
             End If
 
+            ' Bouton Recettes
+            If VerifierPermission("Caisse") Then
+                AjouterBoutonSidebar(flowPnlMenu, "Caisse", y, AddressOf AfficherCaisse)
+
+                y += 50
+            End If
+
+            ' Bouton Dépenses
+            If VerifierPermission("ADMIN") Then
+                AjouterBoutonSidebar(flowPnlMenu, "Administration", y, AddressOf Dashbord)
+
+                y += 50
+            End If
+
+            ' Bouton Accueil
+            btnDeconnexion.ForeColor = Color.FromArgb(231, 76, 60) ' Rouge pour déconnexion
+            AjouterBoutonSidebar(flowPnlMenu, "Déconnexion", y, AddressOf Deconnecter)
+            'y += 50
+
+            ' Assemblage final
             Me.Controls.Add(panelContent)
+            Me.Controls.Add(panelHeader)
             Me.Controls.Add(panelSidebar)
 
-            ChargerModeSombre()
-            ThemeHelper.AppliquerTheme(Me)
-            IconsHelper.AppliquerIconeFormulaire(Me)
+            ' Handlers
+            'AddHandler btnFact.Click, Sub()
+            '                              lblPageTitle.Text = "Module Facturation"
+            '                              LoadForm(New FacturationForm())
+            '                          End Sub
+            'AddHandler btnCaisse.Click, Sub()
+            '                                lblPageTitle.Text = "Module Caisse"
+            '                                LoadForm(New CaisseForm())
+            '                            End Sub
+            'AddHandler btnAdmin.Click, Sub()
+            '                               lblPageTitle.Text = "Administration Système"
+            '                               LoadForm(New AdminForm())
+            '                           End Sub
+            'AddHandler btnDeconnexion.Click, AddressOf Deconnecter
 
+            ' Thèmes et Icônes
+            'ChargerModeSombre()
+            'ThemeHelper.AppliquerTheme(Me)
+            'IconsHelper.AppliquerIconeFormulaire(Me)
+            'IconsHelper.AppliquerIconeBouton(btnFact, "FACTURE")
+            'IconsHelper.AppliquerIconeBouton(btnCaisse, "CAISSE")
+            'IconsHelper.AppliquerIconeBouton(btnAdmin, "ADMIN")
+            'IconsHelper.AppliquerIconeBouton(btnDeconnexion, "INFO")
+
+            ' Timer Session
             timer = New Timer() With {.Interval = 5000}
             AddHandler timer.Tick, AddressOf PingSession
             timer.Start()
         End Sub
+
+        ''' <summary>
+        ''' Ajouter un bouton à la sidebar
+        ''' </summary>
+        Private Sub AjouterBoutonSidebar(panel As Panel, texte As String, y As Integer, action As EventHandler)
+            Dim btn As New Button()
+            btn.Text = texte
+            btn.Width = panel.Width - 10
+            btn.Height = 46
+            btn.Location = New Point(5, y)
+            btn.BackColor = Color.FromArgb(44, 62, 80)
+            btn.ForeColor = Color.White
+            btn.Font = New Font("Arial", 11, FontStyle.Regular)
+            btn.FlatStyle = FlatStyle.Flat
+            btn.FlatAppearance.BorderSize = 0
+            btn.Cursor = Cursors.Hand
+            btn.TextAlign = ContentAlignment.MiddleLeft
+            btn.Padding = New Padding(15, 0, 0, 0)
+            AddHandler btn.Click, Sub(s, e)
+                                      action(s, e)
+                                      SelectionnerBouton(CType(s, Button))
+                                  End Sub
+            AddHandler btn.MouseEnter, Sub(s, e)
+                                           Dim b As Button = CType(s, Button)
+                                           If b IsNot dernieBoutonSelectionne Then
+                                               b.BackColor = Color.FromArgb(28, 35, 49)
+                                           End If
+                                       End Sub
+            AddHandler btn.MouseLeave, Sub(s, e)
+                                           Dim b As Button = CType(s, Button)
+                                           If b IsNot dernieBoutonSelectionne Then
+                                               b.BackColor = Color.FromArgb(44, 62, 80)
+                                           End If
+                                       End Sub
+            panel.Controls.Add(btn)
+        End Sub
+        ''' <summary>
+        ''' Vérifier les permissions de l'utilisateur
+        ''' </summary>
+        Private Function VerifierPermission(fonctionnalite As String) As Boolean
+            Select Case SessionUtilisateur.Role
+                Case "ADMIN"
+
+                    LoadForm(New FormulaireDashboard())
+                    Return True
+
+                Case "Pasteur"
+                    Return True
+
+                Case "FACTURIER"
+                    Select Case fonctionnalite
+                        Case "Facturier"
+                            Return True
+                        Case Else
+                            Return False
+                    End Select
+
+                Case "CAISSIERE"
+                    Select Case fonctionnalite
+                        Case "Caisse"
+                            Return True
+                        Case Else
+                            Return False
+                    End Select
+
+                Case Else
+                    Return False
+            End Select
+        End Function
+        ' --- Helper pour créer les boutons du menu latéral ---
+        Private Function CreerBoutonMenu(texte As String) As Button
+            Dim btn As New Button() With {
+                .Text = "      " & texte,
+                .Width = 220, ' Largeur fixe pour remplir le FlowLayoutPanel
+                .Height = 50,
+                .Margin = New Padding(0, 0, 0, 5), ' Marge inférieure entre les boutons
+                .FlatStyle = FlatStyle.Flat,
+                .ForeColor = Color.FromArgb(180, 190, 210),
+                .Font = FontMenu,
+                .TextAlign = ContentAlignment.MiddleLeft,
+                .Cursor = Cursors.Hand}
+            btn.FlatAppearance.BorderSize = 0
+            btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(45, 55, 75)
+            btn.FlatAppearance.MouseDownBackColor = ColorSidebarAccent
+
+            Return btn
+        End Function
+
+        ' --- Logique Métier (Inchangée) ---
 
         Private Sub LoadForm(f As Form)
             panelContent.Controls.Clear()
@@ -69,6 +447,39 @@ Namespace DevCommerc8ak
             panelContent.Controls.Add(f)
             f.Show()
         End Sub
+        ''' <summary>
+        ''' Sélectionner un bouton et mettre à jour l'affichage
+        ''' </summary>
+        Private Sub SelectionnerBouton(btn As Button)
+            ' Réinitialiser le bouton précédent
+            If dernieBoutonSelectionne IsNot Nothing Then
+                dernieBoutonSelectionne.BackColor = Color.FromArgb(44, 62, 80)
+            End If
+
+            ' Sélectionner le nouveau bouton
+            btn.BackColor = Color.FromArgb(20, 96, 183)
+            dernieBoutonSelectionne = btn
+        End Sub
+        'Private Sub PingSession(sender As Object, e As EventArgs)
+        '    Try
+        '        Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+        '        Dim dal As New DAL(cs)
+        '        Dim repo As New SessionRepository(dal)
+        '        repo.Ping(SessionUtilisateur.SessionId)
+
+        '        Dim notifRepo As New NotificationRepository(dal)
+        '        notifRepo.AssurerTable()
+        '        Dim dt As DataTable = notifRepo.ListerNonLues()
+        '        If dt.Rows.Count > 0 Then
+        '            Dim msg As String = Convert.ToString(dt.Rows(0)("Message"))
+        '            MessageBox.Show(msg, "Notification Système", MessageBoxButtons.OK, MessageBoxIcon.Information)
+        '            notifRepo.MarquerLues()
+        '        End If
+
+        '        VerifierRuptures(dal)
+        '    Catch
+        '    End Try
+        'End Sub
 
         Private Sub PingSession(sender As Object, e As EventArgs)
             Try
@@ -105,6 +516,30 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
+        Private Sub VerifierRuptures(dal As DAL)
+            If (Date.Now - _dernierAlerte).TotalSeconds < 30 Then Return
+
+            Dim paramService As New ParametreService(New ParametreRepository(dal))
+            Dim p As ParametreDTO = paramService.Charger()
+            Dim seuil As Decimal = If(p Is Nothing, 0D, p.SeuilStockCritique)
+
+            Dim sql As String = "SELECT p.ProduitId, p.Libelle, s.QuantiteStock, p.SeuilCritique FROM Produits p " &
+                                "JOIN vStockProduit s ON s.ProduitId = p.ProduitId " &
+                                "WHERE s.QuantiteStock <= CASE WHEN p.SeuilCritique > 0 THEN p.SeuilCritique ELSE @seuil END"
+
+            Dim dt As DataTable = dal.ExecuterTable(sql, CommandType.Text, Nothing)
+            If dt Is Nothing OrElse dt.Rows.Count = 0 Then Return
+
+            Dim notifRepo As New NotificationRepository(dal)
+            notifRepo.Ajouter("Rupture ou seuil critique détecté. Bon d'approvisionnement généré.")
+
+            Dim approRepo As New BonApprovisionnementRepository(dal)
+            Dim approService As New ApprovisionnementService(dal, approRepo)
+            approService.GenererBonAuto(seuil, SessionUtilisateur.UtilisateurId)
+
+            _dernierAlerte = Date.Now
+        End Sub
+
         Private Sub ChargerModeSombre()
             Try
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
@@ -119,6 +554,8 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub Deconnecter(sender As Object, e As EventArgs)
+            If MessageBox.Show("Voulez-vous vraiment vous déconnecter ?", "Déconnexion", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.No Then Return
+
             Try
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
@@ -129,6 +566,34 @@ Namespace DevCommerc8ak
             Dim login As New LoginForm()
             login.Show()
             Me.Close()
+        End Sub
+
+        ''' <summary>
+        ''' Afficher admin
+        ''' </summary>
+        Private Sub Dashbord(sender As Object, e As EventArgs)
+
+
+            LoadForm(New AdminForm())
+
+        End Sub
+
+        ''' <summary>
+        ''' Afficher factureir
+        ''' </summary>
+        Private Sub AfficherFacturier(sender As Object, e As EventArgs)
+
+
+            LoadForm(New FacturationForm())
+
+        End Sub
+
+        ''' <summary>
+        ''' Afficher caisse
+        ''' </summary>
+        Private Sub AfficherCaisse(sender As Object, e As EventArgs)
+            LoadForm(New CaisseForm())
+
         End Sub
 
         Protected Overrides Sub OnFormClosing(e As FormClosingEventArgs)

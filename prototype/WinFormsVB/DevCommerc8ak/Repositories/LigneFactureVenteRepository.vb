@@ -4,6 +4,7 @@ Option Explicit On
 Imports System
 Imports System.Data
 Imports System.Data.SqlClient
+Imports System.Collections.Generic
 
 Namespace DevCommerc8ak
     Public Class LigneFactureVenteRepository
@@ -15,17 +16,20 @@ Namespace DevCommerc8ak
 
         ' Cree une ligne de facture et retourne son identifiant.
         Public Function Ajouter(ligne As LigneFactureVente) As Integer
-            Dim sql As String = "INSERT INTO LignesFactureVente (FactureVenteId, ProduitId, Quantite, PrixUnitaire, MontantRemise, MontantLigne) " &
-                                "VALUES (@FactureVenteId, @ProduitId, @Quantite, @PrixUnitaire, @MontantRemise, @MontantLigne); " &
+            Dim sql As String = "INSERT INTO LignesFactureVente (FactureVenteId, ProduitId, Quantite,QuantiteBase,TypeVente, PrixUnitaire, MontantRemise, MontantLigne, QuantiteSaisie) " &
+                                "VALUES (@FactureVenteId, @ProduitId, @Quantite,@QuantiteBase, @TypeVente, @PrixUnitaire, @MontantRemise, @MontantLigne, @QuantiteSaisie); " &
                                 "SELECT CAST(SCOPE_IDENTITY() AS INT);"
 
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@FactureVenteId", ligne.FactureVenteId),
                 New SqlParameter("@ProduitId", ligne.ProduitId),
                 New SqlParameter("@Quantite", ligne.Quantite),
+                New SqlParameter("@QuantiteBase", ligne.QuantiteBase),
+                New SqlParameter("@TypeVente", ligne.TypeVente),
                 New SqlParameter("@PrixUnitaire", ligne.PrixUnitaire),
                 New SqlParameter("@MontantRemise", ligne.MontantRemise),
-                New SqlParameter("@MontantLigne", ligne.MontantLigne)
+                New SqlParameter("@MontantLigne", ligne.MontantLigne),
+                New SqlParameter("@QuantiteSaisie", ligne.QteSaisie)
             }
 
             Dim id As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
@@ -57,7 +61,7 @@ Namespace DevCommerc8ak
         ' Liste des lignes d'une facture avec libelle produit.
         Public Function ListerDetailsParFacture(factureVenteId As Integer) As DataTable
             Dim sql As String = "" &
-                "SELECT l.LigneFactureVenteId, l.FactureVenteId, l.ProduitId, p.Libelle, l.Quantite, l.PrixUnitaire, l.MontantLigne " &
+                "SELECT l.LigneFactureVenteId, l.FactureVenteId, l.ProduitId, p.Libelle,cast((l.Quantite)as int) as Quantite, l.TypeVente, l.QuantiteBase,  QuantiteSaisie, l.PrixUnitaire, l.MontantLigne " &
                 "FROM LignesFactureVente l JOIN Produits p ON p.ProduitId = l.ProduitId WHERE l.FactureVenteId = @FactureVenteId"
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@FactureVenteId", factureVenteId)}
             Return _dal.ExecuterTable(sql, CommandType.Text, p)

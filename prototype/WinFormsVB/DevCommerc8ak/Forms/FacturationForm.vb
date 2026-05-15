@@ -13,6 +13,21 @@ Namespace DevCommerc8ak
     Public Class FacturationForm
         Inherits Form
 
+        ' --- Couleurs du Thème ---
+        Private ReadOnly ColorPrimary As Color = Color.FromArgb(41, 128, 185) ' Bleu Moderne
+        Private ReadOnly ColorSecondary As Color = Color.FromArgb(52, 73, 94) ' Gris Foncé
+        Private ReadOnly ColorAccent As Color = Color.FromArgb(39, 174, 96) ' Vert Succès
+        Private ReadOnly ColorDanger As Color = Color.FromArgb(192, 57, 43) ' Rouge Annuler
+        Private ReadOnly ColorBg As Color = Color.FromArgb(245, 247, 250) ' Gris très clair
+        Private ReadOnly FontControl As New Font("Segoe UI", 9.5F)
+        Private ReadOnly ColorWhite As Color = Color.White
+        Private ReadOnly FontMain As New Font("Segoe UI", 10)
+        Private ReadOnly FontBold As New Font("Segoe UI", 10, FontStyle.Bold)
+        Private ReadOnly FontTitle As New Font("Segoe UI", 14, FontStyle.Bold)
+
+        ' --- Composants ---
+
+
         Private ReadOnly txtNumeroFacture As TextBox
         Private ReadOnly txtClientId As TextBox
         Private ReadOnly txtClientNom As TextBox
@@ -25,8 +40,8 @@ Namespace DevCommerc8ak
         Private ReadOnly cmbUnite As ComboBox
         Private ReadOnly txtPrixUnitaire As TextBox
         Private ReadOnly lblStock As Label
-        Private ReadOnly lblEquivalent As Label
-        Private ReadOnly lblTotalReel As Label
+        Private ReadOnly lblEquivalent As Label ' nouveau 
+        Private ReadOnly lblTotalReel As Label 'nouveau 
 
         Private ReadOnly gridPanier As DataGridView
         Private ReadOnly txtRemise As TextBox
@@ -44,12 +59,12 @@ Namespace DevCommerc8ak
         Private ReadOnly btnDeconnexion As Button
 
         Private ReadOnly _panier As List(Of PanierLigne)
-        Private ReadOnly _typeVenteService As TypeVenteService
+        Private ReadOnly _typeVenteService As TypeVenteService 'nouveau
         Private _remiseMax As Decimal
         Private _produitsTable As DataTable
         Private _produitsView As DataView
         Private _parametres As ParametreDTO
-        Private _typesVenteCourants As List(Of TypeVenteDTO)
+        Private _typesVenteCourants As List(Of TypeVenteDTO) 'nouveau 
 
         Private Class PanierLigne
             Public Property ProduitId As Integer
@@ -58,110 +73,234 @@ Namespace DevCommerc8ak
             Public Property PrixUnitaire As Decimal
             Public Property Quantite As Decimal
             Public Property QuantiteBase As Decimal
-            Public Property QuantiteEquivalente As Decimal
-            Public Property QuantiteReelle As Decimal
+            Public Property QuantiteEquivalente As Decimal 'nouveau 
+            Public Property QuantiteReelle As Decimal 'nouveau 
             Public Property Total As Decimal
         End Class
-
         Public Sub New()
-            Me.BackColor = Color.White
-            Me.Text = "Facturier"
-            Me.Width = 1280
-            Me.Height = 760
+            ' Configuration de la Form
+            Me.BackColor = ColorBg
+            Me.Text = "Système de Facturation Professionnel"
+            Me.Width = 1300
+            Me.Height = 820
+            Me.Font = FontMain
             Me.StartPosition = FormStartPosition.CenterScreen
+            Me.FormBorderStyle = FormBorderStyle.FixedDialog
+            Me.MaximizeBox = False
 
             _panier = New List(Of PanierLigne)()
             _typeVenteService = New TypeVenteService()
             _typesVenteCourants = New List(Of TypeVenteDTO)()
 
-            Dim lblNumeroFacture As New Label() With {.Text = "Numero facture", .Left = 560, .Top = 20, .AutoSize = True}
-            txtNumeroFacture = New TextBox() With {.Left = 680, .Top = 16, .Width = 180, .Enabled = False}
+            ' --- Header Panel ---
+            Dim pnlHeader As New Panel() With {
+                .Dock = DockStyle.Top,
+                .Height = 70,
+                .BackColor = Color.FromArgb(44, 62, 80)
+            }
+            Dim lblAppTitle As New Label() With {
+                .Text = "GESTION DE FACTURATION",
+                .ForeColor = ColorWhite,
+                .Font = FontTitle,
+                .AutoSize = True,
+                .Left = 20,
+                .Top = 20
+            }
+            Dim lblNumFactLabel As New Label() With {
+                .Text = "N° FACTURE :",
+                .ForeColor = ColorWhite,
+                .Font = FontBold,
+                .AutoSize = True,
+                .Left = 950,
+                .Top = 25
+            }
+            txtNumeroFacture = New TextBox() With {
+                .Left = 1060, .Top = 22, .Width = 180,
+                .Enabled = False, .BackColor = ColorWhite,
+                .BorderStyle = BorderStyle.FixedSingle,
+                .Font = New Font("Segoe UI", 11, FontStyle.Bold),
+                .TextAlign = HorizontalAlignment.Center
+            }
+            pnlHeader.Controls.Add(lblAppTitle)
+            pnlHeader.Controls.Add(lblNumFactLabel)
+            pnlHeader.Controls.Add(txtNumeroFacture)
 
-            Dim grpClient As New GroupBox() With {.Text = "Client", .Left = 20, .Top = 20, .Width = 520, .Height = 140}
-            Dim lblClientId As New Label() With {.Text = "Numero client", .Left = 14, .Top = 28, .AutoSize = True}
-            txtClientId = New TextBox() With {.Left = 130, .Top = 24, .Width = 120, .Enabled = False}
-            Dim lblClientNom As New Label() With {.Text = "Nom du client", .Left = 14, .Top = 62, .AutoSize = True}
-            txtClientNom = New TextBox() With {.Left = 130, .Top = 58, .Width = 360}
-            Dim lblClientTel As New Label() With {.Text = "Numero de telephone", .Left = 14, .Top = 96, .AutoSize = True}
-            txtClientTel = New TextBox() With {.Left = 160, .Top = 92, .Width = 180}
+            ' --- Main Container ---
+            Dim pnlMain As New Panel() With {
+                .Dock = DockStyle.Fill,
+                .Padding = New Padding(20)
+            }
 
-            grpClient.Controls.Add(lblClientId)
-            grpClient.Controls.Add(txtClientId)
-            grpClient.Controls.Add(lblClientNom)
-            grpClient.Controls.Add(txtClientNom)
-            grpClient.Controls.Add(lblClientTel)
-            grpClient.Controls.Add(txtClientTel)
+            ' --- Left Side (Client & Produits) ---
+            Dim pnlLeft As New Panel() With {
+                .Width = 550,
+                .Dock = DockStyle.Left
+            }
 
-            Dim grpProduits As New GroupBox() With {.Text = "Produits", .Left = 20, .Top = 170, .Width = 520, .Height = 520}
-            Dim lblProduit As New Label() With {.Text = "Produit (recherche)", .Left = 14, .Top = 28, .AutoSize = True}
-            txtRecherche = New TextBox() With {.Left = 150, .Top = 24, .Width = 250}
-            btnActualiser = New Button() With {.Text = "Actualiser", .Left = 410, .Top = 22, .Width = 90}
+            ' GroupBox Client
+            Dim grpClient As New GroupBox() With {
+                .Text = "INFORMATIONS CLIENT",
+                .Dock = DockStyle.Top,
+                .Height = 160,
+                .Font = FontBold,
+                .ForeColor = ColorSecondary,
+                .Padding = New Padding(10)
+            }
 
-            gridProduits = New DataGridView() With {.Left = 14, .Top = 58, .Width = 486, .Height = 260, .ReadOnly = True, .AutoGenerateColumns = True, .SelectionMode = DataGridViewSelectionMode.FullRowSelect}
+            ' Dim lblClientId As New Label() With {.Text = "ID Client", .Left = 20, .Top = 35, .AutoSize = True, .Font = FontMain}
+            txtClientId = New TextBox() With {.Left = 140, .Top = 32, .Width = 100, .Enabled = False, .BorderStyle = BorderStyle.FixedSingle, .Visible = False}
 
-            Dim lblQuantite As New Label() With {.Text = "Quantite", .Left = 14, .Top = 332, .AutoSize = True}
-            txtQuantite = New TextBox() With {.Left = 80, .Top = 328, .Width = 70}
-            Dim lblUnite As New Label() With {.Text = "Unite", .Left = 170, .Top = 332, .AutoSize = True}
-            cmbUnite = New ComboBox() With {.Left = 220, .Top = 328, .Width = 110, .DropDownStyle = ComboBoxStyle.DropDownList}
-            Dim lblPrix As New Label() With {.Text = "Prix unitaire", .Left = 350, .Top = 332, .AutoSize = True}
-            txtPrixUnitaire = New TextBox() With {.Left = 430, .Top = 328, .Width = 70, .ReadOnly = True}
+            Dim lblClientNom As New Label() With {.Text = "Nom Complet", .Left = 20, .Top = 75, .AutoSize = True, .Font = FontMain}
+            txtClientNom = New TextBox() With {.Left = 140, .Top = 72, .Width = 380, .BorderStyle = BorderStyle.FixedSingle}
 
-            lblStock = New Label() With {.Left = 14, .Top = 366, .AutoSize = True}
-            lblEquivalent = New Label() With {.Left = 14, .Top = 388, .AutoSize = True}
-            lblTotalReel = New Label() With {.Left = 14, .Top = 410, .AutoSize = True}
+            Dim lblClientTel As New Label() With {.Text = "Téléphone", .Left = 20, .Top = 115, .AutoSize = True, .Font = FontMain}
+            txtClientTel = New TextBox() With {.Left = 140, .Top = 112, .Width = 200, .BorderStyle = BorderStyle.FixedSingle}
 
-            btnAjouter = New Button() With {.Text = "Ajouter", .Left = 14, .Top = 440, .Width = 100}
-            btnRetirer = New Button() With {.Text = "Retirer", .Left = 120, .Top = 440, .Width = 100}
+            grpClient.Controls.AddRange({txtClientId, lblClientNom, txtClientNom, lblClientTel, txtClientTel})
 
-            grpProduits.Controls.Add(lblProduit)
-            grpProduits.Controls.Add(txtRecherche)
-            grpProduits.Controls.Add(btnActualiser)
-            grpProduits.Controls.Add(gridProduits)
-            grpProduits.Controls.Add(lblQuantite)
-            grpProduits.Controls.Add(txtQuantite)
-            grpProduits.Controls.Add(lblUnite)
-            grpProduits.Controls.Add(cmbUnite)
-            grpProduits.Controls.Add(lblPrix)
-            grpProduits.Controls.Add(txtPrixUnitaire)
-            grpProduits.Controls.Add(lblStock)
-            grpProduits.Controls.Add(lblEquivalent)
-            grpProduits.Controls.Add(lblTotalReel)
-            grpProduits.Controls.Add(btnAjouter)
-            grpProduits.Controls.Add(btnRetirer)
+            ' GroupBox Produits
+            Dim grpProduits As New GroupBox() With {
+                .Text = "SÉLECTION DES PRODUITS",
+                .Dock = DockStyle.Fill,
+                .Font = FontBold,
+                .ForeColor = ColorSecondary,
+                .Padding = New Padding(10),
+                .Top = 170
+            }
 
-            Dim grpPanier As New GroupBox() With {.Text = "Panier", .Left = 560, .Top = 60, .Width = 680, .Height = 430}
-            gridPanier = New DataGridView() With {.Left = 14, .Top = 24, .Width = 650, .Height = 390, .ReadOnly = True, .AutoGenerateColumns = True, .SelectionMode = DataGridViewSelectionMode.FullRowSelect}
+            Dim lblRecherche As New Label() With {.Text = "Rechercher", .Left = 20, .Top = 35, .AutoSize = True, .Font = FontMain}
+            txtRecherche = New TextBox() With {.Left = 120, .Top = 32, .Width = 280, .BorderStyle = BorderStyle.FixedSingle}
+            btnActualiser = New Button() With {
+                .Text = "Actualiser", .Left = 410, .Top = 30, .Width = 110, .Height = 30,
+                .FlatStyle = FlatStyle.Flat, .BackColor = ColorPrimary, .ForeColor = ColorWhite, .Cursor = Cursors.Hand
+            }
+            btnActualiser.FlatAppearance.BorderSize = 0
+
+            gridProduits = New DataGridView() With {
+                .Left = 20, .Top = 75, .Width = 500, .Height = 280,
+                .ReadOnly = True, .BorderStyle = BorderStyle.None,
+                .BackgroundColor = ColorWhite, .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                .AlternatingRowsDefaultCellStyle = New DataGridViewCellStyle() With {.BackColor = Color.FromArgb(240, 240, 240)}
+            }
+            gridProduits.ColumnHeadersDefaultCellStyle.BackColor = ColorSecondary
+            gridProduits.ColumnHeadersDefaultCellStyle.ForeColor = ColorWhite
+            gridProduits.EnableHeadersVisualStyles = False
+
+            Dim lblQuantite As New Label() With {.Text = "Qté", .Left = 20, .Top = 375, .AutoSize = True, .Font = FontMain}
+            txtQuantite = New TextBox() With {.Left = 60, .Top = 372, .Width = 60, .BorderStyle = BorderStyle.FixedSingle, .TextAlign = HorizontalAlignment.Center}
+
+            Dim lblUnite As New Label() With {.Text = "Unité", .Left = 135, .Top = 375, .AutoSize = True, .Font = FontMain}
+            cmbUnite = New ComboBox() With {.Left = 185, .Top = 372, .Width = 100, .DropDownStyle = ComboBoxStyle.DropDownList}
+
+            Dim lblPrix As New Label() With {.Text = "Prix Unitaire", .Left = 300, .Top = 375, .AutoSize = True, .Font = FontMain}
+            txtPrixUnitaire = New TextBox() With {.Left = 400, .Top = 372, .Width = 120, .ReadOnly = True, .BorderStyle = BorderStyle.FixedSingle, .BackColor = Color.FromArgb(230, 230, 230), .TextAlign = HorizontalAlignment.Right}
+
+            lblStock = New Label() With {.Left = 20, .Top = 410, .AutoSize = True, .ForeColor = ColorDanger, .Font = New Font("Segoe UI", 9, FontStyle.Italic)}
+            lblEquivalent = New Label() With {.Left = 20, .Top = 432, .AutoSize = True, .ForeColor = ColorDanger, .Font = New Font("Segoe UI", 9, FontStyle.Italic)} '#########nouveau
+            lblTotalReel = New Label() With {.Left = 20, .Top = 454, .AutoSize = True, .ForeColor = ColorDanger, .Font = New Font("Segoe UI", 9, FontStyle.Italic)} '########### nouveau
+
+
+            btnAjouter = New Button() With {
+                .Text = "AJOUTER AU PANIER", .Left = 20, .Top = 477, .Width = 240, .Height = 45,
+                .FlatStyle = FlatStyle.Flat, .BackColor = ColorAccent, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand
+            }
+            btnAjouter.FlatAppearance.BorderSize = 0
+
+            btnRetirer = New Button() With {
+                .Text = "RETIRER", .Left = 280, .Top = 477, .Width = 240, .Height = 45,
+                .FlatStyle = FlatStyle.Flat, .BackColor = ColorDanger, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand
+            }
+            btnRetirer.FlatAppearance.BorderSize = 0
+
+            grpProduits.Controls.AddRange({lblRecherche, txtRecherche, btnActualiser, gridProduits, lblQuantite, txtQuantite, lblUnite, cmbUnite, lblPrix, txtPrixUnitaire, lblStock, lblEquivalent, lblTotalReel, btnAjouter, btnRetirer})
+
+            pnlLeft.Controls.Add(grpProduits)
+            pnlLeft.Controls.Add(grpClient)
+
+            ' --- Right Side (Panier & Actions) ---
+            Dim pnlRight As New Panel() With {
+                .Dock = DockStyle.Fill,
+                .Padding = New Padding(20, 0, 0, 0)
+            }
+
+            Dim grpPanier As New GroupBox() With {
+                .Text = "PANIER DE VENTE",
+                .Dock = DockStyle.Top,
+                .Height = 420,
+                .Font = FontBold,
+                .ForeColor = ColorSecondary
+            }
+            gridPanier = New DataGridView() With {
+                .Dock = DockStyle.Fill,
+                .ReadOnly = True, .BorderStyle = BorderStyle.None,
+                .BackgroundColor = ColorWhite, .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                .AlternatingRowsDefaultCellStyle = New DataGridViewCellStyle() With {.BackColor = Color.FromArgb(240, 240, 240)}
+            }
+            'gridPanier.ColumnHeadersDefaultCellStyle.BackColor = ColorSecondary
+            'gridPanier.ColumnHeadersDefaultCellStyle.ForeColor = ColorWhite
+            'gridPanier.EnableHeadersVisualStyles = False
+
+            gridPanier = CreateStyledGrid()
+            gridPanier.Dock = DockStyle.Fill
+
+
             grpPanier.Controls.Add(gridPanier)
 
-            Dim lblRemise As New Label() With {.Text = "Remise %", .Left = 560, .Top = 510, .AutoSize = True}
-            txtRemise = New TextBox() With {.Left = 640, .Top = 506, .Width = 70}
-            lblSousTotal = New Label() With {.Left = 730, .Top = 510, .AutoSize = True}
-            lblTotal = New Label() With {.Left = 930, .Top = 510, .AutoSize = True}
+            ' Totaux Panel
+            Dim pnlTotals As New Panel() With {
+                .Dock = DockStyle.Top,
+                .Height = 100,
+                .BackColor = ColorWhite,
+                .Padding = New Padding(10)
+            }
+            pnlTotals.BorderStyle = BorderStyle.FixedSingle
 
-            btnValider = New Button() With {.Text = "Valider facture", .Left = 560, .Top = 550, .Width = 140}
-            btnImprimer = New Button() With {.Text = "Imprimer A4", .Left = 710, .Top = 550, .Width = 120}
-            btnPdf = New Button() With {.Text = "Exporter PDF", .Left = 840, .Top = 550, .Width = 120}
-            btnExcel = New Button() With {.Text = "Exporter Excel", .Left = 970, .Top = 550, .Width = 120}
-            btnHistorique = New Button() With {.Text = "Historique", .Left = 560, .Top = 590, .Width = 140}
-            btnAnnuler = New Button() With {.Text = "Annuler", .Left = 710, .Top = 590, .Width = 120}
-            btnDeconnexion = New Button() With {.Text = "Deconnexion", .Left = 840, .Top = 590, .Width = 120}
+            Dim lblRemiseLabel As New Label() With {.Text = "REMISE (%)", .Left = 20, .Top = 15, .AutoSize = True, .Font = FontBold}
+            txtRemise = New TextBox() With {.Left = 120, .Top = 12, .Width = 60, .BorderStyle = BorderStyle.FixedSingle, .TextAlign = HorizontalAlignment.Center}
 
-            Me.Controls.Add(lblNumeroFacture)
-            Me.Controls.Add(txtNumeroFacture)
-            Me.Controls.Add(grpClient)
-            Me.Controls.Add(grpProduits)
-            Me.Controls.Add(grpPanier)
-            Me.Controls.Add(lblRemise)
-            Me.Controls.Add(txtRemise)
-            Me.Controls.Add(lblSousTotal)
-            Me.Controls.Add(lblTotal)
-            Me.Controls.Add(btnValider)
-            Me.Controls.Add(btnImprimer)
-            Me.Controls.Add(btnPdf)
-            Me.Controls.Add(btnExcel)
-            Me.Controls.Add(btnHistorique)
-            Me.Controls.Add(btnAnnuler)
-            Me.Controls.Add(btnDeconnexion)
+            lblSousTotal = New Label() With {
+                .Text = "SOUS-TOTAL : 0.00", .Left = 200, .Top = 15, .Width = 200,
+                .Font = New Font("Segoe UI", 11, FontStyle.Bold), .ForeColor = ColorSecondary
+            }
+
+            lblTotal = New Label() With {
+                .Text = "TOTAL À PAYER : 0.00", .Left = 400, .Top = 10, .Width = 250,
+                .Font = New Font("Segoe UI", 14, FontStyle.Bold), .ForeColor = ColorPrimary,
+                .TextAlign = ContentAlignment.MiddleRight
+            }
+            pnlTotals.Controls.AddRange({lblRemiseLabel, txtRemise, lblSousTotal, lblTotal})
+
+            ' Actions Panel
+            Dim pnlActions As New FlowLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .Padding = New Padding(0, 20, 0, 0)
+            }
+
+            btnValider = New Button() With {.Text = "VALIDER LA VENTE", .Width = 210, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorAccent, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
+            btnImprimer = New Button() With {.Text = "IMPRIMER A4", .Width = 140, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
+            btnPdf = New Button() With {.Text = "PDF", .Width = 100, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
+            btnExcel = New Button() With {.Text = "EXCEL", .Width = 100, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
+
+            btnHistorique = New Button() With {.Text = "HISTORIQUE", .Width = 150, .Height = 40, .FlatStyle = FlatStyle.Flat, .BackColor = ColorPrimary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
+            btnAnnuler = New Button() With {.Text = "ANNULER", .Width = 150, .Height = 40, .FlatStyle = FlatStyle.Flat, .BackColor = ColorDanger, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
+            btnDeconnexion = New Button() With {.Text = "DÉCONNEXION", .Width = 150, .Height = 40, .FlatStyle = FlatStyle.Flat, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
+
+            For Each btn As Button In {btnValider, btnImprimer, btnPdf, btnExcel, btnHistorique, btnAnnuler, btnDeconnexion}
+                btn.FlatAppearance.BorderSize = 0
+                pnlActions.Controls.Add(btn)
+            Next
+
+            pnlRight.Controls.Add(pnlActions)
+            pnlRight.Controls.Add(pnlTotals)
+            pnlRight.Controls.Add(grpPanier)
+
+            pnlMain.Controls.Add(pnlRight)
+            pnlMain.Controls.Add(pnlLeft)
+
+            Me.Controls.Add(pnlMain)
+            Me.Controls.Add(pnlHeader)
+
+            ' --- Handlers ---
 
             AddHandler txtRecherche.TextChanged, AddressOf FiltrerProduits
             AddHandler btnActualiser.Click, AddressOf RechargerProduits
@@ -180,12 +319,67 @@ Namespace DevCommerc8ak
             AddHandler btnDeconnexion.Click, AddressOf Deconnecter
             AddHandler txtClientTel.TextChanged, AddressOf RechercherClientParTelephone
 
-            ThemeHelper.AppliquerTheme(Me)
+            ' Initialisation
             ChargerParametres()
             ChargerProduits()
             GenererNouveauNumeroFacture()
+            ConfigurerGrilleChargerProduit()
         End Sub
 
+
+
+        Private Sub ConfigurerGrilleChargerProduit()
+            gridProduits.Columns.Clear()
+            gridProduits.AutoGenerateColumns = False
+            Dim colProduitId As New DataGridViewTextBoxColumn() With {.DataPropertyName = "ProduitId", .Name = "ProduitId", .Visible = False}
+            Dim colCodeBarres As New DataGridViewTextBoxColumn() With {.DataPropertyName = "CodeBarres", .HeaderText = "CodeBarres", .Width = 210}
+            Dim colLibelle As New DataGridViewTextBoxColumn() With {.DataPropertyName = "Libelle", .HeaderText = "Libelle", .Width = 250}
+            Dim colPrixDetail As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixDetail", .HeaderText = "Prix Detail", .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
+            Dim colPrixAchat As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixAchat", .HeaderText = "PrixAchat", .Width = 80, .Visible = False, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
+            Dim colPrixDemi As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixDemi", .HeaderText = "Prix Demi", .Width = 100, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
+            Dim colPrixQuart As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixQuart", .HeaderText = "Prix Quart", .Width = 100, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
+            Dim colPrixDouzaine As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixDouzaine", .HeaderText = "Prix Douzaine", .Width = 100, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
+            Dim colPrixGros As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixGros", .HeaderText = "Prix Gros", .Width = 80, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
+            Dim colPrixSpecial As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixSpecial", .HeaderText = "PrixSpecial", .Width = 80, .Visible = False}
+            Dim colCoefficientGros As New DataGridViewTextBoxColumn() With {.DataPropertyName = "CoefficientGros", .HeaderText = "CoefficientGros", .Width = 80, .Visible = False}
+            Dim colQuantiteStock As New DataGridViewTextBoxColumn() With {.DataPropertyName = "QuantiteStock", .HeaderText = "Qte Stock", .Width = 100, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
+            Dim colSeuilCritique As New DataGridViewTextBoxColumn() With {.DataPropertyName = "SeuilCritique", .HeaderText = "SeuilCritique", .Width = 80, .Visible = False}
+            Dim colDateExpiration As New DataGridViewTextBoxColumn() With {.DataPropertyName = "DateExpiration", .HeaderText = "DateExpiration", .Width = 80, .Visible = False}
+            Dim colCategorieId As New DataGridViewTextBoxColumn() With {.DataPropertyName = "CategorieId", .HeaderText = "CategorieId", .Width = 80, .Visible = False}
+            Dim colEstActif As New DataGridViewTextBoxColumn() With {.DataPropertyName = "EstActif", .HeaderText = "EstActif", .Width = 80, .Visible = False}
+            Dim colUnitePrincipale As New DataGridViewTextBoxColumn() With {.DataPropertyName = "UnitePrincipale", .HeaderText = "UnitePrincipale", .Width = 120, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleCenter}}
+            Dim colUniteSecondaire As New DataGridViewTextBoxColumn() With {.DataPropertyName = "UniteSecondaire", .HeaderText = "UniteSecondaire", .Width = 80, .Visible = False}
+            Dim colConversionUnite As New DataGridViewTextBoxColumn() With {.DataPropertyName = "ConversionUnite", .HeaderText = "ConversionUnite", .Width = 150, .Visible = True}
+            Dim colVenteDetail As New DataGridViewTextBoxColumn() With {.DataPropertyName = "VenteDetail", .HeaderText = "VenteDetail", .Width = 80, .Visible = False}
+            Dim colSVenteDemi As New DataGridViewTextBoxColumn() With {.DataPropertyName = "VenteDemi", .HeaderText = "VenteDemi", .Width = 80, .Visible = False}
+            Dim colVenteDouzaine As New DataGridViewTextBoxColumn() With {.DataPropertyName = "VenteDouzaine", .HeaderText = "VenteDouzaine", .Width = 80, .Visible = False}
+            Dim colVenteGros As New DataGridViewTextBoxColumn() With {.DataPropertyName = "VenteGros", .HeaderText = "VenteGros", .Width = 80, .Visible = False}
+            gridProduits.Columns.AddRange(New DataGridViewColumn() {colProduitId, colCodeBarres, colLibelle, colPrixDetail, colPrixAchat, colPrixDemi, colPrixQuart, colPrixDouzaine, colPrixGros, colPrixSpecial, colCoefficientGros, colQuantiteStock, colSeuilCritique, colDateExpiration, colCategorieId, colEstActif, colUnitePrincipale, colUniteSecondaire, colConversionUnite, colVenteDetail, colSVenteDemi, colVenteDouzaine, colVenteGros})
+
+
+        End Sub
+
+        Private Function CreateStyledGrid() As DataGridView
+            Dim dgv As New DataGridView() With {
+                .BackgroundColor = Color.White,
+                .BorderStyle = BorderStyle.None,
+                .EnableHeadersVisualStyles = False,
+                .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                .AllowUserToAddRows = False,
+                .ReadOnly = True,
+                .RowHeadersVisible = False,
+                .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                .GridColor = ColorBorder
+            }
+            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245)
+            dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
+            dgv.ColumnHeadersHeight = 45
+            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(232, 234, 246)
+            dgv.DefaultCellStyle.SelectionForeColor = ColorPrimary
+            dgv.DefaultCellStyle.Font = FontControl
+            dgv.RowTemplate.Height = 35
+            Return dgv
+        End Function
         Private Sub ChargerParametres()
             Try
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
@@ -224,18 +418,18 @@ Namespace DevCommerc8ak
 
         Private Sub ChargerUnites(sender As Object, e As EventArgs)
             If gridProduits.CurrentRow Is Nothing Then Return
-            Dim nbUnites As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells("ConversionUnite").Value)
-            Dim prixAchat As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells("PrixAchat").Value)
-            Dim prixGros As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells("PrixGros").Value)
-            Dim prixDemi As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells("PrixDemi").Value)
-            Dim prixDetail As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells("PrixDetail").Value)
-            Dim prixQuart As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells("PrixQuart").Value)
-            Dim prixDouzaine As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells("PrixDouzaine").Value)
-            Dim prixSpecial As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells("PrixSpecial").Value)
-            Dim venteDetail As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells("VenteDetail").Value)
-            Dim venteDemi As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells("VenteDemi").Value)
-            Dim venteDouzaine As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells("VenteDouzaine").Value)
-            Dim venteGros As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells("VenteGros").Value)
+            Dim nbUnites As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(18).Value)
+            Dim prixAchat As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(4).Value)
+            Dim prixGros As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(8).Value)
+            Dim prixDemi As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(5).Value)
+            Dim prixDetail As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(3).Value)
+            Dim prixQuart As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(6).Value)
+            Dim prixDouzaine As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(7).Value)
+            Dim prixSpecial As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(9).Value)
+            Dim venteDetail As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells(19).Value)
+            Dim venteDemi As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells(20).Value)
+            Dim venteDouzaine As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells(21).Value)
+            Dim venteGros As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells(22).Value)
 
             _typesVenteCourants = _typeVenteService.ConstruireTypesVente(nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine)
             cmbUnite.DataSource = Nothing
@@ -263,9 +457,9 @@ Namespace DevCommerc8ak
 
         Private Sub ColorerStockCritique(sender As Object, e As DataGridViewRowPrePaintEventArgs)
             Dim row As DataGridViewRow = gridProduits.Rows(e.RowIndex)
-            If row.Cells("QuantiteStock").Value Is Nothing OrElse row.Cells("SeuilCritique").Value Is Nothing Then Return
-            Dim stock As Decimal = Convert.ToDecimal(row.Cells("QuantiteStock").Value)
-            Dim seuil As Decimal = Convert.ToDecimal(row.Cells("SeuilCritique").Value)
+            If row.Cells(11).Value Is Nothing OrElse row.Cells(12).Value Is Nothing Then Return
+            Dim stock As Decimal = Convert.ToDecimal(row.Cells(11).Value)
+            Dim seuil As Decimal = Convert.ToDecimal(row.Cells(12).Value)
             If stock <= seuil Then
                 row.DefaultCellStyle.BackColor = Color.LightCoral
             End If
@@ -302,11 +496,11 @@ Namespace DevCommerc8ak
 
         Private Sub MettreAJourAffichageStockProduit()
             If gridProduits.CurrentRow Is Nothing Then Return
-            Dim produitId As Integer = Convert.ToInt32(gridProduits.CurrentRow.Cells("ProduitId").Value)
-            Dim stock As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells("QuantiteStock").Value)
-            Dim nbUnites As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells("ConversionUnite").Value)
-            Dim uniteBase As String = Convert.ToString(gridProduits.CurrentRow.Cells("UnitePrincipale").Value)
-            Dim uniteSecondaire As String = Convert.ToString(gridProduits.CurrentRow.Cells("UniteSecondaire").Value)
+            Dim produitId As Integer = Convert.ToInt32(gridProduits.CurrentRow.Cells(0).Value)
+            Dim stock As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(11).Value)
+            Dim nbUnites As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(18).Value)
+            Dim uniteBase As String = Convert.ToString(gridProduits.CurrentRow.Cells(16).Value)
+            Dim uniteSecondaire As String = Convert.ToString(gridProduits.CurrentRow.Cells(17).Value)
             Dim reserve As Decimal = 0D
             For Each ligne As PanierLigne In _panier
                 If ligne.ProduitId = produitId Then
@@ -316,9 +510,9 @@ Namespace DevCommerc8ak
             Dim restant As Decimal = Math.Max(0D, stock - reserve)
             lblStock.Text = "Stock: " & _typeVenteService.FormaterStock(stock, nbUnites, If(uniteBase = "", "base", uniteBase), If(uniteSecondaire = "", "pièce", uniteSecondaire)) &
                 " | Restant: " & _typeVenteService.FormaterStock(restant, nbUnites, If(uniteBase = "", "base", uniteBase), If(uniteSecondaire = "", "pièce", uniteSecondaire))
-        End Function
+        End Sub
 
-        Private Sub AjouterAuPanier(sender As Object, e As EventArgs)
+        Private Sub AjouterAuPanier(sender As Object, e As EventArgs) '"""#### Nouvelle logique tres bon
             If gridProduits.CurrentRow Is Nothing Then Return
 
             Dim qte As Decimal
@@ -332,8 +526,8 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            Dim produitId As Integer = Convert.ToInt32(gridProduits.CurrentRow.Cells("ProduitId").Value)
-            Dim libelle As String = Convert.ToString(gridProduits.CurrentRow.Cells("Libelle").Value)
+            Dim produitId As Integer = Convert.ToInt32(gridProduits.CurrentRow.Cells(0).Value)
+            Dim libelle As String = Convert.ToString(gridProduits.CurrentRow.Cells(2).Value)
             Dim typeChoisi As TypeVenteDTO = ObtenirTypeVenteSelectionne()
             If typeChoisi Is Nothing Then
                 MessageBox.Show("Type de vente invalide.")
@@ -343,7 +537,7 @@ Namespace DevCommerc8ak
             Dim prix As Decimal = PrixSelonUnite()
             Dim quantiteEquivalent As Decimal = typeChoisi.QuantiteEquivalent
             Dim quantiteBase As Decimal = qte * quantiteEquivalent
-            Dim stock As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells("QuantiteStock").Value)
+            Dim stock As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(11).Value)
 
             Dim deja As Decimal = 0D
             For Each l As PanierLigne In _panier
@@ -374,8 +568,8 @@ Namespace DevCommerc8ak
 
         Private Sub RetirerDuPanier(sender As Object, e As EventArgs)
             If gridPanier.CurrentRow Is Nothing Then Return
-            Dim produitId As Integer = Convert.ToInt32(gridPanier.CurrentRow.Cells("ProduitId").Value)
-            Dim unite As String = Convert.ToString(gridPanier.CurrentRow.Cells("Unite").Value)
+            Dim produitId As Integer = Convert.ToInt32(gridPanier.CurrentRow.Cells(0).Value)
+            Dim unite As String = Convert.ToString(gridPanier.CurrentRow.Cells("Unite").Value) '######modifier indice
             _panier.RemoveAll(Function(x) x.ProduitId = produitId AndAlso x.Unite = unite)
             RafraichirPanier()
         End Sub
@@ -448,8 +642,8 @@ Namespace DevCommerc8ak
         Private Function ObtenirStockParProduit(produitId As Integer) As Decimal
             If _produitsTable Is Nothing Then Return 0D
             For Each row As DataRow In _produitsTable.Rows
-                If Convert.ToInt32(row("ProduitId")) = produitId Then
-                    Return Convert.ToDecimal(row("QuantiteStock"))
+                If Convert.ToInt32(row(0)) = produitId Then
+                    Return Convert.ToDecimal(row(11))
                 End If
             Next
             Return 0D
@@ -525,7 +719,7 @@ Namespace DevCommerc8ak
 
                 Dim factureId As Integer = service.CreerFacture(numeroFacture, clientId, sousTotal, remiseMontant, 0D, total, SessionUtilisateur.UtilisateurId)
                 For Each l As PanierLigne In _panier
-                    service.AjouterLigne(factureId, l.ProduitId, l.QuantiteBase, l.PrixUnitaire, 0D, l.Quantite)
+                    service.AjouterLigne(factureId, l.ProduitId, l.QuantiteBase, l.QuantiteEquivalente, l.Unite, l.PrixUnitaire, 0D, l.Quantite)
                 Next
 
                 MessageBox.Show("Facture en attente: " & numeroFacture)
@@ -739,7 +933,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub Deconnecter(sender As Object, e As EventArgs)
-            Dim main = Me.FindForm()
+            Dim main As Form = Me.FindForm()
             If main IsNot Nothing Then
                 main.Close()
             End If

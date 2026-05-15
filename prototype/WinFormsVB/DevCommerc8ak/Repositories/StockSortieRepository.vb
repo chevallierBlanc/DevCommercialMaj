@@ -3,6 +3,7 @@ Option Explicit On
 
 Imports System
 Imports System.Data
+Imports System.Collections.Generic
 Imports System.Data.SqlClient
 
 Namespace DevCommerc8ak
@@ -33,7 +34,8 @@ Namespace DevCommerc8ak
         End Sub
 
         Public Function Ajouter(sortie As StockSortie) As Integer
-            Dim sql As String = "INSERT INTO StockSortie (ProduitId, QuantiteSaisie, Unite, QuantiteBase, DateSortie, Source, RefSource, CreePar) " &
+            Dim reference As String = "SORTM-" & DateTime.Now.ToString("yyyyMMdd-HHmmss")
+            Dim sql As String = "INSERT INTO StockSortie (ProduitId,NumeroSortie, QuantiteSaisie, Unite, QuantiteBase, DateSortie, Source, RefSource, CreePar,MotifId, ClientId) " &
                                 "VALUES (@ProduitId, @QuantiteSaisie, @Unite, @QuantiteBase, @DateSortie, @Source, @RefSource, @CreePar); " &
                                 "SELECT CAST(SCOPE_IDENTITY() AS INT);"
             Dim p As New List(Of SqlParameter) From {
@@ -49,5 +51,43 @@ Namespace DevCommerc8ak
             Dim v As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
             Return Convert.ToInt32(v)
         End Function
+
+        '' --- MODULE 1 : SORTIE MANUELLE ---
+
+        'Public Function EnregistrerSortieManuelle(panier As List(Of StockSortieDTO), motifId As Integer, clientId As Integer?, utilisateurId As Integer) As String
+        '    Dim reference As String = "SORT-" & DateTime.Now.ToString("yyyyMMdd-HHmmss")
+
+        '    Try
+        '        For Each item As StockSortieDTO In panier
+        '            Dim sql As String = "INSERT INTO StockSortie (NumeroSortie, ProduitId, Quantite, Unite, QuantiteBase, MotifId, ClientId, CreePar, DateSortie) " &
+        '                              "VALUES (@ref, @pid, @qte, @unite, @qteBase, @motif, @client, @user, GETDATE())"
+
+        '            Dim params As New Dictionary(Of String, Object) From {
+        '                {"@ref", reference},
+        '                {"@pid", item.ProduitId},
+        '                {"@qte", item.Quantite},
+        '                {"@unite", item.Unite},
+        '                {"@qteBase", item.QuantiteBase},
+        '                {"@motif", motifId},
+        '                {"@client", If(clientId.HasValue, DirectCast(clientId.Value, Object), DBNull.Value)},
+        '                {"@user", utilisateurId}
+        '            }
+
+        '            _dal.ExecuterNonRequete(sql, params)
+
+        '            ' Mise à jour du stock réel
+        '            Dim sqlStock As String = "UPDATE Produits SET StockActuel = StockActuel - @qte WHERE ProduitId = @id"
+        '            Dim paramsStock As New Dictionary(Of String, Object) From {
+        '                {"@qte", item.QuantiteBase},
+        '                {"@id", item.ProduitId}
+        '            }
+        '            _dal.ExecuterNonRequete(sqlStock, paramsStock)
+        '        Next
+        '        Return reference
+        '    Catch ex As Exception
+        '        Throw New Exception("Erreur lors de l'enregistrement de la sortie : " & ex.Message)
+        '    End Try
+        'End Function
+
     End Class
 End Namespace

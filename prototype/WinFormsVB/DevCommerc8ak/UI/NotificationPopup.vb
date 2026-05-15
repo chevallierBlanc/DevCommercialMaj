@@ -8,7 +8,7 @@ Imports System.Collections.Generic
 Imports System.Data
 
 Namespace DevCommerc8ak
-    Public Class NotificationPopup
+    Public Class NotificationPopup1
         Inherits Form
 
         Private ReadOnly timerClose As Timer
@@ -31,7 +31,7 @@ Namespace DevCommerc8ak
             Me.Controls.Add(lblTitre)
             Me.Controls.Add(lblBody)
 
-            Dim area = Screen.PrimaryScreen.WorkingArea
+            Dim area As Rectangle = Screen.PrimaryScreen.WorkingArea
             Me.Left = area.Right - Me.Width - 10
             Me.Top = area.Bottom - Me.Height - 10
 

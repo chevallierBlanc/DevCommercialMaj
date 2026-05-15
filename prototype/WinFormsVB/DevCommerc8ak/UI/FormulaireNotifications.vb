@@ -8,7 +8,7 @@ Imports System.Drawing
 Imports System.Windows.Forms
 
 Namespace DevCommerc8ak
-    Public Class FormulaireNotifications
+    Public Class FormulaireNotifications1
         Inherits Form
 
         Private ReadOnly gridNotifications As DataGridView

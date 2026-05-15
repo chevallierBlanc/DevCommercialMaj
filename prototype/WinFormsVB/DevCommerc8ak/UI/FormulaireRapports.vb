@@ -6,6 +6,7 @@ Imports System.Configuration
 Imports System.IO
 Imports System.Text
 Imports System.Windows.Forms
+Imports System.Collections.Generic
 
 Namespace DevCommerc8ak
     Public Class FormulaireRapports

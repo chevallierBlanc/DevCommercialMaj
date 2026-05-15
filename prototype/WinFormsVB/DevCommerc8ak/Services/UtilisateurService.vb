@@ -3,7 +3,7 @@ Option Explicit On
 
 Imports System
 Imports System.Security.Cryptography
-
+Imports System.Collections.Generic
 Namespace DevCommerc8ak
     Public Class UtilisateurService
         Private ReadOnly _utilisateurRepo As UtilisateurRepository

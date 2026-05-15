@@ -31,7 +31,7 @@ Namespace DevCommerc8ak
         End Function
 
         ' Ajoute une ligne a une facture.
-        Public Function AjouterLigne(factureVenteId As Integer, produitId As Integer, quantite As Decimal, prixUnitaire As Decimal, montantRemise As Decimal, Optional quantiteFacturee As Decimal? = Nothing) As Integer
+        Public Function AjouterLigne(factureVenteId As Integer, produitId As Integer, quantite As Decimal, QuantiteBase As Decimal, TypeVente As String, prixUnitaire As Decimal, montantRemise As Decimal, Optional quantiteFacturee As Decimal? = Nothing) As Integer
             Dim repo As New LigneFactureVenteRepository(_dal)
             Dim quantiteMontant As Decimal = If(quantiteFacturee.HasValue, quantiteFacturee.Value, quantite)
             Dim montantLigne As Decimal = (quantiteMontant * prixUnitaire) - montantRemise
@@ -39,9 +39,12 @@ Namespace DevCommerc8ak
                 .FactureVenteId = factureVenteId,
                 .ProduitId = produitId,
                 .Quantite = quantite,
+                .QuantiteBase = QuantiteBase,
+                .TypeVente = TypeVente,
                 .PrixUnitaire = prixUnitaire,
                 .MontantRemise = montantRemise,
-                .MontantLigne = montantLigne
+                .MontantLigne = montantLigne,
+                .QteSaisie = quantiteFacturee
             }
             Return repo.Ajouter(ligne)
         End Function

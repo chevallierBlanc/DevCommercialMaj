@@ -1,0 +1,16 @@
+# Visual Studio
+.vs/
+bin/
+obj/
+
+# Executables
+*.exe
+*.pdb
+*.vshost.exe
+
+# Temporary files
+*.cache
+*.tmp
+
+
+

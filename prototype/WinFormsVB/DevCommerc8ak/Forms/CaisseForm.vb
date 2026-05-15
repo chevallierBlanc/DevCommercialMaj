@@ -12,6 +12,19 @@ Namespace DevCommerc8ak
     Public Class CaisseForm
         Inherits Form
 
+        ' --- Couleurs du Thème ---
+        Private ReadOnly ColorPrimary As Color = Color.FromArgb(41, 128, 185) ' Bleu Moderne
+        Private ReadOnly ColorSecondary As Color = Color.FromArgb(52, 73, 94) ' Gris Foncé
+        Private ReadOnly ColorAccent As Color = Color.FromArgb(39, 174, 96) ' Vert Succès
+        Private ReadOnly ColorDanger As Color = Color.FromArgb(192, 57, 43) ' Rouge Annuler
+        Private ReadOnly ColorBg As Color = Color.FromArgb(245, 247, 250) ' Gris très clair
+        Private ReadOnly ColorWhite As Color = Color.White
+        Private ReadOnly FontMain As New Font("Segoe UI", 10)
+        Private ReadOnly FontBold As New Font("Segoe UI", 10, FontStyle.Bold)
+        Private ReadOnly FontTitle As New Font("Segoe UI", 14, FontStyle.Bold)
+        Private ReadOnly FontTotal As New Font("Segoe UI", 22, FontStyle.Bold)
+
+        ' --- Composants ---
         Private ReadOnly txtRecherche As TextBox
         Private ReadOnly chkDate As CheckBox
         Private ReadOnly dtDate As DateTimePicker
@@ -33,6 +46,7 @@ Namespace DevCommerc8ak
         Private ReadOnly btnImprimer As Button
         Private ReadOnly btnAnnuler As Button
 
+        ' --- Données ---
         Private _param As ParametreDTO
         Private _totalCourant As Decimal
         Private _dernierTicket As TicketData
@@ -50,108 +64,195 @@ Namespace DevCommerc8ak
         End Class
 
         Public Sub New()
-            Me.BackColor = Color.White
-            Me.Text = "Caisse"
-            Me.Width = 1250
-            Me.Height = 740
+            ' Configuration de la Form
+            Me.BackColor = ColorBg
+            Me.Text = "Terminal de Caisse Professionnel"
+            Me.Width = 1300
+            Me.Height = 800
+            Me.Font = FontMain
             Me.StartPosition = FormStartPosition.CenterScreen
+            Me.FormBorderStyle = FormBorderStyle.FixedDialog
+            Me.MaximizeBox = False
             Me.KeyPreview = True
 
-            Dim panelGauche As New Panel() With {.Left = 10, .Top = 10, .Width = 380, .Height = 680}
-            Dim panelCentre As New Panel() With {.Left = 400, .Top = 10, .Width = 460, .Height = 680}
-            Dim panelDroite As New Panel() With {.Left = 870, .Top = 10, .Width = 360, .Height = 680}
+            ' --- Header Panel ---
+            Dim pnlHeader As New Panel() With {
+                .Dock = DockStyle.Top,
+                .Height = 60,
+                .BackColor = ColorSecondary
+            }
+            Dim lblAppTitle As New Label() With {
+                .Text = "GESTION DE LA CAISSE",
+                .ForeColor = ColorWhite,
+                .Font = FontTitle,
+                .AutoSize = True,
+                .Left = 20,
+                .Top = 15
+            }
+            pnlHeader.Controls.Add(lblAppTitle)
 
-            Dim lblRecherche As New Label() With {.Text = "Recherche (numero, client, telephone)", .Left = 10, .Top = 10, .AutoSize = True}
-            txtRecherche = New TextBox() With {.Left = 10, .Top = 30, .Width = 260}
-            chkDate = New CheckBox() With {.Text = "Date", .Left = 10, .Top = 62, .AutoSize = True}
-            dtDate = New DateTimePicker() With {.Left = 70, .Top = 60, .Width = 120, .Format = DateTimePickerFormat.Short}
-            btnActualiser = New Button() With {.Text = "Actualiser", .Left = 200, .Top = 58, .Width = 90}
+            ' --- Main Container ---
+            Dim pnlMain As New Panel() With {
+                .Dock = DockStyle.Fill,
+                .Padding = New Padding(15)
+            }
+
+            ' --- Colonne Gauche (Liste des Factures) ---
+            Dim pnlGauche As New Panel() With {
+                .Width = 380,
+                .Dock = DockStyle.Left,
+                .BackColor = ColorWhite,
+                .Padding = New Padding(10)
+            }
+            pnlGauche.BorderStyle = BorderStyle.FixedSingle
+
+            Dim lblRechercheTitre As New Label() With {.Text = "RECHERCHE FACTURE", .Dock = DockStyle.Top, .Height = 25, .Font = FontBold, .ForeColor = ColorPrimary}
+            txtRecherche = New TextBox() With {.Dock = DockStyle.Top, .Height = 30, .BorderStyle = BorderStyle.FixedSingle, .Font = New Font("Segoe UI", 11)}
+
+            Dim pnlFiltreDate As New Panel() With {.Dock = DockStyle.Top, .Height = 45, .Padding = New Padding(0, 10, 0, 0)}
+            chkDate = New CheckBox() With {.Text = "Par Date", .Left = 0, .Top = 12, .AutoSize = True, .Font = FontMain}
+            dtDate = New DateTimePicker() With {.Left = 85, .Top = 10, .Width = 120, .Format = DateTimePickerFormat.Short}
+            btnActualiser = New Button() With {
+                .Text = "Actualiser", .Left = 215, .Top = 8, .Width = 100, .Height = 28,
+                .FlatStyle = FlatStyle.Flat, .BackColor = ColorPrimary, .ForeColor = ColorWhite, .Cursor = Cursors.Hand
+            }
+            btnActualiser.FlatAppearance.BorderSize = 0
+            pnlFiltreDate.Controls.AddRange({chkDate, dtDate, btnActualiser})
 
             gridFactures = New DataGridView() With {
-                .Left = 10,
-                .Top = 95,
-                .Width = 360,
-                .Height = 570,
-                .ReadOnly = True,
-                .AutoGenerateColumns = False,
-                .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-                .AllowUserToAddRows = False,
-                .RowHeadersVisible = False
+                .Dock = DockStyle.Fill,
+                .ReadOnly = True, .BorderStyle = BorderStyle.None,
+                .BackgroundColor = ColorWhite, .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                .AllowUserToAddRows = False, .RowHeadersVisible = False,
+                .AlternatingRowsDefaultCellStyle = New DataGridViewCellStyle() With {.BackColor = Color.FromArgb(245, 245, 245)}
+            }
+            gridFactures.ColumnHeadersDefaultCellStyle.BackColor = ColorSecondary
+            gridFactures.ColumnHeadersDefaultCellStyle.ForeColor = ColorWhite
+            gridFactures.EnableHeadersVisualStyles = False
+
+            pnlGauche.Controls.Add(gridFactures)
+            pnlGauche.Controls.Add(pnlFiltreDate)
+            pnlGauche.Controls.Add(txtRecherche)
+            pnlGauche.Controls.Add(lblRechercheTitre)
+
+            ' --- Colonne Centre (Détails Facture) ---
+            Dim pnlCentre As New Panel() With {
+                .Dock = DockStyle.Fill,
+                .Padding = New Padding(15, 0, 15, 0)
             }
 
-            panelGauche.Controls.Add(lblRecherche)
-            panelGauche.Controls.Add(txtRecherche)
-            panelGauche.Controls.Add(chkDate)
-            panelGauche.Controls.Add(dtDate)
-            panelGauche.Controls.Add(btnActualiser)
-            panelGauche.Controls.Add(gridFactures)
+            Dim grpDetails As New GroupBox() With {
+                .Text = "DÉTAILS DE LA SÉLECTION",
+                .Dock = DockStyle.Fill,
+                .Font = FontBold,
+                .ForeColor = ColorSecondary,
+                .Padding = New Padding(10)
+            }
 
-            Dim lblTitreDetail As New Label() With {.Text = "Details facture", .Left = 10, .Top = 10, .AutoSize = True, .Font = New Font("Segoe UI", 11, FontStyle.Bold)}
-            lblNumeroFacture = New Label() With {.Left = 10, .Top = 40, .AutoSize = True}
-            lblClient = New Label() With {.Left = 10, .Top = 65, .AutoSize = True}
-            lblDateFacture = New Label() With {.Left = 10, .Top = 90, .AutoSize = True}
+            Dim pnlInfoFacture As New Panel() With {.Dock = DockStyle.Top, .Height = 90, .BackColor = Color.FromArgb(235, 240, 245)}
+            lblNumeroFacture = New Label() With {.Text = "Facture: -", .Left = 15, .Top = 10, .AutoSize = True, .Font = FontBold, .ForeColor = ColorPrimary}
+            lblClient = New Label() With {.Text = "Client: -", .Left = 15, .Top = 35, .AutoSize = True, .Font = FontMain}
+            lblDateFacture = New Label() With {.Text = "Date: -", .Left = 15, .Top = 60, .AutoSize = True, .Font = FontMain}
+            pnlInfoFacture.Controls.AddRange({lblNumeroFacture, lblClient, lblDateFacture})
 
             gridDetails = New DataGridView() With {
-                .Left = 10,
-                .Top = 120,
-                .Width = 440,
-                .Height = 545,
-                .ReadOnly = True,
-                .AutoGenerateColumns = True,
-                .AllowUserToAddRows = False,
-                .RowHeadersVisible = False
+                .Dock = DockStyle.Fill,
+                .ReadOnly = True, .BorderStyle = BorderStyle.None,
+                .BackgroundColor = ColorWhite, .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                .AllowUserToAddRows = False, .RowHeadersVisible = False,
+                .AlternatingRowsDefaultCellStyle = New DataGridViewCellStyle() With {.BackColor = Color.FromArgb(245, 245, 245)}
+            }
+            gridDetails.ColumnHeadersDefaultCellStyle.BackColor = ColorSecondary
+            gridDetails.ColumnHeadersDefaultCellStyle.ForeColor = ColorWhite
+            gridDetails.EnableHeadersVisualStyles = False
+
+            grpDetails.Controls.Add(gridDetails)
+            grpDetails.Controls.Add(pnlInfoFacture)
+            pnlCentre.Controls.Add(grpDetails)
+
+            ' --- Colonne Droite (Paiement) ---
+            Dim pnlDroite As New Panel() With {
+                .Width = 360,
+                .Dock = DockStyle.Right,
+                .BackColor = ColorWhite,
+                .Padding = New Padding(15)
+            }
+            pnlDroite.BorderStyle = BorderStyle.FixedSingle
+
+            Dim lblTotalTitre As New Label() With {.Text = "MONTANT À PERCEVOIR", .Dock = DockStyle.Top, .Height = 30, .Font = FontBold, .TextAlign = ContentAlignment.MiddleCenter}
+            lblTotal = New Label() With {
+                .Text = "0 FC", .Dock = DockStyle.Top, .Height = 60,
+                .Font = FontTotal, .ForeColor = ColorPrimary, .TextAlign = ContentAlignment.MiddleCenter,
+                .BackColor = Color.FromArgb(240, 248, 255)
             }
 
-            panelCentre.Controls.Add(lblTitreDetail)
-            panelCentre.Controls.Add(lblNumeroFacture)
-            panelCentre.Controls.Add(lblClient)
-            panelCentre.Controls.Add(lblDateFacture)
-            panelCentre.Controls.Add(gridDetails)
-
-            Dim lblTotalTitre As New Label() With {.Text = "TOTAL", .Left = 10, .Top = 10, .AutoSize = True, .Font = New Font("Segoe UI", 12, FontStyle.Bold)}
-            lblTotal = New Label() With {.Left = 10, .Top = 38, .AutoSize = True, .Font = New Font("Segoe UI", 16, FontStyle.Bold), .ForeColor = Color.DarkBlue}
-
-            Dim lblRecu As New Label() With {.Text = "Montant recu", .Left = 10, .Top = 90, .AutoSize = True}
-            txtMontantRecu = New TextBox() With {.Left = 10, .Top = 110, .Width = 200}
-
-            Dim lblDevise As New Label() With {.Text = "Devise", .Left = 220, .Top = 90, .AutoSize = True}
-            cmbDevise = New ComboBox() With {.Left = 220, .Top = 110, .Width = 100, .DropDownStyle = ComboBoxStyle.DropDownList}
+            Dim pnlRecu As New Panel() With {.Dock = DockStyle.Top, .Height = 80, .Padding = New Padding(0, 15, 0, 0)}
+            Dim lblRecuTitre As New Label() With {.Text = "MONTANT REÇU", .Left = 0, .Top = 15, .AutoSize = True, .Font = FontBold}
+            txtMontantRecu = New TextBox() With {
+                .Left = 0, .Top = 38, .Width = 200, .Height = 35,
+                .BorderStyle = BorderStyle.FixedSingle, .Font = New Font("Segoe UI", 14, FontStyle.Bold),
+                .TextAlign = HorizontalAlignment.Right
+            }
+            cmbDevise = New ComboBox() With {
+                .Left = 210, .Top = 38, .Width = 100, .Height = 35,
+                .DropDownStyle = ComboBoxStyle.DropDownList, .Font = New Font("Segoe UI", 12)
+            }
             cmbDevise.Items.AddRange(New Object() {"FC", "USD"})
             cmbDevise.SelectedIndex = 0
+            pnlRecu.Controls.AddRange({lblRecuTitre, txtMontantRecu, cmbDevise})
 
-            lblMonnaie = New Label() With {.Left = 10, .Top = 145, .AutoSize = True, .Font = New Font("Segoe UI", 10, FontStyle.Bold)}
+            lblMonnaie = New Label() With {
+                .Text = "Monnaie: 0 FC", .Dock = DockStyle.Top, .Height = 40,
+                .Font = FontBold, .ForeColor = ColorDanger, .TextAlign = ContentAlignment.MiddleLeft
+            }
 
-            Dim lblMode As New Label() With {.Text = "Mode paiement", .Left = 10, .Top = 185, .AutoSize = True}
-            cmbMode = New ComboBox() With {.Left = 10, .Top = 205, .Width = 200, .DropDownStyle = ComboBoxStyle.DropDownList}
+            Dim pnlMode As New Panel() With {.Dock = DockStyle.Top, .Height = 70}
+            Dim lblModeTitre As New Label() With {.Text = "MODE DE PAIEMENT", .Dock = DockStyle.Top, .Height = 25, .Font = FontBold}
+            cmbMode = New ComboBox() With {.Dock = DockStyle.Top, .Height = 30, .DropDownStyle = ComboBoxStyle.DropDownList}
             cmbMode.Items.AddRange(New Object() {"CASH", "MOBILE_MONEY", "CARTE", "AUTRE"})
             cmbMode.SelectedIndex = 0
+            pnlMode.Controls.AddRange({cmbMode, lblModeTitre})
 
-            Dim lblRef As New Label() With {.Text = "Reference", .Left = 10, .Top = 240, .AutoSize = True}
-            txtReference = New TextBox() With {.Left = 10, .Top = 260, .Width = 200}
+            Dim pnlRef As New Panel() With {.Dock = DockStyle.Top, .Height = 70}
+            Dim lblRefTitre As New Label() With {.Text = "RÉFÉRENCE / TRANSACTION", .Dock = DockStyle.Top, .Height = 25, .Font = FontBold}
+            txtReference = New TextBox() With {.Dock = DockStyle.Top, .Height = 30, .BorderStyle = BorderStyle.FixedSingle}
+            pnlRef.Controls.AddRange({txtReference, lblRefTitre})
 
-            btnEncaisser = New Button() With {.Text = "Encaisser", .Left = 10, .Top = 310, .Width = 140}
-            btnImprimer = New Button() With {.Text = "Imprimer ticket", .Left = 160, .Top = 310, .Width = 140}
-            btnAnnuler = New Button() With {.Text = "Annuler", .Left = 10, .Top = 350, .Width = 140}
+            Dim pnlActions As New Panel() With {.Dock = DockStyle.Bottom, .Height = 180}
+            btnEncaisser = New Button() With {
+                .Text = "VALIDER L'ENCAISSEMENT", .Dock = DockStyle.Top, .Height = 55,
+                .FlatStyle = FlatStyle.Flat, .BackColor = ColorAccent, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand
+            }
+            btnEncaisser.FlatAppearance.BorderSize = 0
 
-            panelDroite.Controls.Add(lblTotalTitre)
-            panelDroite.Controls.Add(lblTotal)
-            panelDroite.Controls.Add(lblRecu)
-            panelDroite.Controls.Add(txtMontantRecu)
-            panelDroite.Controls.Add(lblDevise)
-            panelDroite.Controls.Add(cmbDevise)
-            panelDroite.Controls.Add(lblMonnaie)
-            panelDroite.Controls.Add(lblMode)
-            panelDroite.Controls.Add(cmbMode)
-            panelDroite.Controls.Add(lblRef)
-            panelDroite.Controls.Add(txtReference)
-            panelDroite.Controls.Add(btnEncaisser)
-            panelDroite.Controls.Add(btnImprimer)
-            panelDroite.Controls.Add(btnAnnuler)
+            Dim btnSep1 As New Panel() With {.Dock = DockStyle.Top, .Height = 10}
 
-            Me.Controls.Add(panelGauche)
-            Me.Controls.Add(panelCentre)
-            Me.Controls.Add(panelDroite)
+            btnImprimer = New Button() With {
+                .Text = "IMPRIMER TICKET", .Dock = DockStyle.Top, .Height = 45,
+                .FlatStyle = FlatStyle.Flat, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand
+            }
+            btnImprimer.FlatAppearance.BorderSize = 0
 
+            Dim btnSep2 As New Panel() With {.Dock = DockStyle.Top, .Height = 10}
+
+            btnAnnuler = New Button() With {
+                .Text = "ANNULER / EFFACER", .Dock = DockStyle.Top, .Height = 45,
+                .FlatStyle = FlatStyle.Flat, .BackColor = ColorDanger, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand
+            }
+            btnAnnuler.FlatAppearance.BorderSize = 0
+
+            pnlActions.Controls.AddRange({btnAnnuler, btnSep2, btnImprimer, btnSep1, btnEncaisser})
+
+            pnlDroite.Controls.AddRange({pnlActions, pnlRef, pnlMode, lblMonnaie, pnlRecu, lblTotal, lblTotalTitre})
+
+            ' Assemblage final
+            pnlMain.Controls.Add(pnlCentre)
+            pnlMain.Controls.Add(pnlGauche)
+            pnlMain.Controls.Add(pnlDroite)
+            Me.Controls.Add(pnlMain)
+            Me.Controls.Add(pnlHeader)
+
+            ' --- Handlers ---
             AddHandler btnActualiser.Click, AddressOf ChargerFactures
             AddHandler txtRecherche.TextChanged, AddressOf ChargerFactures
             AddHandler chkDate.CheckedChanged, AddressOf ChargerFactures
@@ -163,12 +264,12 @@ Namespace DevCommerc8ak
             AddHandler btnImprimer.Click, AddressOf ImprimerTicket
             AddHandler btnAnnuler.Click, AddressOf AnnulerSelection
 
-            ThemeHelper.AppliquerTheme(Me)
+            ' Initialisation
             ConfigurerGrilleFactures()
+            ConfigurerGrilleChargerLignes()
             ChargerParametres()
             ChargerFactures(Nothing, EventArgs.Empty)
         End Sub
-
         Protected Overrides Sub OnKeyDown(e As KeyEventArgs)
             MyBase.OnKeyDown(e)
             If e.KeyCode = Keys.Enter Then
@@ -194,6 +295,20 @@ Namespace DevCommerc8ak
             gridFactures.Columns.AddRange(New DataGridViewColumn() {colId, colNumero, colClient, colTel, colDate, colTotal})
         End Sub
 
+        Private Sub ConfigurerGrilleChargerLignes()
+            gridDetails.Columns.Clear()
+            gridDetails.AutoGenerateColumns = False
+            Dim colLigFact As New DataGridViewTextBoxColumn() With {.DataPropertyName = "LigneFactureVenteId", .Name = "LigneFactureVenteId", .Visible = False}
+            Dim colFactV As New DataGridViewTextBoxColumn() With {.DataPropertyName = "FactureVenteId", .HeaderText = "FactureVenteId", .Width = 110, .Visible = False}
+            Dim colprod As New DataGridViewTextBoxColumn() With {.DataPropertyName = "ProduitId", .HeaderText = "ProduitId", .Width = 120, .Visible = False}
+            Dim colLib As New DataGridViewTextBoxColumn() With {.DataPropertyName = "Libelle", .HeaderText = "Libelle", .AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill}
+            Dim colQte As New DataGridViewTextBoxColumn() With {.DataPropertyName = "Quantite", .HeaderText = "Qte", .Width = 80}
+            Dim colPU As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixUnitaire", .HeaderText = "PU", .Width = 80}
+            Dim colTotal As New DataGridViewTextBoxColumn() With {.DataPropertyName = "MontantLigne", .HeaderText = "Total", .Width = 80, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
+            gridDetails.Columns.AddRange(New DataGridViewColumn() {colLigFact, colFactV, colprod, colLib, colQte, colPU, colTotal})
+
+
+        End Sub
         Private Sub ChargerParametres()
             Try
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
@@ -220,11 +335,11 @@ Namespace DevCommerc8ak
 
         Private Sub ChargerDetails(sender As Object, e As EventArgs)
             If gridFactures.CurrentRow Is Nothing Then Return
-            Dim numero As String = Convert.ToString(gridFactures.CurrentRow.Cells("NumeroFacture").Value)
-            Dim client As String = Convert.ToString(gridFactures.CurrentRow.Cells("ClientNom").Value)
-            Dim tel As String = Convert.ToString(gridFactures.CurrentRow.Cells("Telephone").Value)
-            Dim dtFacture As Date = Convert.ToDateTime(gridFactures.CurrentRow.Cells("CreeLe").Value)
-            _totalCourant = Convert.ToDecimal(gridFactures.CurrentRow.Cells("MontantTotal").Value)
+            Dim numero As String = Convert.ToString(gridFactures.CurrentRow.Cells(1).Value)
+            Dim client As String = Convert.ToString(gridFactures.CurrentRow.Cells(2).Value)
+            Dim tel As String = Convert.ToString(gridFactures.CurrentRow.Cells(3).Value)
+            Dim dtFacture As Date = Convert.ToDateTime(gridFactures.CurrentRow.Cells(4).Value)
+            _totalCourant = Convert.ToDecimal(gridFactures.CurrentRow.Cells(5).Value)
 
             lblNumeroFacture.Text = "Facture: " & numero
             lblClient.Text = "Client: " & client & " / " & tel
@@ -238,7 +353,7 @@ Namespace DevCommerc8ak
 
         Private Sub ChargerLignes()
             If gridFactures.CurrentRow Is Nothing Then Return
-            Dim factureId As Integer = Convert.ToInt32(gridFactures.CurrentRow.Cells("FactureVenteId").Value)
+            Dim factureId As Integer = Convert.ToInt32(gridFactures.CurrentRow.Cells(0).Value)
             Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
             Dim dal As New DAL(cs)
             Dim repo As New LigneFactureVenteRepository(dal)
@@ -279,7 +394,7 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                Dim factureId As Integer = Convert.ToInt32(gridFactures.CurrentRow.Cells("FactureVenteId").Value)
+                Dim factureId As Integer = Convert.ToInt32(gridFactures.CurrentRow.Cells(0).Value)
                 Dim monnaieFC As Decimal = montantFC - _totalCourant
 
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
@@ -299,16 +414,16 @@ Namespace DevCommerc8ak
 
         Private Function ConstruireTicketDepuisSelection(montantRecuFc As Decimal, monnaieFc As Decimal, devise As String) As TicketData
             Dim ticket As New TicketData()
-            ticket.Numero = Convert.ToString(gridFactures.CurrentRow.Cells("NumeroFacture").Value)
-            ticket.Client = Convert.ToString(gridFactures.CurrentRow.Cells("ClientNom").Value)
-            ticket.Telephone = Convert.ToString(gridFactures.CurrentRow.Cells("Telephone").Value)
-            ticket.DateFacture = Convert.ToDateTime(gridFactures.CurrentRow.Cells("CreeLe").Value)
-            ticket.Total = Convert.ToDecimal(gridFactures.CurrentRow.Cells("MontantTotal").Value)
+            ticket.Numero = Convert.ToString(gridFactures.CurrentRow.Cells(1).Value)
+            ticket.Client = Convert.ToString(gridFactures.CurrentRow.Cells(2).Value)
+            ticket.Telephone = Convert.ToString(gridFactures.CurrentRow.Cells(3).Value)
+            ticket.DateFacture = Convert.ToDateTime(gridFactures.CurrentRow.Cells(4).Value)
+            ticket.Total = Convert.ToDecimal(gridFactures.CurrentRow.Cells(5).Value)
             ticket.MontantRecu = montantRecuFc
             ticket.Monnaie = monnaieFc
             ticket.Devise = devise
 
-            Dim factureId As Integer = Convert.ToInt32(gridFactures.CurrentRow.Cells("FactureVenteId").Value)
+            Dim factureId As Integer = Convert.ToInt32(gridFactures.CurrentRow.Cells(0).Value)
             Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
             Dim dal As New DAL(cs)
             Dim repo As New LigneFactureVenteRepository(dal)
@@ -340,7 +455,7 @@ Namespace DevCommerc8ak
                 End If
 
                 doc.DefaultPageSettings.Color = If(_param IsNot Nothing, _param.ImpressionCouleur, True)
-                AddHandler doc.PrintPage, Sub(s, e) ImprimerPageTicket(e, ticket)
+                AddHandler doc.PrintPage, Sub(s, eV) ImprimerPageTicket(eV, ticket)
 
                 If _param IsNot Nothing AndAlso _param.ApercuAvantImpression Then
                     Dim preview As New PrintPreviewDialog()
@@ -383,10 +498,11 @@ Namespace DevCommerc8ak
             If ticket.Lignes IsNot Nothing Then
                 For Each row As DataRow In ticket.Lignes.Rows
                     Dim libelle As String = Convert.ToString(row("Libelle"))
-                    Dim qte As String = Convert.ToDecimal(row("Quantite")).ToString()
+                    Dim qte As String = Convert.ToDecimal(row("QuantiteSaisie")).ToString()
+                    Dim unite As String = Convert.ToString(row("TypeVente"))
                     Dim prix As String = Convert.ToDecimal(row("PrixUnitaire")).ToString()
                     Dim total As String = Convert.ToDecimal(row("MontantLigne")).ToString()
-                    Dim line As String = libelle & "  " & qte & " x " & prix
+                    Dim line As String = libelle & "  " & qte & unite & " x " & prix
                     e.Graphics.DrawString(line, New Font("Segoe UI", 7), Brushes.Black, 10, y)
                     y += 12
                     e.Graphics.DrawString("   = " & total, New Font("Segoe UI", 7), Brushes.Black, 10, y)

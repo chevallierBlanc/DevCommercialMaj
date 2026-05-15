@@ -3,6 +3,7 @@ Option Explicit On
 
 Imports System
 Imports System.Data
+Imports System.Collections.Generic
 
 Namespace DevCommerc8ak
     Public Class SessionRepository

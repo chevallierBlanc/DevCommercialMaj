@@ -3,6 +3,7 @@ Option Explicit On
 
 Imports System
 Imports System.Configuration
+Imports Microsoft.VisualBasic
 Imports System.Data
 Imports System.Collections.Generic
 Imports System.Drawing
@@ -11,7 +12,7 @@ Imports System.Drawing.Drawing2D
 Imports System.Drawing.Printing
 
 Namespace DevCommerc8ak
-    Public Class FormulaireStock
+    Public Class FormulaireStock1
         Inherits Form
 
         Private ReadOnly tabs As TabControl
@@ -498,17 +499,18 @@ Namespace DevCommerc8ak
             If cmbProduitExistant.SelectedValue Is Nothing Then Return
             Dim row As DataRowView = TryCast(cmbProduitExistant.SelectedItem, DataRowView)
             If row Is Nothing Then Return
+            Dim r As DataRow = row.Row
 
             txtNomProduit.Text = Convert.ToString(row("Libelle"))
-            cmbCategorie.Text = If(row.IsNull("CategorieId"), "", Convert.ToString(row("CategorieId")))
+            cmbCategorie.Text = If(r.IsNull("CategorieId"), "", Convert.ToString(row("CategorieId")))
             txtReference.Text = GenererReference(Convert.ToString(row("Libelle")), cmbCategorie.Text)
 
-            cmbUniteBase.Text = If(row.IsNull("UnitePrincipale"), "", Convert.ToString(row("UnitePrincipale")))
-            txtNbUniteParBase.Text = If(row.IsNull("ConversionUnite"), "", Convert.ToDecimal(row("ConversionUnite")).ToString())
-            txtPrixAchat.Text = If(row.IsNull("PrixAchat"), "", Convert.ToDecimal(row("PrixAchat")).ToString())
-            txtCoefficientInput.Text = If(row.IsNull("CoefficientGros"), "", Convert.ToDecimal(row("CoefficientGros")).ToString("N4"))
+            cmbUniteBase.Text = If(r.IsNull("UnitePrincipale"), "", Convert.ToString(row("UnitePrincipale")))
+            txtNbUniteParBase.Text = If(r.IsNull("ConversionUnite"), "", Convert.ToDecimal(row("ConversionUnite")).ToString())
+            txtPrixAchat.Text = If(r.IsNull("PrixAchat"), "", Convert.ToDecimal(row("PrixAchat")).ToString())
+            txtCoefficientInput.Text = If(r.IsNull("CoefficientGros"), "", Convert.ToDecimal(row("CoefficientGros")).ToString("N4"))
             Dim prixAchatVal As Decimal = LireDecimal(txtPrixAchat.Text)
-            Dim prixDetailVal As Decimal = If(row.IsNull("PrixDetail"), 0D, Convert.ToDecimal(row("PrixDetail")))
+            Dim prixDetailVal As Decimal = If(r.IsNull("PrixDetail"), 0D, Convert.ToDecimal(row("PrixDetail")))
             Dim conversionVal As Decimal = LireDecimal(txtNbUniteParBase.Text)
             If prixAchatVal > 0D AndAlso conversionVal > 0D AndAlso prixDetailVal > 0D Then
                 txtCoefficientDetail.Text = Math.Round((prixDetailVal * conversionVal) / prixAchatVal, 4).ToString("N4")
@@ -518,7 +520,7 @@ Namespace DevCommerc8ak
 
             chkGros.Checked = Convert.ToBoolean(row("VenteGros"))
             chkDemi.Checked = Convert.ToBoolean(row("VenteDemi"))
-            chkQuart.Checked = (If(row.IsNull("PrixQuart"), 0D, Convert.ToDecimal(row("PrixQuart"))) > 0D)
+            chkQuart.Checked = (If(r.IsNull("PrixQuart"), 0D, Convert.ToDecimal(row("PrixQuart"))) > 0D)
             chkPiece.Checked = Convert.ToBoolean(row("VenteDetail"))
             chkDouzaine.Checked = Convert.ToBoolean(row("VenteDouzaine"))
 
@@ -528,15 +530,17 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub AfficherStockActuel()
-            If cmbProduitExistant.SelectedValue Is Nothing Then Return
-            Dim produitId As Integer = Convert.ToInt32(cmbProduitExistant.SelectedValue)
-            Dim service As StockService = ObtenirStockService()
-            Dim stockPieces As Decimal = service.ObtenirStockActuelProduit(produitId)
-            Dim nb As Decimal = LireDecimal(txtNbUniteParBase.Text)
-            Dim uniteBase As String = If(cmbUniteBase.Text.Trim() = "", "base", cmbUniteBase.Text.Trim())
-            Dim stockBase As Decimal = If(nb > 0D, Decimal.Floor(stockPieces / nb), stockPieces)
-            lblStockActuel.Text = "Stock actuel: " & stockBase.ToString("N2") & " " & uniteBase
-            lblStockActuelPiece.Text = "Equivalent: " & stockPieces.ToString("N2") & " pièces"
+
+            If cmbProduitExistant.SelectedValue IsNot Nothing AndAlso Not TypeOf cmbProduitExistant.SelectedValue Is DataRowView Then
+                Dim produitId As Integer = Convert.ToInt32(cmbProduitExistant.SelectedValue)
+                Dim service As StockService = ObtenirStockService()
+                Dim stockPieces As Decimal = service.ObtenirStockActuelProduit(produitId)
+                Dim nb As Decimal = LireDecimal(txtNbUniteParBase.Text)
+                Dim uniteBase As String = If(cmbUniteBase.Text.Trim() = "", "base", cmbUniteBase.Text.Trim())
+                Dim stockBase As Decimal = If(nb > 0D, Decimal.Floor(stockPieces / nb), stockPieces)
+                lblStockActuel.Text = "Stock actuel: " & stockBase.ToString("N2") & " " & uniteBase
+                lblStockActuelPiece.Text = "Equivalent: " & stockPieces.ToString("N2") & " pièces"
+            End If
         End Sub
 
         Private Sub RecalculerStock(sender As Object, e As EventArgs)
@@ -565,21 +569,25 @@ Namespace DevCommerc8ak
                 Exit Sub
             End If
 
-            Dim input As String = txtCoefficientInput.Text.Replace("%", "").Trim()
+            Dim input As String = txtCoefficientInput.Text.Replace("%", "").Replace(".", ",").Trim()
             Dim valeur As Decimal
             If Decimal.TryParse(input, valeur) Then
                 Dim coefficient As Decimal
                 Dim marge As Decimal
-                If txtCoefficientInput.Text.Contains("%") OrElse valeur > 1D Then
+
+                If txtCoefficientInput.Text.Contains("%") OrElse valeur >= 10 Then
+                    'cas pourcentage
                     marge = valeur
-                    coefficient = 1D + (marge / 100D)
-                    lblTypeCoefficient.Text = "Marge (%)"
+                    coefficient = 1 + (marge / 100)
+                    lblTypeCoefficient.Text = "Marge" & marge & "(%)"
                 Else
+                    'cas coefficient 
                     coefficient = valeur
-                    marge = (coefficient - 1D) * 100D
-                    lblTypeCoefficient.Text = "Coefficient"
+                    marge = (coefficient - 1) * 100
+                    lblTypeCoefficient.Text = "Coefficient" & coefficient & ""
                 End If
-                lblMargeCalculee.Text = Math.Round(marge, 2).ToString() & " %"
+                'affichage marge calculée
+                lblMargeCalculee.Text = $" {Math.Round(marge, 2)} %"
                 _coefficientCalcule = coefficient
                 RecalculerPrixAuto(Nothing, EventArgs.Empty)
             End If
@@ -593,15 +601,29 @@ Namespace DevCommerc8ak
             End If
 
             Dim valeur As Decimal
-            If Decimal.TryParse(txtCoefficientDetail.Text.Replace("%", "").Trim(), valeur) Then
+            Dim marge As Decimal
+            If Decimal.TryParse(txtCoefficientDetail.Text.Replace("%", "").Replace(".", ",").Trim(), valeur) Then
                 If txtCoefficientDetail.Text.Contains("%") OrElse valeur > 1D Then
                     _coefficientDetailCalcule = 1D + (valeur / 100D)
                 Else
                     _coefficientDetailCalcule = valeur
                 End If
+
+                If txtCoefficientDetail.Text.Contains("%") OrElse valeur >= 10 Then
+                    'cas pourcentage
+                    marge = valeur
+                    _coefficientDetailCalcule = 1 + (marge / 100)
+                    ' lblTypeCoefficient.Text = "Marge" & marge & "(%)"
+                Else
+                    'cas coefficient 
+                    _coefficientDetailCalcule = valeur
+                    marge = (_coefficientDetailCalcule - 1) * 100
+                    ' lblTypeCoefficient.Text = "Coefficient" & _coefficientDetailCalcule & ""
+                End If
                 RecalculerPrixAuto(Nothing, EventArgs.Empty)
             End If
         End Sub
+
 
         Private Sub RecalculerPrixAuto(sender As Object, e As EventArgs)
             Dim prixAchatVal As Decimal = LireDecimal(txtPrixAchat.Text)
@@ -666,7 +688,7 @@ Namespace DevCommerc8ak
                         MessageBox.Show("Le nombre d'unités par base doit être supérieur à zéro.")
                         Return
                     End If
-                    Dim prixAchatVal As Decimal = LireDecimal(txtPrixAchat.Text)
+                    Dim prixAchatVal1 As Decimal = LireDecimal(txtPrixAchat.Text)
                     Dim prixGrosVal As Decimal = LireDecimal(txtPrixGros.Text.Replace("-", "0"))
                     Dim prixDemiVal As Decimal = LireDecimal(txtPrixDemi.Text.Replace("-", "0"))
                     Dim prixQuartVal As Decimal = LireDecimal(txtPrixQuart.Text.Replace("-", "0"))
@@ -676,7 +698,7 @@ Namespace DevCommerc8ak
                     Dim produit As New Produit With {
                         .CodeBarres = txtReference.Text.Trim(),
                         .Libelle = nom,
-                        .PrixAchat = prixAchatVal,
+                        .PrixAchat = prixAchatVal1,
                         .PrixGros = prixGrosVal,
                         .PrixDemi = prixDemiVal,
                         .PrixQuart = prixQuartVal,
@@ -852,22 +874,24 @@ Namespace DevCommerc8ak
 
         Private Sub ChargerInventaire(sender As Object, e As EventArgs)
             If cmbProduitInventaire.SelectedValue Is Nothing Then Return
-            Dim produitId As Integer = Convert.ToInt32(cmbProduitInventaire.SelectedValue)
-            Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
-            Dim dal As New DAL(cs)
+            If cmbProduitInventaire.SelectedValue IsNot Nothing AndAlso Not TypeOf cmbProduitInventaire.SelectedValue Is DataRowView Then
+                Dim produitId As Integer = Convert.ToInt32(cmbProduitInventaire.SelectedValue)
+                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                Dim dal As New DAL(cs)
 
-            Dim dtEntree As DataTable = dal.ExecuterTable("SELECT DateEntree, QuantiteBase, PrixAchat FROM StockEntree WHERE ProduitId=@id ORDER BY DateEntree DESC", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
-            Dim dtSortie As DataTable = dal.ExecuterTable("SELECT DateSortie, QuantiteBase, Source FROM StockSortie WHERE ProduitId=@id ORDER BY DateSortie DESC", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
-            gridEntrees.DataSource = dtEntree
-            gridSorties.DataSource = dtSortie
+                Dim dtEntree As DataTable = dal.ExecuterTable("SELECT DateEntree, QuantiteBase, PrixAchat FROM StockEntree WHERE ProduitId=@id ORDER BY DateEntree DESC", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
+                Dim dtSortie As DataTable = dal.ExecuterTable("SELECT DateSortie, QuantiteBase, Source FROM StockSortie WHERE ProduitId=@id ORDER BY DateSortie DESC", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
+                gridEntrees.DataSource = dtEntree
+                gridSorties.DataSource = dtSortie
 
-            Dim totalEntree As Object = dal.ExecuterScalaire("SELECT ISNULL(SUM(QuantiteBase),0) FROM StockEntree WHERE ProduitId=@id", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
-            Dim totalSortie As Object = dal.ExecuterScalaire("SELECT ISNULL(SUM(QuantiteBase),0) FROM StockSortie WHERE ProduitId=@id", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
-            Dim totalPerte As Object = dal.ExecuterScalaire("SELECT ISNULL(SUM(QuantiteBase),0) FROM StockPerte WHERE ProduitId=@id", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
+                Dim totalEntree As Object = dal.ExecuterScalaire("SELECT ISNULL(SUM(QuantiteBase),0) FROM StockEntree WHERE ProduitId=@id", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
+                Dim totalSortie As Object = dal.ExecuterScalaire("SELECT ISNULL(SUM(QuantiteBase),0) FROM StockSortie WHERE ProduitId=@id", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
+                Dim totalPerte As Object = dal.ExecuterScalaire("SELECT ISNULL(SUM(QuantiteBase),0) FROM StockPerte WHERE ProduitId=@id", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
 
-            Dim stockTheo As Decimal = Convert.ToDecimal(totalEntree) - Convert.ToDecimal(totalSortie) - Convert.ToDecimal(totalPerte)
-            txtStockTheorique.Text = stockTheo.ToString("N2")
-            RecalculerEcart(Nothing, EventArgs.Empty)
+                Dim stockTheo As Decimal = Convert.ToDecimal(totalEntree) - Convert.ToDecimal(totalSortie) - Convert.ToDecimal(totalPerte)
+                txtStockTheorique.Text = stockTheo.ToString("N2")
+                RecalculerEcart(Nothing, EventArgs.Empty)
+            End If
         End Sub
 
         Private Sub RecalculerEcart(sender As Object, e As EventArgs)

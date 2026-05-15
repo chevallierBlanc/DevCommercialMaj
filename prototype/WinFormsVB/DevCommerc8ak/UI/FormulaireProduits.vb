@@ -520,14 +520,15 @@ Namespace DevCommerc8ak
             If row Is Nothing Then
                 Return
             End If
+            Dim r As DataRow = row.Row
 
             _produitId = Convert.ToInt32(row("ProduitId"))
             txtLibelle.Text = Convert.ToString(row("Libelle"))
             txtCodeBarres.Text = Convert.ToString(row("CodeBarres"))
-            txtCategorieId.Text = If(row.IsNull("CategorieId"), "", Convert.ToString(row("CategorieId")))
+            txtCategorieId.Text = If(r.IsNull("CategorieId"), "", Convert.ToString(row("CategorieId")))
             chkActif.Checked = Convert.ToBoolean(row("EstActif"))
-            cmbUnitePrincipale.Text = If(row.IsNull("UnitePrincipale"), "", Convert.ToString(row("UnitePrincipale")))
-            cmbUniteSecondaire.Text = If(row.IsNull("UniteSecondaire"), "", Convert.ToString(row("UniteSecondaire")))
+            cmbUnitePrincipale.Text = If(r.IsNull("UnitePrincipale"), "", Convert.ToString(row("UnitePrincipale")))
+            cmbUniteSecondaire.Text = If(r.IsNull("UniteSecondaire"), "", Convert.ToString(row("UniteSecondaire")))
             txtConversion.Text = LireDecimalRow(row, "ConversionUnite").ToString("N2")
             txtPrixAchat.Text = LireDecimalRow(row, "PrixAchat").ToString("N2")
             txtCoeffGros.Text = LireDecimalRow(row, "CoefficientGros").ToString("N4")
@@ -540,7 +541,7 @@ Namespace DevCommerc8ak
             txtQuantite.Text = LireDecimalRow(row, "QuantiteStock").ToString("N2")
             txtSeuil.Text = LireDecimalRow(row, "SeuilCritique").ToString("N2")
             txtMarge.Text = LireDecimalRow(row, "MargePourcent").ToString("N2")
-            If row.IsNull("DateExpiration") Then
+            If r.IsNull("DateExpiration") Then
                 dtpExpiration.Value = Date.Now
             Else
                 dtpExpiration.Value = Convert.ToDateTime(row("DateExpiration"))
@@ -644,7 +645,8 @@ Namespace DevCommerc8ak
         End Function
 
         Private Function LireDecimalRow(row As DataRowView, colonne As String) As Decimal
-            If row Is Nothing OrElse row.IsNull(colonne) Then
+            Dim r As DataRow = row.Row
+            If row Is Nothing OrElse r.IsNull(colonne) Then
                 Return 0D
             End If
             Return Convert.ToDecimal(row(colonne))

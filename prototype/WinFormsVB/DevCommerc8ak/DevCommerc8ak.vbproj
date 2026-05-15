@@ -1,3 +1,4 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -7,10 +8,9 @@
     <RootNamespace>DevCommerc8ak</RootNamespace>
     <AssemblyName>DevCommerc8ak</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
-    <StartupObject>DevCommerc8ak.Program</StartupObject>
+    <StartupObject>DevCommerc8ak.DevCommerc8ak.Program</StartupObject>
     <MyType>WindowsForms</MyType>
   </PropertyGroup>
-
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
@@ -20,7 +20,6 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
-
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <DefineDebug>false</DefineDebug>
@@ -30,7 +29,6 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
-
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
@@ -41,7 +39,6 @@
     <Reference Include="System.Windows.Forms.DataVisualization" />
     <Reference Include="System.Xml" />
   </ItemGroup>
-
   <ItemGroup>
     <Compile Include="Program.vb" />
     <Compile Include="DAL\DAL.vb" />
@@ -95,49 +92,97 @@
     <Compile Include="Services\FournisseurService.vb" />
     <Compile Include="Services\FacturationService.vb" />
     <Compile Include="Services\StockService.vb" />
+    <Compile Include="Services\ThemeHelper.vb" />
     <Compile Include="Services\UtilisateurService.vb" />
     <Compile Include="Services\ParametreService.vb" />
     <Compile Include="Services\RapportService.vb" />
     <Compile Include="Services\ScannerMobileService.vb" />
     <Compile Include="Services\SessionUtilisateur.vb" />
-    <Compile Include="Services\ThemeHelper.vb" />
+    <Compile Include="Services\ThemeHelperA.vb" />
     <Compile Include="Services\ApprovisionnementService.vb" />
     <Compile Include="Services\PdfHelper.vb" />
     <Compile Include="Services\TypeVenteService.vb" />
     <Compile Include="Services\NotificationService.vb" />
     <Compile Include="Services\IconsHelper.vb" />
-    <Compile Include="UI\FormulaireClients.vb" />
-    <Compile Include="UI\FormulaireProduits.vb" />
-    <Compile Include="UI\FormulaireFournisseurs.vb" />
-    <Compile Include="UI\FormulaireFactures.vb" />
-    <Compile Include="UI\FormulairePaiements.vb" />
-    <Compile Include="UI\FormulaireStock.vb" />
-    <Compile Include="UI\FormulaireParametres.vb" />
-    <Compile Include="UI\FormulaireUtilisateurs.vb" />
-    <Compile Include="UI\FormulaireDashboard.vb" />
-    <Compile Include="UI\NotificationPopup.vb" />
-    <Compile Include="UI\FormulaireNotifications.vb" />
-    <Compile Include="UI\FormulaireRapports.vb" />
-    <Compile Include="UI\FormulaireApprovisionnement.vb" />
-    <Compile Include="UI\SplashForm.vb" />
-    <Compile Include="Forms\LoginForm.vb" />
-    <Compile Include="Forms\MainForm.vb" />
-    <Compile Include="Forms\FacturationForm.vb" />
-    <Compile Include="Forms\CaisseForm.vb" />
-    <Compile Include="Forms\AdminForm.vb" />
+    <Compile Include="UI\FormulaireClients.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireNotificationsA.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireProduits.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireFournisseurs.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireFactures.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulairePaiements.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireStock.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireParametres.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireStock_Final_FIXED.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireStock_Final_V3.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireUtilisateurs.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireDashboard.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\NotificationPopup.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireNotifications.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireRapports.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireApprovisionnement.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\NotificationPopupB.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\SplashForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\LoginForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\MainForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FacturationForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\CaisseForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\AdminForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="My Project\AssemblyInfo.vb" />
     <Compile Include="My Project\Resources.Designer.vb" />
     <Compile Include="My Project\Settings.Designer.vb" />
   </ItemGroup>
-
   <ItemGroup>
     <EmbeddedResource Include="My Project\Resources.resx" />
   </ItemGroup>
-
   <ItemGroup>
     <None Include="My Project\App.config" />
     <None Include="My Project\Settings.settings" />
   </ItemGroup>
-
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
 </Project>

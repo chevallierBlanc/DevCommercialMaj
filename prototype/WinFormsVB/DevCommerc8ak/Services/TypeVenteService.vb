@@ -6,6 +6,8 @@ Imports System.Collections.Generic
 
 Namespace DevCommerc8ak
     Public Class TypeVenteService
+
+        ' ########### Calcul type vente
         Public Function ConstruireTypesVente(nbUniteParBase As Decimal,
                                              prixAchat As Decimal,
                                              prixGros As Decimal,

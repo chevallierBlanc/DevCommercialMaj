@@ -14,6 +14,9 @@ Namespace DevCommerc8ak
         Public Property FactureVenteId As Integer
         Public Property ProduitId As Integer
         Public Property Quantite As Decimal
+        Public Property QuantiteBase As Decimal
+        Public Property QteSaisie As Decimal?
+        Public Property TypeVente As String
         Public Property PrixUnitaire As Decimal
         Public Property MontantRemise As Decimal
         Public Property MontantLigne As Decimal

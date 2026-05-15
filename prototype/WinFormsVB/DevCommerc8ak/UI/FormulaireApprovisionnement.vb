@@ -9,6 +9,7 @@ Imports System.Drawing.Drawing2D
 Imports System.Drawing.Printing
 Imports System.IO
 Imports System.Windows.Forms
+Imports System.Collections.Generic
 Imports System.Windows.Forms.DataVisualization.Charting
 
 Namespace DevCommerc8ak
@@ -631,7 +632,7 @@ Namespace DevCommerc8ak
                 Return
             End If
             Dim ligneId As Integer = _bonLigneCouranteId
-            If ligneId <= 0 AndAlso ligneSelectionnee.Cells.Contains("BonLigneId") AndAlso ligneSelectionnee.Cells("BonLigneId").Value IsNot Nothing Then
+            If ligneId <= 0 AndAlso gridLignes.Columns.Contains("BonLigneId") AndAlso ligneSelectionnee.Cells("BonLigneId").Value IsNot Nothing Then
                 ligneId = Convert.ToInt32(ligneSelectionnee.Cells("BonLigneId").Value)
             End If
             If ligneId <= 0 Then
@@ -1001,7 +1002,7 @@ Namespace DevCommerc8ak
         Private Function ObtenirLigneSelectionnee(grille As DataGridView) As DataGridViewRow
             If _bonLigneCouranteId > 0 Then
                 For Each row As DataGridViewRow In grille.Rows
-                    If row.Cells.Contains("BonLigneId") AndAlso row.Cells("BonLigneId").Value IsNot Nothing AndAlso Convert.ToInt32(row.Cells("BonLigneId").Value) = _bonLigneCouranteId Then
+                    If grille.Columns.Contains("BonLigneId") AndAlso row.Cells("BonLigneId").Value IsNot Nothing AndAlso Convert.ToInt32(row.Cells("BonLigneId").Value) = _bonLigneCouranteId Then
                         Return row
                     End If
                 Next
@@ -1028,7 +1029,7 @@ Namespace DevCommerc8ak
                 ligne = gridLignes.CurrentRow
             End If
 
-            If ligne Is Nothing OrElse Not ligne.Cells.Contains("BonLigneId") OrElse ligne.Cells("BonLigneId").Value Is Nothing Then
+            If ligne Is Nothing OrElse Not gridLignes.Columns.Contains("BonLigneId") OrElse ligne.Cells("BonLigneId").Value Is Nothing Then
                 _bonLigneCouranteId = 0
                 Return
             End If
