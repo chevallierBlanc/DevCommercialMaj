@@ -98,6 +98,74 @@ Namespace DevCommerc8ak
             End Using
         End Function
 
+        Public Function EnregistrerPaiementSortieManuelle(numeroSortie As String, montantPaye As Decimal, effectuePar As Integer) As Decimal
+            If String.IsNullOrWhiteSpace(numeroSortie) Then
+                Throw New Exception("Numero de sortie invalide.")
+            End If
+            If montantPaye <= 0D Then
+                Throw New Exception("Le montant du paiement doit etre superieur a zero.")
+            End If
+
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    Try
+                        Dim total As Decimal = 0D
+                        Dim dejaPaye As Decimal = 0D
+                        Using cmd As New SqlCommand("SELECT ISNULL(SUM(ISNULL(MontantLigne,0)),0) AS TotalLigne, ISNULL(MAX(ISNULL(MontantPaye,0)),0) AS MontantPaye FROM StockSortie WITH (UPDLOCK, HOLDLOCK) WHERE NumeroSortie=@NumeroSortie", cn, tx)
+                            cmd.Parameters.AddWithValue("@NumeroSortie", numeroSortie)
+                            Using r As SqlDataReader = cmd.ExecuteReader()
+                                If Not r.Read() Then
+                                    Throw New Exception("Sortie introuvable.")
+                                End If
+                                total = Convert.ToDecimal(r("TotalLigne"))
+                                dejaPaye = Convert.ToDecimal(r("MontantPaye"))
+                            End Using
+                        End Using
+
+                        Dim resteAvant As Decimal = Math.Max(0D, total - dejaPaye)
+                        If resteAvant <= 0D Then
+                            Throw New Exception("Cette sortie est deja totalement reglee.")
+                        End If
+
+                        Dim montantAffecte As Decimal = Math.Min(montantPaye, resteAvant)
+                        Dim nouveauPaye As Decimal = dejaPaye + montantAffecte
+                        Dim nouveauReste As Decimal = Math.Max(0D, total - nouveauPaye)
+                        Dim statut As String = If(nouveauReste <= 0D, "PAYE", "IMPAYE")
+
+                        Using cmdUpdate As New SqlCommand("UPDATE StockSortie SET MontantPaye=@MontantPaye, ResteAPayer=@ResteAPayer, StatutPaiement=@StatutPaiement, CreePar=CreePar WHERE NumeroSortie=@NumeroSortie", cn, tx)
+                            cmdUpdate.Parameters.AddWithValue("@MontantPaye", nouveauPaye)
+                            cmdUpdate.Parameters.AddWithValue("@ResteAPayer", nouveauReste)
+                            cmdUpdate.Parameters.AddWithValue("@StatutPaiement", statut)
+                            cmdUpdate.Parameters.AddWithValue("@NumeroSortie", numeroSortie)
+                            cmdUpdate.ExecuteNonQuery()
+                        End Using
+
+                        tx.Commit()
+                        Return nouveauReste
+                    Catch
+                        tx.Rollback()
+                        Throw
+                    End Try
+                End Using
+            End Using
+        End Function
+
+        Public Function ListerSortieManuelleParNumero(numeroSortie As String) As DataTable
+            Dim sql As String = "" &
+                "SELECT ss.NumeroSortie, ss.DateSortie, ISNULL(c.NomClient, '') AS Client, ISNULL(m.Libelle, ss.Source) AS Motif, " &
+                "p.Libelle AS Produit, ss.QuantiteSaisie, ss.QuantiteBase, ss.Unite, ss.TypeVente, ss.PrixUnitaire, ss.MontantLigne, " &
+                "ss.StatutPaiement, ss.MontantPaye, ss.ResteAPayer, ss.Observation " &
+                "FROM StockSortie ss " &
+                "INNER JOIN Produits p ON p.ProduitId = ss.ProduitId " &
+                "LEFT JOIN Clients c ON c.ClientId = ss.ClientId " &
+                "LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId " &
+                "WHERE ss.NumeroSortie = @NumeroSortie " &
+                "ORDER BY ss.StockSortieId"
+            Dim p As New List(Of SqlParameter) From {New SqlParameter("@NumeroSortie", numeroSortie)}
+            Return _dal.ExecuterTable(sql, CommandType.Text, p)
+        End Function
+
         ' Enregistre une perte/casse.
         Public Function EnregistrerPerte(produitId As Integer, quantiteSaisie As Decimal, unite As String, reference As String, observation As String, typePerte As String, effectuePar As Integer) As Integer
             Return EnregistrerMouvement(produitId, "PERTE", quantiteSaisie, unite, reference, observation, typePerte, effectuePar)

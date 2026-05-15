@@ -1788,7 +1788,8 @@ Namespace DevCommerc8ak
                 Dim sql As String = "" &
                     "SELECT ss.NumeroSortie, MAX(ss.DateSortie) AS DateSortie, ISNULL(c.NomClient, '') AS Client, " &
                     "ISNULL(m.Libelle, ss.Source) AS Motif, SUM(ISNULL(ss.MontantLigne, 0)) AS Total, " &
-                    "MAX(ISNULL(ss.MontantPaye, 0)) AS MontantPaye, MAX(ISNULL(ss.ResteAPayer, 0)) AS ResteAPayer " &
+                    "MAX(ISNULL(ss.MontantPaye, 0)) AS MontantPaye, MAX(ISNULL(ss.ResteAPayer, 0)) AS ResteAPayer, " &
+                    "MAX(ISNULL(ss.StatutPaiement, 'IMPAYE')) AS StatutPaiement " &
                     "FROM StockSortie ss " &
                     "LEFT JOIN Clients c ON c.ClientId = ss.ClientId " &
                     "LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId " &
@@ -1829,11 +1830,177 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub EnregistrerPaiementDette(sender As Object, e As EventArgs)
-            MessageBox.Show("Fonction paiement dette à compléter.")
+            Try
+                If gridDettes.CurrentRow Is Nothing Then
+                    MessageBox.Show("Selectionnez une dette.")
+                    Return
+                End If
+
+                Dim numeroSortie As String = LireCellString(gridDettes.CurrentRow.Cells("NumeroSortie"))
+                Dim resteAPayer As Decimal = LireCellDecimal(gridDettes.CurrentRow.Cells("ResteAPayer"))
+                If resteAPayer <= 0D Then
+                    MessageBox.Show("Cette dette est déjà réglée.")
+                    Return
+                End If
+
+                Dim saisie As String = Interaction.InputBox("Montant à enregistrer pour la dette " & numeroSortie & " :", "Paiement dette", resteAPayer.ToString("0.##"))
+                If String.IsNullOrWhiteSpace(saisie) Then Return
+
+                Dim montant As Decimal
+                If Not Decimal.TryParse(saisie.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, montant) Then
+                    If Not Decimal.TryParse(saisie, montant) Then
+                        MessageBox.Show("Montant invalide.")
+                        Return
+                    End If
+                End If
+                If montant <= 0D Then
+                    MessageBox.Show("Montant invalide.")
+                    Return
+                End If
+
+                Dim service As StockService = ObtenirStockService()
+                Dim nouveauReste As Decimal = service.EnregistrerPaiementSortieManuelle(numeroSortie, montant, SessionUtilisateur.UtilisateurId)
+
+                ChargerDettes(Nothing, EventArgs.Empty)
+                ChargerDashboardSorties(Nothing, EventArgs.Empty)
+                ChargerSortiesDuMois(Nothing, EventArgs.Empty)
+
+                MessageBox.Show("Paiement enregistré. Reste à payer: " & nouveauReste.ToString("N2"))
+            Catch ex As Exception
+                MessageBox.Show("Erreur paiement dette: " & ex.Message)
+            End Try
         End Sub
 
         Private Sub ImprimerTicketDette(sender As Object, e As EventArgs)
-            MessageBox.Show("Fonction ticket dette à compléter.")
+            Try
+                If gridDettes.CurrentRow Is Nothing Then
+                    MessageBox.Show("Selectionnez une dette.")
+                    Return
+                End If
+
+                Dim numeroSortie As String = LireCellString(gridDettes.CurrentRow.Cells("NumeroSortie"))
+                If String.IsNullOrWhiteSpace(numeroSortie) Then
+                    MessageBox.Show("Sortie invalide.")
+                    Return
+                End If
+
+                Dim service As StockService = ObtenirStockService()
+                Dim dt As DataTable = service.ListerSortieManuelleParNumero(numeroSortie)
+                If dt Is Nothing OrElse dt.Rows.Count = 0 Then
+                    MessageBox.Show("Aucune ligne trouvée pour cette sortie.")
+                    Return
+                End If
+
+                Dim ticket As New DebtTicketData With {
+                    .NumeroSortie = numeroSortie,
+                    .Client = LireCellString(gridDettes.CurrentRow.Cells("Client")),
+                    .Motif = LireCellString(gridDettes.CurrentRow.Cells("Motif")),
+                    .DateSortie = If(gridDettes.CurrentRow.Cells("DateSortie").Value Is Nothing OrElse IsDBNull(gridDettes.CurrentRow.Cells("DateSortie").Value), Date.Now, Convert.ToDateTime(gridDettes.CurrentRow.Cells("DateSortie").Value)),
+                    .Total = LireCellDecimal(gridDettes.CurrentRow.Cells("Total")),
+                    .MontantPaye = LireCellDecimal(gridDettes.CurrentRow.Cells("MontantPaye")),
+                    .ResteAPayer = LireCellDecimal(gridDettes.CurrentRow.Cells("ResteAPayer")),
+                    .StatutPaiement = LireCellString(gridDettes.CurrentRow.Cells("StatutPaiement")),
+                    .Lignes = dt
+                }
+
+                Dim doc As New Printing.PrintDocument()
+                If _parametres IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(_parametres.ImprimanteTicket) Then
+                    doc.PrinterSettings.PrinterName = _parametres.ImprimanteTicket
+                End If
+                AddHandler doc.PrintPage, Sub(s, ev) ImprimerPageDette(ev, ticket)
+
+                If _parametres IsNot Nothing AndAlso _parametres.ApercuAvantImpression Then
+                    Dim preview As New PrintPreviewDialog() With {.Document = doc, .Width = 900, .Height = 700}
+                    preview.ShowDialog()
+                Else
+                    doc.Print()
+                End If
+            Catch ex As Exception
+                MessageBox.Show("Erreur impression ticket dette: " & ex.Message)
+            End Try
+        End Sub
+
+        Private Class DebtTicketData
+            Public Property NumeroSortie As String
+            Public Property Client As String
+            Public Property Motif As String
+            Public Property DateSortie As Date
+            Public Property Total As Decimal
+            Public Property MontantPaye As Decimal
+            Public Property ResteAPayer As Decimal
+            Public Property StatutPaiement As String
+            Public Property Lignes As DataTable
+        End Class
+
+        Private Function LireCellString(cell As DataGridViewCell) As String
+            If cell Is Nothing OrElse cell.Value Is Nothing OrElse IsDBNull(cell.Value) Then
+                Return ""
+            End If
+            Return Convert.ToString(cell.Value)
+        End Function
+
+        Private Function LireCellDecimal(cell As DataGridViewCell) As Decimal
+            If cell Is Nothing OrElse cell.Value Is Nothing OrElse IsDBNull(cell.Value) Then
+                Return 0D
+            End If
+            Return Convert.ToDecimal(cell.Value)
+        End Function
+
+        Private Sub ImprimerPageDette(e As Printing.PrintPageEventArgs, ticket As DebtTicketData)
+            Dim y As Integer = 10
+            Dim titre As String = If(_parametres Is Nothing OrElse String.IsNullOrWhiteSpace(_parametres.NomMagasin), "MAGASIN", _parametres.NomMagasin)
+            e.Graphics.DrawString(titre, New Font("Segoe UI", 10, FontStyle.Bold), Brushes.Black, 10, y)
+            y += 14
+            If _parametres IsNot Nothing Then
+                If Not String.IsNullOrWhiteSpace(_parametres.AdresseMagasin) Then
+                    e.Graphics.DrawString(_parametres.AdresseMagasin, New Font("Segoe UI", 7), Brushes.Black, 10, y)
+                    y += 12
+                End If
+                If Not String.IsNullOrWhiteSpace(_parametres.TelephoneMagasin) Then
+                    e.Graphics.DrawString(_parametres.TelephoneMagasin, New Font("Segoe UI", 7), Brushes.Black, 10, y)
+                    y += 12
+                End If
+            End If
+
+            e.Graphics.DrawString("------------------------", New Font("Segoe UI", 7), Brushes.Black, 10, y)
+            y += 12
+            e.Graphics.DrawString("Sortie : " & ticket.NumeroSortie, New Font("Segoe UI", 7), Brushes.Black, 10, y)
+            y += 12
+            e.Graphics.DrawString("Date : " & ticket.DateSortie.ToString("dd/MM/yyyy HH:mm"), New Font("Segoe UI", 7), Brushes.Black, 10, y)
+            y += 12
+            If Not String.IsNullOrWhiteSpace(ticket.Client) Then
+                e.Graphics.DrawString("Client : " & ticket.Client, New Font("Segoe UI", 7), Brushes.Black, 10, y)
+                y += 12
+            End If
+            If Not String.IsNullOrWhiteSpace(ticket.Motif) Then
+                e.Graphics.DrawString("Motif : " & ticket.Motif, New Font("Segoe UI", 7), Brushes.Black, 10, y)
+                y += 12
+            End If
+
+            e.Graphics.DrawString("------------------------", New Font("Segoe UI", 7), Brushes.Black, 10, y)
+            y += 12
+            For Each row As DataRow In ticket.Lignes.Rows
+                Dim libelle As String = Convert.ToString(row("Produit"))
+                Dim qte As String = Convert.ToDecimal(row("QuantiteSaisie")).ToString("0.##")
+                Dim unite As String = Convert.ToString(row("Unite"))
+                Dim totalLigne As String = Convert.ToDecimal(row("MontantLigne")).ToString("0.##")
+                e.Graphics.DrawString(libelle & "  " & qte & " " & unite, New Font("Segoe UI", 7), Brushes.Black, 10, y)
+                y += 12
+                e.Graphics.DrawString("   = " & totalLigne & " FC", New Font("Segoe UI", 7), Brushes.Black, 10, y)
+                y += 12
+            Next
+
+            e.Graphics.DrawString("------------------------", New Font("Segoe UI", 7), Brushes.Black, 10, y)
+            y += 12
+            e.Graphics.DrawString("Total : " & ticket.Total.ToString("0.##") & " FC", New Font("Segoe UI", 8, FontStyle.Bold), Brushes.Black, 10, y)
+            y += 12
+            e.Graphics.DrawString("Payé : " & ticket.MontantPaye.ToString("0.##") & " FC", New Font("Segoe UI", 7), Brushes.Black, 10, y)
+            y += 12
+            e.Graphics.DrawString("Reste : " & ticket.ResteAPayer.ToString("0.##") & " FC", New Font("Segoe UI", 7), Brushes.Black, 10, y)
+            y += 12
+            e.Graphics.DrawString("Statut : " & If(String.IsNullOrWhiteSpace(ticket.StatutPaiement), "IMPAYE", ticket.StatutPaiement), New Font("Segoe UI", 7), Brushes.Black, 10, y)
+            y += 12
+            e.Graphics.DrawString("Merci pour votre visite", New Font("Segoe UI", 7), Brushes.Black, 10, y)
         End Sub
 
         ' NOUVEAU: Analyse Produit
