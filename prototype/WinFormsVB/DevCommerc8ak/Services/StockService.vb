@@ -683,7 +683,11 @@ Namespace DevCommerc8ak
         ''' </summary>
         Public Function ObtenirAnalyseProduit(produitId As Integer) As DataTable
             Dim sql As String = "" &
-                "WITH Ventes AS (" &
+                "WITH Stock AS (" &
+                "    SELECT ISNULL(s.QuantiteStock,0) AS StockReelRestant " &
+                "    FROM vStockProduit s " &
+                "    WHERE s.ProduitId = @ProduitId" &
+                "), Ventes AS (" &
                 "    SELECT " &
                 "        ISNULL(SUM(ISNULL(l.QuantiteBase,0)),0) AS TotalVentes, " &
                 "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'GROS' THEN ISNULL(l.QuantiteBase,0) ELSE 0 END),0) AS TotalGros, " &
@@ -744,9 +748,9 @@ Namespace DevCommerc8ak
                 "       m.TotalSortiesHorsCaisse, " &
                 "       mv.TotalEntreesMouvements, " &
                 "       mv.TotalSortiesMouvements, " &
-                "       (e.TotalEntrees - v.TotalVentes - m.TotalSortiesManuelles - pte.TotalPertes) AS StockReelRestant, " &
-                "       CASE WHEN ISNULL(p.ConversionUnite,0) > 0 THEN FLOOR((e.TotalEntrees - v.TotalVentes - m.TotalSortiesManuelles - pte.TotalPertes) / p.ConversionUnite) ELSE 0 END AS StockRestantCartons, " &
-                "       CASE WHEN ISNULL(p.ConversionUnite,0) > 0 THEN (e.TotalEntrees - v.TotalVentes - m.TotalSortiesManuelles - pte.TotalPertes) - (FLOOR((e.TotalEntrees - v.TotalVentes - m.TotalSortiesManuelles - pte.TotalPertes) / p.ConversionUnite) * p.ConversionUnite) ELSE (e.TotalEntrees - v.TotalVentes - m.TotalSortiesManuelles - pte.TotalPertes) END AS StockRestantPieces, " &
+                "       s.StockReelRestant, " &
+                "       CASE WHEN ISNULL(p.ConversionUnite,0) > 0 THEN FLOOR(s.StockReelRestant / p.ConversionUnite) ELSE 0 END AS StockRestantCartons, " &
+                "       CASE WHEN ISNULL(p.ConversionUnite,0) > 0 THEN s.StockReelRestant - (FLOOR(s.StockReelRestant / p.ConversionUnite) * p.ConversionUnite) ELSE s.StockReelRestant END AS StockRestantPieces, " &
                 "       v.MontantVentes + m.MontantManuel AS MontantTotalGenere " &
                 "FROM Produits p " &
                 "CROSS JOIN Entrees e " &
@@ -754,6 +758,7 @@ Namespace DevCommerc8ak
                 "CROSS JOIN SortiesManuelles m " &
                 "CROSS JOIN Pertes pte " &
                 "CROSS JOIN Mouvements mv " &
+                "CROSS JOIN Stock s " &
                 "WHERE p.ProduitId = @ProduitId"
             Dim params As New List(Of SqlParameter) From {
                 New SqlParameter("@ProduitId", produitId)

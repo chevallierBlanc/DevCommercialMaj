@@ -2024,6 +2024,7 @@ Namespace DevCommerc8ak
                     Dim totalDettesClients As Decimal = LireDecimalTable(row, "TotalDettesClients")
                     Dim totalDettesBoss As Decimal = LireDecimalTable(row, "TotalDettesBoss")
                     Dim totalSortiesHorsCaisse As Decimal = LireDecimalTable(row, "TotalSortiesHorsCaisse")
+                    Dim stockReel As Decimal = LireDecimalTable(row, "StockReelRestant")
                     Dim stockCartons As Decimal = LireDecimalTable(row, "StockRestantCartons")
                     Dim stockPieces As Decimal = LireDecimalTable(row, "StockRestantPieces")
                     Dim montantTotalGenere As Decimal = LireDecimalTable(row, "MontantTotalGenere")
@@ -2037,8 +2038,15 @@ Namespace DevCommerc8ak
                         " Q:" & FormatageGlobal.FormatNombre(totalQuart) &
                         " P:" & FormatageGlobal.FormatNombre(totalPiece) &
                         " Dz:" & FormatageGlobal.FormatNombre(totalDouzaine) &
+                        " | Stock réel: " & FormatageGlobal.FormatNombre(stockReel) & " P" &
                         " | Stock: " & FormatageGlobal.FormatNombre(stockCartons) & "C+" & FormatageGlobal.FormatNombre(stockPieces) & "P" &
                         " | Mnt: " & FormatageGlobal.FormatMontant(montantTotalGenere)
+                Else
+                    lblAnalyseSortieGros.Text = "Entrées: 0 | Ventes: 0"
+                    lblAnalyseSortiePiece.Text = "Sorties manuelles: 0 | Pertes: 0"
+                    lblAnalyseRestantGros.Text = "Dons: 0 | Allocations: 0"
+                    lblAnalyseRestantPiece.Text = "Dettes client: 0 | Dettes boss: 0 | Hors caisse: 0"
+                    lblAnalyseRealisation.Text = "G:0 D:0 Q:0 P:0 Dz:0 | Stock réel: 0 P | Stock: 0C+0P | Mnt: 0 FC"
                 End If
             Catch
             End Try
