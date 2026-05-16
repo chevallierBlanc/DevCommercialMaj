@@ -506,8 +506,8 @@ Namespace DevCommerc8ak
             txtReference.Text = GenererReference(Convert.ToString(row("Libelle")), cmbCategorie.Text)
 
             cmbUniteBase.Text = If(r.IsNull("UnitePrincipale"), "", Convert.ToString(row("UnitePrincipale")))
-            txtNbUniteParBase.Text = If(r.IsNull("ConversionUnite"), "", Convert.ToDecimal(row("ConversionUnite")).ToString())
-            txtPrixAchat.Text = If(r.IsNull("PrixAchat"), "", Convert.ToDecimal(row("PrixAchat")).ToString())
+            txtNbUniteParBase.Text = If(r.IsNull("ConversionUnite"), "", Convert.ToDecimal(row("ConversionUnite")).ToString("N0"))
+            txtPrixAchat.Text = If(r.IsNull("PrixAchat"), "", Convert.ToDecimal(row("PrixAchat")).ToString("N0"))
             txtCoefficientInput.Text = If(r.IsNull("CoefficientGros"), "", Convert.ToDecimal(row("CoefficientGros")).ToString("N4"))
             Dim prixAchatVal As Decimal = LireDecimal(txtPrixAchat.Text)
             Dim prixDetailVal As Decimal = If(r.IsNull("PrixDetail"), 0D, Convert.ToDecimal(row("PrixDetail")))
@@ -538,8 +538,8 @@ Namespace DevCommerc8ak
                 Dim nb As Decimal = LireDecimal(txtNbUniteParBase.Text)
                 Dim uniteBase As String = If(cmbUniteBase.Text.Trim() = "", "base", cmbUniteBase.Text.Trim())
                 Dim stockBase As Decimal = If(nb > 0D, Decimal.Floor(stockPieces / nb), stockPieces)
-                lblStockActuel.Text = "Stock actuel: " & stockBase.ToString("N2") & " " & uniteBase
-                lblStockActuelPiece.Text = "Equivalent: " & stockPieces.ToString("N2") & " pièces"
+                lblStockActuel.Text = "Stock actuel: " & stockBase.ToString("N0") & " " & uniteBase
+                lblStockActuelPiece.Text = "Equivalent: " & stockPieces.ToString("N0") & " pièces"
             End If
         End Sub
 
@@ -553,11 +553,11 @@ Namespace DevCommerc8ak
             Dim stockApresPieces As Decimal = stockActuelPieces + totalPiecesEntree
             Dim uniteBase As String = If(cmbUniteBase.Text.Trim() = "", "base", cmbUniteBase.Text.Trim())
 
-            lblStockActuel.Text = "Stock actuel: " & stockActuelBase.ToString("N2") & " " & uniteBase
-            lblStockActuelPiece.Text = "Equivalent: " & stockActuelPieces.ToString("N2") & " pièces"
-            lblStockApres.Text = "Stock après: " & stockApresBase.ToString("N2") & " " & uniteBase
-            lblStockApresPiece.Text = "Après: " & stockApresPieces.ToString("N2") & " pièces"
-            lblEquivalentType.Text = If(nb > 0D, nb.ToString("N2") & " pièces / unité", "0 pièce / unité")
+            lblStockActuel.Text = "Stock actuel: " & stockActuelBase.ToString("N0") & " " & uniteBase
+            lblStockActuelPiece.Text = "Equivalent: " & stockActuelPieces.ToString("N0") & " pièces"
+            lblStockApres.Text = "Stock après: " & stockApresBase.ToString("N0") & " " & uniteBase
+            lblStockApresPiece.Text = "Après: " & stockApresPieces.ToString("N0") & " pièces"
+            lblEquivalentType.Text = If(nb > 0D, nb.ToString("N0") & " pièces / unité", "0 pièce / unité")
             RafraichirTypesVente()
         End Sub
 
@@ -643,11 +643,11 @@ Namespace DevCommerc8ak
             Dim prixQuart As Decimal = prixPiece * Math.Max(1D, Decimal.Floor(nbUnites / 4D))
             Dim prixDouzaine As Decimal = prixPiece * 12D
 
-            txtPrixGros.Text = If(chkGros.Checked, prixGros.ToString("N2"), "-")
-            txtPrixDemi.Text = If(chkDemi.Checked, prixDemi.ToString("N2"), "-")
-            txtPrixQuart.Text = If(chkQuart.Checked, prixQuart.ToString("N2"), "-")
-            txtPrixPiece.Text = If(chkPiece.Checked, prixPiece.ToString("N2"), "-")
-            txtPrixDouzaine.Text = If(chkDouzaine.Checked, prixDouzaine.ToString("N2"), "-")
+            txtPrixGros.Text = If(chkGros.Checked, prixGros.ToString("N0"), "-")
+            txtPrixDemi.Text = If(chkDemi.Checked, prixDemi.ToString("N0"), "-")
+            txtPrixQuart.Text = If(chkQuart.Checked, prixQuart.ToString("N0"), "-")
+            txtPrixPiece.Text = If(chkPiece.Checked, prixPiece.ToString("N0"), "-")
+            txtPrixDouzaine.Text = If(chkDouzaine.Checked, prixDouzaine.ToString("N0"), "-")
             RafraichirTypesVente()
         End Sub
 
@@ -889,7 +889,7 @@ Namespace DevCommerc8ak
                 Dim totalPerte As Object = dal.ExecuterScalaire("SELECT ISNULL(SUM(QuantiteBase),0) FROM StockPerte WHERE ProduitId=@id", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
 
                 Dim stockTheo As Decimal = Convert.ToDecimal(totalEntree) - Convert.ToDecimal(totalSortie) - Convert.ToDecimal(totalPerte)
-                txtStockTheorique.Text = stockTheo.ToString("N2")
+                txtStockTheorique.Text = stockTheo.ToString("N0")
                 RecalculerEcart(Nothing, EventArgs.Empty)
             End If
         End Sub
@@ -898,7 +898,7 @@ Namespace DevCommerc8ak
             Dim reel As Decimal = LireDecimal(txtStockReel.Text)
             Dim theo As Decimal = LireDecimal(txtStockTheorique.Text)
             Dim ecart As Decimal = reel - theo
-            txtEcart.Text = ecart.ToString("N2")
+            txtEcart.Text = ecart.ToString("N0")
         End Sub
 
         Private Sub ValiderInventaire(sender As Object, e As EventArgs)
@@ -1135,8 +1135,8 @@ Namespace DevCommerc8ak
 
                 Dim row As DataRow = dt.Rows(0)
                 cmbProduitExistant.SelectedValue = Convert.ToInt32(row("ProduitId"))
-                txtQuantiteEntree.Text = Convert.ToDecimal(row("Quantite")).ToString("N2")
-                txtPrixAchat.Text = Convert.ToDecimal(row("PrixAchat")).ToString("N2")
+                txtQuantiteEntree.Text = Convert.ToDecimal(row("Quantite")).ToString("N0")
+                txtPrixAchat.Text = Convert.ToDecimal(row("PrixAchat")).ToString("N0")
                 txtReference.Text = Convert.ToString(row("NumeroBon"))
                 txtObservationEntree.Text = "Réception depuis " & Convert.ToString(row("NumeroBon"))
                 AfficherStockActuel()

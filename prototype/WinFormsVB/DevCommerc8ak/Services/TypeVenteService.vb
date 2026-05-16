@@ -103,13 +103,7 @@ Namespace DevCommerc8ak
         End Function
 
         Public Function FormaterStock(stockReel As Decimal, nbUniteParBase As Decimal, uniteBase As String, uniteSecondaire As String) As String
-            If nbUniteParBase <= 0D OrElse String.IsNullOrWhiteSpace(uniteSecondaire) Then
-                Return stockReel.ToString("N2") & " " & uniteBase
-            End If
-
-            Dim stockBase As Decimal = Decimal.Floor(stockReel / nbUniteParBase)
-            Dim reste As Decimal = stockReel - (stockBase * nbUniteParBase)
-            Return stockBase.ToString("N0") & " " & uniteBase & " / " & reste.ToString("N0") & " " & uniteSecondaire
+            Return FormatageGlobal.FormatStockAvecEquivalence(stockReel, nbUniteParBase, uniteBase, uniteSecondaire)
         End Function
     End Class
 End Namespace

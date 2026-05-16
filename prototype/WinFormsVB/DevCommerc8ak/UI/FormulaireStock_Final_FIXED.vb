@@ -1020,8 +1020,8 @@ Namespace DevCommerc8ak
                 Dim nb As Decimal = LireDecimal(txtNbUniteParBase.Text)
                 Dim uniteBase As String = If(cmbUniteBase.Text.Trim() = "", "base", cmbUniteBase.Text.Trim())
                 Dim stockBase As Decimal = If(nb > 0D, Decimal.Floor(stockPieces / nb), stockPieces)
-                lblStockActuel.Text = "Stock actuel: " & stockBase.ToString("N2") & " " & uniteBase
-                lblStockActuelPiece.Text = "Equivalent: " & stockPieces.ToString("N2") & " pièces"
+                lblStockActuel.Text = "Stock actuel: " & stockBase.ToString("N0") & " " & uniteBase
+                lblStockActuelPiece.Text = "Equivalent: " & stockPieces.ToString("N0") & " pièces"
             End If
         End Sub
 
@@ -1170,11 +1170,11 @@ Namespace DevCommerc8ak
             If cmbProduitSortie.SelectedValue Is Nothing Then Return
             Dim typeChoisi As TypeVenteDTO = ObtenirTypeVenteSelectionne()
             Dim prix As Decimal = PrixSelonUnite()
-            lblPrixProd.Text = prix.ToString("N2") & "FC"
+            lblPrixProd.Text = FormatageGlobal.FormatMontant(prix)
             If typeChoisi Is Nothing Then
                 lblEquivalent.Text = "Equivalent: 0 pièce / unité"
             Else
-                lblEquivalent.Text = "Equivalent: " & typeChoisi.QuantiteEquivalent.ToString("N2") & " pièces / unité"
+                lblEquivalent.Text = "Equivalent: " & typeChoisi.QuantiteEquivalent.ToString("N0") & " pièces / unité"
             End If
             MiseAJourIndicateursQuantite(Nothing, EventArgs.Empty)
         End Sub
@@ -1224,7 +1224,7 @@ Namespace DevCommerc8ak
             End If
 
             Dim quantiteReelle As Decimal = qte * typeChoisi.QuantiteEquivalent
-            lblTotalReel.Text = "Total réel: " & quantiteReelle.ToString("N2") & " pièces"
+            lblTotalReel.Text = "Total réel: " & quantiteReelle.ToString("N0") & " pièces"
         End Sub
 
         Private Sub MettreAJourAffichageStockProduit()
@@ -1274,11 +1274,11 @@ Namespace DevCommerc8ak
             Dim stockApresPieces As Decimal = stockActuelPieces + totalPiecesEntree
             Dim uniteBase As String = If(cmbUniteBase.Text.Trim() = "", "base", cmbUniteBase.Text.Trim())
 
-            lblStockActuel.Text = "Stock actuel: " & stockActuelBase.ToString("N2") & " " & uniteBase
-            lblStockActuelPiece.Text = "Equivalent: " & stockActuelPieces.ToString("N2") & " pièces"
-            lblStockApres.Text = "Stock après: " & stockApresBase.ToString("N2") & " " & uniteBase
-            lblStockApresPiece.Text = "Après: " & stockApresPieces.ToString("N2") & " pièces"
-            'lblEquivalentType.Text = If(nb > 0D, nb.ToString("N2") & " pièces / unité", "0 pièce / unité")
+            lblStockActuel.Text = "Stock actuel: " & stockActuelBase.ToString("N0") & " " & uniteBase
+            lblStockActuelPiece.Text = "Equivalent: " & stockActuelPieces.ToString("N0") & " pièces"
+            lblStockApres.Text = "Stock après: " & stockApresBase.ToString("N0") & " " & uniteBase
+            lblStockApresPiece.Text = "Après: " & stockApresPieces.ToString("N0") & " pièces"
+            'lblEquivalentType.Text = If(nb > 0D, nb.ToString("N0") & " pièces / unité", "0 pièce / unité")
             RafraichirTypesVente()
         End Sub
 
@@ -1394,11 +1394,11 @@ Namespace DevCommerc8ak
             Dim prixQuart As Decimal = prixPiece * Math.Max(1D, Decimal.Floor(nbUnites / 4D))
             Dim prixDouzaine As Decimal = prixPiece * 12D
 
-            txtPrixGros.Text = If(chkGros.Checked, prixGros.ToString("N2"), "-")
-            txtPrixDemi.Text = If(chkDemi.Checked, prixDemi.ToString("N2"), "-")
-            txtPrixQuart.Text = If(chkQuart.Checked, prixQuart.ToString("N2"), "-")
-            txtPrixPiece.Text = If(chkPiece.Checked, prixPiece.ToString("N2"), "-")
-            txtPrixDouzaine.Text = If(chkDouzaine.Checked, prixDouzaine.ToString("N2"), "-")
+            txtPrixGros.Text = If(chkGros.Checked, prixGros.ToString("N0"), "-")
+            txtPrixDemi.Text = If(chkDemi.Checked, prixDemi.ToString("N0"), "-")
+            txtPrixQuart.Text = If(chkQuart.Checked, prixQuart.ToString("N0"), "-")
+            txtPrixPiece.Text = If(chkPiece.Checked, prixPiece.ToString("N0"), "-")
+            txtPrixDouzaine.Text = If(chkDouzaine.Checked, prixDouzaine.ToString("N0"), "-")
         End Sub
         'Private Sub ChargerSortiesDuMois(sender As Object, e As EventArgs)
         '    Try
@@ -1769,15 +1769,15 @@ Namespace DevCommerc8ak
                 gridEntrees.DataSource = dtEntree
                 gridSorties.DataSource = dtSortie
 
-                Dim totalEntree As Object = dal.ExecuterScalaire("SELECT ISNULL(SUM(QuantiteBase),0) FROM StockEntree WHERE ProduitId=@id", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
-                Dim totalSortie As Object = dal.ExecuterScalaire("SELECT ISNULL(SUM(QuantiteBase),0) FROM StockSortie WHERE ProduitId=@id", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
-                Dim totalPerte As Object = dal.ExecuterScalaire("SELECT ISNULL(SUM(QuantiteBase),0) FROM StockPerte WHERE ProduitId=@id", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
+            Dim totalEntree As Object = dal.ExecuterScalaire("SELECT ISNULL(SUM(QuantiteBase),0) FROM StockEntree WHERE ProduitId=@id", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
+            Dim totalSortie As Object = dal.ExecuterScalaire("SELECT ISNULL(SUM(QuantiteBase),0) FROM StockSortie WHERE ProduitId=@id", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
+            Dim totalPerte As Object = dal.ExecuterScalaire("SELECT ISNULL(SUM(QuantiteBase),0) FROM StockPerte WHERE ProduitId=@id", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
 
-                Dim stockTheo As Decimal = Convert.ToDecimal(totalEntree) - Convert.ToDecimal(totalSortie) - Convert.ToDecimal(totalPerte)
-                txtStockTheorique.Text = stockTheo.ToString("N2")
-                RecalculerEcart(Nothing, EventArgs.Empty)
-                ' NOUVEAU: Analyse Produit
-                ChargerAnalyseProduit(produitId)
+            Dim stockTheo As Decimal = Convert.ToDecimal(totalEntree) - Convert.ToDecimal(totalSortie) - Convert.ToDecimal(totalPerte)
+            txtStockTheorique.Text = stockTheo.ToString("N0")
+            RecalculerEcart(Nothing, EventArgs.Empty)
+            ' NOUVEAU: Analyse Produit
+            ChargerAnalyseProduit(produitId)
             End If
         End Sub
 
@@ -1843,7 +1843,7 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                Dim saisie As String = Interaction.InputBox("Montant à enregistrer pour la dette " & numeroSortie & " :", "Paiement dette", resteAPayer.ToString("0.##"))
+                Dim saisie As String = Interaction.InputBox("Montant à enregistrer pour la dette " & numeroSortie & " :", "Paiement dette", resteAPayer.ToString("N0"))
                 If String.IsNullOrWhiteSpace(saisie) Then Return
 
                 Dim montant As Decimal
@@ -1865,7 +1865,7 @@ Namespace DevCommerc8ak
                 ChargerDashboardSorties(Nothing, EventArgs.Empty)
                 ChargerSortiesDuMois(Nothing, EventArgs.Empty)
 
-                MessageBox.Show("Paiement enregistré. Reste à payer: " & nouveauReste.ToString("N2"))
+                MessageBox.Show("Paiement enregistré. Reste à payer: " & FormatageGlobal.FormatMontant(nouveauReste))
             Catch ex As Exception
                 MessageBox.Show("Erreur paiement dette: " & ex.Message)
             End Try
@@ -1981,9 +1981,9 @@ Namespace DevCommerc8ak
             y += 12
             For Each row As DataRow In ticket.Lignes.Rows
                 Dim libelle As String = Convert.ToString(row("Produit"))
-                Dim qte As String = Convert.ToDecimal(row("QuantiteSaisie")).ToString("0.##")
+                Dim qte As String = Convert.ToDecimal(row("QuantiteSaisie")).ToString("N0")
                 Dim unite As String = Convert.ToString(row("Unite"))
-                Dim totalLigne As String = Convert.ToDecimal(row("MontantLigne")).ToString("0.##")
+                Dim totalLigne As String = Convert.ToDecimal(row("MontantLigne")).ToString("N0")
                 e.Graphics.DrawString(libelle & "  " & qte & " " & unite, New Font("Segoe UI", 7), Brushes.Black, 10, y)
                 y += 12
                 e.Graphics.DrawString("   = " & totalLigne & " FC", New Font("Segoe UI", 7), Brushes.Black, 10, y)
@@ -1992,11 +1992,11 @@ Namespace DevCommerc8ak
 
             e.Graphics.DrawString("------------------------", New Font("Segoe UI", 7), Brushes.Black, 10, y)
             y += 12
-            e.Graphics.DrawString("Total : " & ticket.Total.ToString("0.##") & " FC", New Font("Segoe UI", 8, FontStyle.Bold), Brushes.Black, 10, y)
+            e.Graphics.DrawString("Total : " & ticket.Total.ToString("N0") & " FC", New Font("Segoe UI", 8, FontStyle.Bold), Brushes.Black, 10, y)
             y += 12
-            e.Graphics.DrawString("Payé : " & ticket.MontantPaye.ToString("0.##") & " FC", New Font("Segoe UI", 7), Brushes.Black, 10, y)
+            e.Graphics.DrawString("Payé : " & ticket.MontantPaye.ToString("N0") & " FC", New Font("Segoe UI", 7), Brushes.Black, 10, y)
             y += 12
-            e.Graphics.DrawString("Reste : " & ticket.ResteAPayer.ToString("0.##") & " FC", New Font("Segoe UI", 7), Brushes.Black, 10, y)
+            e.Graphics.DrawString("Reste : " & ticket.ResteAPayer.ToString("N0") & " FC", New Font("Segoe UI", 7), Brushes.Black, 10, y)
             y += 12
             e.Graphics.DrawString("Statut : " & If(String.IsNullOrWhiteSpace(ticket.StatutPaiement), "IMPAYE", ticket.StatutPaiement), New Font("Segoe UI", 7), Brushes.Black, 10, y)
             y += 12
@@ -2008,12 +2008,37 @@ Namespace DevCommerc8ak
             Try
                 Dim service As StockService = ObtenirStockService()
                 Dim analyse As DataTable = service.ObtenirAnalyseProduit(produitId)
-                If analyse IsNot Nothing Then
-                    'lblAnalyseSortieGros.Text = "Sorties Gros: " & analyse.SortieGros.ToString("N2")
-                    'lblAnalyseSortiePiece.Text = "Sorties Pièces: " & analyse.SortiePiece.ToString("N2")
-                    'lblAnalyseRestantGros.Text = "Restant Gros: " & analyse.RestantGros.ToString("N2")
-                    'lblAnalyseRestantPiece.Text = "Restant Pièces: " & analyse.RestantPiece.ToString("N2")
-                    'lblAnalyseRealisation.Text = "Réalisation: " & analyse.RealisationTotale.ToString("N2") & " " & cmbDevise.Text
+                If analyse IsNot Nothing AndAlso analyse.Rows.Count > 0 Then
+                    Dim row As DataRow = analyse.Rows(0)
+                    Dim totalEntrees As Decimal = LireDecimalTable(row, "TotalEntrees")
+                    Dim totalVentes As Decimal = LireDecimalTable(row, "TotalVentes")
+                    Dim totalSortiesManuelles As Decimal = LireDecimalTable(row, "TotalSortiesManuelles")
+                    Dim totalPertes As Decimal = LireDecimalTable(row, "TotalPertes")
+                    Dim totalGros As Decimal = LireDecimalTable(row, "TotalGros")
+                    Dim totalDemi As Decimal = LireDecimalTable(row, "TotalDemi")
+                    Dim totalQuart As Decimal = LireDecimalTable(row, "TotalQuart")
+                    Dim totalPiece As Decimal = LireDecimalTable(row, "TotalPiece")
+                    Dim totalDouzaine As Decimal = LireDecimalTable(row, "TotalDouzaine")
+                    Dim totalDons As Decimal = LireDecimalTable(row, "TotalDons")
+                    Dim totalAllocations As Decimal = LireDecimalTable(row, "TotalAllocations")
+                    Dim totalDettesClients As Decimal = LireDecimalTable(row, "TotalDettesClients")
+                    Dim totalDettesBoss As Decimal = LireDecimalTable(row, "TotalDettesBoss")
+                    Dim totalSortiesHorsCaisse As Decimal = LireDecimalTable(row, "TotalSortiesHorsCaisse")
+                    Dim stockCartons As Decimal = LireDecimalTable(row, "StockRestantCartons")
+                    Dim stockPieces As Decimal = LireDecimalTable(row, "StockRestantPieces")
+                    Dim montantTotalGenere As Decimal = LireDecimalTable(row, "MontantTotalGenere")
+
+                    lblAnalyseSortieGros.Text = "Entrées: " & FormatageGlobal.FormatNombre(totalEntrees) & " | Ventes: " & FormatageGlobal.FormatNombre(totalVentes)
+                    lblAnalyseSortiePiece.Text = "Sorties manuelles: " & FormatageGlobal.FormatNombre(totalSortiesManuelles) & " | Pertes: " & FormatageGlobal.FormatNombre(totalPertes)
+                    lblAnalyseRestantGros.Text = "Dons: " & FormatageGlobal.FormatNombre(totalDons) & " | Allocations: " & FormatageGlobal.FormatNombre(totalAllocations)
+                    lblAnalyseRestantPiece.Text = "Dettes client: " & FormatageGlobal.FormatNombre(totalDettesClients) & " | Dettes boss: " & FormatageGlobal.FormatNombre(totalDettesBoss) & " | Hors caisse: " & FormatageGlobal.FormatNombre(totalSortiesHorsCaisse)
+                    lblAnalyseRealisation.Text = "G:" & FormatageGlobal.FormatNombre(totalGros) &
+                        " D:" & FormatageGlobal.FormatNombre(totalDemi) &
+                        " Q:" & FormatageGlobal.FormatNombre(totalQuart) &
+                        " P:" & FormatageGlobal.FormatNombre(totalPiece) &
+                        " Dz:" & FormatageGlobal.FormatNombre(totalDouzaine) &
+                        " | Stock: " & FormatageGlobal.FormatNombre(stockCartons) & "C+" & FormatageGlobal.FormatNombre(stockPieces) & "P" &
+                        " | Mnt: " & FormatageGlobal.FormatMontant(montantTotalGenere)
                 End If
             Catch
             End Try
@@ -2029,7 +2054,7 @@ Namespace DevCommerc8ak
             Dim reel As Decimal = LireDecimal(txtStockReel.Text)
             Dim theo As Decimal = LireDecimal(txtStockTheorique.Text)
             Dim ecart As Decimal = reel - theo
-            txtEcart.Text = ecart.ToString("N2")
+            txtEcart.Text = ecart.ToString("N0")
         End Sub
         'Private Sub ValiderInventaire(sender As Object, e As EventArgs)
         '    ' Logique de validation inventaire originale
@@ -2228,6 +2253,13 @@ Namespace DevCommerc8ak
             Return 0D
         End Function
 
+        Private Function LireDecimalTable(row As DataRow, colonne As String) As Decimal
+            If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains(colonne) OrElse row.IsNull(colonne) Then
+                Return 0D
+            End If
+            Return Convert.ToDecimal(row(colonne))
+        End Function
+
         Private Function ExtraireDecimal(texte As String) As Decimal
             If texte Is Nothing Then Return 0D
             Dim parts As String() = texte.Split(" "c)
@@ -2274,8 +2306,8 @@ Namespace DevCommerc8ak
 
                 Dim row As DataRow = dt.Rows(0)
                 cmbProduitExistant.SelectedValue = Convert.ToInt32(row("ProduitId"))
-                txtQuantiteEntree.Text = Convert.ToDecimal(row("Quantite")).ToString("N2")
-                txtPrixAchat.Text = Convert.ToDecimal(row("PrixAchat")).ToString("N2")
+                txtQuantiteEntree.Text = Convert.ToDecimal(row("Quantite")).ToString("N0")
+                txtPrixAchat.Text = Convert.ToDecimal(row("PrixAchat")).ToString("N0")
                 txtReference.Text = Convert.ToString(row("NumeroBon"))
                 txtObservationEntree.Text = "Réception depuis " & Convert.ToString(row("NumeroBon"))
                 AfficherStockActuel()

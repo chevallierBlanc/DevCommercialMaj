@@ -416,8 +416,8 @@ Namespace DevCommerc8ak
             txtNomProduit.Text = Convert.ToString(row("Libelle"))
             cmbCategorie.Text = If(row.IsNull("CategorieId"), "", Convert.ToString(row("CategorieId")))
             cmbUniteBase.Text = If(row.IsNull("UnitePrincipale"), "", Convert.ToString(row("UnitePrincipale")))
-            txtNbUniteParBase.Text = If(row.IsNull("ConversionUnite"), "", Convert.ToDecimal(row("ConversionUnite")).ToString())
-            txtPrixAchat.Text = If(row.IsNull("PrixAchat"), "", Convert.ToDecimal(row("PrixAchat")).ToString())
+            txtNbUniteParBase.Text = If(row.IsNull("ConversionUnite"), "", Convert.ToDecimal(row("ConversionUnite")).ToString("N0"))
+            txtPrixAchat.Text = If(row.IsNull("PrixAchat"), "", Convert.ToDecimal(row("PrixAchat")).ToString("N0"))
             txtCoefficientInput.Text = If(row.IsNull("CoefficientGros"), "", Convert.ToDecimal(row("CoefficientGros")).ToString("N4"))
 
             chkGros.Checked = Convert.ToBoolean(row("VenteGros"))
@@ -436,8 +436,8 @@ Namespace DevCommerc8ak
                 Dim stockPieces As Decimal = _stockService.ObtenirStockActuelProduit(produitId)
                 Dim nb As Decimal = LireDecimal(txtNbUniteParBase.Text)
                 Dim stockBase As Decimal = If(nb > 0D, Decimal.Floor(stockPieces / nb), stockPieces)
-                lblStockActuel.Text = "Stock actuel: " & stockBase.ToString("N2")
-                lblStockActuelPiece.Text = "Equivalent: " & stockPieces.ToString("N2") & " pièces"
+                lblStockActuel.Text = "Stock actuel: " & stockBase.ToString("N0")
+                lblStockActuelPiece.Text = "Equivalent: " & stockPieces.ToString("N0") & " pièces"
             End If
         End Sub
         'Private Sub AfficherStockActuel()
@@ -463,8 +463,8 @@ Namespace DevCommerc8ak
             Dim stockApresPieces As Decimal = stockActuelPieces + totalPiecesEntree
             Dim stockApresBase As Decimal = If(nb > 0D, Decimal.Floor(stockApresPieces / nb), stockApresPieces)
 
-            lblStockApres.Text = "Stock après: " & stockApresBase.ToString("N2")
-            lblStockApresPiece.Text = "Après: " & stockApresPieces.ToString("N2") & " pièces"
+            lblStockApres.Text = "Stock après: " & stockApresBase.ToString("N0")
+            lblStockApresPiece.Text = "Après: " & stockApresPieces.ToString("N0") & " pièces"
         End Sub
 
         Private Sub CoefficientInputChange(sender As Object, e As EventArgs)
@@ -502,10 +502,10 @@ Namespace DevCommerc8ak
             Dim prixGros As Decimal = prixAchatVal * coeffGros
             Dim prixPiece As Decimal = (prixAchatVal * coeffDetail) / nbUnites
 
-            txtPrixGros.Text = If(chkGros.Checked, prixGros.ToString("N2"), "-")
-            txtPrixDemi.Text = If(chkDemi.Checked, (prixGros * 0.5D).ToString("N2"), "-")
-            txtPrixPiece.Text = If(chkPiece.Checked, prixPiece.ToString("N2"), "-")
-            txtPrixDouzaine.Text = If(chkDouzaine.Checked, (prixPiece * 12D).ToString("N2"), "-")
+            txtPrixGros.Text = If(chkGros.Checked, prixGros.ToString("N0"), "-")
+            txtPrixDemi.Text = If(chkDemi.Checked, (prixGros * 0.5D).ToString("N0"), "-")
+            txtPrixPiece.Text = If(chkPiece.Checked, prixPiece.ToString("N0"), "-")
+            txtPrixDouzaine.Text = If(chkDouzaine.Checked, (prixPiece * 12D).ToString("N0"), "-")
         End Sub
 
         Private Sub EnregistrerEntree(sender As Object, e As EventArgs)
@@ -588,11 +588,11 @@ Namespace DevCommerc8ak
                     lblTotalSortiePiece.Text = row("SortiePieces").ToString()
                     lblTotalRestantGros.Text = row("RestantGros").ToString()
                     lblTotalRestantPiece.Text = row("RestantPiecesSeules").ToString()
-                    lblRealisationTotale.Text = Convert.ToDecimal(row("RealisationEstimee")).ToString("N2") & " FC"
+                    lblRealisationTotale.Text = Convert.ToDecimal(row("RealisationEstimee")).ToString("N0") & " FC"
                 End If
 
                 ' Grilles Originales
-                txtStockTheorique.Text = _stockService.ObtenirStockActuelProduit(produitId).ToString("N2")
+                txtStockTheorique.Text = _stockService.ObtenirStockActuelProduit(produitId).ToString("N0")
                 RecalculerEcart(Nothing, EventArgs.Empty)
             End If
         End Sub
@@ -611,7 +611,7 @@ Namespace DevCommerc8ak
             Dim reel As Decimal = LireDecimal(txtStockReel.Text)
             Dim theo As Decimal = LireDecimal(txtStockTheorique.Text)
             Dim ecart As Decimal = reel - theo
-            txtEcart.Text = ecart.ToString("N2")
+            txtEcart.Text = ecart.ToString("N0")
         End Sub
 
         Private Sub ChargerAlertes(sender As Object, e As EventArgs)
@@ -706,8 +706,8 @@ Namespace DevCommerc8ak
 
                 Dim row As DataRow = dt.Rows(0)
                 cmbProduitExistant.SelectedValue = Convert.ToInt32(row("ProduitId"))
-                txtQuantiteEntree.Text = Convert.ToDecimal(row("Quantite")).ToString("N2")
-                txtPrixAchat.Text = Convert.ToDecimal(row("PrixAchat")).ToString("N2")
+                txtQuantiteEntree.Text = Convert.ToDecimal(row("Quantite")).ToString("N0")
+                txtPrixAchat.Text = Convert.ToDecimal(row("PrixAchat")).ToString("N0")
                 txtReference.Text = Convert.ToString(row("NumeroBon"))
                 txtObservationEntree.Text = "Réception depuis " & Convert.ToString(row("NumeroBon"))
                 AfficherStockActuel()

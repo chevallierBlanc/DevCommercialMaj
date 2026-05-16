@@ -346,8 +346,8 @@ Namespace DevCommerc8ak
             lblDateFacture.Text = "Date: " & dtFacture.ToString("dd/MM/yyyy")
 
             ChargerLignes()
-            lblTotal.Text = _totalCourant.ToString() & " FC"
-            txtMontantRecu.Text = _totalCourant.ToString()
+            lblTotal.Text = FormatageGlobal.FormatMontant(_totalCourant)
+            txtMontantRecu.Text = _totalCourant.ToString("N0")
             CalculerMonnaie(Nothing, EventArgs.Empty)
         End Sub
 
@@ -374,7 +374,7 @@ Namespace DevCommerc8ak
                 Dim monnaieFC As Decimal = recuFC - _totalCourant
                 Dim taux As Decimal = If(_param Is Nothing, 0D, _param.TauxUsd)
                 Dim monnaieUSD As Decimal = If(taux = 0D, 0D, monnaieFC / taux)
-                lblMonnaie.Text = "Monnaie: " & monnaieFC.ToString() & " FC (" & monnaieUSD.ToString("0.00") & " USD)"
+                lblMonnaie.Text = "Monnaie: " & FormatageGlobal.FormatMontant(monnaieFC) & " (" & monnaieUSD.ToString("N0") & " USD)"
             Catch
             End Try
         End Sub

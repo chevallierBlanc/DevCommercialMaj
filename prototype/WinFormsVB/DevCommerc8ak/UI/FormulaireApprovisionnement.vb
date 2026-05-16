@@ -529,7 +529,7 @@ Namespace DevCommerc8ak
                 cmbFournisseur.SelectedIndex = -1
             End If
             cmbTypePaiement.Text = Convert.ToString(gridBons.CurrentRow.Cells("TypePaiement").Value)
-            lblTotalBon.Text = "Total bon: " & Convert.ToDecimal(gridBons.CurrentRow.Cells("TotalBon").Value).ToString("N2")
+            lblTotalBon.Text = "Total bon: " & FormatageGlobal.FormatMontant(Convert.ToDecimal(gridBons.CurrentRow.Cells("TotalBon").Value))
             DefinirStatutAffiche(Convert.ToString(gridBons.CurrentRow.Cells("Statut").Value))
             gridLignes.DataSource = _repo.ListerLignes(_bonCourantId)
             gridLignes.ClearSelection()
@@ -562,7 +562,7 @@ Namespace DevCommerc8ak
                 Dim libelle As String = Convert.ToString(row("Libelle"))
                 If libelle.ToLowerInvariant().Contains(q) Then
                     txtProduitChoisi.Text = libelle
-                    txtPrixPrecedent.Text = ObtenirPrixPrecedent(Convert.ToInt32(row("ProduitId"))).ToString("N2")
+                    txtPrixPrecedent.Text = ObtenirPrixPrecedent(Convert.ToInt32(row("ProduitId"))).ToString("N0")
                     If txtPrixAchat.Text.Trim() = "" Then
                         txtPrixAchat.Text = txtPrixPrecedent.Text
                     End If
@@ -574,7 +574,7 @@ Namespace DevCommerc8ak
         Private Sub MettreAJourTotalLigne(sender As Object, e As EventArgs)
             Dim quantite As Decimal = LireDecimal(txtQuantite.Text)
             Dim prix As Decimal = LireDecimal(txtPrixAchat.Text)
-            lblTotalLigne.Text = "Total ligne: " & (quantite * prix).ToString("N2")
+            lblTotalLigne.Text = "Total ligne: " & FormatageGlobal.FormatMontant(quantite * prix)
         End Sub
 
         Private Sub AjouterLigne(sender As Object, e As EventArgs)
@@ -612,7 +612,7 @@ Namespace DevCommerc8ak
             gridLignes.DataSource = _repo.ListerLignes(_bonCourantId)
             _bonLigneCouranteId = 0
             gridLignes.ClearSelection()
-            lblTotalBon.Text = "Total bon: " & CalculerTotalBon(_bonCourantId).ToString("N2")
+            lblTotalBon.Text = "Total bon: " & FormatageGlobal.FormatMontant(CalculerTotalBon(_bonCourantId))
             DefinirStatutAffiche("EnAttente")
             ChargerBons(Nothing, EventArgs.Empty)
         End Sub
@@ -647,7 +647,7 @@ Namespace DevCommerc8ak
             gridLignes.DataSource = _repo.ListerLignes(_bonCourantId)
             _bonLigneCouranteId = 0
             gridLignes.ClearSelection()
-            lblTotalBon.Text = "Total bon: " & CalculerTotalBon(_bonCourantId).ToString("N2")
+            lblTotalBon.Text = "Total bon: " & FormatageGlobal.FormatMontant(CalculerTotalBon(_bonCourantId))
             ChargerBons(Nothing, EventArgs.Empty)
         End Sub
 
@@ -746,7 +746,7 @@ Namespace DevCommerc8ak
             txtNumeroBon.Text = ObtenirNumeroBon(_bonCourantId)
             gridLignes.DataSource = _repo.ListerLignes(_bonCourantId)
             gridLignes.ClearSelection()
-            lblTotalBon.Text = "Total bon: " & CalculerTotalBon(_bonCourantId).ToString("N2")
+            lblTotalBon.Text = "Total bon: " & FormatageGlobal.FormatMontant(CalculerTotalBon(_bonCourantId))
             DefinirStatutAffiche("EnAttente")
             ChargerBons(Nothing, EventArgs.Empty)
             ChargerSuggestions()
@@ -765,7 +765,7 @@ Namespace DevCommerc8ak
                 If qte <= 0D Then
                     Continue For
                 End If
-                texte &= "- " & Convert.ToString(ligne.Cells("Libelle").Value) & " : " & qte.ToString("N2") & Environment.NewLine
+                texte &= "- " & Convert.ToString(ligne.Cells("Libelle").Value) & " : " & qte.ToString("N0") & Environment.NewLine
                 compteur += 1
                 If compteur >= 8 Then
                     Exit For
@@ -886,16 +886,16 @@ Namespace DevCommerc8ak
                         For Each row As DataRow In dtLignes.Rows
                             pe.Graphics.DrawLine(New Pen(Color.FromArgb(232, 236, 242)), 30, y + 16, 790, y + 16)
                             pe.Graphics.DrawString(Convert.ToString(row("Libelle")), fontBloc, Brushes.Black, colProduit, y)
-                            pe.Graphics.DrawString(Convert.ToDecimal(row("Quantite")).ToString("N2"), fontBloc, Brushes.Black, colQte, y)
-                            pe.Graphics.DrawString(Convert.ToDecimal(row("PrixAchat")).ToString("N2"), fontBloc, Brushes.Black, colPrix, y)
-                            pe.Graphics.DrawString(Convert.ToDecimal(row("TotalLigne")).ToString("N2"), fontBloc, Brushes.Black, colTotal, y)
+                            pe.Graphics.DrawString(Convert.ToDecimal(row("Quantite")).ToString("N0"), fontBloc, Brushes.Black, colQte, y)
+                            pe.Graphics.DrawString(Convert.ToDecimal(row("PrixAchat")).ToString("N0"), fontBloc, Brushes.Black, colPrix, y)
+                            pe.Graphics.DrawString(Convert.ToDecimal(row("TotalLigne")).ToString("N0"), fontBloc, Brushes.Black, colTotal, y)
                             y += 24
                         Next
 
                         y += 16
                         pe.Graphics.DrawRectangle(New Pen(Color.FromArgb(17, 35, 74), 1.4F), 520, y, 270, 44)
                         pe.Graphics.DrawString("TOTAL BON", fontBlocGras, pinceauBleu, 536, y + 7)
-                        pe.Graphics.DrawString(CalculerTotalBon(_bonCourantId).ToString("N2"), New Font("Segoe UI", 12, FontStyle.Bold), Brushes.Black, 666, y + 8)
+                        pe.Graphics.DrawString(CalculerTotalBon(_bonCourantId).ToString("N0"), New Font("Segoe UI", 12, FontStyle.Bold), Brushes.Black, 666, y + 8)
                         y += 70
 
                         pe.Graphics.DrawString("Observation : réception contrôlée selon le bon validé.", fontBloc, pinceauGris, 30, y)
@@ -927,7 +927,7 @@ Namespace DevCommerc8ak
             _bonCourantId = bonId
             txtNumeroBon.Text = ObtenirNumeroBon(bonId)
             gridLignes.DataSource = _repo.ListerLignes(bonId)
-            lblTotalBon.Text = "Total bon: " & CalculerTotalBon(bonId).ToString("N2")
+            lblTotalBon.Text = "Total bon: " & FormatageGlobal.FormatMontant(CalculerTotalBon(bonId))
             ImprimerBonA4(sender, e)
         End Sub
 

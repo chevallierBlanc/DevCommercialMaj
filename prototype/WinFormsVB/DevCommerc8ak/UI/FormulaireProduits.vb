@@ -529,18 +529,18 @@ Namespace DevCommerc8ak
             chkActif.Checked = Convert.ToBoolean(row("EstActif"))
             cmbUnitePrincipale.Text = If(r.IsNull("UnitePrincipale"), "", Convert.ToString(row("UnitePrincipale")))
             cmbUniteSecondaire.Text = If(r.IsNull("UniteSecondaire"), "", Convert.ToString(row("UniteSecondaire")))
-            txtConversion.Text = LireDecimalRow(row, "ConversionUnite").ToString("N2")
-            txtPrixAchat.Text = LireDecimalRow(row, "PrixAchat").ToString("N2")
+            txtConversion.Text = LireDecimalRow(row, "ConversionUnite").ToString("N0")
+            txtPrixAchat.Text = LireDecimalRow(row, "PrixAchat").ToString("N0")
             txtCoeffGros.Text = LireDecimalRow(row, "CoefficientGros").ToString("N4")
-            txtPrixGros.Text = LireDecimalRow(row, "PrixGros").ToString("N2")
-            txtPrixUnite.Text = LireDecimalRow(row, "PrixDetail").ToString("N2")
-            txtPrixDemi.Text = LireDecimalRow(row, "PrixDemi").ToString("N2")
-            txtPrixQuart.Text = LireDecimalRow(row, "PrixQuart").ToString("N2")
-            txtPrixDouzaine.Text = LireDecimalRow(row, "PrixDouzaine").ToString("N2")
-            txtPrixSpecial.Text = LireDecimalRow(row, "PrixSpecial").ToString("N2")
-            txtQuantite.Text = LireDecimalRow(row, "QuantiteStock").ToString("N2")
-            txtSeuil.Text = LireDecimalRow(row, "SeuilCritique").ToString("N2")
-            txtMarge.Text = LireDecimalRow(row, "MargePourcent").ToString("N2")
+            txtPrixGros.Text = LireDecimalRow(row, "PrixGros").ToString("N0")
+            txtPrixUnite.Text = LireDecimalRow(row, "PrixDetail").ToString("N0")
+            txtPrixDemi.Text = LireDecimalRow(row, "PrixDemi").ToString("N0")
+            txtPrixQuart.Text = LireDecimalRow(row, "PrixQuart").ToString("N0")
+            txtPrixDouzaine.Text = LireDecimalRow(row, "PrixDouzaine").ToString("N0")
+            txtPrixSpecial.Text = LireDecimalRow(row, "PrixSpecial").ToString("N0")
+            txtQuantite.Text = LireDecimalRow(row, "QuantiteStock").ToString("N0")
+            txtSeuil.Text = LireDecimalRow(row, "SeuilCritique").ToString("N0")
+            txtMarge.Text = LireDecimalRow(row, "MargePourcent").ToString("N0")
             If r.IsNull("DateExpiration") Then
                 dtpExpiration.Value = Date.Now
             Else
@@ -664,9 +664,9 @@ Namespace DevCommerc8ak
             Dim prixAchat As Decimal = LireDecimal(txtPrixAchat.Text)
             Dim prixGros As Decimal = LireDecimal(txtPrixGros.Text)
             If prixAchat > 0D AndAlso prixGros > 0D Then
-                txtMarge.Text = Math.Round(((prixGros / prixAchat) - 1D) * 100D, 2).ToString("N2")
+                txtMarge.Text = Math.Round(((prixGros / prixAchat) - 1D) * 100D, 2).ToString("N0")
             Else
-                txtMarge.Text = "0,00"
+                txtMarge.Text = "0"
             End If
         End Sub
 
@@ -693,11 +693,11 @@ Namespace DevCommerc8ak
                 prixDouzaine = prixUnite * 12D
             End If
 
-            txtPrixGros.Text = prixGros.ToString("N2")
-            txtPrixDemi.Text = prixDemi.ToString("N2")
-            txtPrixQuart.Text = prixQuart.ToString("N2")
-            txtPrixUnite.Text = prixUnite.ToString("N2")
-            txtPrixDouzaine.Text = prixDouzaine.ToString("N2")
+            txtPrixGros.Text = prixGros.ToString("N0")
+            txtPrixDemi.Text = prixDemi.ToString("N0")
+            txtPrixQuart.Text = prixQuart.ToString("N0")
+            txtPrixUnite.Text = prixUnite.ToString("N0")
+            txtPrixDouzaine.Text = prixDouzaine.ToString("N0")
             MajOptionsVente(Nothing, EventArgs.Empty)
             MettreAJourMarge(Nothing, EventArgs.Empty)
         End Sub
@@ -762,7 +762,7 @@ Namespace DevCommerc8ak
 
                 If dtKpi.Rows.Count > 0 Then
                     lblKpiProduitRentable.Text = Convert.ToString(dtKpi.Rows(0)("ProduitPlusRentable"))
-                    lblKpiTotalRecettes.Text = Convert.ToDecimal(dtKpi.Rows(0)("TotalRecettes")).ToString("N2")
+                    lblKpiTotalRecettes.Text = FormatageGlobal.FormatMontant(Convert.ToDecimal(dtKpi.Rows(0)("TotalRecettes")))
                     lblKpiNombreProduits.Text = Convert.ToInt32(dtKpi.Rows(0)("NombreTotalProduits")).ToString()
                     lblKpiFaibleRotation.Text = Convert.ToInt32(dtKpi.Rows(0)("FaibleRotation")).ToString()
                     lblKpiDormants.Text = Convert.ToInt32(dtKpi.Rows(0)("ProduitsDormants")).ToString()

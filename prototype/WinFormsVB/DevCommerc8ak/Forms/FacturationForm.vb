@@ -446,11 +446,11 @@ Namespace DevCommerc8ak
             If gridProduits.CurrentRow Is Nothing Then Return
             Dim typeChoisi As TypeVenteDTO = ObtenirTypeVenteSelectionne()
             Dim prix As Decimal = PrixSelonUnite()
-            txtPrixUnitaire.Text = prix.ToString("N2")
+            txtPrixUnitaire.Text = prix.ToString("N0")
             If typeChoisi Is Nothing Then
                 lblEquivalent.Text = "Equivalent: 0 pièce / unité"
             Else
-                lblEquivalent.Text = "Equivalent: " & typeChoisi.QuantiteEquivalent.ToString("N2") & " pièces / unité"
+                lblEquivalent.Text = "Equivalent: " & typeChoisi.QuantiteEquivalent.ToString("N0") & " pièces / unité"
             End If
             MiseAJourIndicateursQuantite(Nothing, EventArgs.Empty)
         End Sub
@@ -491,7 +491,7 @@ Namespace DevCommerc8ak
             End If
 
             Dim quantiteReelle As Decimal = qte * typeChoisi.QuantiteEquivalent
-            lblTotalReel.Text = "Total réel: " & quantiteReelle.ToString("N2") & " pièces"
+            lblTotalReel.Text = "Total réel: " & quantiteReelle.ToString("N0") & " pièces"
         End Sub
 
         Private Sub MettreAJourAffichageStockProduit()

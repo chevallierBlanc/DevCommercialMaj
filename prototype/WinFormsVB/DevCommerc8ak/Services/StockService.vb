@@ -682,10 +682,83 @@ Namespace DevCommerc8ak
         ''' Récupère l'analyse détaillée d'un produit pour l'inventaire
         ''' </summary>
         Public Function ObtenirAnalyseProduit(produitId As Integer) As DataTable
+            Dim sql As String = "" &
+                "WITH Ventes AS (" &
+                "    SELECT " &
+                "        ISNULL(SUM(ISNULL(l.QuantiteBase,0)),0) AS TotalVentes, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'GROS' THEN ISNULL(l.QuantiteBase,0) ELSE 0 END),0) AS TotalGros, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'DEMI' THEN ISNULL(l.QuantiteBase,0) ELSE 0 END),0) AS TotalDemi, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'QUART' THEN ISNULL(l.QuantiteBase,0) ELSE 0 END),0) AS TotalQuart, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) IN ('PIECE','UNITE') THEN ISNULL(l.QuantiteBase,0) ELSE 0 END),0) AS TotalPiece, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'DOUZAINE' THEN ISNULL(l.QuantiteBase,0) ELSE 0 END),0) AS TotalDouzaine, " &
+                "        ISNULL(SUM(ISNULL(l.MontantLigne,0)),0) AS MontantVentes " &
+                "    FROM LignesFactureVente l " &
+                "    INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
+                "    WHERE l.ProduitId = @ProduitId AND UPPER(ISNULL(f.Statut,'')) = 'PAYEE' " &
+                "), SortiesManuelles AS (" &
+                "    SELECT " &
+                "        ISNULL(SUM(ISNULL(ss.QuantiteBase,0)),0) AS TotalSortiesManuelles, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(ss.TypeVente,'')) = 'GROS' THEN ISNULL(ss.QuantiteBase,0) ELSE 0 END),0) AS TotalGros, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(ss.TypeVente,'')) = 'DEMI' THEN ISNULL(ss.QuantiteBase,0) ELSE 0 END),0) AS TotalDemi, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(ss.TypeVente,'')) = 'QUART' THEN ISNULL(ss.QuantiteBase,0) ELSE 0 END),0) AS TotalQuart, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(ss.TypeVente,'')) IN ('PIECE','UNITE') THEN ISNULL(ss.QuantiteBase,0) ELSE 0 END),0) AS TotalPiece, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(ss.TypeVente,'')) = 'DOUZAINE' THEN ISNULL(ss.QuantiteBase,0) ELSE 0 END),0) AS TotalDouzaine, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(m.Nature,'')) LIKE '%DON%' OR UPPER(ISNULL(m.Libelle,'')) LIKE '%DON%' THEN ISNULL(ss.QuantiteBase,0) ELSE 0 END),0) AS TotalDons, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(m.Nature,'')) LIKE '%ALLOC%' OR UPPER(ISNULL(m.Libelle,'')) LIKE '%ALLOC%' THEN ISNULL(ss.QuantiteBase,0) ELSE 0 END),0) AS TotalAllocations, " &
+                "        ISNULL(SUM(CASE WHEN (UPPER(ISNULL(m.Nature,'')) LIKE '%DETTE%' OR UPPER(ISNULL(m.Libelle,'')) LIKE '%DETTE%') AND (UPPER(ISNULL(m.Libelle,'')) LIKE '%CLIENT%' OR (UPPER(ISNULL(ss.StatutPaiement,'')) = 'IMPAYE' AND ss.ClientId IS NOT NULL)) THEN ISNULL(ss.QuantiteBase,0) ELSE 0 END),0) AS TotalDettesClients, " &
+                "        ISNULL(SUM(CASE WHEN (UPPER(ISNULL(m.Nature,'')) LIKE '%DETTE%' OR UPPER(ISNULL(m.Libelle,'')) LIKE '%DETTE%') AND (UPPER(ISNULL(m.Libelle,'')) LIKE '%BOSS%' OR UPPER(ISNULL(m.Libelle,'')) LIKE '%PATRON%' OR UPPER(ISNULL(m.Libelle,'')) LIKE '%MAISON%') THEN ISNULL(ss.QuantiteBase,0) ELSE 0 END),0) AS TotalDettesBoss, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(m.Nature,'')) LIKE '%HORS%' OR UPPER(ISNULL(m.Libelle,'')) LIKE '%HORS%' THEN ISNULL(ss.QuantiteBase,0) ELSE 0 END),0) AS TotalSortiesHorsCaisse, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(ss.StatutPaiement,'')) <> 'GRATUIT' THEN ISNULL(ss.MontantLigne,0) ELSE 0 END),0) AS MontantManuel " &
+                "    FROM StockSortie ss " &
+                "    LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId " &
+                "    WHERE ss.ProduitId = @ProduitId AND UPPER(ISNULL(ss.Source,'')) = 'SORTIE_MANUELLE' " &
+                "), Pertes AS (" &
+                "    SELECT ISNULL(SUM(ISNULL(QuantiteBase,0)),0) AS TotalPertes " &
+                "    FROM StockPerte " &
+                "    WHERE ProduitId = @ProduitId " &
+                "), Mouvements AS (" &
+                "    SELECT " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(TypeMouvement,'')) = 'ENTREE' THEN ISNULL(QuantiteBase,0) ELSE 0 END),0) AS TotalEntreesMouvements, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(TypeMouvement,'')) IN ('SORTIE','SORTIE_MANUELLE','PERTE') THEN ISNULL(QuantiteBase,0) ELSE 0 END),0) AS TotalSortiesMouvements " &
+                "    FROM MouvementsStock " &
+                "    WHERE ProduitId = @ProduitId " &
+                "), Entrees AS (" &
+                "    SELECT ISNULL(SUM(ISNULL(QuantiteBase,0)),0) AS TotalEntrees " &
+                "    FROM StockEntree " &
+                "    WHERE ProduitId = @ProduitId " &
+                ") " &
+                "SELECT p.ProduitId, p.Libelle, p.ConversionUnite, p.UnitePrincipale, p.UniteSecondaire, " &
+                "       e.TotalEntrees, " &
+                "       v.TotalVentes, " &
+                "       m.TotalSortiesManuelles, " &
+                "       v.TotalGros + m.TotalGros AS TotalGros, " &
+                "       v.TotalDemi + m.TotalDemi AS TotalDemi, " &
+                "       v.TotalQuart + m.TotalQuart AS TotalQuart, " &
+                "       v.TotalPiece + m.TotalPiece AS TotalPiece, " &
+                "       v.TotalDouzaine + m.TotalDouzaine AS TotalDouzaine, " &
+                "       pte.TotalPertes, " &
+                "       m.TotalDons, " &
+                "       m.TotalAllocations, " &
+                "       m.TotalDettesClients, " &
+                "       m.TotalDettesBoss, " &
+                "       m.TotalSortiesHorsCaisse, " &
+                "       mv.TotalEntreesMouvements, " &
+                "       mv.TotalSortiesMouvements, " &
+                "       (e.TotalEntrees - v.TotalVentes - m.TotalSortiesManuelles - pte.TotalPertes) AS StockReelRestant, " &
+                "       CASE WHEN ISNULL(p.ConversionUnite,0) > 0 THEN FLOOR((e.TotalEntrees - v.TotalVentes - m.TotalSortiesManuelles - pte.TotalPertes) / p.ConversionUnite) ELSE 0 END AS StockRestantCartons, " &
+                "       CASE WHEN ISNULL(p.ConversionUnite,0) > 0 THEN (e.TotalEntrees - v.TotalVentes - m.TotalSortiesManuelles - pte.TotalPertes) - (FLOOR((e.TotalEntrees - v.TotalVentes - m.TotalSortiesManuelles - pte.TotalPertes) / p.ConversionUnite) * p.ConversionUnite) ELSE (e.TotalEntrees - v.TotalVentes - m.TotalSortiesManuelles - pte.TotalPertes) END AS StockRestantPieces, " &
+                "       v.MontantVentes + m.MontantManuel AS MontantTotalGenere " &
+                "FROM Produits p " &
+                "CROSS JOIN Entrees e " &
+                "CROSS JOIN Ventes v " &
+                "CROSS JOIN SortiesManuelles m " &
+                "CROSS JOIN Pertes pte " &
+                "CROSS JOIN Mouvements mv " &
+                "WHERE p.ProduitId = @ProduitId"
             Dim params As New List(Of SqlParameter) From {
                 New SqlParameter("@ProduitId", produitId)
             }
-            Return _dal.ExecuterTable("GetAnalyseStockProduit", CommandType.StoredProcedure, params)
+            Return _dal.ExecuterTable(sql, CommandType.Text, params)
         End Function
 
         ' --- MÉTHODES PRIVÉES (INCHANGÉES) ---
