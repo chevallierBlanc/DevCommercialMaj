@@ -449,8 +449,8 @@ Namespace DevCommerc8ak
         '        Dim nb As Decimal = LireDecimal(txtNbUniteParBase.Text)
         '        Dim uniteBase As String = If(cmbUniteBase.Text.Trim() = "", "base", cmbUniteBase.Text.Trim())
         '        Dim stockBase As Decimal = If(nb > 0D, Decimal.Floor(stockPieces / nb), stockPieces)
-        '        lblStockActuel.Text = "Stock actuel: " & stockBase.ToString("N2") & " " & uniteBase
-        '        lblStockActuelPiece.Text = "Equivalent: " & stockPieces.ToString("N2") & " pièces"
+        '        lblStockActuel.Text = "Stock actuel: " & stockBase.ToString("N0") & " " & uniteBase
+        '        lblStockActuelPiece.Text = "Equivalent: " & stockPieces.ToString("N0") & " pièces"
         '    End If
         'End Sub
 
@@ -577,7 +577,7 @@ Namespace DevCommerc8ak
                 Dim totalPerte As Object = dal.ExecuterScalaire("SELECT ISNULL(SUM(QuantiteBase),0) FROM StockPerte WHERE ProduitId=@id", CommandType.Text, New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@id", produitId)})
 
                 'Dim stockTheo As Decimal = Convert.ToDecimal(totalEntree) - Convert.ToDecimal(totalSortie) - Convert.ToDecimal(totalPerte)
-                'txtStockTheorique.Text = stockTheo.ToString("N2")
+                'txtStockTheorique.Text = stockTheo.ToString("N0")
                 'RecalculerEcart(Nothing, EventArgs.Empty)
 
                 ' Analyse NOUVELLE

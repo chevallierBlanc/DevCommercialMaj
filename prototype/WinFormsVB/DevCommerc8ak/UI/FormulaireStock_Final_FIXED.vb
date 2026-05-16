@@ -1260,8 +1260,8 @@ Namespace DevCommerc8ak
         '        Dim nb As Decimal = LireDecimal(If(r.IsNull("ConversionUnite"), "", Convert.ToDecimal(row("ConversionUnite")).ToString()))
         '        Dim uniteBase As String = If(r.IsNull("UnitePrincipale"), "", Convert.ToString(row("UnitePrincipale")))
         '        Dim stockBase As Decimal = If(nb > 0D, Decimal.Floor(stockPieces / nb), stockPieces)
-        '        lblStockActuelS.Text = "Stock actuel: " & stockBase.ToString("N2") & " " & uniteBase
-        '        lblStockActuelPieceS.Text = "Equivalent: " & stockPieces.ToString("N2") & " pièces"
+        '        lblStockActuelS.Text = "Stock actuel: " & stockBase.ToString("N0") & " " & uniteBase
+        '        lblStockActuelPieceS.Text = "Equivalent: " & stockPieces.ToString("N0") & " pièces"
         '    End If
         'End Sub
         Private Sub RecalculerStock(sender As Object, e As EventArgs)
@@ -1291,7 +1291,7 @@ Namespace DevCommerc8ak
         '        Dim stockActuel As Decimal = If(stock Is Nothing, 0D, Convert.ToDecimal(stock))
         '        Dim qte As Decimal = LireDecimal(txtQuantiteSortie.Text)
         '        Dim restant As Decimal = stockActuel - qte
-        '        txtStockRestant.Text = restant.ToString("N2")
+        '        txtStockRestant.Text = restant.ToString("N0")
         '    End If
         'End Sub
         'chargement types ventes tab sortie 
@@ -1749,7 +1749,7 @@ Namespace DevCommerc8ak
 
         '        ' Stock Théorique
         '        Dim service As StockService = ObtenirStockService()
-        '        txtStockTheorique.Text = service.ObtenirStockActuelProduit(produitId).ToString("N2")
+        '        txtStockTheorique.Text = service.ObtenirStockActuelProduit(produitId).ToString("N0")
 
         '        ' NOUVEAU: Analyse Produit
         '        ChargerAnalyseProduit(produitId)
@@ -2047,7 +2047,7 @@ Namespace DevCommerc8ak
         'Private Sub CalculerEcart(sender As Object, e As EventArgs)
         '    Dim theo As Decimal = LireDecimal(txtStockTheorique.Text)
         '    Dim reel As Decimal = LireDecimal(txtStockReel.Text)
-        '    txtEcart.Text = (reel - theo).ToString("N2")
+        '    txtEcart.Text = (reel - theo).ToString("N0")
         'End Sub
 
         Private Sub RecalculerEcart(sender As Object, e As EventArgs)

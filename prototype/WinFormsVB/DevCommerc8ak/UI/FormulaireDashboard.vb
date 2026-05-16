@@ -334,10 +334,10 @@ Namespace DevCommerc8ak
         '        If cur < cible Then
         '            cur = Math.Min(cible, cur + stepVal)
         '            kpiCurrent(lbl) = cur
-        '            lbl.Text = cur.ToString("0.##")
+        '            lbl.Text = cur.ToString("N0")
         '            termine = False
         '        Else
-        '            lbl.Text = cible.ToString("0.##")
+        '            lbl.Text = cible.ToString("N0")
         '        End If
         '    Next
         '    If termine Then
