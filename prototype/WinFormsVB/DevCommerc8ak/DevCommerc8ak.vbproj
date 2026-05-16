@@ -101,6 +101,7 @@
     <Compile Include="Services\ThemeHelperA.vb" />
     <Compile Include="Services\ApprovisionnementService.vb" />
     <Compile Include="Services\PdfHelper.vb" />
+    <Compile Include="Services\FormatageGlobal.vb" />
     <Compile Include="Services\TypeVenteService.vb" />
     <Compile Include="Services\NotificationService.vb" />
     <Compile Include="Services\IconsHelper.vb" />
