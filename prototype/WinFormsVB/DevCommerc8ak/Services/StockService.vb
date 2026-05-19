@@ -6,6 +6,7 @@ Imports System.Data
 Imports System.Data.SqlClient
 Imports System.Collections.Generic
 Imports System.Configuration
+Imports System.Web.Script.Serialization
 
 Namespace DevCommerc8ak
     Public Class StockService
@@ -89,6 +90,13 @@ Namespace DevCommerc8ak
                         Next
 
                         tx.Commit()
+                        Try
+                            Dim syncService As New OfflineSyncService(_dal)
+                            For Each item As StockSortie In items
+                                syncService.EssayerSynchroniserStockSortie(item)
+                            Next
+                        Catch
+                        End Try
                         Return numeroSortie
                     Catch
                         tx.Rollback()
@@ -142,6 +150,11 @@ Namespace DevCommerc8ak
                         End Using
 
                         tx.Commit()
+                        Try
+                            Dim syncService As New OfflineSyncService(_dal)
+                            syncService.EssayerSynchroniserSortieParNumero(numeroSortie)
+                        Catch
+                        End Try
                         Return nouveauReste
                     Catch
                         tx.Rollback()

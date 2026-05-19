@@ -51,6 +51,9 @@ Namespace DevCommerc8ak
                 Return
             End If
 
+            Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+            OfflineSyncScheduler.Start(cs)
+
             Dim main As New MainForm()
             main.Show()
             Me.Hide()
