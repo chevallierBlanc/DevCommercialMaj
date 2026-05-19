@@ -109,6 +109,7 @@
     <Compile Include="Services\ApprovisionnementService.vb" />
     <Compile Include="Services\PdfHelper.vb" />
     <Compile Include="Services\FormatageGlobal.vb" />
+    <Compile Include="Services\SyncLogService.vb" />
     <Compile Include="Services\RemoteApiSession.vb" />
     <Compile Include="Services\DashboardApiClient.vb" />
     <Compile Include="Services\OfflineSyncService.vb" />

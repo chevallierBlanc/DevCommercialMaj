@@ -14,6 +14,7 @@ Namespace DevCommerc8ak
         Private ReadOnly _stockQueueRepo As StockSortieNonSynchroniseRepository
         Private ReadOnly _depenseQueueRepo As DepensesNonSynchroniseesRepository
         Private ReadOnly _stockSortieRepo As StockSortieRepository
+        Private ReadOnly _log As New SyncLogService()
         Public Sub New(dal As DAL)
             _stockQueueRepo = New StockSortieNonSynchroniseRepository(dal)
             _depenseQueueRepo = New DepensesNonSynchroniseesRepository(dal)
@@ -44,13 +45,16 @@ Namespace DevCommerc8ak
             Dim payload As String = ConstruireJsonStockSortie(sortie)
             If Not SynchronisationActive() Then
                 EnqueueStockSortie(payload)
+                _log.Warn("Synchro stock désactivée, file d'attente alimentée pour " & sortie.NumeroSortie)
                 Return False
             End If
             Try
                 EnvoyerJson("api/stocksortie", payload)
+                _log.Info("StockSortie synchronisée: " & sortie.NumeroSortie)
                 Return True
             Catch ex As Exception
                 EnqueueStockSortie(payload, ex.Message)
+                _log.Error("Echec synchro StockSortie: " & sortie.NumeroSortie, ex)
                 Return False
             End Try
         End Function
@@ -87,14 +91,17 @@ Namespace DevCommerc8ak
 
             If Not SynchronisationActive() Then
                 EnqueueStockSortie(payload)
+                _log.Warn("Synchro stock désactivée, file d'attente alimentée pour " & numeroSortie)
                 Return False
             End If
 
             Try
                 EnvoyerJson("api/stocksortie", payload)
+                _log.Info("StockSortie synchronisée par numéro: " & numeroSortie)
                 Return True
             Catch ex As Exception
                 EnqueueStockSortie(payload, ex.Message)
+                _log.Error("Echec synchro StockSortie par numéro: " & numeroSortie, ex)
                 Return False
             End Try
         End Function
@@ -103,13 +110,16 @@ Namespace DevCommerc8ak
             Dim payload As String = ConstruireJsonDepense(depense)
             If Not SynchronisationActive() Then
                 EnqueueDepense(payload)
+                _log.Warn("Synchro dépense désactivée, file d'attente alimentée pour " & depense.Categorie)
                 Return False
             End If
             Try
                 EnvoyerJson("api/depenses", payload)
+                _log.Info("Depense synchronisée: " & depense.Categorie)
                 Return True
             Catch ex As Exception
                 EnqueueDepense(payload, ex.Message)
+                _log.Error("Echec synchro Depense: " & depense.Categorie, ex)
                 Return False
             End Try
         End Function
@@ -119,11 +129,17 @@ Namespace DevCommerc8ak
             For Each row As DataRow In dt.Rows
                 Dim id As Integer = Convert.ToInt32(row("Id"))
                 Dim jsonData As String = Convert.ToString(row("JsonData"))
+                If Not PeutRetenter(row) Then
+                    _log.Info("Retry différé pour StockSortie Id=" & id.ToString())
+                    Continue For
+                End If
                 Try
                     EnvoyerJson("api/stocksortie", jsonData)
                     _stockQueueRepo.MarquerResultat(id, "SYNC_OK", Nothing, Convert.ToInt32(row("NombreTentatives")) + 1)
+                    _log.Info("Retry synchro StockSortie réussi (Id=" & id.ToString() & ")")
                 Catch ex As Exception
                     _stockQueueRepo.MarquerResultat(id, "ECHEC", ex.Message, Convert.ToInt32(row("NombreTentatives")) + 1)
+                    _log.Error("Retry synchro StockSortie échoué (Id=" & id.ToString() & ")", ex)
                 End Try
             Next
         End Sub
@@ -133,11 +149,17 @@ Namespace DevCommerc8ak
             For Each row As DataRow In dt.Rows
                 Dim id As Integer = Convert.ToInt32(row("Id"))
                 Dim jsonData As String = Convert.ToString(row("JsonData"))
+                If Not PeutRetenter(row) Then
+                    _log.Info("Retry différé pour Depense Id=" & id.ToString())
+                    Continue For
+                End If
                 Try
                     EnvoyerJson("api/depenses", jsonData)
                     _depenseQueueRepo.MarquerResultat(id, "SYNC_OK", Nothing, Convert.ToInt32(row("NombreTentatives")) + 1)
+                    _log.Info("Retry synchro Depense réussi (Id=" & id.ToString() & ")")
                 Catch ex As Exception
                     _depenseQueueRepo.MarquerResultat(id, "ECHEC", ex.Message, Convert.ToInt32(row("NombreTentatives")) + 1)
+                    _log.Error("Retry synchro Depense échoué (Id=" & id.ToString() & ")", ex)
                 End Try
             Next
         End Sub
@@ -162,6 +184,29 @@ Namespace DevCommerc8ak
         Private Sub EnvoyerJson(chemin As String, jsonData As String)
             RemoteApiSession.PostJson(chemin, jsonData)
         End Sub
+
+        Private Function PeutRetenter(row As DataRow) As Boolean
+            If row Is Nothing Then
+                Return False
+            End If
+
+            Dim tentatives As Integer = 0
+            If Not row.IsNull("NombreTentatives") Then
+                tentatives = Convert.ToInt32(row("NombreTentatives"))
+            End If
+
+            Dim derniereTentative As DateTime? = Nothing
+            If Not row.IsNull("DerniereTentative") Then
+                derniereTentative = Convert.ToDateTime(row("DerniereTentative"))
+            End If
+
+            If Not derniereTentative.HasValue Then
+                Return True
+            End If
+
+            Dim attenteMinutes As Integer = Math.Min(60, CInt(2 * Math.Pow(2, Math.Min(tentatives, 5))))
+            Return (DateTime.UtcNow - derniereTentative.Value.ToUniversalTime()).TotalMinutes >= attenteMinutes
+        End Function
 
         Private Function ConstruireJsonStockSortie(sortie As StockSortie) As String
             Dim payload As New Dictionary(Of String, Object) From {

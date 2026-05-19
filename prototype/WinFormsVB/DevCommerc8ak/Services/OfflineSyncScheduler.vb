@@ -10,6 +10,7 @@ Namespace DevCommerc8ak
         Private ReadOnly _syncTimer As New Timer()
         Private _started As Boolean
         Private _dal As DAL
+        Private ReadOnly _log As New SyncLogService()
 
         Public Sub Start(connectionString As String)
             SyncLock GetType(OfflineSyncScheduler)
@@ -33,9 +34,12 @@ Namespace DevCommerc8ak
 
         Private Sub OnElapsed(sender As Object, e As ElapsedEventArgs)
             Try
+                _log.Info("Cycle de synchronisation démarré")
                 Dim service As New OfflineSyncService(_dal)
                 service.SynchroniserTout()
-            Catch
+                _log.Info("Cycle de synchronisation terminé")
+            Catch ex As Exception
+                _log.Error("Echec du cycle de synchronisation", ex)
             End Try
         End Sub
     End Module
