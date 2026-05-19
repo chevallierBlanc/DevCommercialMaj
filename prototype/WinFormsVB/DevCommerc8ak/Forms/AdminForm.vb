@@ -86,7 +86,7 @@ Namespace DevCommerc8ak
             btnParametres = CreerBoutonCard("Paramètres", "Configuration du système", Color.FromArgb(156, 39, 176))
 
             ' Handlers (Logique conservée)
-            AddHandler btnDashboard.Click, Sub() OuvrirFenetre(New FormulaireDashboard())
+            AddHandler btnDashboard.Click, Sub() OuvrirFenetre(New FormulaireDashboardCloud())
             AddHandler btnProduits.Click, Sub() OuvrirFenetre(New FormulaireProduits())
             AddHandler btnClients.Click, Sub() OuvrirFenetre(New FormulaireClients())
             AddHandler btnFournisseurs.Click, Sub() OuvrirFenetre(New FormulaireFournisseurs())

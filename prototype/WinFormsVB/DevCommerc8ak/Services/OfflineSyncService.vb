@@ -14,8 +14,6 @@ Namespace DevCommerc8ak
         Private ReadOnly _stockQueueRepo As StockSortieNonSynchroniseRepository
         Private ReadOnly _depenseQueueRepo As DepensesNonSynchroniseesRepository
         Private ReadOnly _stockSortieRepo As StockSortieRepository
-        Private Shared ReadOnly _http As New HttpClient() With {.Timeout = TimeSpan.FromSeconds(10)}
-
         Public Sub New(dal As DAL)
             _stockQueueRepo = New StockSortieNonSynchroniseRepository(dal)
             _depenseQueueRepo = New DepensesNonSynchroniseesRepository(dal)
@@ -162,12 +160,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub EnvoyerJson(chemin As String, jsonData As String)
-            Dim url As String = BaseApiUrl() & chemin.TrimStart("/"c)
-            Dim content As New StringContent(jsonData, Encoding.UTF8, "application/json")
-            Dim resp As HttpResponseMessage = _http.PostAsync(url, content).Result
-            If Not resp.IsSuccessStatusCode Then
-                Throw New Exception("API " & CInt(resp.StatusCode).ToString() & " : " & resp.ReasonPhrase)
-            End If
+            RemoteApiSession.PostJson(chemin, jsonData)
         End Sub
 
         Private Function ConstruireJsonStockSortie(sortie As StockSortie) As String

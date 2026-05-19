@@ -51,6 +51,9 @@ Namespace DevCommerc8ak
                 Return
             End If
 
+            Dim apiOk As Boolean = RemoteApiSession.Authentifier(txtUser.Text.Trim(), txtPass.Text)
+            lblStatus.Text = If(apiOk, "Etat serveur: API connectee", "Etat serveur: API indisponible, mode local")
+
             Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
             OfflineSyncScheduler.Start(cs)
 
