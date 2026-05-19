@@ -53,6 +53,21 @@ public sealed class JournalierDashboardResponse
     public decimal TotalSorties { get; set; }
     public decimal DepensesDuJour { get; set; }
     public decimal BeneficeEstime { get; set; }
+    public decimal TotalEntrees { get; set; }
+    public decimal TotalVentes { get; set; }
+    public decimal TotalSortiesManuelles { get; set; }
+    public decimal TotalPertes { get; set; }
+    public decimal TotalDons { get; set; }
+    public decimal TotalAllocations { get; set; }
+    public decimal TotalDettesClients { get; set; }
+    public decimal TotalDettesBoss { get; set; }
+    public decimal TotalSortiesHorsCaisse { get; set; }
+    public decimal TotalGros { get; set; }
+    public decimal TotalDemi { get; set; }
+    public decimal TotalQuart { get; set; }
+    public decimal TotalPiece { get; set; }
+    public decimal TotalDouzaine { get; set; }
+    public decimal MontantTotalGenere { get; set; }
     public List<DailyProductRow> ProduitsVendus { get; set; } = [];
     public List<ManualExitRow> SortiesManuelles { get; set; } = [];
     public List<ExpenseRow> DepensesParCategorie { get; set; } = [];
@@ -68,6 +83,21 @@ public sealed class MensuelDashboardResponse
     public decimal CaMensuel { get; set; }
     public decimal DepensesMensuelles { get; set; }
     public decimal BeneficeEstime { get; set; }
+    public decimal TotalEntrees { get; set; }
+    public decimal TotalVentes { get; set; }
+    public decimal TotalSortiesManuelles { get; set; }
+    public decimal TotalPertes { get; set; }
+    public decimal TotalDons { get; set; }
+    public decimal TotalAllocations { get; set; }
+    public decimal TotalDettesClients { get; set; }
+    public decimal TotalDettesBoss { get; set; }
+    public decimal TotalSortiesHorsCaisse { get; set; }
+    public decimal TotalGros { get; set; }
+    public decimal TotalDemi { get; set; }
+    public decimal TotalQuart { get; set; }
+    public decimal TotalPiece { get; set; }
+    public decimal TotalDouzaine { get; set; }
+    public decimal MontantTotalGenere { get; set; }
     public List<DailyProductRow> TopProduits { get; set; } = [];
     public List<ExpenseRow> TopDepenses { get; set; } = [];
     public List<PeriodSeriesPoint> EvolutionVentes { get; set; } = [];
@@ -81,6 +111,21 @@ public sealed class AnnuelDashboardResponse
     public decimal CaAnnuel { get; set; }
     public decimal DepensesAnnuelles { get; set; }
     public decimal BeneficeEstime { get; set; }
+    public decimal TotalEntrees { get; set; }
+    public decimal TotalVentes { get; set; }
+    public decimal TotalSortiesManuelles { get; set; }
+    public decimal TotalPertes { get; set; }
+    public decimal TotalDons { get; set; }
+    public decimal TotalAllocations { get; set; }
+    public decimal TotalDettesClients { get; set; }
+    public decimal TotalDettesBoss { get; set; }
+    public decimal TotalSortiesHorsCaisse { get; set; }
+    public decimal TotalGros { get; set; }
+    public decimal TotalDemi { get; set; }
+    public decimal TotalQuart { get; set; }
+    public decimal TotalPiece { get; set; }
+    public decimal TotalDouzaine { get; set; }
+    public decimal MontantTotalGenere { get; set; }
     public List<PeriodSeriesPoint> VentesParMois { get; set; } = [];
     public List<PeriodSeriesPoint> DepensesParMois { get; set; } = [];
     public List<PeriodSeriesPoint> BeneficesParMois { get; set; } = [];
