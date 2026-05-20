@@ -76,6 +76,21 @@ Namespace DevCommerc8ak
             Return prefix & "-" & numero.ToString("000")
         End Function
 
+        Public Function ListerSortieManuelleParNumero(numeroSortie As String) As DataTable
+            Dim sql As String = "" &
+                "SELECT ss.NumeroSortie, ss.DateSortie, ISNULL(c.NomClient, '') AS Client, ISNULL(m.Libelle, ss.Source) AS Motif, " &
+                "p.Libelle AS Produit, ss.QuantiteSaisie, ss.QuantiteBase, ss.Unite, ss.TypeVente, ss.PrixUnitaire, ss.MontantLigne, " &
+                "ss.StatutPaiement, ss.MontantPaye, ss.ResteAPayer, ss.Observation " &
+                "FROM StockSortie ss " &
+                "INNER JOIN Produits p ON p.ProduitId = ss.ProduitId " &
+                "LEFT JOIN Clients c ON c.ClientId = ss.ClientId " &
+                "LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId " &
+                "WHERE ss.NumeroSortie = @NumeroSortie " &
+                "ORDER BY ss.StockSortieId"
+            Dim p As New List(Of SqlParameter) From {New SqlParameter("@NumeroSortie", numeroSortie)}
+            Return _dal.ExecuterTable(sql, CommandType.Text, p)
+        End Function
+
         '' --- MODULE 1 : SORTIE MANUELLE ---
 
         'Public Function EnregistrerSortieManuelle(panier As List(Of StockSortieDTO), motifId As Integer, clientId As Integer?, utilisateurId As Integer) As String

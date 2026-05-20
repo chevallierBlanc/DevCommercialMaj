@@ -39,7 +39,7 @@ Namespace DevCommerc8ak
         Public Property Motif As String
         Public Property Category As String
         Public Property User As String
-        Public Property Date As DateTime
+        Public Property [Date] As DateTime
         Public Property Amount As Decimal
         Public Property Observation As String
     End Class

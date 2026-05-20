@@ -248,7 +248,7 @@ Namespace DevCommerc8ak
         End Function
 
         Private Shared Function LireDecimal(row As DataRow, colonne As String) As Decimal
-            If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains(colonne) OrElse IsDBNull(row(colonne)) Then
+            If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains(colonne) OrElse row.IsNull(colonne) Then
                 Return 0D
             End If
             Return Convert.ToDecimal(row(colonne))
