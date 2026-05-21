@@ -115,6 +115,7 @@
     <Compile Include="Services\OfflineSyncService.vb" />
     <Compile Include="Services\OfflineSyncScheduler.vb" />
     <Compile Include="Services\DepenseService.vb" />
+    <Compile Include="Services\VenteService.vb" />
     <Compile Include="Services\TypeVenteService.vb" />
     <Compile Include="Services\NotificationService.vb" />
     <Compile Include="Services\IconsHelper.vb" />
@@ -161,6 +162,9 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FormulaireRapports.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireVente.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FormulaireApprovisionnement.vb">

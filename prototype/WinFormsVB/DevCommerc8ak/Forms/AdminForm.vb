@@ -19,7 +19,7 @@ Namespace DevCommerc8ak
         Private ReadOnly FontSubtitle As New Font("Segoe UI", 10)
         Private ReadOnly FontButton As New Font("Segoe UI", 10, FontStyle.Bold)
 
-        ' --- Composants (Noms conservés) ---
+        ' --- Composants (Noms conservÃ©s) ---
         Private ReadOnly btnDashboard As Button
         Private ReadOnly btnProduits As Button
         Private ReadOnly btnClients As Button
@@ -27,6 +27,7 @@ Namespace DevCommerc8ak
         Private ReadOnly btnFactures As Button
         Private ReadOnly btnPaiements As Button
         Private ReadOnly btnStock As Button
+        Private ReadOnly btnVentes As Button
         Private ReadOnly btnRapports As Button
         Private ReadOnly btnAppro As Button
         Private ReadOnly btnParametres As Button
@@ -34,13 +35,13 @@ Namespace DevCommerc8ak
 
         Public Sub New()
             ' Configuration de la Form
-            Me.Text = "Centre de Contrôle Administrateur"
+            Me.Text = "Centre de ContrÃ´le Administrateur"
             Me.Size = New Size(1000, 750)
             Me.StartPosition = FormStartPosition.CenterScreen
             Me.BackColor = ColorBg
             Me.DoubleBuffered = True
 
-            ' --- En-tête ---
+            ' --- En-tÃªte ---
             Dim pnlHeader As New Panel() With {
                 .Dock = DockStyle.Top,
                 .Height = 120,
@@ -48,7 +49,7 @@ Namespace DevCommerc8ak
             }
 
             Dim lbl As New Label() With {
-                .Text = "Gestion du Système",
+                .Text = "Gestion du SystÃ¨me",
                 .Font = FontTitle,
                 .ForeColor = ColorTextPrimary,
                 .AutoSize = True,
@@ -56,7 +57,7 @@ Namespace DevCommerc8ak
             }
 
             Dim lblSub As New Label() With {
-                .Text = "Accédez aux différents modules de configuration et de gestion opérationnelle.",
+                .Text = "AccÃ©dez aux diffÃ©rents modules de configuration et de gestion opÃ©rationnelle.",
                 .Font = FontSubtitle,
                 .ForeColor = ColorTextSecondary,
                 .AutoSize = True,
@@ -64,7 +65,7 @@ Namespace DevCommerc8ak
             }
             pnlHeader.Controls.AddRange({lbl, lblSub})
 
-            ' --- Grille de fonctionnalités (FlowLayoutPanel pour la fluidité) ---
+            ' --- Grille de fonctionnalitÃ©s (FlowLayoutPanel pour la fluiditÃ©) ---
             Dim flowMain As New FlowLayoutPanel() With {
                 .Dock = DockStyle.Fill,
                 .Padding = New Padding(30),
@@ -72,20 +73,21 @@ Namespace DevCommerc8ak
                 .BackColor = Color.Transparent
             }
 
-            ' Initialisation des boutons (Noms conservés)
-            btnDashboard = CreerBoutonCard("Tableau de Bord", "Vue globale de l'activité", Color.FromArgb(76, 175, 80))
+            ' Initialisation des boutons (Noms conservÃ©s)
+            btnDashboard = CreerBoutonCard("Tableau de Bord", "Vue globale de l'activitÃ©", Color.FromArgb(76, 175, 80))
             btnProduits = CreerBoutonCard("Produits", "Gestion du catalogue articles", Color.FromArgb(255, 152, 0))
-            btnClients = CreerBoutonCard("Clients", "Base de données clients", Color.FromArgb(244, 67, 54))
+            btnClients = CreerBoutonCard("Clients", "Base de donnÃ©es clients", Color.FromArgb(244, 67, 54))
             btnFournisseurs = CreerBoutonCard("Fournisseurs", "Gestion des partenaires", Color.FromArgb(36, 36, 39))
             btnFactures = CreerBoutonCard("Factures", "Historique et suivi facturation", Color.FromArgb(33, 150, 243))
             btnPaiements = CreerBoutonCard("Paiements", "Suivi des encaissements", Color.FromArgb(30, 60, 114))
-            btnStock = CreerBoutonCard("Stock", "État et mouvements de stock", Color.FromArgb(0, 188, 212))
+            btnStock = CreerBoutonCard("Stock", "Ã‰tat et mouvements de stock", Color.FromArgb(0, 188, 212))
+            btnVentes = CreerBoutonCard("Ventes", "Analyse des ventes et stock", Color.FromArgb(103, 58, 183))
             btnAppro = CreerBoutonCard("Approvisionnement", "Bons de commande", Color.FromArgb(255, 152, 0))
             btnRapports = CreerBoutonCard("Rapports", "Analyses et statistiques", Color.FromArgb(0, 125, 141))
-            btnUtilisateurs = CreerBoutonCard("Utilisateurs", "Gestion des accès et rôles", Color.FromArgb(42, 93, 155))
-            btnParametres = CreerBoutonCard("Paramètres", "Configuration du système", Color.FromArgb(156, 39, 176))
+            btnUtilisateurs = CreerBoutonCard("Utilisateurs", "Gestion des accÃ¨s et rÃ´les", Color.FromArgb(42, 93, 155))
+            btnParametres = CreerBoutonCard("ParamÃ¨tres", "Configuration du systÃ¨me", Color.FromArgb(156, 39, 176))
 
-            ' Handlers (Logique conservée)
+            ' Handlers (Logique conservÃ©e)
             AddHandler btnDashboard.Click, Sub() OuvrirFenetre(New FormulaireDashboardCloud())
             AddHandler btnProduits.Click, Sub() OuvrirFenetre(New FormulaireProduits())
             AddHandler btnClients.Click, Sub() OuvrirFenetre(New FormulaireClients())
@@ -93,23 +95,24 @@ Namespace DevCommerc8ak
             AddHandler btnFactures.Click, Sub() OuvrirFenetre(New FormulaireFactures())
             AddHandler btnPaiements.Click, Sub() OuvrirFenetre(New FormulairePaiements())
             AddHandler btnStock.Click, Sub() OuvrirFenetre(New FormulaireStock())
+            AddHandler btnVentes.Click, Sub() OuvrirFenetre(New FormulaireVente())
             AddHandler btnRapports.Click, Sub() OuvrirFenetre(New FormulaireRapports())
             AddHandler btnAppro.Click, Sub() OuvrirFenetre(New FormulaireApprovisionnement())
             AddHandler btnParametres.Click, Sub() OuvrirFenetre(New FormulaireParametres())
             AddHandler btnUtilisateurs.Click, Sub() OuvrirFenetre(New FormulaireUtilisateurs())
 
-            ' Ajout à la grille
-            flowMain.Controls.AddRange({btnDashboard, btnProduits, btnClients, btnFournisseurs, btnFactures, btnPaiements, btnStock, btnAppro, btnRapports, btnUtilisateurs, btnParametres})
+            ' Ajout Ã  la grille
+            flowMain.Controls.AddRange({btnDashboard, btnProduits, btnClients, btnFournisseurs, btnFactures, btnPaiements, btnStock, btnVentes, btnAppro, btnRapports, btnUtilisateurs, btnParametres})
 
             ' Assemblage final
             Me.Controls.Add(flowMain)
             Me.Controls.Add(pnlHeader)
 
-            ' Thèmes et Icônes (Logique conservée)
+            ' ThÃ¨mes et IcÃ´nes (Logique conservÃ©e)
             'ThemeHelper.AppliquerTheme(Me)
             'IconsHelper.AppliquerIconeFormulaire(Me)
 
-            '' Application des icônes via le helper existant
+            '' Application des icÃ´nes via le helper existant
             'IconsHelper.AppliquerIconeBouton(btnProduits, "PRODUITS")
             'IconsHelper.AppliquerIconeBouton(btnClients, "CLIENTS")
             'IconsHelper.AppliquerIconeBouton(btnStock, "STOCK")
@@ -118,7 +121,7 @@ Namespace DevCommerc8ak
             'IconsHelper.AppliquerIconeBouton(btnUtilisateurs, "UTILISATEURS")
         End Sub
 
-        ' --- Helper pour créer des boutons sous forme de cartes ---
+        ' --- Helper pour crÃ©er des boutons sous forme de cartes ---
         Private Function CreerBoutonCard(titre As String, description As String, couleur As Color) As Button
             Dim btn As New Button() With {
                 .Size = New Size(210, 140),
@@ -151,7 +154,7 @@ Namespace DevCommerc8ak
                 .Enabled = False ' Pour que le clic passe au bouton
             }
             btn.Controls.Add(lblDesc)
-            ' Bande de couleur à gauche
+            ' Bande de couleur Ã  gauche
             Dim panelCouleur As New Panel()
             panelCouleur.BackColor = couleur
             panelCouleur.Size = New Size(5, 140)
