@@ -16,7 +16,7 @@ public sealed class SyncRepository(DbConnectionFactory factory)
         var skipped = 0;
         await using var cn = factory.Create();
         await cn.OpenAsync(ct);
-        await using var tx = await cn.BeginTransactionAsync(ct);
+        using var tx = cn.BeginTransaction();
 
         try
         {
@@ -82,11 +82,11 @@ public sealed class SyncRepository(DbConnectionFactory factory)
         cmd.Parameters.AddWithValue("@Categorie", request.Categorie);
         cmd.Parameters.AddWithValue("@Montant", request.Montant);
         cmd.Parameters.AddWithValue("@Devise", request.Devise);
-        cmd.Parameters.AddWithValue("@Description", (object?)request.Description ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@Description", DbNullIfNull(request.Description));
         cmd.Parameters.AddWithValue("@DateDepense", request.DateDepense ?? DateTime.UtcNow.Date);
         cmd.Parameters.AddWithValue("@Source", request.Source);
         cmd.Parameters.AddWithValue("@TypeDepense", request.TypeDepense);
-        cmd.Parameters.AddWithValue("@CreePar", (object?)request.CreePar ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@CreePar", DbNullIfNull(request.CreePar));
     }
 
     private static async Task<bool> ExistsStockSortieAsync(SqlConnection cn, SqlTransaction tx, string numeroSortie, StockSortieSyncLine line, StockSortieSyncRequest request, CancellationToken ct)
@@ -119,22 +119,22 @@ public sealed class SyncRepository(DbConnectionFactory factory)
         await using var cmd = new SqlCommand(sql, cn, tx);
         cmd.Parameters.AddWithValue("@ProduitId", line.ProduitId);
         cmd.Parameters.AddWithValue("@QuantiteSaisie", line.QuantiteSaisie);
-        cmd.Parameters.AddWithValue("@Unite", (object?)line.Unite ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@Unite", DbNullIfNull(line.Unite));
         cmd.Parameters.AddWithValue("@QuantiteBase", line.QuantiteBase);
         cmd.Parameters.AddWithValue("@DateSortie", request.DateSortie ?? DateTime.UtcNow);
         cmd.Parameters.AddWithValue("@Source", request.Source ?? "SORTIE_MANUELLE");
         cmd.Parameters.AddWithValue("@RefSource", request.NumeroSortie);
-        cmd.Parameters.AddWithValue("@CreePar", (object?)request.CreePar ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@CreePar", DbNullIfNull(request.CreePar));
         cmd.Parameters.AddWithValue("@NumeroSortie", request.NumeroSortie);
-        cmd.Parameters.AddWithValue("@ClientId", (object?)request.ClientId ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@MotifId", (object?)request.MotifId ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@TypeVente", (object?)line.TypeVente ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@PrixUnitaire", (object?)line.PrixUnitaire ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@MontantLigne", (object?)line.MontantLigne ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@StatutPaiement", (object?)line.StatutPaiement ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@MontantPaye", (object?)line.MontantPaye ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@ResteAPayer", (object?)line.ResteAPayer ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@Observation", (object?)line.Observation ?? request.Observation ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@ClientId", DbNullIfNull(request.ClientId));
+        cmd.Parameters.AddWithValue("@MotifId", DbNullIfNull(request.MotifId));
+        cmd.Parameters.AddWithValue("@TypeVente", DbNullIfNull(line.TypeVente));
+        cmd.Parameters.AddWithValue("@PrixUnitaire", DbNullIfNull(line.PrixUnitaire));
+        cmd.Parameters.AddWithValue("@MontantLigne", DbNullIfNull(line.MontantLigne));
+        cmd.Parameters.AddWithValue("@StatutPaiement", DbNullIfNull(line.StatutPaiement));
+        cmd.Parameters.AddWithValue("@MontantPaye", DbNullIfNull(line.MontantPaye));
+        cmd.Parameters.AddWithValue("@ResteAPayer", DbNullIfNull(line.ResteAPayer));
+        cmd.Parameters.AddWithValue("@Observation", DbNullIfNull(string.IsNullOrWhiteSpace(line.Observation) ? request.Observation : line.Observation));
         await cmd.ExecuteNonQueryAsync(ct);
     }
 
@@ -164,12 +164,22 @@ public sealed class SyncRepository(DbConnectionFactory factory)
         cmd.Parameters.AddWithValue("@ProduitId", line.ProduitId);
         cmd.Parameters.AddWithValue("@Quantite", line.QuantiteSaisie);
         cmd.Parameters.AddWithValue("@QuantiteBase", line.QuantiteBase);
-        cmd.Parameters.AddWithValue("@Unite", (object?)line.Unite ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@Unite", DbNullIfNull(line.Unite));
         cmd.Parameters.AddWithValue("@Reference", request.NumeroSortie);
-        cmd.Parameters.AddWithValue("@Observation", (object?)line.Observation ?? request.Observation ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@EffectuePar", (object?)request.CreePar ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@Observation", DbNullIfNull(string.IsNullOrWhiteSpace(line.Observation) ? request.Observation : line.Observation));
+        cmd.Parameters.AddWithValue("@EffectuePar", DbNullIfNull(request.CreePar));
         cmd.Parameters.AddWithValue("@NumeroMouvement", numeroMouvement);
         await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    private static object DbNullIfNull<T>(T? value) where T : struct
+    {
+        return value.HasValue ? value.Value : DBNull.Value;
+    }
+
+    private static object DbNullIfNull(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? DBNull.Value : value!;
     }
 }
 
