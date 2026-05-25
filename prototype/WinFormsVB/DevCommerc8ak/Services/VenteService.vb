@@ -58,7 +58,7 @@ Namespace DevCommerc8ak
             Return _dal.ExecuterTable(sql, CommandType.Text, Nothing)
         End Function
 
-        Private Function ListerVentesParPeriode(dateDebut As DateTime, dateFin As DateTime) As DataTable
+        Public Function ListerVentesParPeriode(dateDebut As DateTime, dateFin As DateTime) As DataTable
             Dim sql As String = "" &
                 "SELECT MAX(f.CreeLe) AS DateVente, " &
                 "p.Libelle AS Produit, " &
