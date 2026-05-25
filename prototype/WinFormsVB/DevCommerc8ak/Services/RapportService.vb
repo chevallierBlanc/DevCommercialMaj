@@ -43,11 +43,86 @@ Namespace DevCommerc8ak
 
         ' Valeur stock.
         Public Function ValeurStock() As Decimal
-            Dim sql As String = "SELECT ISNULL(SUM(s.QuantiteStock * CASE WHEN p.PrixAchat > 0 THEN p.PrixAchat " &
-                                "WHEN p.PrixGros > 0 THEN p.PrixGros ELSE p.PrixDetail END),0) " &
-                                "FROM Produits p JOIN vStockProduit s ON s.ProduitId = p.ProduitId"
+            Dim sql As String = "" &
+                "WITH CtePrixMoyen AS(" &
+                "    SELECT se.ProduitId," &
+                "           SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) AS CoutAchatMoyenPiece " &
+                "    FROM StockEntree se " &
+                "    GROUP BY se.ProduitId" &
+                ") " &
+                "SELECT ISNULL(CAST(SUM(ISNULL(s.QuantiteStock, 0) * ISNULL(pm.CoutAchatMoyenPiece, 0)) AS BIGINT), 0) " &
+                "FROM vStockProduit s " &
+                "LEFT JOIN CtePrixMoyen pm ON pm.ProduitId = s.ProduitId"
             Dim v As Object = _dal.ExecuterScalaire(sql, CommandType.Text, Nothing)
             Return Convert.ToDecimal(v)
+        End Function
+
+        ' Analyse vente et rentabilite sur une periode.
+        Public Function AnalyseVente(dateDebut As Date, dateFin As Date) As DataTable
+            Dim sql As String = "" &
+                "WITH CTEStockEntree AS" &
+                "(" &
+                "    SELECT" &
+                "       se.ProduitId," &
+                "        SUM(ISNULL(se.QuantiteBase, 0)) AS QuantiteEntreePieces," &
+                "        SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) AS ValeurStockEntree," &
+                "        SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) AS CoutAchatMoyenPiece " &
+                "    FROM StockEntree se " &
+                "    WHERE se.DateEntree >= @DateDebut " &
+                "      AND se.DateEntree < DATEADD(DAY, 1, @DateFin) " &
+                "    GROUP BY se.ProduitId" &
+                "), " &
+                "Ventes AS" &
+                "(" &
+                "    SELECT" &
+                "        l.ProduitId," &
+                "        SUM(ISNULL(l.Quantite, 0)) AS QuantiteVenduePieces," &
+                "        SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS ChiffreAffaires " &
+                "    FROM LignesFactureVente l " &
+                "    INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
+                "    WHERE f.Statut = 'PAYEE' " &
+                "      AND f.CreeLe >= @DateDebut " &
+                "      AND f.CreeLe < DATEADD(DAY, 1, @DateFin) " &
+                "    GROUP BY l.ProduitId" &
+                "), " &
+                "AnalyseProduit AS" &
+                "(" &
+                "    SELECT" &
+                "        p.ProduitId," &
+                "        p.Libelle AS Produit," &
+                "        ISNULL(se.ValeurStockEntree, 0) AS ValeurStockEntree," &
+                "        ISNULL(v.QuantiteVenduePieces, 0) AS QuantiteVenduePieces," &
+                "        ISNULL(v.ChiffreAffaires, 0) AS ChiffreAffaires," &
+                "        ISNULL(v.QuantiteVenduePieces, 0) * ISNULL(se.CoutAchatMoyenPiece, 0) AS CoutMarchandisesVendues," &
+                "        ISNULL(v.ChiffreAffaires, 0) - (ISNULL(v.QuantiteVenduePieces, 0) * ISNULL(se.CoutAchatMoyenPiece, 0)) AS Benefice," &
+                "        ISNULL(s.QuantiteStock, 0) AS StockRestantPieces," &
+                "        ISNULL(s.QuantiteStock, 0) * ISNULL(se.CoutAchatMoyenPiece, 0) AS CoutStockRestant " &
+                "    FROM Produits p " &
+                "    LEFT JOIN CTEStockEntree se ON se.ProduitId = p.ProduitId " &
+                "    LEFT JOIN Ventes v ON v.ProduitId = p.ProduitId " &
+                "    LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId" &
+                ") " &
+                "SELECT " &
+                "    ISNULL(CAST(SUM(ValeurStockEntree) AS BIGINT), 0) AS ValeurStockEntree, " &
+                "    ISNULL(CAST(SUM(CoutMarchandisesVendues) AS BIGINT), 0) AS CoutMarchandisesVendues, " &
+                "    ISNULL(CAST(SUM(ChiffreAffaires) AS BIGINT), 0) AS ChiffreAffaires, " &
+                "    ISNULL(CAST(SUM(Benefice) AS BIGINT), 0) AS BeneficeRealise, " &
+                "    ISNULL(CAST(SUM(CoutStockRestant) AS BIGINT), 0) AS CoutStockRestant, " &
+                "    ISNULL(CAST(SUM(CoutStockRestant) * (ISNULL(SUM(Benefice), 0) / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS BIGINT), 0) AS ProjectionBeneficeRestant, " &
+                "    ISNULL(CAST((ISNULL(SUM(Benefice), 0) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS DECIMAL(10,2)), 0) AS MargeBeneficiairePourcentage, " &
+                "    CASE " &
+                "        WHEN ISNULL(SUM(Benefice), 0) < 0 THEN 'CRITIQUE / PERTE' " &
+                "        WHEN ISNULL(SUM(Benefice), 0) = 0 THEN 'POINT MORT' " &
+                "        WHEN ISNULL(SUM(Benefice), 0) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0) < 10 THEN 'FAIBLE RENTABILITÉ' " &
+                "        WHEN ISNULL(SUM(Benefice), 0) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0) BETWEEN 10 AND 25 THEN 'PROGRÈS' " &
+                "        ELSE 'BONNE RENTABILITÉ' " &
+                "    END AS Evaluation " &
+                "FROM AnalyseProduit"
+            Dim p As New List(Of SqlParameter) From {
+                New SqlParameter("@DateDebut", dateDebut.Date),
+                New SqlParameter("@DateFin", dateFin.Date)
+            }
+            Return _dal.ExecuterTable(sql, CommandType.Text, p)
         End Function
 
         ' Factures en attente (non payees).

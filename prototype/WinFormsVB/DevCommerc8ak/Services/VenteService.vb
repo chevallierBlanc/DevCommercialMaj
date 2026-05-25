@@ -60,23 +60,19 @@ Namespace DevCommerc8ak
 
         Private Function ListerVentesParPeriode(dateDebut As DateTime, dateFin As DateTime) As DataTable
             Dim sql As String = "" &
-                "SELECT f.CreeLe AS DateVente, " &
-                "ISNULL(f.NumeroFacture, '') AS NumeroFacture, " &
+                "SELECT MAX(f.CreeLe) AS DateVente, " &
                 "p.Libelle AS Produit, " &
-                "ISNULL(l.TypeVente, '') AS TypeVente, " &
-                "ISNULL(l.QuantiteBase, l.Quantite) AS QuantiteVendue, " &
-                "ISNULL(p.PrixAchat, 0) AS PrixAchatUnitaire, " &
-                "ISNULL(l.PrixUnitaire, 0) AS PrixVenteUnitaire, " &
-                "ISNULL(l.MontantLigne, ISNULL(l.QuantiteBase, 0) * ISNULL(l.PrixUnitaire, 0)) AS MontantGenere, " &
-                "ISNULL(l.MontantLigne, ISNULL(l.QuantiteBase, 0) * ISNULL(l.PrixUnitaire, 0)) - (ISNULL(l.QuantiteBase, 0) * ISNULL(p.PrixAchat, 0)) AS Benefice, " &
-                "ISNULL(u.NomUtilisateur, '') AS Agent " &
+                "CAST(MAX(ISNULL(p.PrixAchat, 0)) AS BIGINT) AS PrixAchatCarton, " &
+                "CAST(SUM(ISNULL(l.Quantite, 0)) AS BIGINT) AS QuantiteVenduePieces, " &
+                "CAST(SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS BIGINT) AS MontantGenere, " &
+                "CAST(SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0)) - (ISNULL(l.Quantite, 0) * (ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0)))) AS BIGINT) AS Benefice " &
                 "FROM LignesFactureVente l " &
                 "INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
                 "INNER JOIN Produits p ON p.ProduitId = l.ProduitId " &
-                "LEFT JOIN Utilisateurs u ON u.UtilisateurId = f.CreePar " &
                 "WHERE f.Statut = 'PAYEE' " &
                 "AND f.CreeLe >= @DateDebut AND f.CreeLe < @DateFin " &
-                "ORDER BY f.CreeLe DESC, p.Libelle ASC, l.LigneFactureVenteId DESC"
+                "GROUP BY p.ProduitId, p.Libelle " &
+                "ORDER BY MAX(f.CreeLe) DESC, p.Libelle ASC"
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@DateDebut", dateDebut),
                 New SqlParameter("@DateFin", dateFin)

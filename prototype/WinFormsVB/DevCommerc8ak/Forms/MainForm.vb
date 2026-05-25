@@ -144,7 +144,7 @@ Namespace DevCommerc8ak
         'End Sub
 
 
-        ' --- Couleurs du Thème Portail ---
+        ' --- Couleurs du ThÃ¨me Portail ---
         Private ReadOnly ColorSidebar As Color = Color.FromArgb(28, 35, 49) ' Bleu Nuit Profond
         Private ReadOnly ColorSidebarAccent As Color = Color.FromArgb(41, 128, 185) ' Bleu Action
         Private ReadOnly ColorHeader As Color = Color.White
@@ -174,12 +174,12 @@ Namespace DevCommerc8ak
 
         Public Sub New()
             ' Configuration de la Form
-            Me.Text = "Système de Gestion Commerciale - Portail Principal"
+            Me.Text = "SystÃ¨me de Gestion Commerciale - Portail Principal"
             Me.WindowState = FormWindowState.Maximized
             Me.BackColor = ColorBg
             Me.Font = FontMain
 
-            ' --- Sidebar (Navigation Latérale) ---
+            ' --- Sidebar (Navigation LatÃ©rale) ---
             panelSidebar = New Panel() With {
                 .Dock = DockStyle.Left,
                 .Width = 240,
@@ -219,7 +219,7 @@ Namespace DevCommerc8ak
             pnlUser.Controls.AddRange({lblUserRole, lblUserName})
 
 
-            ' Séparateur
+            ' SÃ©parateur
             Dim pnlSep As New Panel() With {.Dock = DockStyle.Top, .Height = 1, .BackColor = Color.FromArgb(45, 55, 75), .Margin = New Padding(20, 0, 20, 0)}
 
 
@@ -235,12 +235,12 @@ Namespace DevCommerc8ak
             btnFact = CreerBoutonMenu("Facturier")
             btnCaisse = CreerBoutonMenu("Caisse")
             btnAdmin = CreerBoutonMenu("Administration")
-            btnDeconnexion = CreerBoutonMenu("Déconnexion")
-            btnDeconnexion.ForeColor = Color.FromArgb(231, 76, 60) ' Rouge pour déconnexion
+            btnDeconnexion = CreerBoutonMenu("DÃ©connexion")
+            btnDeconnexion.ForeColor = Color.FromArgb(231, 76, 60) ' Rouge pour dÃ©connexion
 
 
 
-            ' --- Header (Barre Supérieure) ---
+            ' --- Header (Barre SupÃ©rieure) ---
             'panelHeader = New Panel() With {
             '    .Dock = DockStyle.Top,
             '    .Height = 60,
@@ -267,7 +267,7 @@ Namespace DevCommerc8ak
                 .Padding = New Padding(10)
             }
 
-            ' Gestion des droits d'accès
+            ' Gestion des droits d'accÃ¨s
             'If SessionUtilisateur.Role = "ADMIN" Then
             '    flowPnlMenu.Controls.Add(btnFact)
             '    flowPnlMenu.Controls.Add(btnCaisse)
@@ -303,16 +303,21 @@ Namespace DevCommerc8ak
                 y += 50
             End If
 
-            ' Bouton Dépenses
+            ' Bouton DÃ©penses
             If VerifierPermission("ADMIN") Then
                 AjouterBoutonSidebar(flowPnlMenu, "Administration", y, AddressOf Dashbord)
 
                 y += 50
             End If
 
+            If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) Then
+                AjouterBoutonSidebar(flowPnlMenu, "Analyse ventes", y, AddressOf AfficherAnalyseVente)
+                y += 50
+            End If
+
             ' Bouton Accueil
-            btnDeconnexion.ForeColor = Color.FromArgb(231, 76, 60) ' Rouge pour déconnexion
-            AjouterBoutonSidebar(flowPnlMenu, "Déconnexion", y, AddressOf Deconnecter)
+            btnDeconnexion.ForeColor = Color.FromArgb(231, 76, 60) ' Rouge pour dÃ©connexion
+            AjouterBoutonSidebar(flowPnlMenu, "DÃ©connexion", y, AddressOf Deconnecter)
             'y += 50
 
             ' Assemblage final
@@ -330,12 +335,12 @@ Namespace DevCommerc8ak
             '                                LoadForm(New CaisseForm())
             '                            End Sub
             'AddHandler btnAdmin.Click, Sub()
-            '                               lblPageTitle.Text = "Administration Système"
+            '                               lblPageTitle.Text = "Administration SystÃ¨me"
             '                               LoadForm(New AdminForm())
             '                           End Sub
             'AddHandler btnDeconnexion.Click, AddressOf Deconnecter
 
-            ' Thèmes et Icônes
+            ' ThÃ¨mes et IcÃ´nes
             'ChargerModeSombre()
             'ThemeHelper.AppliquerTheme(Me)
             'IconsHelper.AppliquerIconeFormulaire(Me)
@@ -351,7 +356,7 @@ Namespace DevCommerc8ak
         End Sub
 
         ''' <summary>
-        ''' Ajouter un bouton à la sidebar
+        ''' Ajouter un bouton Ã  la sidebar
         ''' </summary>
         Private Sub AjouterBoutonSidebar(panel As Panel, texte As String, y As Integer, action As EventHandler)
             Dim btn As New Button()
@@ -386,7 +391,7 @@ Namespace DevCommerc8ak
             panel.Controls.Add(btn)
         End Sub
         ''' <summary>
-        ''' Vérifier les permissions de l'utilisateur
+        ''' VÃ©rifier les permissions de l'utilisateur
         ''' </summary>
         Private Function VerifierPermission(fonctionnalite As String) As Boolean
             Select Case SessionUtilisateur.Role
@@ -418,13 +423,13 @@ Namespace DevCommerc8ak
                     Return False
             End Select
         End Function
-        ' --- Helper pour créer les boutons du menu latéral ---
+        ' --- Helper pour crÃ©er les boutons du menu latÃ©ral ---
         Private Function CreerBoutonMenu(texte As String) As Button
             Dim btn As New Button() With {
                 .Text = "      " & texte,
                 .Width = 220, ' Largeur fixe pour remplir le FlowLayoutPanel
                 .Height = 50,
-                .Margin = New Padding(0, 0, 0, 5), ' Marge inférieure entre les boutons
+                .Margin = New Padding(0, 0, 0, 5), ' Marge infÃ©rieure entre les boutons
                 .FlatStyle = FlatStyle.Flat,
                 .ForeColor = Color.FromArgb(180, 190, 210),
                 .Font = FontMenu,
@@ -437,7 +442,7 @@ Namespace DevCommerc8ak
             Return btn
         End Function
 
-        ' --- Logique Métier (Inchangée) ---
+        ' --- Logique MÃ©tier (InchangÃ©e) ---
 
         Private Sub LoadForm(f As Form)
             panelContent.Controls.Clear()
@@ -448,15 +453,15 @@ Namespace DevCommerc8ak
             f.Show()
         End Sub
         ''' <summary>
-        ''' Sélectionner un bouton et mettre à jour l'affichage
+        ''' SÃ©lectionner un bouton et mettre Ã  jour l'affichage
         ''' </summary>
         Private Sub SelectionnerBouton(btn As Button)
-            ' Réinitialiser le bouton précédent
+            ' RÃ©initialiser le bouton prÃ©cÃ©dent
             If dernieBoutonSelectionne IsNot Nothing Then
                 dernieBoutonSelectionne.BackColor = Color.FromArgb(44, 62, 80)
             End If
 
-            ' Sélectionner le nouveau bouton
+            ' SÃ©lectionner le nouveau bouton
             btn.BackColor = Color.FromArgb(20, 96, 183)
             dernieBoutonSelectionne = btn
         End Sub
@@ -472,7 +477,7 @@ Namespace DevCommerc8ak
         '        Dim dt As DataTable = notifRepo.ListerNonLues()
         '        If dt.Rows.Count > 0 Then
         '            Dim msg As String = Convert.ToString(dt.Rows(0)("Message"))
-        '            MessageBox.Show(msg, "Notification Système", MessageBoxButtons.OK, MessageBoxIcon.Information)
+        '            MessageBox.Show(msg, "Notification SystÃ¨me", MessageBoxButtons.OK, MessageBoxIcon.Information)
         '            notifRepo.MarquerLues()
         '        End If
 
@@ -531,7 +536,7 @@ Namespace DevCommerc8ak
             If dt Is Nothing OrElse dt.Rows.Count = 0 Then Return
 
             Dim notifRepo As New NotificationRepository(dal)
-            notifRepo.Ajouter("Rupture ou seuil critique détecté. Bon d'approvisionnement généré.")
+            notifRepo.Ajouter("Rupture ou seuil critique dÃ©tectÃ©. Bon d'approvisionnement gÃ©nÃ©rÃ©.")
 
             Dim approRepo As New BonApprovisionnementRepository(dal)
             Dim approService As New ApprovisionnementService(dal, approRepo)
@@ -554,7 +559,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub Deconnecter(sender As Object, e As EventArgs)
-            If MessageBox.Show("Voulez-vous vraiment vous déconnecter ?", "Déconnexion", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.No Then Return
+            If MessageBox.Show("Voulez-vous vraiment vous dÃ©connecter ?", "DÃ©connexion", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.No Then Return
 
             Try
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
@@ -576,6 +581,13 @@ Namespace DevCommerc8ak
 
             LoadForm(New AdminForm())
 
+        End Sub
+
+        ''' <summary>
+        ''' Afficher analyse ventes
+        ''' </summary>
+        Private Sub AfficherAnalyseVente(sender As Object, e As EventArgs)
+            LoadForm(New FormulaireAnalyseVente())
         End Sub
 
         ''' <summary>

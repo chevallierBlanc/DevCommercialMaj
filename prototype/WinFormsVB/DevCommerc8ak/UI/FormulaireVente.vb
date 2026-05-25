@@ -272,7 +272,7 @@ Namespace DevCommerc8ak
                 For Each row As DataRow In dt.Rows
                     totalMontant += LireDecimal(row, "MontantGenere")
                     totalBenefice += LireDecimal(row, "Benefice")
-                    totalQuantite += LireDecimal(row, "QuantiteVendue")
+                    totalQuantite += LireDecimal(row, "QuantiteVenduePieces")
                 Next
             End If
 
@@ -305,15 +305,11 @@ Namespace DevCommerc8ak
             End If
 
             ConfigurerColonne(gridVentes, "DateVente", "Date vente", 150, "dd/MM/yyyy HH:mm")
-            ConfigurerColonne(gridVentes, "NumeroFacture", "Numero facture", 140)
             ConfigurerColonne(gridVentes, "Produit", "Produit", 220)
-            ConfigurerColonne(gridVentes, "TypeVente", "Type vente", 110)
-            ConfigurerColonne(gridVentes, "QuantiteVendue", "Quantite", 90, "N0")
-            ConfigurerColonne(gridVentes, "PrixAchatUnitaire", "Prix achat (FC)", 120, "N0")
-            ConfigurerColonne(gridVentes, "PrixVenteUnitaire", "Prix vente (FC)", 120, "N0")
-            ConfigurerColonne(gridVentes, "MontantGenere", "Montant genere (FC)", 140, "N0")
+            ConfigurerColonne(gridVentes, "PrixAchatCarton", "Prix achat carton (FC)", 140, "N0")
+            ConfigurerColonne(gridVentes, "QuantiteVenduePieces", "Quantite vendue (pieces)", 140, "N0")
+            ConfigurerColonne(gridVentes, "MontantGenere", "Montant genere (FC)", 160, "N0")
             ConfigurerColonne(gridVentes, "Benefice", "Benefice (FC)", 120, "N0")
-            ConfigurerColonne(gridVentes, "Agent", "Agent", 140)
         End Sub
 
         Private Sub ConfigurerGrilleStock()
