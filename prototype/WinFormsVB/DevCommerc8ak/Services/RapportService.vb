@@ -84,6 +84,19 @@ Namespace DevCommerc8ak
                 "      AND f.CreeLe >= @DateDebut " &
                 "      AND f.CreeLe < DATEADD(DAY, 1, @DateFin) " &
                 "    GROUP BY l.ProduitId" &
+                "), DepensesPeriode AS" &
+                "(" &
+                "    SELECT ISNULL(SUM(ISNULL(Montant, 0)), 0) AS TotalDepenses " &
+                "    FROM Depenses " &
+                "    WHERE DateDepense >= @DateDebut " &
+                "      AND DateDepense < DATEADD(DAY, 1, @DateFin)" &
+                "), SortiesManuelles AS" &
+                "(" &
+                "    SELECT ISNULL(SUM(ISNULL(ss.MontantLigne, 0)), 0) AS TotalChargesManuelles " &
+                "    FROM StockSortie ss " &
+                "    WHERE ss.DateSortie >= @DateDebut " &
+                "      AND ss.DateSortie < DATEADD(DAY, 1, @DateFin) " &
+                "      AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL')" &
                 "), " &
                 "AnalyseProduit AS" &
                 "(" &
@@ -107,17 +120,22 @@ Namespace DevCommerc8ak
                 "    ISNULL(CAST(SUM(CoutMarchandisesVendues) AS BIGINT), 0) AS CoutMarchandisesVendues, " &
                 "    ISNULL(CAST(SUM(ChiffreAffaires) AS BIGINT), 0) AS ChiffreAffaires, " &
                 "    ISNULL(CAST(SUM(Benefice) AS BIGINT), 0) AS BeneficeRealise, " &
+                "    ISNULL(CAST(MAX(dp.TotalDepenses) AS BIGINT), 0) AS DepensesTotal, " &
+                "    ISNULL(CAST(MAX(sm.TotalChargesManuelles) AS BIGINT), 0) AS ChargesSortiesManuelles, " &
+                "    ISNULL(CAST(SUM(Benefice) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) AS BIGINT), 0) AS BeneficeNetRealise, " &
                 "    ISNULL(CAST(SUM(CoutStockRestant) AS BIGINT), 0) AS CoutStockRestant, " &
                 "    ISNULL(CAST(SUM(CoutStockRestant) * (ISNULL(SUM(Benefice), 0) / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS BIGINT), 0) AS ProjectionBeneficeRestant, " &
-                "    ISNULL(CAST((ISNULL(SUM(Benefice), 0) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS DECIMAL(10,2)), 0) AS MargeBeneficiairePourcentage, " &
+                "    ISNULL(CAST(((ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS DECIMAL(10,2)), 0) AS MargeBeneficiairePourcentage, " &
                 "    CASE " &
-                "        WHEN ISNULL(SUM(Benefice), 0) < 0 THEN 'CRITIQUE / PERTE' " &
-                "        WHEN ISNULL(SUM(Benefice), 0) = 0 THEN 'POINT MORT' " &
-                "        WHEN ISNULL(SUM(Benefice), 0) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0) < 10 THEN 'FAIBLE RENTABILITÉ' " &
-                "        WHEN ISNULL(SUM(Benefice), 0) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0) BETWEEN 10 AND 25 THEN 'PROGRÈS' " &
+                "        WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) < 0 THEN 'CRITIQUE / PERTE' " &
+                "        WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) = 0 THEN 'POINT MORT' " &
+                "        WHEN (ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0) < 10 THEN 'FAIBLE RENTABILITÉ' " &
+                "        WHEN (ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0) BETWEEN 10 AND 25 THEN 'PROGRÈS' " &
                 "        ELSE 'BONNE RENTABILITÉ' " &
                 "    END AS Evaluation " &
-                "FROM AnalyseProduit"
+                "FROM AnalyseProduit " &
+                "CROSS JOIN DepensesPeriode dp " &
+                "CROSS JOIN SortiesManuelles sm"
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@DateDebut", dateDebut.Date),
                 New SqlParameter("@DateFin", dateFin.Date)

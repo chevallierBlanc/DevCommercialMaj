@@ -2027,9 +2027,12 @@ Namespace DevCommerc8ak
                     Dim stockReel As Decimal = LireDecimalTable(row, "StockReelRestant")
                     Dim stockCartons As Decimal = LireDecimalTable(row, "StockRestantCartons")
                     Dim stockPieces As Decimal = LireDecimalTable(row, "StockRestantPieces")
+                    Dim venteCarton As Decimal = LireDecimalTable(row, "TotalVenteCartons")
+                    Dim ventePiece As Decimal = LireDecimalTable(row, "ResteVentePieces")
                     Dim montantTotalGenere As Decimal = LireDecimalTable(row, "MontantTotalGenere")
 
-                    lblAnalyseSortieGros.Text = "Entrées: " & FormatageGlobal.FormatNombre(totalEntrees) & " | Ventes: " & FormatageGlobal.FormatNombre(totalVentes)
+                    lblAnalyseSortieGros.Text = "Entrées: " & FormatageGlobal.FormatNombre(totalEntrees) & " | Ventes: " & FormatageGlobal.FormatNombre(totalVentes) & vbCrLf &
+                        "Vente en cartons" & FormatageGlobal.FormatNombre(venteCarton) & "C+" & FormatageGlobal.FormatNombre(ventePiece) & "P" & vbCrLf
                     lblAnalyseSortiePiece.Text = "Sorties manuelles: " & FormatageGlobal.FormatNombre(totalSortiesManuelles) & " | Pertes: " & FormatageGlobal.FormatNombre(totalPertes)
                     lblAnalyseRestantGros.Text = "Dons: " & FormatageGlobal.FormatNombre(totalDons) & " | Allocations: " & FormatageGlobal.FormatNombre(totalAllocations)
                     lblAnalyseRestantPiece.Text = "Dettes client: " & FormatageGlobal.FormatNombre(totalDettesClients) & " | Dettes boss: " & FormatageGlobal.FormatNombre(totalDettesBoss) & " | Hors caisse: " & FormatageGlobal.FormatNombre(totalSortiesHorsCaisse)

@@ -4,6 +4,7 @@ Option Explicit On
 Imports System
 Imports System.Data
 Imports System.Drawing
+Imports System.Drawing.Printing
 Imports System.Windows.Forms
 
 Namespace DevCommerc8ak
@@ -25,16 +26,28 @@ Namespace DevCommerc8ak
         Private ReadOnly tabs As TabControl
         Private ReadOnly gridVentes As DataGridView
         Private ReadOnly gridStock As DataGridView
+        Private ReadOnly tabDepenses As TabPage
+        Private ReadOnly gridDepenses As DataGridView
         Private ReadOnly cmbPeriode As ComboBox
         Private ReadOnly dtpJour As DateTimePicker
         Private ReadOnly cmbMois As ComboBox
         Private ReadOnly cmbAnnee As ComboBox
         Private ReadOnly btnRafraichirVentes As Button
         Private ReadOnly btnRafraichirStock As Button
+        Private ReadOnly cmbPeriodeDepenses As ComboBox
+        Private ReadOnly dtpJourDepenses As DateTimePicker
+        Private ReadOnly cmbMoisDepenses As ComboBox
+        Private ReadOnly cmbAnneeDepenses As ComboBox
+        Private ReadOnly btnRafraichirDepenses As Button
+        Private ReadOnly btnImprimerDepenses As Button
         Private ReadOnly lblResumeVentes As Label
         Private ReadOnly lblResumeStock As Label
+        Private ReadOnly lblResumeDepenses As Label
+        Private ReadOnly pdocDepenses As PrintDocument
 
         Private ReadOnly _service As VenteService
+        Private _depensesCourantes As DataTable
+        Private _depensePrintRowIndex As Integer
 
         Public Sub New()
             Me.Text = "Ventes"
@@ -77,8 +90,10 @@ Namespace DevCommerc8ak
 
             Dim tabVentes As New TabPage("Ventes journalieres") With {.BackColor = ColorBg, .Padding = New Padding(12)}
             Dim tabStock As New TabPage("Stock produits") With {.BackColor = ColorBg, .Padding = New Padding(12)}
+            tabDepenses = New TabPage("Dépenses") With {.BackColor = ColorBg, .Padding = New Padding(12)}
             tabs.TabPages.Add(tabVentes)
             tabs.TabPages.Add(tabStock)
+            tabs.TabPages.Add(tabDepenses)
 
             ' --- Onglet 1 : ventes ---
             Dim pnlFiltres As New Panel() With {.Dock = DockStyle.Top, .Height = 112, .BackColor = ColorCard, .Padding = New Padding(14)}
@@ -171,6 +186,75 @@ Namespace DevCommerc8ak
             tabStock.Controls.Add(gridStock)
             tabStock.Controls.Add(pnlStockTop)
 
+            ' --- Onglet 3 : dépenses ---
+            Dim pnlDepenses As New Panel() With {.Dock = DockStyle.Top, .Height = 118, .BackColor = ColorCard, .Padding = New Padding(14)}
+            pnlDepenses.BorderStyle = BorderStyle.FixedSingle
+
+            pnlDepenses.Controls.Add(New Label() With {.Text = "Periode", .Left = 14, .Top = 16, .AutoSize = True, .Font = FontLabel, .ForeColor = Color.FromArgb(90, 90, 90)})
+            cmbPeriodeDepenses = New ComboBox() With {.Left = 14, .Top = 38, .Width = 160, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
+            cmbPeriodeDepenses.Items.AddRange(New Object() {"Jour", "Mois", "Annee"})
+
+            pnlDepenses.Controls.Add(New Label() With {.Text = "Jour", .Left = 200, .Top = 16, .AutoSize = True, .Font = FontLabel, .ForeColor = Color.FromArgb(90, 90, 90)})
+            dtpJourDepenses = New DateTimePicker() With {.Left = 200, .Top = 38, .Width = 145, .Format = DateTimePickerFormat.Short, .Font = FontControl}
+
+            pnlDepenses.Controls.Add(New Label() With {.Text = "Mois", .Left = 365, .Top = 16, .AutoSize = True, .Font = FontLabel, .ForeColor = Color.FromArgb(90, 90, 90)})
+            cmbMoisDepenses = New ComboBox() With {.Left = 365, .Top = 38, .Width = 80, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
+
+            pnlDepenses.Controls.Add(New Label() With {.Text = "Annee", .Left = 460, .Top = 16, .AutoSize = True, .Font = FontLabel, .ForeColor = Color.FromArgb(90, 90, 90)})
+            cmbAnneeDepenses = New ComboBox() With {.Left = 460, .Top = 38, .Width = 90, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
+
+            btnRafraichirDepenses = New Button() With {
+                .Text = "Actualiser",
+                .Left = 580,
+                .Top = 34,
+                .Width = 120,
+                .Height = 32,
+                .BackColor = ColorSecondary,
+                .ForeColor = Color.White,
+                .FlatStyle = FlatStyle.Flat,
+                .Font = FontLabel,
+                .Cursor = Cursors.Hand
+            }
+            btnRafraichirDepenses.FlatAppearance.BorderSize = 0
+
+            btnImprimerDepenses = New Button() With {
+                .Text = "Imprimer",
+                .Left = 720,
+                .Top = 34,
+                .Width = 120,
+                .Height = 32,
+                .BackColor = ColorAccent,
+                .ForeColor = Color.White,
+                .FlatStyle = FlatStyle.Flat,
+                .Font = FontLabel,
+                .Cursor = Cursors.Hand
+            }
+            btnImprimerDepenses.FlatAppearance.BorderSize = 0
+
+            lblResumeDepenses = New Label() With {
+                .Left = 14,
+                .Top = 78,
+                .Width = 1230,
+                .Height = 28,
+                .Font = New Font("Segoe UI", 10, FontStyle.Bold),
+                .ForeColor = ColorPrimary,
+                .Text = "Total dépenses: 0 FC | Catégories: 0"
+            }
+
+            pnlDepenses.Controls.Add(cmbPeriodeDepenses)
+            pnlDepenses.Controls.Add(dtpJourDepenses)
+            pnlDepenses.Controls.Add(cmbMoisDepenses)
+            pnlDepenses.Controls.Add(cmbAnneeDepenses)
+            pnlDepenses.Controls.Add(btnRafraichirDepenses)
+            pnlDepenses.Controls.Add(btnImprimerDepenses)
+            pnlDepenses.Controls.Add(lblResumeDepenses)
+
+            gridDepenses = CreerGrille()
+            gridDepenses.Dock = DockStyle.Fill
+
+            tabDepenses.Controls.Add(gridDepenses)
+            tabDepenses.Controls.Add(pnlDepenses)
+
             pnlContent.Controls.Add(tabs)
             Me.Controls.Add(pnlContent)
             Me.Controls.Add(pnlHeader)
@@ -178,16 +262,28 @@ Namespace DevCommerc8ak
             AddHandler cmbPeriode.SelectedIndexChanged, AddressOf ActualiserFiltresPeriode
             AddHandler btnRafraichirVentes.Click, Sub() ChargerVentes()
             AddHandler btnRafraichirStock.Click, Sub() ChargerStock()
+            AddHandler cmbPeriodeDepenses.SelectedIndexChanged, AddressOf ActualiserFiltresDepensesPeriode
+            AddHandler btnRafraichirDepenses.Click, Sub() ChargerDepenses()
+            AddHandler btnImprimerDepenses.Click, AddressOf ImprimerDepenses
             AddHandler tabs.SelectedIndexChanged, AddressOf ChargerOngletActif
             AddHandler Me.Load, AddressOf FormulaireVente_Load
+            pdocDepenses = New PrintDocument() With {
+                .DocumentName = "Depenses",
+                .OriginAtMargins = True
+            }
+            pdocDepenses.DefaultPageSettings.Margins = New Margins(50, 50, 60, 60)
+            AddHandler pdocDepenses.PrintPage, AddressOf PdocDepenses_PrintPage
 
             InitialiserCombos()
+            InitialiserCombosDepenses()
             ActualiserFiltresPeriode(Nothing, EventArgs.Empty)
+            ActualiserFiltresDepensesPeriode(Nothing, EventArgs.Empty)
         End Sub
 
         Private Sub FormulaireVente_Load(sender As Object, e As EventArgs)
             ChargerVentes()
             ChargerStock()
+            ChargerDepenses()
         End Sub
 
         Private Sub InitialiserCombos()
@@ -206,6 +302,23 @@ Namespace DevCommerc8ak
             cmbAnnee.SelectedItem = anneeCourante.ToString()
         End Sub
 
+        Private Sub InitialiserCombosDepenses()
+            cmbMoisDepenses.Items.Clear()
+            For i As Integer = 1 To 12
+                cmbMoisDepenses.Items.Add(i.ToString("00"))
+            Next
+
+            cmbAnneeDepenses.Items.Clear()
+            Dim anneeCourante As Integer = Date.Today.Year
+            For i As Integer = anneeCourante - 5 To anneeCourante + 5
+                cmbAnneeDepenses.Items.Add(i.ToString())
+            Next
+
+            cmbPeriodeDepenses.SelectedIndex = 0
+            cmbMoisDepenses.SelectedItem = Date.Today.Month.ToString("00")
+            cmbAnneeDepenses.SelectedItem = anneeCourante.ToString()
+        End Sub
+
         Private Sub ActualiserFiltresPeriode(sender As Object, e As EventArgs)
             Dim periode As String = Convert.ToString(cmbPeriode.SelectedItem)
             Dim afficherJour As Boolean = String.Equals(periode, "Jour", StringComparison.OrdinalIgnoreCase)
@@ -219,9 +332,24 @@ Namespace DevCommerc8ak
             ChargerVentes()
         End Sub
 
+        Private Sub ActualiserFiltresDepensesPeriode(sender As Object, e As EventArgs)
+            Dim periode As String = Convert.ToString(cmbPeriodeDepenses.SelectedItem)
+            Dim afficherJour As Boolean = String.Equals(periode, "Jour", StringComparison.OrdinalIgnoreCase)
+            Dim afficherMois As Boolean = String.Equals(periode, "Mois", StringComparison.OrdinalIgnoreCase)
+            Dim afficherAnnee As Boolean = String.Equals(periode, "Annee", StringComparison.OrdinalIgnoreCase)
+
+            dtpJourDepenses.Visible = afficherJour
+            cmbMoisDepenses.Visible = afficherMois
+            cmbAnneeDepenses.Visible = afficherMois OrElse afficherAnnee
+
+            ChargerDepenses()
+        End Sub
+
         Private Sub ChargerOngletActif(sender As Object, e As EventArgs)
             If tabs.SelectedTab IsNot Nothing AndAlso tabs.SelectedTab.Text.Contains("Stock") Then
                 ChargerStock()
+            ElseIf tabs.SelectedTab IsNot Nothing AndAlso tabs.SelectedTab Is tabDepenses Then
+                ChargerDepenses()
             Else
                 ChargerVentes()
             End If
@@ -263,6 +391,50 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
+        Private Sub ChargerDepenses()
+            Try
+                Dim periode As String = Convert.ToString(cmbPeriodeDepenses.SelectedItem)
+                Dim dt As DataTable
+
+                Select Case periode
+                    Case "Mois"
+                        Dim mois As Integer = Convert.ToInt32(cmbMoisDepenses.SelectedItem)
+                        Dim annee As Integer = Convert.ToInt32(cmbAnneeDepenses.SelectedItem)
+                        dt = _service.ListerDepensesMois(annee, mois)
+                    Case "Annee"
+                        Dim annee As Integer = Convert.ToInt32(cmbAnneeDepenses.SelectedItem)
+                        dt = _service.ListerDepensesAnnee(annee)
+                    Case Else
+                        dt = _service.ListerDepensesJour(dtpJourDepenses.Value.Date)
+                End Select
+
+                _depensesCourantes = dt
+                gridDepenses.DataSource = dt
+                ConfigurerGrilleDepenses()
+                MettreAJourResumeDepenses(dt)
+            Catch ex As Exception
+                MessageBox.Show("Impossible de charger les dépenses : " & ex.Message, "Ventes", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
+        End Sub
+
+        Private Sub MettreAJourResumeDepenses(dt As DataTable)
+            Dim totalMontant As Decimal = 0D
+            Dim nbCategories As Integer = 0
+            Dim nbLignes As Integer = 0
+
+            If dt IsNot Nothing Then
+                nbCategories = dt.Rows.Count
+                For Each row As DataRow In dt.Rows
+                    totalMontant += LireDecimal(row, "MontantTotal")
+                    nbLignes += Convert.ToInt32(LireDecimal(row, "NombreDepenses"))
+                Next
+            End If
+
+            lblResumeDepenses.Text = "Total dépenses: " & FormatageGlobal.FormatMontant(totalMontant) &
+                " | Catégories: " & FormatageGlobal.FormatNombre(nbCategories) &
+                " | Lignes: " & FormatageGlobal.FormatNombre(nbLignes)
+        End Sub
+
         Private Sub MettreAJourResumeVentes(dt As DataTable)
             Dim totalMontant As Decimal = 0D
             Dim totalBenefice As Decimal = 0D
@@ -297,6 +469,18 @@ Namespace DevCommerc8ak
             lblResumeStock.Text = "Stock global: " & FormatageGlobal.FormatNombre(stockGlobal) &
                 " | Sorties ventes: " & FormatageGlobal.FormatNombre(sortiesVentes) &
                 " | Sorties manuelles: " & FormatageGlobal.FormatNombre(sortiesManuelles)
+        End Sub
+
+        Private Sub ConfigurerGrilleDepenses()
+            If gridDepenses.Columns.Count = 0 Then
+                Return
+            End If
+
+            ConfigurerColonne(gridDepenses, "Categorie", "Catégorie", 300)
+            ConfigurerColonne(gridDepenses, "NombreDepenses", "Nombre", 90, "N0")
+            ConfigurerColonne(gridDepenses, "MontantTotal", "Montant total (FC)", 150, "N0")
+            ConfigurerColonne(gridDepenses, "PremiereDate", "Première dépense", 160, "dd/MM/yyyy")
+            ConfigurerColonne(gridDepenses, "DerniereDate", "Dernière dépense", 160, "dd/MM/yyyy")
         End Sub
 
         Private Sub ConfigurerGrilleVentes()
@@ -347,6 +531,101 @@ Namespace DevCommerc8ak
                 col.DefaultCellStyle.Format = format
                 col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
             End If
+        End Sub
+
+        Private Sub ImprimerDepenses(sender As Object, e As EventArgs)
+            If _depensesCourantes Is Nothing OrElse _depensesCourantes.Rows.Count = 0 Then
+                MessageBox.Show("Aucune dépense à imprimer.", "Ventes", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+
+            _depensePrintRowIndex = 0
+            Using preview As New PrintPreviewDialog()
+                preview.Document = pdocDepenses
+                preview.Width = 1200
+                preview.Height = 800
+                preview.StartPosition = FormStartPosition.CenterParent
+                preview.ShowDialog(Me)
+            End Using
+        End Sub
+
+        Private Sub PdocDepenses_PrintPage(sender As Object, e As PrintPageEventArgs)
+            Dim data As DataTable = _depensesCourantes
+            If data Is Nothing OrElse data.Rows.Count = 0 Then
+                e.HasMorePages = False
+                Return
+            End If
+
+            Dim left As Integer = e.MarginBounds.Left
+            Dim top As Integer = e.MarginBounds.Top
+            Dim pageWidth As Integer = e.MarginBounds.Width
+            Dim y As Integer = top
+
+            Using titreFont As New Font("Segoe UI", 14.0F, FontStyle.Bold),
+                  sousTitreFont As New Font("Segoe UI", 9.0F, FontStyle.Regular),
+                  enteteFont As New Font("Segoe UI", 9.0F, FontStyle.Bold),
+                  ligneFont As New Font("Segoe UI", 9.0F, FontStyle.Regular)
+
+                e.Graphics.DrawString("Liste des dépenses", titreFont, Brushes.Black, left, y)
+                y += 26
+                e.Graphics.DrawString(lblResumeDepenses.Text, sousTitreFont, Brushes.Black, left, y)
+                y += 28
+
+                Dim colonnes As String() = {"Categorie", "NombreDepenses", "MontantTotal", "PremiereDate", "DerniereDate"}
+                Dim largeurs As Integer() = {
+                    CInt(pageWidth * 0.38),
+                    CInt(pageWidth * 0.12),
+                    CInt(pageWidth * 0.18),
+                    CInt(pageWidth * 0.16),
+                    CInt(pageWidth * 0.16)
+                }
+                Dim titres As String() = {"Catégorie", "Nombre", "Montant (FC)", "Première", "Dernière"}
+                Dim hauteurEntete As Integer = 24
+                Dim hauteurLigne As Integer = 22
+
+                Dim x As Integer = left
+                For i As Integer = 0 To titres.Length - 1
+                    e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(240, 240, 240)), x, y, largeurs(i), hauteurEntete)
+                    e.Graphics.DrawRectangle(Pens.Gray, x, y, largeurs(i), hauteurEntete)
+                    e.Graphics.DrawString(titres(i), enteteFont, Brushes.Black, New RectangleF(x + 4, y + 4, largeurs(i) - 8, hauteurEntete - 8))
+                    x += largeurs(i)
+                Next
+                y += hauteurEntete
+
+                While _depensePrintRowIndex < data.Rows.Count
+                    Dim row As DataRow = data.Rows(_depensePrintRowIndex)
+                    If y + hauteurLigne > e.MarginBounds.Bottom Then
+                        e.HasMorePages = True
+                        Return
+                    End If
+
+                    x = left
+                    For i As Integer = 0 To colonnes.Length - 1
+                        Dim valeur As String = ""
+                        If Not row.IsNull(colonnes(i)) Then
+                            If String.Equals(colonnes(i), "MontantTotal", StringComparison.OrdinalIgnoreCase) Then
+                                valeur = FormatageGlobal.FormatMontant(Convert.ToDecimal(row(colonnes(i))))
+                            ElseIf String.Equals(colonnes(i), "NombreDepenses", StringComparison.OrdinalIgnoreCase) Then
+                                valeur = Convert.ToDecimal(row(colonnes(i))).ToString("N0")
+                            ElseIf String.Equals(colonnes(i), "PremiereDate", StringComparison.OrdinalIgnoreCase) OrElse String.Equals(colonnes(i), "DerniereDate", StringComparison.OrdinalIgnoreCase) Then
+                                valeur = Convert.ToDateTime(row(colonnes(i))).ToString("dd/MM/yyyy")
+                            Else
+                                valeur = Convert.ToString(row(colonnes(i)))
+                            End If
+                        End If
+
+                        e.Graphics.DrawRectangle(Pens.Gray, x, y, largeurs(i), hauteurLigne)
+                        e.Graphics.DrawString(valeur, ligneFont, Brushes.Black, New RectangleF(x + 4, y + 3, largeurs(i) - 8, hauteurLigne - 6))
+                        x += largeurs(i)
+                    Next
+
+                    y += hauteurLigne
+                    _depensePrintRowIndex += 1
+                End While
+            End Using
+
+            _depensePrintRowIndex = 0
+            e.HasMorePages = False
         End Sub
 
         Private Function CreerGrille() As DataGridView

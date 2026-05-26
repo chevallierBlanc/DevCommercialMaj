@@ -24,6 +24,7 @@ Namespace DevCommerc8ak
         Private ReadOnly ColorSuccess As Color = Color.FromArgb(46, 125, 50)
         Private ReadOnly ColorDanger As Color = Color.FromArgb(198, 40, 40)
         Private ReadOnly ColorWarning As Color = Color.FromArgb(245, 124, 0)
+        Private ReadOnly ColorNetBenefit As Color = Color.FromArgb(0, 121, 107)
         Private ReadOnly ColorTextPrimary As Color = Color.FromArgb(31, 41, 55)
         Private ReadOnly ColorTextSecondary As Color = Color.FromArgb(107, 114, 128)
 
@@ -59,6 +60,7 @@ Namespace DevCommerc8ak
         Private lblCoutMarchandisesVendues As Label
         Private lblChiffreAffaires As Label
         Private lblBeneficesRealise As Label
+        Private lblBeneficeNetRealise As Label
         Private lblCoutStockRestant As Label
         Private lblProjectionBeneficeRestant As Label
         Private lblMargeBeneficiairePourcentage As Label
@@ -67,6 +69,7 @@ Namespace DevCommerc8ak
         Private _cibleCoutMarchandisesVendues As Decimal
         Private _cibleChiffreAffaires As Decimal
         Private _cibleBeneficesRealise As Decimal
+        Private _cibleBeneficeNetRealise As Decimal
         Private _cibleCoutStockRestant As Decimal
         Private _cibleProjectionBeneficeRestant As Decimal
         Private _cibleMargeBeneficiairePourcentage As Decimal
@@ -75,6 +78,7 @@ Namespace DevCommerc8ak
         Private _courantCoutMarchandisesVendues As Decimal
         Private _courantChiffreAffaires As Decimal
         Private _courantBeneficesRealise As Decimal
+        Private _courantBeneficeNetRealise As Decimal
         Private _courantCoutStockRestant As Decimal
         Private _courantProjectionBeneficeRestant As Decimal
         Private _courantMargeBeneficiairePourcentage As Decimal
@@ -239,9 +243,9 @@ Namespace DevCommerc8ak
             tableKpi.Controls.Add(CreerCarteKpi("Coût stock restant", ColorWarning, lblCoutStockRestant), 1, 1)
             tableKpi.Controls.Add(CreerCarteKpi("Projection bénéfice restant", ColorPrimary, lblProjectionBeneficeRestant), 2, 1)
             tableKpi.Controls.Add(CreerCarteKpi("Marge bénéficiaire", ColorAccent, lblMargeBeneficiairePourcentage), 0, 2)
+            tableKpi.Controls.Add(CreerCarteKpi("Bénéfice net réalisé", ColorNetBenefit, lblBeneficeNetRealise), 1, 2)
             panelEvaluationCard = CreerCarteTexte("Évaluation", Color.FromArgb(76, 175, 80), lblEvaluationValue)
-            tableKpi.Controls.Add(panelEvaluationCard, 1, 2)
-            tableKpi.SetColumnSpan(panelEvaluationCard, 2)
+            tableKpi.Controls.Add(panelEvaluationCard, 2, 2)
 
             Dim lblNote As New Label() With {
                 .Text = "Les valeurs sont affichées sans décimales inutiles. Les montants sont en FC.",
@@ -362,6 +366,7 @@ Namespace DevCommerc8ak
             _cibleCoutMarchandisesVendues = LireDecimal(row, "CoutMarchandisesVendues")
             _cibleChiffreAffaires = LireDecimal(row, "ChiffreAffaires")
             _cibleBeneficesRealise = LireDecimal(row, "BeneficeRealise")
+            _cibleBeneficeNetRealise = LireDecimal(row, "BeneficeNetRealise")
             _cibleCoutStockRestant = LireDecimal(row, "CoutStockRestant")
             _cibleProjectionBeneficeRestant = LireDecimal(row, "ProjectionBeneficeRestant")
             _cibleMargeBeneficiairePourcentage = LireDecimal(row, "MargeBeneficiairePourcentage")
@@ -374,6 +379,7 @@ Namespace DevCommerc8ak
             _courantCoutMarchandisesVendues = 0D
             _courantChiffreAffaires = 0D
             _courantBeneficesRealise = 0D
+            _courantBeneficeNetRealise = 0D
             _courantCoutStockRestant = 0D
             _courantProjectionBeneficeRestant = 0D
             _courantMargeBeneficiairePourcentage = 0D
@@ -388,6 +394,7 @@ Namespace DevCommerc8ak
             termine = AnimerValeur(lblCoutMarchandisesVendues, _courantCoutMarchandisesVendues, _cibleCoutMarchandisesVendues, AddressOf FormatageGlobal.FormatMontant) AndAlso termine
             termine = AnimerValeur(lblChiffreAffaires, _courantChiffreAffaires, _cibleChiffreAffaires, AddressOf FormatageGlobal.FormatMontant) AndAlso termine
             termine = AnimerValeur(lblBeneficesRealise, _courantBeneficesRealise, _cibleBeneficesRealise, AddressOf FormatageGlobal.FormatMontant) AndAlso termine
+            termine = AnimerValeur(lblBeneficeNetRealise, _courantBeneficeNetRealise, _cibleBeneficeNetRealise, AddressOf FormatageGlobal.FormatMontant) AndAlso termine
             termine = AnimerValeur(lblCoutStockRestant, _courantCoutStockRestant, _cibleCoutStockRestant, AddressOf FormatageGlobal.FormatMontant) AndAlso termine
             termine = AnimerValeur(lblProjectionBeneficeRestant, _courantProjectionBeneficeRestant, _cibleProjectionBeneficeRestant, AddressOf FormatageGlobal.FormatMontant) AndAlso termine
             termine = AnimerValeur(lblMargeBeneficiairePourcentage, _courantMargeBeneficiairePourcentage, _cibleMargeBeneficiairePourcentage, AddressOf FormatageGlobal.FormatPourcentage) AndAlso termine

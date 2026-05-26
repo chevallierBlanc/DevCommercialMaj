@@ -58,6 +58,40 @@ Namespace DevCommerc8ak
             Return _dal.ExecuterTable(sql, CommandType.Text, Nothing)
         End Function
 
+        Public Function ListerDepensesJour(dateRef As Date) As DataTable
+            Return ListerDepensesParPeriode(dateRef.Date, dateRef.Date.AddDays(1))
+        End Function
+
+        Public Function ListerDepensesMois(annee As Integer, mois As Integer) As DataTable
+            Dim debut As New DateTime(annee, mois, 1)
+            Return ListerDepensesParPeriode(debut, debut.AddMonths(1))
+        End Function
+
+        Public Function ListerDepensesAnnee(annee As Integer) As DataTable
+            Dim debut As New DateTime(annee, 1, 1)
+            Return ListerDepensesParPeriode(debut, debut.AddYears(1))
+        End Function
+
+        Public Function ListerDepensesParPeriode(dateDebut As DateTime, dateFin As DateTime) As DataTable
+            Dim sql As String = "" &
+                "SELECT " &
+                "    ISNULL(NULLIF(LTRIM(RTRIM(d.Categorie)), ''), 'Sans catégorie') AS Categorie, " &
+                "    COUNT(*) AS NombreDepenses, " &
+                "    CAST(SUM(ISNULL(d.Montant, 0)) AS BIGINT) AS MontantTotal, " &
+                "    MIN(d.DateDepense) AS PremiereDate, " &
+                "    MAX(d.DateDepense) AS DerniereDate " &
+                "FROM Depenses d " &
+                "WHERE d.DateDepense >= @DateDebut " &
+                "  AND d.DateDepense < @DateFin " &
+                "GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(d.Categorie)), ''), 'Sans catégorie') " &
+                "ORDER BY SUM(ISNULL(d.Montant, 0)) DESC, Categorie ASC"
+            Dim p As New List(Of SqlParameter) From {
+                New SqlParameter("@DateDebut", dateDebut),
+                New SqlParameter("@DateFin", dateFin)
+            }
+            Return _dal.ExecuterTable(sql, CommandType.Text, p)
+        End Function
+
         Public Function ListerVentesParPeriode(dateDebut As DateTime, dateFin As DateTime) As DataTable
             Dim sql As String = "" &
                 "SELECT MAX(f.CreeLe) AS DateVente, " &
