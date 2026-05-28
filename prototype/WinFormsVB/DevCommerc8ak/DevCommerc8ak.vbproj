@@ -131,6 +131,9 @@
     <Compile Include="UI\FormulaireBeneficeNetDetails.vb">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="UI\FormulaireEvaluationDetails.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="UI\FormulaireClients.vb">
       <SubType>Form</SubType>
     </Compile>

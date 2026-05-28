@@ -86,6 +86,7 @@ Namespace DevCommerc8ak
         Private _cibleMargeBeneficiairePourcentage As Decimal
         Private _cibleDepensesTotal As Decimal
         Private _cibleChargesSortiesManuelles As Decimal
+        Private _cibleEvaluation As String = String.Empty
 
         Private _courantValeurStockEntree As Decimal
         Private _courantCoutMarchandisesVendues As Decimal
@@ -371,6 +372,7 @@ Namespace DevCommerc8ak
             RendreCarteCliquable(panelBeneficeNetCard)
             tableKpi.Controls.Add(panelBeneficeNetCard, 1, 2)
             panelEvaluationCard = CreerCarteTexte("Évaluation", Color.FromArgb(76, 175, 80), lblEvaluationValue)
+            RendreCarteCliquable(panelEvaluationCard, AddressOf OuvrirDetailsEvaluation)
             tableKpi.Controls.Add(panelEvaluationCard, 2, 2)
 
             Dim lblNote As New Label() With {
@@ -521,6 +523,7 @@ Namespace DevCommerc8ak
             _cibleChargesSortiesManuelles = LireDecimal(row, "ChargesSortiesManuelles")
 
             Dim evaluation As String = LireTexte(row, "Evaluation")
+            _cibleEvaluation = evaluation
             lblEvaluationValue.Text = If(String.IsNullOrWhiteSpace(evaluation), "-", evaluation)
             AppliquerStyleEvaluation(lblEvaluationValue.Text)
 
@@ -537,19 +540,23 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub RendreCarteCliquable(card As Control)
+            RendreCarteCliquable(card, AddressOf OuvrirDetailsBeneficeNet)
+        End Sub
+
+        Private Sub RendreCarteCliquable(card As Control, action As EventHandler)
             If card Is Nothing Then
                 Return
             End If
 
             card.Cursor = Cursors.Hand
-            AddHandler card.Click, AddressOf OuvrirDetailsBeneficeNet
+            AddHandler card.Click, action
 
             For Each ctrl As Control In card.Controls
                 ctrl.Cursor = Cursors.Hand
-                AddHandler ctrl.Click, AddressOf OuvrirDetailsBeneficeNet
+                AddHandler ctrl.Click, action
                 For Each child As Control In ctrl.Controls
                     child.Cursor = Cursors.Hand
-                    AddHandler child.Click, AddressOf OuvrirDetailsBeneficeNet
+                    AddHandler child.Click, action
                 Next
             Next
         End Sub
@@ -574,6 +581,20 @@ Namespace DevCommerc8ak
                 MessageBox.Show("Impossible d'ouvrir le détail du bénéfice net : " & ex.Message, "Analyse ventes", MessageBoxButtons.OK, MessageBoxIcon.Error)
             Finally
                 Me.UseWaitCursor = False
+            End Try
+        End Sub
+
+        Private Sub OuvrirDetailsEvaluation(sender As Object, e As EventArgs)
+            Try
+                If _dateAnalyseDebut = Date.MinValue OrElse _dateAnalyseFin = Date.MinValue Then
+                    Return
+                End If
+
+                Using frm As New FormulaireEvaluationDetails(_dateAnalyseDebut, _dateAnalyseFin, _cibleBeneficesRealise, _cibleDepensesTotal, _cibleChargesSortiesManuelles, _cibleBeneficeNetRealise, _cibleMargeBeneficiairePourcentage, _cibleEvaluation)
+                    frm.ShowDialog(Me)
+                End Using
+            Catch ex As Exception
+                MessageBox.Show("Impossible d'ouvrir le détail de l'évaluation : " & ex.Message, "Analyse ventes", MessageBoxButtons.OK, MessageBoxIcon.Error)
             End Try
         End Sub
 
