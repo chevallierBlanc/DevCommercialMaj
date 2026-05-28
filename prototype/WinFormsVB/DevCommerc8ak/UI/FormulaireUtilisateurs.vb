@@ -1,0 +1,324 @@
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Configuration
+Imports System.Drawing
+Imports System.Drawing.Drawing2D
+Imports System.Windows.Forms
+
+Namespace DevCommerc8ak
+    Public Class FormulaireUtilisateurs
+        Inherits Form
+
+        ' --- Constantes de Design ---
+        'Private ReadOnly ColorPrimary As Color = Color.FromArgb(63, 81, 181) ' Indigo
+        'Private ReadOnly ColorSecondary As Color = Color.FromArgb(48, 63, 159)
+        'Private ReadOnly ColorAccent As Color = Color.FromArgb(255, 64, 129)
+        Private ReadOnly ColorBackground As Color = Color.FromArgb(245, 247, 250)
+        Private ReadOnly ColorCard As Color = Color.White
+        Private ReadOnly ColorText As Color = Color.FromArgb(33, 33, 33)
+        Private ReadOnly ColorTextSecondary As Color = Color.FromArgb(117, 117, 117)
+        Private ReadOnly ColorBorder As Color = Color.FromArgb(230, 230, 230)
+        ' Private ReadOnly FontTitle As New Font("Segoe UI Semibold", 18.0F)
+        Private ReadOnly FontSubTitle As New Font("Segoe UI", 10.0F)
+        Private ReadOnly FontLabel As New Font("Segoe UI Semibold", 9.0F)
+        Private ReadOnly FontControl As New Font("Segoe UI", 9.5F)
+
+
+        Private ReadOnly ColorPrimary As Color = Color.FromArgb(52, 73, 94) ' Gris Foncé
+        Private ReadOnly ColorSecondary As Color = Color.FromArgb(41, 128, 185) ' Bleu Moderne
+        Private ReadOnly ColorAccent As Color = Color.FromArgb(39, 174, 96) ' Vert Succès
+        Private ReadOnly ColorDanger As Color = Color.FromArgb(192, 57, 43) ' Rouge Annuler
+        Private ReadOnly ColorBg As Color = Color.FromArgb(245, 247, 250) ' Gris très clair
+        Private ReadOnly ColorWhite As Color = Color.White
+        Private ReadOnly FontMain As New Font("Segoe UI", 10)
+        Private ReadOnly FontBold As New Font("Segoe UI", 10, FontStyle.Bold)
+        Private ReadOnly FontTitle As New Font("Segoe UI", 18.0F, FontStyle.Bold)
+        Private ReadOnly FontTotal As New Font("Segoe UI", 22, FontStyle.Bold)
+
+
+        ' --- Composants UI (Noms conservés) ---
+        Private ReadOnly grid As DataGridView
+        Private ReadOnly gridConnectes As DataGridView
+        Private ReadOnly timer As Timer
+        Private ReadOnly txtNom As TextBox
+        Private ReadOnly txtMotDePasse As TextBox
+        Private ReadOnly cmbRole As ComboBox
+        Private ReadOnly chkActif As CheckBox
+        Private ReadOnly btnAjouter As Button
+        Private ReadOnly btnResetMdp As Button
+        Private ReadOnly btnRafraichir As Button
+
+        ' --- Nouveaux composants de structure (Layouts propres) ---
+        Private ReadOnly panelHero As Panel
+        Private ReadOnly lblHeroTitre As Label
+        Private ReadOnly lblHeroSousTitre As Label
+        Private ReadOnly mainTableLayout As TableLayoutPanel
+        Private ReadOnly cardForm As Panel
+        Private ReadOnly flowButtons As FlowLayoutPanel
+        Private ReadOnly splitGrids As TableLayoutPanel
+
+        Public Sub New()
+            ' Configuration de base du formulaire
+            Me.Text = "Gestion des Utilisateurs"
+            Me.Width = 1100
+            Me.Height = 800
+            Me.StartPosition = FormStartPosition.CenterScreen
+            Me.BackColor = ColorBackground
+            Me.DoubleBuffered = True
+
+            ' --- Header / Hero Section ---
+            panelHero = New Panel() With {.Dock = DockStyle.Top, .Height = 90, .BackColor = ColorPrimary}
+            lblHeroTitre = New Label() With {.Text = "Administration Utilisateurs", .Font = FontTitle, .AutoSize = True, .Left = 20, .Top = 15, .ForeColor = Color.White}
+            lblHeroSousTitre = New Label() With {.Text = "Gérez les accès, les rôles et surveillez les sessions actives en temps réel.", .Left = 27, .Top = 54, .AutoSize = True, .Font = FontSubTitle, .ForeColor = Color.FromArgb(210, 210, 255)}
+            panelHero.Controls.Add(lblHeroTitre)
+            panelHero.Controls.Add(lblHeroSousTitre)
+
+            ' --- Layout Principal ---
+            mainTableLayout = New TableLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .ColumnCount = 1,
+                .RowCount = 3,
+                .Padding = New Padding(20)
+            }
+            mainTableLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 120)) ' Carte Formulaire
+            mainTableLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 60))  ' Boutons
+            mainTableLayout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))  ' Grilles
+
+            ' --- Carte de Formulaire ---
+            cardForm = New Panel() With {
+                .Dock = DockStyle.Fill,
+                .BackColor = ColorCard,
+                .Padding = New Padding(20)
+            }
+
+            Dim formTable As New TableLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .ColumnCount = 4,
+                .RowCount = 2
+            }
+            formTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 30))
+            formTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25))
+            formTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25))
+            formTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 20))
+
+            ' Initialisation des contrôles (Noms conservés)
+            txtNom = CreateStyledTextBox()
+            txtMotDePasse = CreateStyledTextBox()
+            txtMotDePasse.PasswordChar = "*"c
+
+            cmbRole = New ComboBox() With {
+                .Dock = DockStyle.Top,
+                .DropDownStyle = ComboBoxStyle.DropDownList,
+                .Font = FontControl,
+                .FlatStyle = FlatStyle.Flat,
+                .Margin = New Padding(0, 0, 20, 0)
+            }
+            cmbRole.Items.AddRange(New Object() {"ADMIN", "CAISSIERE", "FACTURIER"})
+
+            chkActif = New CheckBox() With {
+                .Text = "Compte Actif",
+                .Font = FontControl,
+                .ForeColor = ColorText,
+                .AutoSize = True,
+                .Margin = New Padding(0, 5, 0, 0)
+            }
+
+            ' Ajout au layout de formulaire
+            formTable.Controls.Add(CreateLabel("Nom d'utilisateur"), 0, 0)
+            formTable.Controls.Add(txtNom, 0, 1)
+            formTable.Controls.Add(CreateLabel("Mot de passe"), 1, 0)
+            formTable.Controls.Add(txtMotDePasse, 1, 1)
+            formTable.Controls.Add(CreateLabel("Rôle / Privilège"), 2, 0)
+            formTable.Controls.Add(cmbRole, 2, 1)
+            formTable.Controls.Add(chkActif, 3, 1)
+
+            cardForm.Controls.Add(formTable)
+
+            ' --- Barre de Boutons (FlowLayout) ---
+            flowButtons = New FlowLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .FlowDirection = FlowDirection.LeftToRight,
+                .Padding = New Padding(0, 10, 0, 0)
+            }
+
+            btnAjouter = CreateStyledButton("Ajouter", ColorPrimary)
+            btnResetMdp = CreateStyledButton("Reset MDP", ColorSecondary)
+            btnRafraichir = CreateStyledButton("Rafraîchir", Color.Gray)
+
+            flowButtons.Controls.AddRange(New Control() {btnAjouter, btnResetMdp, btnRafraichir})
+
+            ' --- Grilles (Split Vertical) ---
+            splitGrids = New TableLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .ColumnCount = 1,
+                .RowCount = 2
+            }
+            splitGrids.RowStyles.Add(New RowStyle(SizeType.Percent, 60)) ' Liste Utilisateurs
+            splitGrids.RowStyles.Add(New RowStyle(SizeType.Percent, 40)) ' Sessions Actives
+
+            grid = CreateStyledGrid("Liste des Utilisateurs")
+            gridConnectes = CreateStyledGrid("Sessions Actives (Temps Réel)")
+
+            ' Conteneurs pour titres de grilles
+            Dim p1 As New Panel() With {.Dock = DockStyle.Fill, .Padding = New Padding(0, 0, 0, 10)}
+            p1.Controls.Add(grid)
+            p1.Controls.Add(New Label() With {.Text = "Répertoire des comptes", .Dock = DockStyle.Top, .Height = 25, .Font = FontLabel, .ForeColor = ColorPrimary})
+
+            Dim p2 As New Panel() With {.Dock = DockStyle.Fill, .Padding = New Padding(0, 10, 0, 0)}
+            p2.Controls.Add(gridConnectes)
+            p2.Controls.Add(New Label() With {.Text = "Utilisateurs actuellement connectés", .Dock = DockStyle.Top, .Height = 25, .Font = FontLabel, .ForeColor = ColorAccent})
+
+            splitGrids.Controls.Add(p1, 0, 0)
+            splitGrids.Controls.Add(p2, 0, 1)
+
+            ' Assemblage final
+            mainTableLayout.Controls.Add(cardForm, 0, 0)
+            mainTableLayout.Controls.Add(flowButtons, 0, 1)
+            mainTableLayout.Controls.Add(splitGrids, 0, 2)
+
+            Me.Controls.Add(mainTableLayout)
+            Me.Controls.Add(panelHero)
+
+            ' --- Liaison des événements (Logique conservée) ---
+            AddHandler btnAjouter.Click, AddressOf Ajouter
+            AddHandler btnResetMdp.Click, AddressOf ResetMdp
+            AddHandler btnRafraichir.Click, AddressOf Charger
+
+            ' --- Initialisation ---
+            'ThemeHelper.AppliquerTheme(Me)
+            timer = New Timer() With {.Interval = 5000}
+            AddHandler timer.Tick, AddressOf ChargerConnectes
+            timer.Start()
+
+            ' Chargement initial
+            AddHandler Me.Load, AddressOf Charger
+        End Sub
+
+        ' --- Helpers de Design ---
+
+        Private Function CreateLabel(text As String) As Label
+            Return New Label() With {
+                .Text = text,
+                .AutoSize = True,
+                .Font = FontLabel,
+                .ForeColor = ColorTextSecondary,
+                .Margin = New Padding(0, 0, 0, 2)
+            }
+        End Function
+
+        Private Function CreateStyledTextBox() As TextBox
+            Return New TextBox() With {
+                .Dock = DockStyle.Top,
+                .Font = FontControl,
+                .BorderStyle = BorderStyle.FixedSingle,
+                .Margin = New Padding(0, 0, 20, 0)
+            }
+        End Function
+
+        Private Function CreateStyledButton(text As String, backColor As Color) As Button
+            Dim btn As New Button() With {
+                .Text = text,
+                .Width = 120,
+                .Height = 38,
+                .BackColor = backColor,
+                .ForeColor = Color.White,
+                .FlatStyle = FlatStyle.Flat,
+                .Font = FontLabel,
+                .Cursor = Cursors.Hand,
+                .Margin = New Padding(0, 0, 10, 0)
+            }
+            btn.FlatAppearance.BorderSize = 0
+            Return btn
+        End Function
+
+        Private Function CreateStyledGrid(title As String) As DataGridView
+            Dim dgv As New DataGridView() With {
+                .Dock = DockStyle.Fill,
+                .BackgroundColor = Color.White,
+                .BorderStyle = BorderStyle.None,
+                .EnableHeadersVisualStyles = False,
+                .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                .AllowUserToAddRows = False,
+                .ReadOnly = True,
+                .RowHeadersVisible = False,
+                .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                .GridColor = ColorBorder
+            }
+            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245)
+            dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
+            dgv.ColumnHeadersHeight = 40
+            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(232, 234, 246)
+            dgv.DefaultCellStyle.SelectionForeColor = ColorPrimary
+            dgv.DefaultCellStyle.Font = FontControl
+            dgv.RowTemplate.Height = 32
+            Return dgv
+        End Function
+
+        ' --- LOGIQUE MÉTIER (STRICTEMENT IDENTIQUE À L'ORIGINAL) ---
+
+        Private Function ObtenirService() As UtilisateurService
+            Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+            Dim dal As New DAL(cs)
+            Dim utilisateurRepo As New UtilisateurRepository(dal)
+            Dim roleRepo As New RoleRepository(dal)
+            Dim sessionRepo As New SessionRepository(dal)
+            Return New UtilisateurService(utilisateurRepo, roleRepo, sessionRepo)
+        End Function
+
+        Private Sub Charger(sender As Object, e As EventArgs)
+            Try
+                Dim service As UtilisateurService = ObtenirService()
+                grid.DataSource = service.Lister()
+            Catch ex As Exception
+                MessageBox.Show("Erreur chargement utilisateurs: " & ex.Message)
+            End Try
+        End Sub
+
+        Private Sub ChargerConnectes(sender As Object, e As EventArgs)
+            Try
+                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                Dim dal As New DAL(cs)
+                Dim repo As New SessionRepository(dal)
+                gridConnectes.DataSource = repo.ListerConnectes()
+            Catch
+            End Try
+        End Sub
+
+        Private Sub Ajouter(sender As Object, e As EventArgs)
+            Try
+                If txtNom.Text.Trim() = "" OrElse txtMotDePasse.Text.Trim() = "" OrElse cmbRole.SelectedItem Is Nothing Then
+                    MessageBox.Show("Nom, mot de passe et role obligatoires.")
+                    Return
+                End If
+
+                Dim service As UtilisateurService = ObtenirService()
+                service.CreerUtilisateur(txtNom.Text.Trim(), txtMotDePasse.Text.Trim(), cmbRole.SelectedItem.ToString())
+                Charger(sender, e)
+            Catch ex As Exception
+                MessageBox.Show("Erreur ajout utilisateur: " & ex.Message)
+            End Try
+        End Sub
+
+        Private Sub ResetMdp(sender As Object, e As EventArgs)
+            Try
+                If grid.CurrentRow Is Nothing Then
+                    MessageBox.Show("Selectionnez un utilisateur.")
+                    Return
+                End If
+                If txtMotDePasse.Text.Trim() = "" Then
+                    MessageBox.Show("Entrez un nouveau mot de passe.")
+                    Return
+                End If
+
+                Dim id As Integer = Convert.ToInt32(grid.CurrentRow.Cells("UtilisateurId").Value)
+                Dim service As UtilisateurService = ObtenirService()
+                service.ReinitialiserMotDePasse(id, txtMotDePasse.Text.Trim())
+                MessageBox.Show("Mot de passe mis a jour.")
+            Catch ex As Exception
+                MessageBox.Show("Erreur reset mot de passe: " & ex.Message)
+            End Try
+        End Sub
+    End Class
+End Namespace

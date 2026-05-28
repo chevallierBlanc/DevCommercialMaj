@@ -1,0 +1,921 @@
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Configuration
+Imports System.Data
+Imports System.Drawing
+Imports System.Drawing.Drawing2D
+Imports System.Drawing.Printing
+Imports System.IO
+Imports System.Windows.Forms
+Imports System.Windows.Forms.DataVisualization.Charting
+Imports System.Collections.Generic
+
+Namespace DevCommerc8ak
+    Public Class FormulaireProduits
+        Inherits Form
+
+        ' --- Constantes de Design ---
+        'Private ReadOnly ColorPrimary As Color = Color.FromArgb(63, 81, 181) ' Indigo
+        'Private ReadOnly ColorSecondary As Color = Color.FromArgb(48, 63, 159)
+        'Private ReadOnly ColorAccent As Color = Color.FromArgb(255, 64, 129)
+        Private ReadOnly ColorBackground As Color = Color.FromArgb(245, 247, 250)
+        Private ReadOnly ColorCard As Color = Color.White
+        Private ReadOnly ColorText As Color = Color.FromArgb(33, 33, 33)
+        Private ReadOnly ColorTextSecondary As Color = Color.FromArgb(117, 117, 117)
+        Private ReadOnly ColorBorder As Color = Color.FromArgb(230, 230, 230)
+        ' Private ReadOnly FontTitle As New Font("Segoe UI Semibold", 18.0F)
+        Private ReadOnly FontSubTitle As New Font("Segoe UI", 10.0F)
+        Private ReadOnly FontLabel As New Font("Segoe UI Semibold", 9.0F)
+        Private ReadOnly FontControl As New Font("Segoe UI", 9.5F)
+
+        Private Const TaillePageProduits As Integer = 14
+
+
+        Private ReadOnly ColorPrimary As Color = Color.FromArgb(52, 73, 94) ' Gris Foncé
+        Private ReadOnly ColorSecondary As Color = Color.FromArgb(41, 128, 185) ' Bleu Moderne
+        Private ReadOnly ColorAccent As Color = Color.FromArgb(39, 174, 96) ' Vert Succès
+        Private ReadOnly ColorDanger As Color = Color.FromArgb(192, 57, 43) ' Rouge Annuler
+        Private ReadOnly ColorBg As Color = Color.FromArgb(245, 247, 250) ' Gris très clair
+        Private ReadOnly ColorWhite As Color = Color.White
+        Private ReadOnly FontMain As New Font("Segoe UI", 10)
+        Private ReadOnly FontBold As New Font("Segoe UI", 10, FontStyle.Bold)
+        Private ReadOnly FontTitle As New Font("Segoe UI", 18.0F, FontStyle.Bold)
+        Private ReadOnly FontTotal As New Font("Segoe UI", 22, FontStyle.Bold)
+
+        ' --- Composants UI (Noms conservés) ---
+        Private ReadOnly txtRecherche As TextBox
+        Private ReadOnly btnNouveau As Button
+        Private ReadOnly btnEnregistrer As Button
+        Private ReadOnly btnSupprimer As Button
+        Private ReadOnly btnActualiser As Button
+        Private ReadOnly btnImprimerProduits As Button
+        Private ReadOnly btnImprimerHistorique As Button
+
+        Private ReadOnly txtLibelle As TextBox
+        Private ReadOnly txtCodeBarres As TextBox
+        Private ReadOnly txtCategorieId As TextBox
+        Private ReadOnly chkActif As CheckBox
+
+        Private ReadOnly cmbUnitePrincipale As ComboBox
+        Private ReadOnly cmbUniteSecondaire As ComboBox
+        Private ReadOnly txtConversion As TextBox
+
+        Private ReadOnly txtPrixUnite As TextBox
+        Private ReadOnly txtPrixAchat As TextBox
+        Private ReadOnly txtPrixDemi As TextBox
+        Private ReadOnly txtPrixQuart As TextBox
+        Private ReadOnly txtPrixDouzaine As TextBox
+        Private ReadOnly txtPrixGros As TextBox
+        Private ReadOnly txtPrixSpecial As TextBox
+        Private ReadOnly txtCoeffGros As TextBox
+        Private ReadOnly btnCalculerPrix As Button
+
+        Private ReadOnly txtQuantite As TextBox
+        Private ReadOnly txtSeuil As TextBox
+        Private ReadOnly txtMarge As TextBox
+        Private ReadOnly dtpExpiration As DateTimePicker
+
+        Private ReadOnly chkVenteUnite As CheckBox
+        Private ReadOnly chkVenteDemi As CheckBox
+        Private ReadOnly chkVenteQuart As CheckBox
+        Private ReadOnly chkVenteDouzaine As CheckBox
+        Private ReadOnly chkVenteGros As CheckBox
+
+        Private ReadOnly tabs As TabControl
+        Private ReadOnly tabProduits As TabPage
+        Private ReadOnly tabHistorique As TabPage
+        Private ReadOnly tabDashboard As TabPage
+        Private ReadOnly panelHero As Panel
+        Private ReadOnly lblHeroTitre As Label
+        Private ReadOnly lblHeroSousTitre As Label
+        Private ReadOnly grid As DataGridView
+        Private ReadOnly gridHistorique As DataGridView
+        Private ReadOnly gridProduitVedette As DataGridView
+        Private ReadOnly lblPagination As Label
+        Private ReadOnly btnPagePrecedente As Button
+        Private ReadOnly btnPageSuivante As Button
+        Private ReadOnly cmbAnneeDashboard As ComboBox
+        Private ReadOnly cmbProduitHistorique As ComboBox
+        Private ReadOnly dtpHistoriqueDu As DateTimePicker
+        Private ReadOnly dtpHistoriqueAu As DateTimePicker
+        Private ReadOnly chkFiltreDate As CheckBox
+        Private ReadOnly chartTopProduits As Chart
+        Private ReadOnly chartCategories As Chart
+        Private ReadOnly lblKpiProduitRentable As Label
+        Private ReadOnly lblKpiTotalRecettes As Label
+        Private ReadOnly lblKpiNombreProduits As Label
+        Private ReadOnly lblKpiFaibleRotation As Label
+        Private ReadOnly lblKpiDormants As Label
+
+        ' --- Variables de Logique ---
+        Private _produitsTable As DataTable
+        Private _historiqueTable As DataTable
+        Private _produitsView As DataView
+        Private _produitId As Integer
+        Private _pageCourante As Integer
+
+        Public Sub New()
+            ' Configuration de base
+            Me.Text = "Gestion du Catalogue Produits"
+            Me.Width = 1350
+            Me.Height = 900
+            Me.StartPosition = FormStartPosition.CenterScreen
+            Me.BackColor = ColorBackground
+            Me.DoubleBuffered = True
+            _pageCourante = 1
+
+            ' --- Header / Hero Section ---
+            panelHero = New Panel() With {.Dock = DockStyle.Top, .Height = 90, .BackColor = ColorPrimary}
+            lblHeroTitre = New Label() With {.Text = "Catalogue Produits & Intelligence Tarifaire", .Left = 25, .Top = 18, .AutoSize = True, .Font = FontTitle, .ForeColor = Color.White}
+            lblHeroSousTitre = New Label() With {.Text = "Édition des prix, historique détaillé et lecture décisionnelle du portefeuille produit.", .Left = 27, .Top = 54, .AutoSize = True, .Font = FontSubTitle, .ForeColor = Color.FromArgb(210, 210, 255)}
+            panelHero.Controls.Add(lblHeroTitre)
+            panelHero.Controls.Add(lblHeroSousTitre)
+
+            ' --- TabControl ---
+            tabs = New TabControl() With {.Dock = DockStyle.Fill, .Padding = New Point(15, 8)}
+            tabProduits = New TabPage("Gestion Produits") With {.BackColor = ColorBackground}
+            tabHistorique = New TabPage("Historique des Prix") With {.BackColor = ColorBackground}
+            tabDashboard = New TabPage("Analyses & Dashboard") With {.BackColor = ColorBackground}
+            tabs.TabPages.AddRange({tabProduits, tabHistorique, tabDashboard})
+
+            ' --- TAB PRODUITS : STRUCTURE ---
+            Dim mainTableProduits As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 4, .Padding = New Padding(10)}
+            mainTableProduits.RowStyles.Add(New RowStyle(SizeType.Absolute, 60))  ' Barre Recherche/Actions
+            mainTableProduits.RowStyles.Add(New RowStyle(SizeType.Absolute, 260)) ' Cartes Edition
+            mainTableProduits.RowStyles.Add(New RowStyle(SizeType.Percent, 100))  ' Grille
+            mainTableProduits.RowStyles.Add(New RowStyle(SizeType.Absolute, 40))  ' Pagination
+
+            ' 1. Barre de Recherche et Actions
+            Dim flowHeader As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.LeftToRight, .Padding = New Padding(0, 10, 0, 0)}
+            txtRecherche = New TextBox() With {.Width = 250, .Font = FontControl, .BorderStyle = BorderStyle.FixedSingle, .Margin = New Padding(0, 5, 20, 0)}
+            btnNouveau = CreateStyledButton("Nouveau", ColorPrimary)
+            btnEnregistrer = CreateStyledButton("Enregistrer", Color.ForestGreen)
+            btnSupprimer = CreateStyledButton("Supprimer", Color.Crimson)
+            btnActualiser = CreateStyledButton("Actualiser", Color.Gray)
+            btnImprimerProduits = CreateStyledButton("Imprimer Liste", Color.SlateGray)
+
+            flowHeader.Controls.Add(New Label() With {.Text = "Recherche :", .Font = FontLabel, .ForeColor = ColorTextSecondary, .Margin = New Padding(0, 10, 5, 0), .AutoSize = True})
+            flowHeader.Controls.Add(txtRecherche)
+            flowHeader.Controls.AddRange({btnNouveau, btnEnregistrer, btnSupprimer, btnActualiser, btnImprimerProduits})
+
+            ' 2. Cartes d'Édition (Layout Flexible)
+            Dim tableEdition As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 4, .RowCount = 1}
+            tableEdition.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25))
+            tableEdition.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25))
+            tableEdition.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25))
+            tableEdition.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25))
+
+            ' Carte 1: Infos de base
+            Dim cardInfos As Panel = CreateCard("Fiche Produit")
+            txtLibelle = CreateField(cardInfos, "Désignation", 20, 45, 280)
+            txtCodeBarres = CreateField(cardInfos, "Code Barres / QR", 20, 105, 160)
+            txtCategorieId = CreateField(cardInfos, "Catégorie ID", 190, 105, 60)
+            chkActif = New CheckBox() With {.Text = "Actif", .Left = 260, .Top = 108, .Font = FontControl, .AutoSize = True}
+            cardInfos.Controls.Add(chkActif)
+
+            ' Carte 2: Unités
+            Dim cardUnites As Panel = CreateCard("Unités & Conversion")
+            cmbUnitePrincipale = CreateComboField(cardUnites, "Unité Principale", 20, 45, 280)
+            cmbUniteSecondaire = CreateComboField(cardUnites, "Unité Secondaire", 20, 105, 160)
+            txtConversion = CreateField(cardUnites, "Taux Conv.", 190, 105, 110)
+            cmbUnitePrincipale.Items.AddRange({"Carton", "Sac", "Paquet", "Pack", "Bidon", "Sachet"})
+            cmbUniteSecondaire.Items.AddRange({"Piece", "Demi", "Quart", "Douzaine"})
+
+            ' Carte 3: Prix
+            Dim cardPrix As Panel = CreateCard("Tarification")
+            txtPrixAchat = CreateField(cardPrix, "Prix Achat", 20, 45, 100)
+            txtCoeffGros = CreateField(cardPrix, "Coeff.", 130, 45, 60)
+            btnCalculerPrix = CreateStyledButton("Calculer", ColorSecondary, 80, 30)
+            btnCalculerPrix.Left = 200 : btnCalculerPrix.Top = 42
+            cardPrix.Controls.Add(btnCalculerPrix)
+
+            txtPrixGros = CreateField(cardPrix, "Prix Gros", 20, 105, 100)
+            txtPrixUnite = CreateField(cardPrix, "Prix Détail", 130, 105, 100)
+            txtPrixDemi = CreateField(cardPrix, "Demi", 20, 165, 80)
+            txtPrixQuart = CreateField(cardPrix, "Quart", 110, 165, 80)
+            txtPrixDouzaine = CreateField(cardPrix, "Douzaine", 200, 165, 80)
+            txtPrixSpecial = CreateField(cardPrix, "Spécial", 20, 210, 100)
+
+            ' Carte 4: Stock & Options
+            Dim cardStock As Panel = CreateCard("Stock & Options")
+            txtQuantite = CreateField(cardStock, "Stock Actuel", 20, 45, 100) : txtQuantite.ReadOnly = True
+            txtSeuil = CreateField(cardStock, "Seuil Alerte", 130, 45, 100)
+            txtMarge = CreateField(cardStock, "Marge %", 20, 105, 100) : txtMarge.ReadOnly = True
+            dtpExpiration = New DateTimePicker() With {.Left = 130, .Top = 105, .Width = 150, .Format = DateTimePickerFormat.Short, .Font = FontControl}
+            cardStock.Controls.Add(New Label() With {.Text = "Expiration", .Left = 130, .Top = 85, .Font = FontLabel, .ForeColor = ColorTextSecondary, .AutoSize = True})
+            cardStock.Controls.Add(dtpExpiration)
+
+            Dim flowOptions As New FlowLayoutPanel() With {.Left = 20, .Top = 160, .Width = 280, .Height = 80}
+            chkVenteGros = CreateOption(flowOptions, "Vente Gros")
+            chkVenteUnite = CreateOption(flowOptions, "Vente Détail")
+            chkVenteDemi = CreateOption(flowOptions, "Vente Demi")
+            chkVenteQuart = CreateOption(flowOptions, "Vente Quart")
+            chkVenteDouzaine = CreateOption(flowOptions, "Vente Douzaine")
+            cardStock.Controls.Add(flowOptions)
+
+            tableEdition.Controls.Add(cardInfos, 0, 0)
+            tableEdition.Controls.Add(cardUnites, 1, 0)
+            tableEdition.Controls.Add(cardPrix, 2, 0)
+            tableEdition.Controls.Add(cardStock, 3, 0)
+
+            ' 3. Grille
+            grid = CreateStyledGrid()
+
+            ' 4. Pagination
+            Dim flowPager As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft}
+            btnPageSuivante = CreateStyledButton(">", Color.LightGray, 40, 30)
+            lblPagination = New Label() With {.Text = "Page 1/1", .Font = FontLabel, .Margin = New Padding(10, 8, 10, 0), .AutoSize = True}
+            btnPagePrecedente = CreateStyledButton("<", Color.LightGray, 40, 30)
+            flowPager.Controls.AddRange({btnPageSuivante, lblPagination, btnPagePrecedente})
+
+            mainTableProduits.Controls.Add(flowHeader, 0, 0)
+            mainTableProduits.Controls.Add(tableEdition, 0, 1)
+            mainTableProduits.Controls.Add(grid, 0, 2)
+            mainTableProduits.Controls.Add(flowPager, 0, 3)
+            tabProduits.Controls.Add(mainTableProduits)
+
+            ' --- TAB HISTORIQUE : STRUCTURE ---
+            Dim mainTableHist As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 2, .Padding = New Padding(20)}
+            mainTableHist.RowStyles.Add(New RowStyle(SizeType.Absolute, 80))
+            mainTableHist.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+
+            Dim cardHistFiltres As Panel = CreateCard("Filtres Historique")
+            cardHistFiltres.Height = 70
+            cmbProduitHistorique = CreateComboField(cardHistFiltres, "Produit", 20, 30, 250)
+            chkFiltreDate = New CheckBox() With {.Text = "Filtrer par date", .Left = 290, .Top = 32, .Font = FontControl, .AutoSize = True}
+            dtpHistoriqueDu = New DateTimePicker() With {.Left = 420, .Top = 30, .Width = 130, .Format = DateTimePickerFormat.Short}
+            dtpHistoriqueAu = New DateTimePicker() With {.Left = 560, .Top = 30, .Width = 130, .Format = DateTimePickerFormat.Short}
+            btnImprimerHistorique = CreateStyledButton("Imprimer Rapport", ColorSecondary, 150, 35)
+            btnImprimerHistorique.Left = 710 : btnImprimerHistorique.Top = 25
+            cardHistFiltres.Controls.AddRange({chkFiltreDate, dtpHistoriqueDu, dtpHistoriqueAu, btnImprimerHistorique})
+
+            gridHistorique = CreateStyledGrid()
+            mainTableHist.Controls.Add(cardHistFiltres, 0, 0)
+            mainTableHist.Controls.Add(gridHistorique, 0, 1)
+            tabHistorique.Controls.Add(mainTableHist)
+
+            ' --- TAB DASHBOARD : STRUCTURE ---
+            Dim mainTableDash As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 3, .Padding = New Padding(20)}
+            mainTableDash.RowStyles.Add(New RowStyle(SizeType.Absolute, 60))
+            mainTableDash.RowStyles.Add(New RowStyle(SizeType.Absolute, 120))
+            mainTableDash.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+
+            cmbAnneeDashboard = New ComboBox() With {.Width = 120, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
+            Dim flowDashTop As New FlowLayoutPanel() With {.Dock = DockStyle.Fill}
+            flowDashTop.Controls.Add(New Label() With {.Text = "Année d'analyse :", .Font = FontLabel, .Margin = New Padding(0, 8, 10, 0), .AutoSize = True})
+            flowDashTop.Controls.Add(cmbAnneeDashboard)
+
+            Dim tableKpi As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 5, .RowCount = 1}
+            tableKpi.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 20))
+            tableKpi.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 20))
+            tableKpi.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 20))
+            tableKpi.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 20))
+            tableKpi.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 20))
+
+            lblKpiProduitRentable = CreateKpiCard(tableKpi, "Produit Rentable", 0)
+            lblKpiTotalRecettes = CreateKpiCard(tableKpi, "Total Recettes", 1)
+            lblKpiNombreProduits = CreateKpiCard(tableKpi, "Nb Produits", 2)
+            lblKpiFaibleRotation = CreateKpiCard(tableKpi, "Faible Rotation", 3)
+            lblKpiDormants = CreateKpiCard(tableKpi, "Dormants", 4)
+
+            Dim tableCharts As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 2}
+            tableCharts.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 40))
+            tableCharts.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 60))
+            tableCharts.RowStyles.Add(New RowStyle(SizeType.Percent, 50))
+            tableCharts.RowStyles.Add(New RowStyle(SizeType.Percent, 50))
+
+            gridProduitVedette = CreateStyledGrid()
+            chartTopProduits = New Chart() With {.Dock = DockStyle.Fill, .BackColor = ColorCard}
+            chartCategories = New Chart() With {.Dock = DockStyle.Fill, .BackColor = ColorCard}
+
+            tableCharts.Controls.Add(gridProduitVedette, 0, 0)
+            tableCharts.SetRowSpan(gridProduitVedette, 2)
+            tableCharts.Controls.Add(chartTopProduits, 1, 0)
+            tableCharts.Controls.Add(chartCategories, 1, 1)
+
+            mainTableDash.Controls.Add(flowDashTop, 0, 0)
+            mainTableDash.Controls.Add(tableKpi, 0, 1)
+            mainTableDash.Controls.Add(tableCharts, 0, 2)
+            tabDashboard.Controls.Add(mainTableDash)
+
+            ' Assemblage final
+            Me.Controls.Add(tabs)
+            Me.Controls.Add(panelHero)
+
+            ' --- Liaison des événements (Logique conservée) ---
+            AddHandler btnNouveau.Click, AddressOf NouveauProduit
+            AddHandler btnEnregistrer.Click, AddressOf EnregistrerProduit
+            AddHandler btnSupprimer.Click, AddressOf SupprimerProduit
+            AddHandler btnActualiser.Click, AddressOf ChargerDonnees
+            AddHandler btnImprimerProduits.Click, AddressOf ImprimerListeProduits
+            AddHandler btnImprimerHistorique.Click, AddressOf ImprimerHistoriquePrix
+            AddHandler txtRecherche.TextChanged, AddressOf Filtrer
+            AddHandler grid.SelectionChanged, AddressOf ChargerSelection
+            AddHandler btnPagePrecedente.Click, AddressOf PagePrecedente
+            AddHandler btnPageSuivante.Click, AddressOf PageSuivante
+            AddHandler txtPrixUnite.TextChanged, AddressOf MajOptionsVente
+            AddHandler txtPrixDemi.TextChanged, AddressOf MajOptionsVente
+            AddHandler txtPrixQuart.TextChanged, AddressOf MajOptionsVente
+            AddHandler txtPrixDouzaine.TextChanged, AddressOf MajOptionsVente
+            AddHandler txtPrixGros.TextChanged, AddressOf MajOptionsVente
+            AddHandler txtPrixSpecial.TextChanged, AddressOf MajOptionsVente
+            AddHandler txtPrixAchat.TextChanged, AddressOf MettreAJourMarge
+            AddHandler txtPrixGros.TextChanged, AddressOf MettreAJourMarge
+            AddHandler btnCalculerPrix.Click, AddressOf CalculerPrixAuto
+            AddHandler cmbProduitHistorique.SelectedIndexChanged, AddressOf ChargerHistoriquePrix
+            AddHandler chkFiltreDate.CheckedChanged, AddressOf ChargerHistoriquePrix
+            AddHandler dtpHistoriqueDu.ValueChanged, AddressOf ChargerHistoriquePrix
+            AddHandler dtpHistoriqueAu.ValueChanged, AddressOf ChargerHistoriquePrix
+            AddHandler cmbAnneeDashboard.SelectedIndexChanged, AddressOf ChargerDashboard
+
+            ' --- Initialisation ---
+            ' ThemeHelper.AppliquerTheme(Me)
+            ConfigurerCharts()
+            ConfigurerGrilleProduits()
+            ChargerDonnees(Nothing, EventArgs.Empty)
+        End Sub
+
+        ' --- Helpers de Design ---
+
+        Private Function CreateStyledButton(text As String, backColor As Color, Optional w As Integer = 110, Optional h As Integer = 35) As Button
+            Return New Button() With {
+                .Text = text, .Width = w, .Height = h,
+                .BackColor = backColor, .ForeColor = Color.White,
+                .FlatStyle = FlatStyle.Flat, .Font = FontLabel, .Cursor = Cursors.Hand,
+                .Margin = New Padding(0, 0, 10, 0)
+            }
+        End Function
+
+        Private Function CreateCard(title As String) As Panel
+            Dim p As New Panel() With {.Dock = DockStyle.Fill, .BackColor = ColorCard, .Margin = New Padding(5), .Padding = New Padding(10)}
+            p.Controls.Add(New Label() With {.Text = title, .Font = FontLabel, .ForeColor = ColorPrimary, .AutoSize = True, .Top = 5, .Left = 10})
+            Return p
+        End Function
+
+        Private Function CreateField(parent As Control, label As String, x As Integer, y As Integer, w As Integer) As TextBox
+            parent.Controls.Add(New Label() With {.Text = label, .Left = x, .Top = y - 20, .Font = FontLabel, .ForeColor = ColorTextSecondary, .AutoSize = True})
+            Dim txt As New TextBox() With {.Left = x, .Top = y, .Width = w, .Font = FontControl, .BorderStyle = BorderStyle.FixedSingle}
+            parent.Controls.Add(txt)
+            Return txt
+        End Function
+
+        Private Function CreateComboField(parent As Control, label As String, x As Integer, y As Integer, w As Integer) As ComboBox
+            parent.Controls.Add(New Label() With {.Text = label, .Left = x, .Top = y - 20, .Font = FontLabel, .ForeColor = ColorTextSecondary, .AutoSize = True})
+            Dim cmb As New ComboBox() With {.Left = x, .Top = y, .Width = w, .Font = FontControl, .DropDownStyle = ComboBoxStyle.DropDownList, .FlatStyle = FlatStyle.Flat}
+            parent.Controls.Add(cmb)
+            Return cmb
+        End Function
+
+        Private Function CreateOption(parent As Control, text As String) As CheckBox
+            Dim chk As New CheckBox() With {.Text = text, .Font = FontSubTitle, .AutoSize = True, .Margin = New Padding(0, 0, 10, 5)}
+            parent.Controls.Add(chk)
+            Return chk
+        End Function
+
+        Private Function CreateKpiCard(parent As TableLayoutPanel, title As String, col As Integer) As Label
+            Dim p As New Panel() With {.Dock = DockStyle.Fill, .BackColor = ColorCard, .Margin = New Padding(5)}
+            Dim lblTitre As New Label() With {.Text = title, .Top = 10, .Left = 10, .Font = FontLabel, .ForeColor = ColorTextSecondary, .AutoSize = True}
+            Dim lblValeur As New Label() With {.Top = 40, .Left = 10, .Font = New Font("Segoe UI", 14.0F, FontStyle.Bold), .ForeColor = ColorPrimary, .AutoSize = True}
+            p.Controls.Add(lblTitre)
+            p.Controls.Add(lblValeur)
+            parent.Controls.Add(p, col, 0)
+            Return lblValeur
+        End Function
+
+        Private Function CreateStyledGrid() As DataGridView
+            Dim dgv As New DataGridView() With {
+                .Dock = DockStyle.Fill, .BackgroundColor = Color.White, .BorderStyle = BorderStyle.None,
+                .EnableHeadersVisualStyles = False, .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                .AllowUserToAddRows = False, .ReadOnly = True, .RowHeadersVisible = False,
+                .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, .GridColor = ColorBorder
+            }
+            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245)
+            dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
+            dgv.ColumnHeadersHeight = 40
+            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(232, 234, 246)
+            dgv.DefaultCellStyle.SelectionForeColor = ColorPrimary
+            dgv.DefaultCellStyle.Font = FontControl
+            Return dgv
+        End Function
+
+        Private Sub ConfigurerCharts()
+            ConfigurerChart(chartTopProduits, SeriesChartType.Bar, "TopProduits")
+            ConfigurerChart(chartCategories, SeriesChartType.Pie, "Categories")
+        End Sub
+
+        Private Sub ConfigurerChart(chart As Chart, type As SeriesChartType, name As String)
+            chart.ChartAreas.Clear()
+            chart.Series.Clear()
+            chart.ChartAreas.Add(New ChartArea("Main"))
+            chart.Series.Add(New Series(name) With {.ChartType = type, .Palette = ChartColorPalette.Pastel})
+        End Sub
+
+        Private Sub ConfigurerGrilleProduits()
+            grid.Columns.Clear()
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "Libelle", .HeaderText = "Désignation", .FillWeight = 200})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "CodeBarres", .HeaderText = "Code Barres", .Width = 120})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "QuantiteStock", .HeaderText = "Stock", .Width = 80})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixAchat", .HeaderText = "P. Achat", .Width = 100})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixGros", .HeaderText = "P. Gros", .Width = 100})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixDetail", .HeaderText = "P. Détail", .Width = 100})
+            grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "EstActif", .HeaderText = "Actif", .Width = 60})
+        End Sub
+
+        ' --- LOGIQUE MÉTIER (STRICTEMENT IDENTIQUE À L'ORIGINAL) ---
+
+        Private Function ObtenirService() As ProduitService
+            Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+            Dim dal As New DAL(cs)
+            Dim repo As New ProduitRepository(dal)
+            Return New ProduitService(repo)
+        End Function
+
+        Private Sub ChargerDonnees(sender As Object, e As EventArgs)
+            'Try
+            '    Dim service As ProduitService = ObtenirService()
+            '    _produitsTable = service.
+            '    _produitsView = New DataView(_produitsTable)
+            '    MettreAJourPagination()
+            '    RemplirComboProduitsHistorique()
+            '    RemplirComboAnnees()
+            'Catch ex As Exception
+            '    MessageBox.Show("Erreur chargement: " & ex.Message)
+            'End Try
+
+
+
+
+            Try
+                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                Dim dal As New DAL(cs)
+                Dim repo As New ProduitRepository(dal)
+                _produitsTable = repo.ListerTable()
+                If Not _produitsTable.Columns.Contains("MargePourcent") Then
+                    _produitsTable.Columns.Add("MargePourcent", GetType(Decimal))
+                End If
+
+                For Each row As DataRow In _produitsTable.Rows
+                    Dim prixAchat As Decimal = Convert.ToDecimal(row("PrixAchat"))
+                    Dim prixGros As Decimal = Convert.ToDecimal(row("PrixGros"))
+                    Dim marge As Decimal = 0D
+                    If prixAchat > 0D AndAlso prixGros > 0D Then
+                        marge = Math.Round(((prixGros / prixAchat) - 1D) * 100D, 2)
+                    End If
+                    row("MargePourcent") = marge
+                Next
+
+                _produitsView = New DataView(_produitsTable)
+                ChargerPageProduits(True)
+                RemplirComboProduitsHistorique()
+                ChargerHistoriquePrix(Nothing, EventArgs.Empty)
+                ChargerDashboard(Nothing, EventArgs.Empty)
+                MettreAJourPagination()
+                RemplirComboAnnees()
+            Catch ex As Exception
+                MessageBox.Show("Erreur chargement produits: " & ex.Message)
+            End Try
+        End Sub
+        Private Sub ChargerPageProduits(reinitialiser As Boolean)
+            If _produitsView Is Nothing Then
+                Return
+            End If
+            If reinitialiser Then
+                _pageCourante = 1
+            End If
+            Dim tablePage As DataTable = _produitsTable.Clone()
+            Dim lignes As DataRow() = _produitsView.ToTable().Select()
+            Dim totalLignes As Integer = lignes.Length
+            Dim totalPages As Integer = Math.Max(1, CInt(Math.Ceiling(totalLignes / CType(TaillePageProduits, Decimal))))
+            If _pageCourante > totalPages Then
+                _pageCourante = totalPages
+            End If
+            Dim debut As Integer = (_pageCourante - 1) * TaillePageProduits
+            Dim fin As Integer = Math.Min(debut + TaillePageProduits - 1, totalLignes - 1)
+            If totalLignes > 0 Then
+                For i As Integer = debut To fin
+                    tablePage.ImportRow(lignes(i))
+                Next
+            End If
+            grid.DataSource = tablePage
+            lblPagination.Text = "Page " & _pageCourante.ToString() & "/" & totalPages.ToString()
+            btnPagePrecedente.Enabled = _pageCourante > 1
+            btnPageSuivante.Enabled = _pageCourante < totalPages
+        End Sub
+        Private Sub MettreAJourPagination()
+            If _produitsView Is Nothing Then Return
+            Dim total As Integer = _produitsView.Count
+            Dim nbPages As Integer = Math.Max(1, CInt(Math.Ceiling(total / TaillePageProduits)))
+            If _pageCourante > nbPages Then _pageCourante = nbPages
+            lblPagination.Text = "Page " & _pageCourante.ToString() & "/" & nbPages.ToString()
+
+            Dim dtPage As DataTable = _produitsTable.Clone()
+            Dim debut As Integer = (_pageCourante - 1) * TaillePageProduits
+            Dim fin As Integer = Math.Min(debut + TaillePageProduits, total) - 1
+            For i As Integer = debut To fin
+                dtPage.ImportRow(_produitsView(i).Row)
+            Next
+            grid.DataSource = dtPage
+        End Sub
+
+        Private Sub PagePrecedente(sender As Object, e As EventArgs)
+            If _pageCourante > 1 Then
+                _pageCourante -= 1
+                MettreAJourPagination()
+            End If
+        End Sub
+
+        Private Sub PageSuivante(sender As Object, e As EventArgs)
+            Dim total As Integer = _produitsView.Count
+            Dim nbPages As Integer = Math.Max(1, CInt(Math.Ceiling(total / TaillePageProduits)))
+            If _pageCourante < nbPages Then
+                _pageCourante += 1
+                MettreAJourPagination()
+            End If
+        End Sub
+
+        Private Sub Filtrer(sender As Object, e As EventArgs)
+            If _produitsView Is Nothing Then Return
+            Dim q As String = txtRecherche.Text.Trim().Replace("'", "''")
+            If q = "" Then
+                _produitsView.RowFilter = ""
+            Else
+                _produitsView.RowFilter = String.Format("Libelle LIKE '%{0}%' OR CodeBarres LIKE '%{0}%'", q)
+            End If
+            _pageCourante = 1
+            MettreAJourPagination()
+        End Sub
+
+        Private Sub NouveauProduit(sender As Object, e As EventArgs)
+            _produitId = 0
+            txtLibelle.Clear()
+            txtCodeBarres.Clear()
+            txtCategorieId.Clear()
+            txtPrixAchat.Clear()
+            txtPrixGros.Clear()
+            txtPrixUnite.Clear()
+            txtPrixDemi.Clear()
+            txtPrixQuart.Clear()
+            txtPrixDouzaine.Clear()
+            txtPrixSpecial.Clear()
+            txtCoeffGros.Clear()
+            txtQuantite.Clear()
+            txtSeuil.Clear()
+            txtMarge.Clear()
+            cmbUnitePrincipale.SelectedIndex = -1
+            cmbUniteSecondaire.SelectedIndex = -1
+            chkActif.Checked = True
+            chkVenteGros.Checked = False
+            chkVenteUnite.Checked = False
+            chkVenteDemi.Checked = False
+            chkVenteQuart.Checked = False
+            chkVenteDouzaine.Checked = False
+            MessageBox.Show("L'ajout direct n'est pas autorisé ici. Sélectionnez un produit existant pour le modifier.")
+        End Sub
+
+        Private Sub ChargerSelection(sender As Object, e As EventArgs)
+            If grid.CurrentRow Is Nothing Then Return
+            Dim row As DataRowView = TryCast(grid.CurrentRow.DataBoundItem, DataRowView)
+            If row Is Nothing Then Return
+            Dim r As DataRow = row.Row
+            _produitId = Convert.ToInt32(row("ProduitId"))
+            txtLibelle.Text = Convert.ToString(row("Libelle"))
+            txtCodeBarres.Text = Convert.ToString(row("CodeBarres"))
+            txtCategorieId.Text = If(r.IsNull("CategorieId"), "", Convert.ToString(row("CategorieId")))
+            chkActif.Checked = Convert.ToBoolean(row("EstActif"))
+            cmbUnitePrincipale.Text = If(r.IsNull("UnitePrincipale"), "", Convert.ToString(row("UnitePrincipale")))
+            cmbUniteSecondaire.Text = If(r.IsNull("UniteSecondaire"), "", Convert.ToString(row("UniteSecondaire")))
+            txtConversion.Text = LireDecimalRow(row, "ConversionUnite").ToString("N2")
+            txtPrixAchat.Text = LireDecimalRow(row, "PrixAchat").ToString("N2")
+            txtCoeffGros.Text = LireDecimalRow(row, "CoefficientGros").ToString("N4")
+            txtPrixGros.Text = LireDecimalRow(row, "PrixGros").ToString("N2")
+            txtPrixUnite.Text = LireDecimalRow(row, "PrixDetail").ToString("N2")
+            txtPrixDemi.Text = LireDecimalRow(row, "PrixDemi").ToString("N2")
+            txtPrixQuart.Text = LireDecimalRow(row, "PrixQuart").ToString("N2")
+            txtPrixDouzaine.Text = LireDecimalRow(row, "PrixDouzaine").ToString("N2")
+            txtPrixSpecial.Text = LireDecimalRow(row, "PrixSpecial").ToString("N2")
+            txtQuantite.Text = LireDecimalRow(row, "QuantiteStock").ToString("N2")
+            txtSeuil.Text = LireDecimalRow(row, "SeuilCritique").ToString("N2")
+            txtMarge.Text = LireDecimalRow(row, "MargePourcent").ToString("N2")
+            If r.IsNull("DateExpiration") Then
+                dtpExpiration.Value = Date.Now
+            Else
+                dtpExpiration.Value = Convert.ToDateTime(row("DateExpiration"))
+            End If
+            chkVenteUnite.Checked = Convert.ToBoolean(row("VenteDetail"))
+            chkVenteDemi.Checked = Convert.ToBoolean(row("VenteDemi"))
+            chkVenteDouzaine.Checked = Convert.ToBoolean(row("VenteDouzaine"))
+            chkVenteGros.Checked = Convert.ToBoolean(row("VenteGros"))
+            chkVenteQuart.Checked = LireDecimal(txtPrixQuart.Text) > 0D
+        End Sub
+
+        Private Sub EnregistrerProduit(sender As Object, e As EventArgs)
+            Try
+                If _produitId <= 0 Then
+                    MessageBox.Show("Sélectionnez un produit existant à modifier.")
+                    Return
+                End If
+                If Not ValiderFormulaire() Then Return
+
+                Dim service As ProduitService = ObtenirService()
+                Dim produit As New Produit With {
+                    .ProduitId = _produitId,
+                    .CodeBarres = txtCodeBarres.Text.Trim(),
+                    .Libelle = txtLibelle.Text.Trim(),
+                    .PrixAchat = LireDecimal(txtPrixAchat.Text),
+                    .PrixDetail = LireDecimal(txtPrixUnite.Text),
+                    .PrixDemi = If(chkVenteDemi.Checked, LireDecimal(txtPrixDemi.Text), 0D),
+                    .PrixQuart = If(chkVenteQuart.Checked, LireDecimal(txtPrixQuart.Text), 0D),
+                    .PrixDouzaine = If(chkVenteDouzaine.Checked, LireDecimal(txtPrixDouzaine.Text), 0D),
+                    .PrixGros = If(chkVenteGros.Checked, LireDecimal(txtPrixGros.Text), 0D),
+                    .PrixSpecial = LireDecimal(txtPrixSpecial.Text),
+                    .CoefficientGros = LireDecimal(txtCoeffGros.Text),
+                    .SeuilCritique = LireDecimal(txtSeuil.Text),
+                    .DateExpiration = dtpExpiration.Value,
+                    .CategorieId = If(txtCategorieId.Text.Trim() = "", CType(Nothing, Integer?), Convert.ToInt32(txtCategorieId.Text.Trim())),
+                    .UnitePrincipale = If(cmbUnitePrincipale.Text.Trim() = "", Nothing, cmbUnitePrincipale.Text.Trim()),
+                    .UniteSecondaire = If(cmbUniteSecondaire.Text.Trim() = "", Nothing, cmbUniteSecondaire.Text.Trim()),
+                    .ConversionUnite = LireDecimal(txtConversion.Text),
+                    .EstActif = chkActif.Checked,
+                    .VenteDetail = chkVenteUnite.Checked,
+                    .VenteDemi = chkVenteDemi.Checked,
+                    .VenteDouzaine = chkVenteDouzaine.Checked,
+                    .VenteGros = chkVenteGros.Checked
+                }
+
+                service.MettreAJour(produit)
+                MessageBox.Show("Produit modifié.")
+                ChargerDonnees(sender, e)
+            Catch ex As Exception
+                MessageBox.Show("Erreur enregistrement: " & ex.Message)
+            End Try
+        End Sub
+
+        Private Sub SupprimerProduit(sender As Object, e As EventArgs)
+            Try
+                If _produitId <= 0 Then
+                    MessageBox.Show("Sélectionnez un produit.")
+                    Return
+                End If
+                Dim rep As DialogResult = MessageBox.Show("Voulez-vous supprimer ce produit ?", "Suppression", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
+                If rep <> DialogResult.Yes Then Return
+
+                Dim service As ProduitService = ObtenirService()
+                service.Supprimer(_produitId)
+                _produitId = 0
+                ChargerDonnees(sender, e)
+            Catch ex As Exception
+                MessageBox.Show("Erreur suppression: " & ex.Message)
+            End Try
+        End Sub
+
+        Private Function ValiderFormulaire() As Boolean
+            If txtLibelle.Text.Trim() = "" Then
+                MessageBox.Show("La désignation est obligatoire.")
+                Return False
+            End If
+            If cmbUnitePrincipale.Text.Trim() = "" Then
+                MessageBox.Show("L'unité principale est obligatoire.")
+                Return False
+            End If
+            Return True
+        End Function
+
+        Private Function LireDecimal(texte As String) As Decimal
+            Dim v As Decimal
+            If Decimal.TryParse(If(texte.Trim() = "", "0", texte.Trim()), v) Then Return v
+            Return 0D
+        End Function
+
+        Private Function LireDecimalRow(row As DataRowView, colonne As String) As Decimal
+            If row Is Nothing OrElse row.Row.IsNull(colonne) Then Return 0D
+            Return Convert.ToDecimal(row(colonne))
+        End Function
+
+        Private Sub MajOptionsVente(sender As Object, e As EventArgs)
+            chkVenteGros.Checked = LireDecimal(txtPrixGros.Text) > 0D
+            chkVenteUnite.Checked = LireDecimal(txtPrixUnite.Text) > 0D
+            chkVenteDemi.Checked = LireDecimal(txtPrixDemi.Text) > 0D
+            chkVenteQuart.Checked = LireDecimal(txtPrixQuart.Text) > 0D
+            chkVenteDouzaine.Checked = LireDecimal(txtPrixDouzaine.Text) > 0D
+        End Sub
+
+        Private Sub MettreAJourMarge(sender As Object, e As EventArgs)
+            Dim prixAchat As Decimal = LireDecimal(txtPrixAchat.Text)
+            Dim prixGros As Decimal = LireDecimal(txtPrixGros.Text)
+            If prixAchat > 0D AndAlso prixGros > 0D Then
+                txtMarge.Text = Math.Round(((prixGros / prixAchat) - 1D) * 100D, 2).ToString("N2")
+            Else
+                txtMarge.Text = "0,00"
+            End If
+        End Sub
+
+        Private Sub CalculerPrixAuto(sender As Object, e As EventArgs)
+            Dim prixAchat As Decimal = LireDecimal(txtPrixAchat.Text)
+            Dim coeff As Decimal = LireDecimal(txtCoeffGros.Text)
+            If prixAchat <= 0D OrElse coeff <= 0D Then Return
+
+            Dim prixGros As Decimal = prixAchat * coeff
+            Dim prixDemi As Decimal = prixGros * 0.5D
+            Dim prixQuart As Decimal = prixGros * 0.25D
+            Dim conv As Decimal = LireDecimal(txtConversion.Text)
+            Dim prixUnite As Decimal = 0D
+            Dim prixDouzaine As Decimal = 0D
+            If conv > 0D Then
+                prixUnite = prixGros / conv
+                prixDouzaine = prixUnite * 12D
+            End If
+
+            txtPrixGros.Text = prixGros.ToString("N2")
+            txtPrixDemi.Text = prixDemi.ToString("N2")
+            txtPrixQuart.Text = prixQuart.ToString("N2")
+            txtPrixUnite.Text = prixUnite.ToString("N2")
+            txtPrixDouzaine.Text = prixDouzaine.ToString("N2")
+            MajOptionsVente(Nothing, EventArgs.Empty)
+            MettreAJourMarge(Nothing, EventArgs.Empty)
+        End Sub
+
+        Private Sub RemplirComboProduitsHistorique()
+            cmbProduitHistorique.Items.Clear()
+            cmbProduitHistorique.Items.Add(New ComboProduitItem(0, "Tous les produits"))
+            If _produitsTable IsNot Nothing Then
+                For Each row As DataRow In _produitsTable.Rows
+                    cmbProduitHistorique.Items.Add(New ComboProduitItem(Convert.ToInt32(row("ProduitId")), Convert.ToString(row("Libelle"))))
+                Next
+            End If
+            cmbProduitHistorique.DisplayMember = "Libelle"
+            cmbProduitHistorique.ValueMember = "ProduitId"
+            cmbProduitHistorique.SelectedIndex = 0
+        End Sub
+
+        Private Sub RemplirComboAnnees()
+            cmbAnneeDashboard.Items.Clear()
+            For i As Integer = DateTime.Now.Year To DateTime.Now.Year - 5 Step -1
+                cmbAnneeDashboard.Items.Add(i)
+            Next
+            cmbAnneeDashboard.SelectedIndex = 0
+        End Sub
+
+        Private Sub ChargerHistoriquePrix(sender As Object, e As EventArgs)
+            Try
+                Dim service As ProduitService = ObtenirService()
+                Dim pId As Integer? = Nothing
+                If cmbProduitHistorique.SelectedItem IsNot Nothing Then
+                    Dim item As ComboProduitItem = DirectCast(cmbProduitHistorique.SelectedItem, ComboProduitItem)
+                    If item.ProduitId > 0 Then pId = item.ProduitId
+                End If
+                Dim dDu As Date? = If(chkFiltreDate.Checked, dtpHistoriqueDu.Value.Date, CType(Nothing, Date?))
+                Dim dAu As Date? = If(chkFiltreDate.Checked, dtpHistoriqueAu.Value.Date, CType(Nothing, Date?))
+                gridHistorique.DataSource = service.ListerHistoriquePrixTable(pId, dDu, dAu)
+            Catch
+            End Try
+        End Sub
+
+        Private Sub ChargerDashboard(sender As Object, e As EventArgs)
+            'Try
+            '    Dim annee As Integer = Convert.ToInt32(cmbAnneeDashboard.SelectedItem)
+            '    Dim service As ProduitService = ObtenirService()
+            '    Dim ds As DataSet = service.KpiProduits
+
+            '    ' KPI
+            '    Dim dtKpi As DataTable = ds.Tables("KPI")
+            '    If dtKpi.Rows.Count > 0 Then
+            '        Dim r As Object = dtKpi.Rows(0)
+            '        lblKpiProduitRentable.Text = Convert.ToString(r("TopProduit"))
+            '        lblKpiTotalRecettes.Text = Convert.ToDecimal(r("TotalRecettes")).ToString("N0") & " FC"
+            '        lblKpiNombreProduits.Text = Convert.ToString(r("NbProduits"))
+            '        lblKpiFaibleRotation.Text = Convert.ToString(r("FaibleRotation"))
+            '        lblKpiDormants.Text = Convert.ToString(r("Dormants"))
+            '    End If
+
+            '    ' Charts
+            '    AlimenterChart(chartTopProduits, ds.Tables("TopVentes"), "Libelle", "TotalVentes")
+            '    AlimenterChart(chartCategories, ds.Tables("ParCategorie"), "Categorie", "Nombre")
+            '    gridProduitVedette.DataSource = ds.Tables("TopVentes")
+            'Catch
+            'End Try
+
+
+            Try
+                Dim service As ProduitService = ObtenirService()
+                If cmbAnneeDashboard.Items.Count = 0 Then
+                    For annee As Integer = Date.Now.Year - 4 To Date.Now.Year
+                        cmbAnneeDashboard.Items.Add(annee.ToString())
+                    Next
+                    cmbAnneeDashboard.Text = Date.Now.Year.ToString()
+                End If
+
+                Dim anneeRef As Integer = Convert.ToInt32(cmbAnneeDashboard.Text)
+                Dim dtTop As DataTable = service.TopProduitsVendus(anneeRef)
+                Dim dtVedette As DataTable = service.ProduitPlusVenduParMois(anneeRef)
+                Dim dtCategories As DataTable = service.RepartitionParCategorie()
+                Dim dtKpi As DataTable = service.KpiProduits()
+
+                gridProduitVedette.DataSource = dtVedette
+                'StyliserGrille(gridProduitVedette)
+                AlimenterChart(chartTopProduits, dtTop, "Libelle", "QuantiteVendue")
+                AlimenterChart(chartCategories, dtCategories, "Categorie", "NombreProduits")
+
+                If dtKpi.Rows.Count > 0 Then
+                    lblKpiProduitRentable.Text = Convert.ToString(dtKpi.Rows(0)("ProduitPlusRentable"))
+                    lblKpiTotalRecettes.Text = Convert.ToDecimal(dtKpi.Rows(0)("TotalRecettes")).ToString("N2")
+                    lblKpiNombreProduits.Text = Convert.ToInt32(dtKpi.Rows(0)("NombreTotalProduits")).ToString()
+                    lblKpiFaibleRotation.Text = Convert.ToInt32(dtKpi.Rows(0)("FaibleRotation")).ToString()
+                    lblKpiDormants.Text = Convert.ToInt32(dtKpi.Rows(0)("ProduitsDormants")).ToString()
+                End If
+            Catch ex As Exception
+                MessageBox.Show("Erreur dashboard produit: " & ex.Message)
+            End Try
+        End Sub
+
+        Private Sub AlimenterChart(chart As Chart, dt As DataTable, colX As String, colY As String)
+            chart.Series(0).Points.Clear()
+            For Each row As DataRow In dt.Rows
+                chart.Series(0).Points.AddXY(Convert.ToString(row(colX)), Convert.ToDecimal(row(colY)))
+            Next
+        End Sub
+
+        Private Sub ImprimerListeProduits(sender As Object, e As EventArgs)
+            If _produitsView Is Nothing Then
+                Return
+            End If
+            Dim dtPrint As DataTable = _produitsView.ToTable()
+            ImprimerTableau("Liste des produits", dtPrint, New String() {"Libelle", "CodeBarres", "QuantiteStock", "PrixAchat", "PrixGros", "PrixDetail", "PrixDemi", "PrixDouzaine", "PrixQuart", "MargePourcent"})
+        End Sub
+
+        Private Sub ImprimerHistoriquePrix(sender As Object, e As EventArgs)
+            If _historiqueTable Is Nothing Then
+                Return
+            End If
+            ImprimerTableau("Historique des prix", _historiqueTable, New String() {"Produit", "TypePrix", "AncienPrix", "NouveauPrix", "ModifieLe", "Utilisateur"})
+        End Sub
+
+
+        Private Sub ImprimerTableau(titre As String, table As DataTable, colonnes As String())
+            Try
+                Dim dal As New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)
+                Dim param As ParametreDTO = (New ParametreService(New ParametreRepository(dal))).Charger()
+                Dim doc As New PrintDocument()
+                If param IsNot Nothing AndAlso param.ImprimanteA4 <> "" Then
+                    doc.PrinterSettings.PrinterName = param.ImprimanteA4
+                End If
+                doc.DefaultPageSettings.Color = If(param IsNot Nothing, param.ImpressionCouleur, True)
+
+                AddHandler doc.PrintPage,
+                    Sub(s As Object, pe As PrintPageEventArgs)
+                        Dim y As Integer = 30
+                        If param IsNot Nothing AndAlso param.LogoPath <> "" AndAlso File.Exists(param.LogoPath) Then
+                            Using img As Image = Image.FromFile(param.LogoPath)
+                                pe.Graphics.DrawImage(img, 30, y, 60, 60)
+                            End Using
+                        End If
+                        pe.Graphics.DrawString(If(param IsNot Nothing, param.NomMagasin, "Paons Rehoboth"), New Font("Segoe UI", 15, FontStyle.Bold), Brushes.Black, 105, y)
+                        y += 24
+                        pe.Graphics.DrawString(If(param IsNot Nothing, param.AdresseMagasin, ""), New Font("Segoe UI", 9), Brushes.Black, 105, y)
+                        y += 18
+                        pe.Graphics.DrawString(If(param IsNot Nothing, param.TelephoneMagasin, ""), New Font("Segoe UI", 9), Brushes.Black, 105, y)
+                        y += 34
+                        pe.Graphics.DrawString(titre, New Font("Segoe UI", 12, FontStyle.Bold), Brushes.Black, 30, y)
+                        y += 28
+
+                        Dim x As Integer = 30
+                        For Each col As String In colonnes
+                            pe.Graphics.DrawString(col, New Font("Segoe UI", 9, FontStyle.Bold), Brushes.Black, x, y)
+                            x += 120
+                        Next
+                        y += 22
+
+                        For Each row As DataRow In table.Rows
+                            x = 30
+                            For Each col As String In colonnes
+                                pe.Graphics.DrawString(Convert.ToString(row(col)), New Font("Segoe UI", 8.5F), Brushes.Black, x, y)
+                                x += 120
+                            Next
+                            y += 20
+                            If y > 1020 Then
+                                Exit For
+                            End If
+                        Next
+                    End Sub
+
+                If param IsNot Nothing AndAlso param.ApercuAvantImpression Then
+                    Dim preview As New PrintPreviewDialog() With {.Document = doc, .Width = 1000, .Height = 700}
+                    preview.ShowDialog(Me)
+                Else
+                    doc.Print()
+                End If
+            Catch ex As Exception
+                MessageBox.Show("Erreur impression: " & ex.Message)
+            End Try
+        End Sub
+        ' Classes internes pour les combos
+        Private Class ComboProduitItem
+            Public Property ProduitId As Integer
+            Public Property Libelle As String
+            Public Sub New(id As Integer, libel As String)
+                ProduitId = id : Libelle = libel
+            End Sub
+        End Class
+    End Class
+End Namespace

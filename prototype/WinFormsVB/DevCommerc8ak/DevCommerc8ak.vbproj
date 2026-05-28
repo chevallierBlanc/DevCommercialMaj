@@ -1,0 +1,221 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{01FA93F5-A8F7-402A-B5DB-6C9EBB9E1891}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>DevCommerc8ak</RootNamespace>
+    <AssemblyName>DevCommerc8ak</AssemblyName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <StartupObject>DevCommerc8ak.DevCommerc8ak.Program</StartupObject>
+    <MyType>WindowsForms</MyType>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <DefineDebug>true</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <OutputPath>bin\Debug\</OutputPath>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <DefineDebug>false</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Guna.UI2">
+      <HintPath>C:\Users\Ntanta\Downloads\_Getintopc.com_Guna_UI_Framework_Ultimate_v2.0.0.1\Guna_UI_Framework_Ultimate_v2.0.0.1\Guna_UI_Framework_Ultimate_v2.0.0.1\Guna.UI-Framework-Lib-master\Guna.UI2 WinForms\.net 4.0\Guna.UI2.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Windows.Forms.DataVisualization" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="DTOs\FinanceDTOs.vb" />
+    <Compile Include="Program.vb" />
+    <Compile Include="DAL\DAL.vb" />
+    <Compile Include="Entities\Client.vb" />
+    <Compile Include="Entities\Produit.vb" />
+    <Compile Include="Entities\Fournisseur.vb" />
+    <Compile Include="Entities\FactureVente.vb" />
+    <Compile Include="Entities\LigneFactureVente.vb" />
+    <Compile Include="Entities\Paiement.vb" />
+    <Compile Include="Entities\MouvementStock.vb" />
+    <Compile Include="Entities\StockEntree.vb" />
+    <Compile Include="Entities\StockSortie.vb" />
+    <Compile Include="Entities\StockPerte.vb" />
+    <Compile Include="Entities\StockInventaire.vb" />
+    <Compile Include="Entities\Depense.vb" />
+    <Compile Include="Entities\Utilisateur.vb" />
+    <Compile Include="Entities\Role.vb" />
+    <Compile Include="Entities\Parametre.vb" />
+    <Compile Include="Entities\BonApprovisionnement.vb" />
+    <Compile Include="Entities\BonApprovisionnementLigne.vb" />
+    <Compile Include="DTOs\ClientDTO.vb" />
+    <Compile Include="DTOs\ProduitDTO.vb" />
+    <Compile Include="DTOs\FournisseurDTO.vb" />
+    <Compile Include="DTOs\FactureVenteDTO.vb" />
+    <Compile Include="DTOs\LigneFactureVenteDTO.vb" />
+    <Compile Include="DTOs\PaiementDTO.vb" />
+    <Compile Include="DTOs\MouvementStockDTO.vb" />
+    <Compile Include="DTOs\UtilisateurDTO.vb" />
+    <Compile Include="DTOs\ApiDashboardDTOs.vb" />
+    <Compile Include="DTOs\ParametreDTO.vb" />
+    <Compile Include="DTOs\BonApprovisionnementDTO.vb" />
+    <Compile Include="DTOs\TypeVenteDTO.vb" />
+    <Compile Include="DTOs\NotificationDTO.vb" />
+    <Compile Include="Repositories\ClientRepository.vb" />
+    <Compile Include="Repositories\FinanceRepositories %284%29.vb" />
+    <Compile Include="Repositories\ProduitRepository.vb" />
+    <Compile Include="Repositories\FournisseurRepository.vb" />
+    <Compile Include="Repositories\FactureVenteRepository.vb" />
+    <Compile Include="Repositories\LigneFactureVenteRepository.vb" />
+    <Compile Include="Repositories\PaiementRepository.vb" />
+    <Compile Include="Repositories\MouvementStockRepository.vb" />
+    <Compile Include="Repositories\StockEntreeRepository.vb" />
+    <Compile Include="Repositories\StockSortieRepository.vb" />
+    <Compile Include="Repositories\StockPerteRepository.vb" />
+    <Compile Include="Repositories\StockInventaireRepository.vb" />
+    <Compile Include="Repositories\UtilisateurRepository.vb" />
+    <Compile Include="Repositories\RoleRepository.vb" />
+    <Compile Include="Repositories\ParametreRepository.vb" />
+    <Compile Include="Repositories\BonApprovisionnementRepository.vb" />
+    <Compile Include="Repositories\NotificationRepository.vb" />
+    <Compile Include="Repositories\SessionRepository.vb" />
+    <Compile Include="Repositories\DepenseRepository.vb" />
+    <Compile Include="Repositories\StockSortieNonSynchroniseRepository.vb" />
+    <Compile Include="Repositories\DepensesNonSynchroniseesRepository.vb" />
+    <Compile Include="Services\ClientService.vb" />
+    <Compile Include="Services\FinanceServices %284%29.vb" />
+    <Compile Include="Services\ProduitService.vb" />
+    <Compile Include="Services\FournisseurService.vb" />
+    <Compile Include="Services\FacturationService.vb" />
+    <Compile Include="Services\StockService.vb" />
+    <Compile Include="Services\ThemeHelper.vb" />
+    <Compile Include="Services\UtilisateurService.vb" />
+    <Compile Include="Services\ParametreService.vb" />
+    <Compile Include="Services\RapportService.vb" />
+    <Compile Include="Services\ScannerMobileService.vb" />
+    <Compile Include="Services\SessionUtilisateur.vb" />
+    <Compile Include="Services\ThemeHelperA.vb" />
+    <Compile Include="Services\ApprovisionnementService.vb" />
+    <Compile Include="Services\PdfHelper.vb" />
+    <Compile Include="Services\FormatageGlobal.vb" />
+    <Compile Include="Services\SyncLogService.vb" />
+    <Compile Include="Services\RemoteApiSession.vb" />
+    <Compile Include="Services\DashboardApiClient.vb" />
+    <Compile Include="Services\OfflineSyncService.vb" />
+    <Compile Include="Services\OfflineSyncScheduler.vb" />
+    <Compile Include="Services\DepenseService.vb" />
+    <Compile Include="Services\VenteService.vb" />
+    <Compile Include="Services\TypeVenteService.vb" />
+    <Compile Include="Services\NotificationService.vb" />
+    <Compile Include="Services\IconsHelper.vb" />
+    <Compile Include="UI\FormulaireAnalyseVente .vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireClients.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireFinance %286%29.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireFinance .vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireNotificationsA.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireProduits.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireFournisseurs.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireFactures.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulairePaiements.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireParametres.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireRapports.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireStock_Final_FIXED.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireDashboardCloud.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireConsultationDashboard.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireUtilisateurs.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireDashboard.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireVente .vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\NotificationPopup.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireNotifications.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireApprovisionnement.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\NotificationPopupB.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\SplashForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\LoginForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\MainForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FacturationForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\CaisseForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\AdminForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="My Project\AssemblyInfo.vb" />
+    <Compile Include="My Project\Resources.Designer.vb" />
+    <Compile Include="My Project\Settings.Designer.vb" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="My Project\Resources.resx" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="My Project\App.config" />
+    <None Include="My Project\Settings.settings" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
+</Project>
