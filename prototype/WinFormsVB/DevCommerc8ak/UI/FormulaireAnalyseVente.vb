@@ -51,6 +51,7 @@ Namespace DevCommerc8ak
 
         Private ReadOnly gridDetailVentes As DataGridView
         Private ReadOnly panelEvaluationCard As Panel
+        Private ReadOnly panelBeneficeNetCard As Panel
         Private ReadOnly lblEvaluationValue As Label
 
         Private ReadOnly timerAnimation As Timer
@@ -73,6 +74,8 @@ Namespace DevCommerc8ak
         Private _cibleCoutStockRestant As Decimal
         Private _cibleProjectionBeneficeRestant As Decimal
         Private _cibleMargeBeneficiairePourcentage As Decimal
+        Private _cibleDepensesTotal As Decimal
+        Private _cibleChargesSortiesSansRecette As Decimal
 
         Private _courantValeurStockEntree As Decimal
         Private _courantCoutMarchandisesVendues As Decimal
@@ -82,6 +85,8 @@ Namespace DevCommerc8ak
         Private _courantCoutStockRestant As Decimal
         Private _courantProjectionBeneficeRestant As Decimal
         Private _courantMargeBeneficiairePourcentage As Decimal
+        Private _dateAnalyseDebut As Date
+        Private _dateAnalyseFin As Date
 
         Public Sub New()
             Me.Text = "Analyse ventes"
@@ -243,7 +248,9 @@ Namespace DevCommerc8ak
             tableKpi.Controls.Add(CreerCarteKpi("Coût stock restant", ColorWarning, lblCoutStockRestant), 1, 1)
             tableKpi.Controls.Add(CreerCarteKpi("Projection bénéfice restant", ColorPrimary, lblProjectionBeneficeRestant), 2, 1)
             tableKpi.Controls.Add(CreerCarteKpi("Marge bénéficiaire", ColorAccent, lblMargeBeneficiairePourcentage), 0, 2)
-            tableKpi.Controls.Add(CreerCarteKpi("Bénéfice net réalisé", ColorNetBenefit, lblBeneficeNetRealise), 1, 2)
+            panelBeneficeNetCard = CreerCarteKpi("Bénéfice net réalisé", ColorNetBenefit, lblBeneficeNetRealise)
+            RendreCarteCliquable(panelBeneficeNetCard)
+            tableKpi.Controls.Add(panelBeneficeNetCard, 1, 2)
             panelEvaluationCard = CreerCarteTexte("Évaluation", Color.FromArgb(76, 175, 80), lblEvaluationValue)
             tableKpi.Controls.Add(panelEvaluationCard, 2, 2)
 
@@ -336,6 +343,8 @@ Namespace DevCommerc8ak
                 Dim debut As Date
                 Dim finInclusive As Date
                 CalculerPeriode(debut, finInclusive)
+                _dateAnalyseDebut = debut.Date
+                _dateAnalyseFin = finInclusive.Date
 
                 Dim dtResume As DataTable = rapportService.AnalyseVente(debut, finInclusive)
                 Dim row As DataRow = Nothing
@@ -370,6 +379,8 @@ Namespace DevCommerc8ak
             _cibleCoutStockRestant = LireDecimal(row, "CoutStockRestant")
             _cibleProjectionBeneficeRestant = LireDecimal(row, "ProjectionBeneficeRestant")
             _cibleMargeBeneficiairePourcentage = LireDecimal(row, "MargeBeneficiairePourcentage")
+            _cibleDepensesTotal = LireDecimal(row, "DepensesTotal")
+            _cibleChargesSortiesSansRecette = LireDecimal(row, "ChargesSortiesSansRecette")
 
             Dim evaluation As String = LireTexte(row, "Evaluation")
             lblEvaluationValue.Text = If(String.IsNullOrWhiteSpace(evaluation), "-", evaluation)
@@ -385,6 +396,35 @@ Namespace DevCommerc8ak
             _courantMargeBeneficiairePourcentage = 0D
 
             timerAnimation.Start()
+        End Sub
+
+        Private Sub RendreCarteCliquable(card As Control)
+            If card Is Nothing Then
+                Return
+            End If
+
+            card.Cursor = Cursors.Hand
+            AddHandler card.Click, AddressOf OuvrirDetailsBeneficeNet
+
+            For Each ctrl As Control In card.Controls
+                ctrl.Cursor = Cursors.Hand
+                AddHandler ctrl.Click, AddressOf OuvrirDetailsBeneficeNet
+            Next
+        End Sub
+
+        Private Sub OuvrirDetailsBeneficeNet(sender As Object, e As EventArgs)
+            Try
+                If _dateAnalyseDebut = Date.MinValue OrElse _dateAnalyseFin = Date.MinValue Then
+                    Return
+                End If
+
+                Dim dtDetails As DataTable = rapportService.BeneficeNetDetails(_dateAnalyseDebut, _dateAnalyseFin)
+                Using frm As New FormulaireBeneficeNetDetails(_dateAnalyseDebut, _dateAnalyseFin, dtDetails, _cibleBeneficesRealise, _cibleDepensesTotal, _cibleChargesSortiesSansRecette, _cibleBeneficeNetRealise)
+                    frm.ShowDialog(Me)
+                End Using
+            Catch ex As Exception
+                MessageBox.Show("Impossible d'ouvrir le détail du bénéfice net : " & ex.Message, "Analyse ventes", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
         End Sub
 
         Private Sub TimerAnimation_Tick(sender As Object, e As EventArgs)
