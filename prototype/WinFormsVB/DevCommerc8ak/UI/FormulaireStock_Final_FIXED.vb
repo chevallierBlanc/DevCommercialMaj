@@ -545,17 +545,19 @@ Namespace DevCommerc8ak
             tabInventaire.Controls.Add(layoutInventaire)
 
             ' Saisie Inventaire
-            Dim cardSaisieInv As Panel = CreateCard(600, 330, "SAISIE INVENTAIRE")
+            Dim cardSaisieInv As Panel = CreateCard(600, 360, "SAISIE INVENTAIRE")
             cmbProduitInventaire = New ComboBox() With {.Left = 120, .Top = 45, .Width = 250, .DropDownStyle = ComboBoxStyle.DropDownList}
             txtStockTheorique = New TextBox() With {.Left = 120, .Top = 75, .Width = 100, .ReadOnly = True}
             txtStockReel = New TextBox() With {.Left = 120, .Top = 105, .Width = 100}
             txtEcart = New TextBox() With {.Left = 300, .Top = 105, .Width = 100, .ReadOnly = True}
-            btnValiderInventaire = New Button() With {.Text = "Valider Inventaire", .Left = 240, .Top = 140, .Width = 162, .Height = 40, .BackColor = ColorAccent, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            txtObservationInventaire = New TextBox() With {.Left = 120, .Top = 150, .Width = 280, .Height = 60, .Multiline = True, .ScrollBars = ScrollBars.Vertical}
+            btnValiderInventaire = New Button() With {.Text = "Valider Inventaire", .Left = 240, .Top = 225, .Width = 180, .Height = 44, .BackColor = ColorAccent, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             cardSaisieInv.Controls.AddRange(New Control() {
                 New Label() With {.Text = "Produit:", .Left = 20, .Top = 48, .AutoSize = True}, cmbProduitInventaire,
                 New Label() With {.Text = "Théorique:", .Left = 20, .Top = 78, .AutoSize = True}, txtStockTheorique,
                 New Label() With {.Text = "Réel:", .Left = 20, .Top = 108, .AutoSize = True}, txtStockReel,
                 New Label() With {.Text = "Ecart:", .Left = 240, .Top = 108, .AutoSize = True}, txtEcart,
+                New Label() With {.Text = "Observation:", .Left = 20, .Top = 154, .AutoSize = True}, txtObservationInventaire,
                 btnValiderInventaire
             })
             layoutInventaire.Controls.Add(cardSaisieInv, 0, 0)
@@ -2106,7 +2108,11 @@ Namespace DevCommerc8ak
                 Dim produitId As Integer = Convert.ToInt32(cmbProduitInventaire.SelectedValue)
                 Dim qte As Decimal = LireDecimal(txtStockReel.Text)
                 Dim service As StockService = ObtenirStockService()
-                service.AjusterInventaire(produitId, qte, "base", "INV", txtObservationInventaire.Text.Trim(), SessionUtilisateur.UtilisateurId)
+                Dim observation As String = ""
+                If txtObservationInventaire IsNot Nothing AndAlso txtObservationInventaire.Text IsNot Nothing Then
+                    observation = txtObservationInventaire.Text.Trim()
+                End If
+                service.AjusterInventaire(produitId, qte, "base", "INV", observation, SessionUtilisateur.UtilisateurId)
                 MessageBox.Show("Inventaire enregistré.")
                 ChargerInventaire(Nothing, EventArgs.Empty)
             Catch ex As Exception

@@ -159,10 +159,10 @@ Namespace DevCommerc8ak
             dt.Columns.Add("Montant", GetType(Decimal))
             dt.Columns.Add("Commentaire", GetType(String))
 
-            Dim resume As DataTable = AnalyseVente(dateDebut, dateFin)
+            Dim resumeAnalyse As DataTable = AnalyseVente(dateDebut, dateFin)
             Dim row As DataRow = Nothing
-            If resume IsNot Nothing AndAlso resume.Rows.Count > 0 Then
-                row = resume.Rows(0)
+            If resumeAnalyse IsNot Nothing AndAlso resumeAnalyse.Rows.Count > 0 Then
+                row = resumeAnalyse.Rows(0)
             End If
 
             Dim beneficeRealise As Decimal = LireDecimal(row, "BeneficeRealise")
@@ -258,7 +258,11 @@ Namespace DevCommerc8ak
                 ") q " &
                 "GROUP BY Categorie " &
                 "ORDER BY SUM(Montant) DESC, Categorie ASC"
-            Dim dtCharges As DataTable = _dal.ExecuterTable(sqlCharges, CommandType.Text, pDepenses)
+            Dim pCharges As New List(Of SqlParameter) From {
+                New SqlParameter("@DateDebut", dateDebut.Date),
+                New SqlParameter("@DateFin", dateFin.Date)
+            }
+            Dim dtCharges As DataTable = _dal.ExecuterTable(sqlCharges, CommandType.Text, pCharges)
             For Each charge As DataRow In dtCharges.Rows
                 AjouterLigneBeneficeNet(dt, 20, "Charges", Convert.ToString(charge("Categorie")), Convert.ToDecimal(charge("QuantitePieces")), Convert.ToDecimal(charge("MontantTotal")), "Charge consommant du stock ou sans recette")
             Next

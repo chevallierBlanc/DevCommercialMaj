@@ -255,7 +255,7 @@ Namespace DevCommerc8ak
         Private Sub InitOngletDepenses()
             tpDepenses.BackColor = ColorBg
             Dim mainLayoutDepenses As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 1, .Padding = New Padding(24), .BackColor = ColorBg}
-            mainLayoutDepenses.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 400))
+            mainLayoutDepenses.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 470))
             mainLayoutDepenses.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
 
             ' Formulaire de saisie (Carte)
@@ -266,7 +266,7 @@ Namespace DevCommerc8ak
             Dim layoutSaisie As New TableLayoutPanel() With {
                 .Dock = DockStyle.Fill,
                 .ColumnCount = 1,
-                .RowCount = 10,
+                .RowCount = 11,
                 .Padding = New Padding(0)
             }
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 35)) ' Titre
@@ -278,7 +278,7 @@ Namespace DevCommerc8ak
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 35)) ' FlowLayout Devise/Source/Type
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Label Description
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 70)) ' TextBox Description
-            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 40)) ' Bouton Valider
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 48)) ' Bouton Valider
             layoutSaisie.BackColor = Color.Transparent
 
             Dim lblSaisieTitle As New Label() With {.Text = "Nouvelle Dépense", .Font = FontTitle, .ForeColor = ColorPrimary, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
@@ -312,7 +312,7 @@ Namespace DevCommerc8ak
             layoutSaisie.Controls.Add(CreateLabel("Description"), 0, 6)
             txtDescriptionDepense = CreateStyledTextBox("Description...")
             txtDescriptionDepense.Multiline = True
-            txtDescriptionDepense.Height = 60 ' Ajuster la hauteur pour une meilleure visibilité
+            txtDescriptionDepense.Height = 74 ' Ajuster la hauteur pour une meilleure visibilité
             layoutSaisie.Controls.Add(txtDescriptionDepense, 0, 7)
 
             layoutSaisie.Controls.Add(CreateLabel("Date"), 0, 8)
@@ -320,6 +320,7 @@ Namespace DevCommerc8ak
             layoutSaisie.Controls.Add(dtpDateDepense, 0, 9)
 
             btnValiderDepense = CreateStyledButton("Valider la dépense", ColorDanger)
+            btnValiderDepense.Height = 44
             layoutSaisie.Controls.Add(btnValiderDepense, 0, 10)
 
             pnlSaisie.Controls.Add(layoutSaisie)
@@ -792,6 +793,7 @@ Namespace DevCommerc8ak
 
         Private Function CreerGrille() As DataGridView
             Dim dgv As New DataGridView() With {
+                .Dock = DockStyle.Fill,
                 .BackgroundColor = ColorCardBg,
                 .BorderStyle = BorderStyle.None,
                 .AllowUserToAddRows = False,
