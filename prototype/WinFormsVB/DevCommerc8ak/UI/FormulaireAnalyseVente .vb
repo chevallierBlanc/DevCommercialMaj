@@ -555,17 +555,25 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub OuvrirDetailsBeneficeNet(sender As Object, e As EventArgs)
+            Me.UseWaitCursor = True
             Try
                 If _dateAnalyseDebut = Date.MinValue OrElse _dateAnalyseFin = Date.MinValue Then
                     Return
                 End If
 
                 Dim dtDetails As DataTable = rapportService.BeneficeNetDetails(_dateAnalyseDebut, _dateAnalyseFin)
+                If dtDetails Is Nothing OrElse dtDetails.Rows.Count = 0 Then
+                    MessageBox.Show("Aucun détail de bénéfice net disponible pour cette période.", "Analyse ventes", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    Return
+                End If
+
                 Using frm As New FormulaireBeneficeNetDetails(_dateAnalyseDebut, _dateAnalyseFin, dtDetails, _cibleBeneficesRealise, _cibleDepensesTotal, _cibleChargesSortiesManuelles, _cibleBeneficeNetRealise)
                     frm.ShowDialog(Me)
                 End Using
             Catch ex As Exception
                 MessageBox.Show("Impossible d'ouvrir le détail du bénéfice net : " & ex.Message, "Analyse ventes", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Finally
+                Me.UseWaitCursor = False
             End Try
         End Sub
 

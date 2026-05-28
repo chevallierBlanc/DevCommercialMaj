@@ -108,6 +108,15 @@ Namespace DevCommerc8ak
                 .Padding = New Padding(18, 2, 18, 0)
             }
 
+            Dim lblFormule As New Label() With {
+                .Dock = DockStyle.Top,
+                .Height = 24,
+                .Text = "Formule: Bénéfice net = Bénéfice réalisé - Dépenses - Charges sans recette",
+                .ForeColor = Color.FromArgb(120, 120, 120),
+                .Font = New Font("Segoe UI", 9.0F, FontStyle.Regular),
+                .Padding = New Padding(18, 0, 18, 4)
+            }
+
             gridDetails = New DataGridView() With {
                 .Dock = DockStyle.Fill,
                 .ReadOnly = True,
@@ -132,6 +141,7 @@ Namespace DevCommerc8ak
 
             Me.Controls.Add(gridDetails)
             Me.Controls.Add(lblNote)
+            Me.Controls.Add(lblFormule)
             Me.Controls.Add(pnlSynthese)
             Me.Controls.Add(header)
 
@@ -141,6 +151,7 @@ Namespace DevCommerc8ak
         Private Sub FormulaireBeneficeNetDetails_Load(sender As Object, e As EventArgs)
             gridDetails.DataSource = _details
             ConfigurerGrille()
+            AppliquerStyleLignes()
         End Sub
 
         Private Sub ConfigurerGrille()
@@ -173,6 +184,24 @@ Namespace DevCommerc8ak
                 col.DefaultCellStyle.Format = format
                 col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
             End If
+        End Sub
+
+        Private Sub AppliquerStyleLignes()
+            For Each row As DataGridViewRow In gridDetails.Rows
+                If row.IsNewRow Then
+                    Continue For
+                End If
+
+                Dim ordre As Integer = 0
+                If gridDetails.Columns.Contains("Ordre") AndAlso row.Cells("Ordre").Value IsNot Nothing Then
+                    Integer.TryParse(Convert.ToString(row.Cells("Ordre").Value), ordre)
+                End If
+
+                If ordre = 0 OrElse ordre = 1 OrElse ordre = 2 OrElse ordre = 99 Then
+                    row.DefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F, FontStyle.Bold)
+                    row.DefaultCellStyle.BackColor = If(ordre = 99, Color.FromArgb(232, 245, 233), Color.FromArgb(250, 250, 250))
+                End If
+            Next
         End Sub
 
         Private Function CreerCarteSynthese(titre As String, couleur As Color, valeur As String) As Panel
