@@ -553,7 +553,7 @@ Namespace DevCommerc8ak
                 '    depenses = _depenseService.ObtenirDepensesParMois(annee, mois)
                 'End If
 
-                gridHistoriqueDepenses.DataSource = _depenseService.GetHistorique()
+                gridHistoriqueDepenses.DataSource = _depenseService.GetHistorique(annee, mois)
                 ConfigurerGrilleDepenses()
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement historique dépenses: " & ex.Message)
@@ -772,7 +772,7 @@ Namespace DevCommerc8ak
             btn.FlatAppearance.BorderSize = 0
             'btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(backColor.R - 20, backColor.G - 20, backColor.B - 20)
             'btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(backColor.R + 20, backColor.G + 20, backColor.B + 20)
-            'Return btn
+            Return btn
         End Function
 
         Private Function CreateLabel(text As String, Optional margin As Padding = Nothing) As Label
@@ -945,7 +945,7 @@ Namespace DevCommerc8ak
                 Dim annee As Integer = Convert.ToInt32(cmbAnneeRapport.SelectedItem)
                 Dim mois As Integer = cmbMoisRapport.SelectedIndex ' 0 = Toute l'année, 1 = Janvier...
 
-                dtRapportAImprimer = _depenseService.GetRapportDepenses(annee, mois)
+                dtRapportAImprimer = _depenseService.GetHistorique(annee, mois)
 
                 If mois = 0 Then
                     titreRapport = "RAPPORT ANNUEL DES DÉPENSES - " & annee.ToString()

@@ -92,8 +92,15 @@ Namespace DevCommerc8ak
                 "      AND DateDepense < DATEADD(DAY, 1, @DateFin)" &
                 "), SortiesManuelles AS" &
                 "(" &
-                "    SELECT ISNULL(SUM(ISNULL(ss.MontantLigne, 0)), 0) AS TotalChargesManuelles " &
+                "    SELECT ISNULL(SUM(ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0)), 0) AS TotalChargesManuelles " &
                 "    FROM StockSortie ss " &
+                "    LEFT JOIN (" &
+                "        SELECT se.ProduitId, " &
+                "               SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) AS CoutPiece " &
+                "        FROM StockEntree se " &
+                "        WHERE se.DateEntree < DATEADD(DAY, 1, @DateFin) " &
+                "        GROUP BY se.ProduitId" &
+                "    ) cp ON cp.ProduitId = ss.ProduitId " &
                 "    WHERE ss.DateSortie >= @DateDebut " &
                 "      AND ss.DateSortie < DATEADD(DAY, 1, @DateFin) " &
                 "      AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL')" &
@@ -141,6 +148,134 @@ Namespace DevCommerc8ak
                 New SqlParameter("@DateFin", dateFin.Date)
             }
             Return _dal.ExecuterTable(sql, CommandType.Text, p)
+        End Function
+
+        Public Function BeneficeNetDetails(dateDebut As Date, dateFin As Date) As DataTable
+            Dim dt As New DataTable()
+            dt.Columns.Add("Ordre", GetType(Integer))
+            dt.Columns.Add("Rubrique", GetType(String))
+            dt.Columns.Add("Categorie", GetType(String))
+            dt.Columns.Add("QuantitePieces", GetType(Decimal))
+            dt.Columns.Add("Montant", GetType(Decimal))
+            dt.Columns.Add("Commentaire", GetType(String))
+
+            Dim resume As DataTable = AnalyseVente(dateDebut, dateFin)
+            Dim row As DataRow = Nothing
+            If resume IsNot Nothing AndAlso resume.Rows.Count > 0 Then
+                row = resume.Rows(0)
+            End If
+
+            Dim beneficeRealise As Decimal = LireDecimal(row, "BeneficeRealise")
+            Dim depensesTotal As Decimal = LireDecimal(row, "DepensesTotal")
+            Dim chargesManuelles As Decimal = LireDecimal(row, "ChargesSortiesManuelles")
+            Dim beneficeNet As Decimal = LireDecimal(row, "BeneficeNetRealise")
+
+            AjouterLigneBeneficeNet(dt, 0, "Synthèse", "Bénéfice réalisé", 0D, beneficeRealise, "Résultat commercial avant charges")
+            AjouterLigneBeneficeNet(dt, 1, "Synthèse", "Dépenses", 0D, depensesTotal, "Dépenses de la période")
+            AjouterLigneBeneficeNet(dt, 2, "Synthèse", "Sorties manuelles", 0D, chargesManuelles, "Sorties valorisées au coût réel")
+
+            Dim sqlDepenses As String = "" &
+                "SELECT ISNULL(NULLIF(LTRIM(RTRIM(d.Categorie)), ''), 'Sans catégorie') AS Categorie, " &
+                "       COUNT(*) AS NombreDepenses, " &
+                "       SUM(ISNULL(d.Montant, 0)) AS MontantTotal " &
+                "FROM Depenses d " &
+                "WHERE d.DateDepense >= @DateDebut " &
+                "  AND d.DateDepense < DATEADD(DAY, 1, @DateFin) " &
+                "GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(d.Categorie)), ''), 'Sans catégorie') " &
+                "ORDER BY SUM(ISNULL(d.Montant, 0)) DESC, Categorie ASC"
+            Dim pDepenses As New List(Of SqlParameter) From {
+                New SqlParameter("@DateDebut", dateDebut.Date),
+                New SqlParameter("@DateFin", dateFin.Date)
+            }
+            Dim dtDepenses As DataTable = _dal.ExecuterTable(sqlDepenses, CommandType.Text, pDepenses)
+            For Each dep As DataRow In dtDepenses.Rows
+                AjouterLigneBeneficeNet(dt, 10, "Dépenses", Convert.ToString(dep("Categorie")), 0D, Convert.ToDecimal(dep("MontantTotal")), Convert.ToString(dep("NombreDepenses")) & " dépense(s)")
+            Next
+
+            Dim sqlCharges As String = "" &
+                "WITH CoutPieceProduit AS (" &
+                "    SELECT se.ProduitId, " &
+                "           SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) AS CoutPiece " &
+                "    FROM StockEntree se " &
+                "    WHERE se.DateEntree < DATEADD(DAY, 1, @DateFin) " &
+                "    GROUP BY se.ProduitId" &
+                ") " &
+                "SELECT Categorie, SUM(Pieces) AS QuantitePieces, SUM(Montant) AS MontantTotal " &
+                "FROM (" &
+                "    SELECT 'Sorties gratuites' AS Categorie, ISNULL(ss.QuantiteBase, 0) AS Pieces, ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0) AS Montant " &
+                "    FROM StockSortie ss " &
+                "    LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = ss.ProduitId " &
+                "    WHERE ss.DateSortie >= @DateDebut AND ss.DateSortie < DATEADD(DAY, 1, @DateFin) " &
+                "      AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL') " &
+                "      AND UPPER(ISNULL(ss.StatutPaiement, '')) = 'GRATUIT' " &
+                "    UNION ALL " &
+                "    SELECT 'Dons' AS Categorie, ISNULL(ss.QuantiteBase, 0) AS Pieces, ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0) AS Montant " &
+                "    FROM StockSortie ss " &
+                "    LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId " &
+                "    LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = ss.ProduitId " &
+                "    WHERE ss.DateSortie >= @DateDebut AND ss.DateSortie < DATEADD(DAY, 1, @DateFin) " &
+                "      AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL') " &
+                "      AND (UPPER(ISNULL(m.Nature, '')) LIKE '%DON%' OR UPPER(ISNULL(m.Libelle, '')) LIKE '%DON%') " &
+                "    UNION ALL " &
+                "    SELECT 'Allocations' AS Categorie, ISNULL(ss.QuantiteBase, 0) AS Pieces, ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0) AS Montant " &
+                "    FROM StockSortie ss " &
+                "    LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId " &
+                "    LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = ss.ProduitId " &
+                "    WHERE ss.DateSortie >= @DateDebut AND ss.DateSortie < DATEADD(DAY, 1, @DateFin) " &
+                "      AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL') " &
+                "      AND (UPPER(ISNULL(m.Nature, '')) LIKE '%ALLOC%' OR UPPER(ISNULL(m.Libelle, '')) LIKE '%ALLOC%') " &
+                "    UNION ALL " &
+                "    SELECT 'Dettes clients' AS Categorie, ISNULL(ss.QuantiteBase, 0) AS Pieces, ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0) AS Montant " &
+                "    FROM StockSortie ss " &
+                "    LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId " &
+                "    LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = ss.ProduitId " &
+                "    WHERE ss.DateSortie >= @DateDebut AND ss.DateSortie < DATEADD(DAY, 1, @DateFin) " &
+                "      AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL') " &
+                "      AND (UPPER(ISNULL(m.Nature, '')) LIKE '%DETTE%' OR UPPER(ISNULL(m.Libelle, '')) LIKE '%DETTE%') " &
+                "      AND (UPPER(ISNULL(m.Libelle, '')) LIKE '%CLIENT%' OR (UPPER(ISNULL(ss.StatutPaiement, '')) = 'IMPAYE' AND ss.ClientId IS NOT NULL)) " &
+                "    UNION ALL " &
+                "    SELECT 'Dettes boss' AS Categorie, ISNULL(ss.QuantiteBase, 0) AS Pieces, ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0) AS Montant " &
+                "    FROM StockSortie ss " &
+                "    LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId " &
+                "    LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = ss.ProduitId " &
+                "    WHERE ss.DateSortie >= @DateDebut AND ss.DateSortie < DATEADD(DAY, 1, @DateFin) " &
+                "      AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL') " &
+                "      AND (UPPER(ISNULL(m.Nature, '')) LIKE '%DETTE%' OR UPPER(ISNULL(m.Libelle, '')) LIKE '%DETTE%') " &
+                "      AND (UPPER(ISNULL(m.Libelle, '')) LIKE '%BOSS%' OR UPPER(ISNULL(m.Libelle, '')) LIKE '%PATRON%' OR UPPER(ISNULL(m.Libelle, '')) LIKE '%MAISON%') " &
+                "    UNION ALL " &
+                "    SELECT 'Hors caisse' AS Categorie, ISNULL(ss.QuantiteBase, 0) AS Pieces, ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0) AS Montant " &
+                "    FROM StockSortie ss " &
+                "    LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId " &
+                "    LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = ss.ProduitId " &
+                "    WHERE ss.DateSortie >= @DateDebut AND ss.DateSortie < DATEADD(DAY, 1, @DateFin) " &
+                "      AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL') " &
+                "      AND (UPPER(ISNULL(m.Nature, '')) LIKE '%HORS%' OR UPPER(ISNULL(m.Libelle, '')) LIKE '%HORS%') " &
+                "    UNION ALL " &
+                "    SELECT 'Pertes' AS Categorie, ISNULL(sp.QuantiteBase, 0) AS Pieces, ISNULL(sp.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0) AS Montant " &
+                "    FROM StockPerte sp " &
+                "    LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = sp.ProduitId " &
+                "    WHERE sp.DatePerte >= @DateDebut AND sp.DatePerte < DATEADD(DAY, 1, @DateFin) " &
+                ") q " &
+                "GROUP BY Categorie " &
+                "ORDER BY SUM(Montant) DESC, Categorie ASC"
+            Dim dtCharges As DataTable = _dal.ExecuterTable(sqlCharges, CommandType.Text, pDepenses)
+            For Each charge As DataRow In dtCharges.Rows
+                AjouterLigneBeneficeNet(dt, 20, "Charges", Convert.ToString(charge("Categorie")), Convert.ToDecimal(charge("QuantitePieces")), Convert.ToDecimal(charge("MontantTotal")), "Charge consommant du stock ou sans recette")
+            Next
+
+            AjouterLigneBeneficeNet(dt, 99, "Synthèse", "Bénéfice net réalisé", 0D, beneficeNet, "Bénéfice après déductions")
+            Return dt
+        End Function
+
+        Private Sub AjouterLigneBeneficeNet(dt As DataTable, ordre As Integer, rubrique As String, categorie As String, quantitePieces As Decimal, montant As Decimal, commentaire As String)
+            dt.Rows.Add(ordre, rubrique, categorie, quantitePieces, montant, commentaire)
+        End Sub
+
+        Private Shared Function LireDecimal(row As DataRow, colonne As String) As Decimal
+            If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains(colonne) OrElse row.IsNull(colonne) Then
+                Return 0D
+            End If
+            Return Convert.ToDecimal(row(colonne))
         End Function
 
         ' Factures en attente (non payees).

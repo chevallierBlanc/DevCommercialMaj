@@ -71,6 +71,34 @@ Namespace DevCommerc8ak.Finance
             Return _dal.ExecuterTable("SELECT * FROM Depenses ORDER BY CreatedAt DESC", CommandType.Text, Nothing)
         End Function
 
+        Public Function GetHistorique(annee As Integer, Optional mois As Integer = 0) As DataTable
+            Dim sql As String = "" &
+                "SELECT " &
+                "    Id, " &
+                "    DateDepense, " &
+                "    Categorie AS NomCategorie, " &
+                "    Description, " &
+                "    Montant, " &
+                "    Devise, " &
+                "    Source, " &
+                "    TypeDepense, " &
+                "    CreePar, " &
+                "    CreatedAt " &
+                "FROM Depenses " &
+                "WHERE YEAR(DateDepense) = @annee "
+            Dim params As New List(Of SqlParameter) From {
+                New SqlParameter("@annee", annee)
+            }
+
+            If mois > 0 Then
+                sql &= "AND MONTH(DateDepense) = @mois "
+                params.Add(New SqlParameter("@mois", mois))
+            End If
+
+            sql &= "ORDER BY DateDepense DESC, CreatedAt DESC"
+            Return _dal.ExecuterTable(sql, CommandType.Text, params)
+        End Function
+
         Public Function GetStatsParCategorie() As DataTable
             Return _dal.ExecuterTable("SELECT Categorie, SUM(Montant) as Total FROM Depenses GROUP BY Categorie", CommandType.Text, Nothing)
         End Function

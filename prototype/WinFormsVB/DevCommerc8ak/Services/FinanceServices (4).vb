@@ -53,8 +53,12 @@ Namespace DevCommerc8ak.Services
             End If
         End Sub
 
-        Public Function GetHistorique() As DataTable
-            Return _repo.GetAll()
+        Public Function GetHistorique(Optional annee As Integer = 0, Optional mois As Integer = 0) As DataTable
+            If annee <= 0 Then
+                Return _repo.GetAll()
+            End If
+
+            Return _repo.GetHistorique(annee, mois)
         End Function
 
         Public Function GetStatsParCategorie() As DataTable
