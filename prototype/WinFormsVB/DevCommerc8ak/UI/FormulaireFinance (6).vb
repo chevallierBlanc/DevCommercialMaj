@@ -255,7 +255,7 @@ Namespace DevCommerc8ak
         Private Sub InitOngletDepenses()
             tpDepenses.BackColor = ColorBg
             Dim mainLayoutDepenses As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 1, .Padding = New Padding(24), .BackColor = ColorBg}
-            mainLayoutDepenses.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 470))
+            mainLayoutDepenses.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 560))
             mainLayoutDepenses.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
 
             ' Formulaire de saisie (Carte)
@@ -277,8 +277,10 @@ Namespace DevCommerc8ak
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Label Devise/Source/Type
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 35)) ' FlowLayout Devise/Source/Type
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Label Description
-            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 70)) ' TextBox Description
-            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 48)) ' Bouton Valider
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 74)) ' TextBox Description
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Label Date
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 36)) ' DatePicker
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 54)) ' Bouton Valider
             layoutSaisie.BackColor = Color.Transparent
 
             Dim lblSaisieTitle As New Label() With {.Text = "Nouvelle Dépense", .Font = FontTitle, .ForeColor = ColorPrimary, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
@@ -698,6 +700,7 @@ Namespace DevCommerc8ak
             If gridHistoriqueDepenses.Columns.Count = 0 Then Return
 
             ' Configuration des colonnes pour l'historique des dépenses
+            ConfigurerColonne(gridHistoriqueDepenses, "Id", "", 0, Nothing, True)
             ConfigurerColonne(gridHistoriqueDepenses, "DateDepense", "Date", 100, "dd/MM/yyyy")
             ConfigurerColonne(gridHistoriqueDepenses, "NomCategorie", "Catégorie", 150)
             ConfigurerColonne(gridHistoriqueDepenses, "Description", "Description", 200)
@@ -711,19 +714,26 @@ Namespace DevCommerc8ak
             If gridHistoriqueBanque.Columns.Count = 0 Then Return
 
             ' Configuration des colonnes pour l'historique bancaire
+            ConfigurerColonne(gridHistoriqueBanque, "Id", "", 0, Nothing, True)
             ConfigurerColonne(gridHistoriqueBanque, "DateTransaction", "Date", 100, "dd/MM/yyyy")
+            ConfigurerColonne(gridHistoriqueBanque, "DateOperation", "Date", 100, "dd/MM/yyyy")
             ConfigurerColonne(gridHistoriqueBanque, "Description", "Description", 250)
             ConfigurerColonne(gridHistoriqueBanque, "Montant", "Montant", 120, "N0")
             ConfigurerColonne(gridHistoriqueBanque, "Devise", "Devise", 80)
             ConfigurerColonne(gridHistoriqueBanque, "TypeTransaction", "Type", 100)
+            ConfigurerColonne(gridHistoriqueBanque, "TypeOperation", "Type", 100)
         End Sub
 
-        Private Sub ConfigurerColonne(grid As DataGridView, nom As String, titre As String, largeur As Integer, Optional format As String = Nothing)
+        Private Sub ConfigurerColonne(grid As DataGridView, nom As String, titre As String, largeur As Integer, Optional format As String = Nothing, Optional cacher As Boolean = False)
             If Not grid.Columns.Contains(nom) Then Return
 
             Dim col As DataGridViewColumn = grid.Columns(nom)
             col.HeaderText = titre
             col.Width = largeur
+            If cacher Then
+                col.Visible = False
+                Return
+            End If
             If Not String.IsNullOrWhiteSpace(format) Then
                 col.DefaultCellStyle.Format = format
                 col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
