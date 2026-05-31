@@ -313,6 +313,8 @@ Namespace DevCommerc8ak
             If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) Then
                 AjouterBoutonSidebar(flowPnlMenu, "Analyse ventes", y, AddressOf AfficherAnalyseVente)
                 y += 50
+                AjouterBoutonSidebar(flowPnlMenu, "Inventaire", y, AddressOf AfficherInventaire)
+                y += 50
             End If
 
             ' Bouton Accueil
@@ -588,6 +590,13 @@ Namespace DevCommerc8ak
         ''' </summary>
         Private Sub AfficherAnalyseVente(sender As Object, e As EventArgs)
             LoadForm(New FormulaireAnalyseVente())
+        End Sub
+
+        ''' <summary>
+        ''' Afficher inventaire intelligent
+        ''' </summary>
+        Private Sub AfficherInventaire(sender As Object, e As EventArgs)
+            LoadForm(New FrmInventaireIntelligent())
         End Sub
 
         ''' <summary>

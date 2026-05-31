@@ -60,6 +60,8 @@
     <Compile Include="Entities\StockPerte.vb" />
     <Compile Include="Entities\StockInventaire.vb" />
     <Compile Include="Entities\Depense.vb" />
+    <Compile Include="Entities\Inventaire.vb" />
+    <Compile Include="Entities\InventaireLigne.vb" />
     <Compile Include="Entities\Utilisateur.vb" />
     <Compile Include="Entities\Role.vb" />
     <Compile Include="Entities\Parametre.vb" />
@@ -97,6 +99,7 @@
     <Compile Include="Repositories\NotificationRepository.vb" />
     <Compile Include="Repositories\SessionRepository.vb" />
     <Compile Include="Repositories\DepenseRepository.vb" />
+    <Compile Include="Repositories\InventaireIntelligentRepository.vb" />
     <Compile Include="Repositories\StockSortieNonSynchroniseRepository.vb" />
     <Compile Include="Repositories\DepensesNonSynchroniseesRepository.vb" />
     <Compile Include="Services\ClientService.vb" />
@@ -165,6 +168,9 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FormulaireStock_Final_FIXED.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FrmInventaireIntelligent.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FormulaireDashboardCloud.vb">

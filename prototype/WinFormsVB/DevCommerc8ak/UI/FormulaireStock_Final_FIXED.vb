@@ -702,6 +702,11 @@ Namespace DevCommerc8ak
             AddHandler btnActualiserDash.Click, AddressOf ChargerDashboardSorties
             AddHandler btnPayer.Click, AddressOf EnregistrerPaiementDette
             AddHandler btnTicket.Click, AddressOf ImprimerTicketDette
+
+            ' Inventaire historique remplacé par FrmInventaireIntelligent
+            txtStockReel.ReadOnly = True
+            txtObservationInventaire.ReadOnly = True
+            btnValiderInventaire.Enabled = False
         End Sub
 
         ' --- DESIGN HELPERS ---
@@ -2101,20 +2106,7 @@ Namespace DevCommerc8ak
 
         Private Sub ValiderInventaire(sender As Object, e As EventArgs)
             Try
-                If cmbProduitInventaire.SelectedValue Is Nothing Then
-                    MessageBox.Show("Selectionnez un produit.")
-                    Return
-                End If
-                Dim produitId As Integer = Convert.ToInt32(cmbProduitInventaire.SelectedValue)
-                Dim qte As Decimal = LireDecimal(txtStockReel.Text)
-                Dim service As StockService = ObtenirStockService()
-                Dim observation As String = ""
-                If txtObservationInventaire IsNot Nothing AndAlso txtObservationInventaire.Text IsNot Nothing Then
-                    observation = txtObservationInventaire.Text.Trim()
-                End If
-                service.AjusterInventaire(produitId, qte, "base", "INV", observation, SessionUtilisateur.UtilisateurId)
-                MessageBox.Show("Inventaire enregistré.")
-                ChargerInventaire(Nothing, EventArgs.Empty)
+                MessageBox.Show("La validation d'inventaire a été déplacée vers FrmInventaireIntelligent.", "Inventaire", MessageBoxButtons.OK, MessageBoxIcon.Information)
             Catch ex As Exception
                 MessageBox.Show("Erreur inventaire: " & ex.Message)
             End Try

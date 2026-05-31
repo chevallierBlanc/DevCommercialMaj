@@ -250,6 +250,135 @@ Namespace DevCommerc8ak
             Return ecart
         End Function
 
+        Public Function AppliquerAjustementsInventaire(inventaireId As Integer, referenceInventaire As String, lignes As DataTable, effectuePar As Integer) As Integer
+            If lignes Is Nothing OrElse lignes.Rows.Count = 0 Then
+                Throw New Exception("Aucune ligne d'inventaire à valider.")
+            End If
+
+            Dim nonComptes As Integer = 0
+            For Each row As DataRow In lignes.Rows
+                If row Is Nothing OrElse row.IsNull("StockPhysique") Then
+                    nonComptes += 1
+                End If
+            Next
+            If nonComptes > 0 Then
+                Throw New Exception("Impossible de valider. Il reste " & nonComptes.ToString() & " produit(s) non compté(s).")
+            End If
+
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    Try
+                        Dim mouvementsCree As Integer = 0
+
+                        For Each row As DataRow In lignes.Rows
+                            If row Is Nothing Then Continue For
+
+                            Dim produitId As Integer = Convert.ToInt32(row("ProduitId"))
+                            Dim stockTheorique As Decimal = If(row.IsNull("StockTheorique"), 0D, Convert.ToDecimal(row("StockTheorique")))
+                            Dim stockPhysique As Decimal = If(row.IsNull("StockPhysique"), 0D, Convert.ToDecimal(row("StockPhysique")))
+                            Dim ecart As Decimal = stockPhysique - stockTheorique
+                            Dim statut As String = If(ecart = 0D, "CONFORME", If(ecart < 0D, "MANQUE", "SURPLUS"))
+                            Dim motif As String = ""
+                            If lignes.Columns.Contains("Motif") AndAlso Not row.IsNull("Motif") Then
+                                motif = Convert.ToString(row("Motif"))
+                            End If
+
+                            Using cmdMaj As New SqlCommand("UPDATE InventaireLignes SET StockPhysique=@StockPhysique, Ecart=@Ecart, Statut=@Statut, Motif=@Motif, DateComptage=SYSDATETIME(), ModifieLe=SYSDATETIME() WHERE InventaireId=@InventaireId AND ProduitId=@ProduitId", cn, tx)
+                                cmdMaj.Parameters.AddWithValue("@StockPhysique", stockPhysique)
+                                cmdMaj.Parameters.AddWithValue("@Ecart", ecart)
+                                cmdMaj.Parameters.AddWithValue("@Statut", statut)
+                                cmdMaj.Parameters.AddWithValue("@Motif", If(String.IsNullOrWhiteSpace(motif), CType(DBNull.Value, Object), motif))
+                                cmdMaj.Parameters.AddWithValue("@InventaireId", inventaireId)
+                                cmdMaj.Parameters.AddWithValue("@ProduitId", produitId)
+                                cmdMaj.ExecuteNonQuery()
+                            End Using
+
+                            If ecart > 0D Then
+                                Dim info As DataRow = ObtenirInfosProduit(produitId)
+                                Dim entree As New StockEntree With {
+                                    .IdStock = referenceInventaire & "-" & produitId.ToString(),
+                                    .ProduitId = produitId,
+                                    .QuantiteSaisie = ecart,
+                                    .Unite = "base",
+                                    .QuantiteBase = ecart,
+                                    .PrixAchat = ObtenirPrixAchat(info),
+                                    .Devise = "CDF",
+                                    .Taux = 0D,
+                                    .DateEntree = Date.Now,
+                                    .FournisseurId = Nothing,
+                                    .CreePar = effectuePar
+                                }
+                                _entreeRepo.Ajouter(entree, cn, tx)
+
+                                Dim mvtEntree As New MouvementStock With {
+                                    .NumeroMouvement = GenererNumeroMouvement(cn, tx),
+                                    .ProduitId = produitId,
+                                    .TypeMouvement = "AJUSTEMENT_POSITIF",
+                                    .Quantite = ecart,
+                                    .QuantiteBase = ecart,
+                                    .Unite = "base",
+                                    .StockAvant = stockTheorique,
+                                    .StockApres = stockPhysique,
+                                    .Reference = referenceInventaire,
+                                    .Observation = If(String.IsNullOrWhiteSpace(motif), "Ajustement inventaire positif", motif),
+                                    .EffectuePar = effectuePar
+                                }
+                                _mvtRepo.Ajouter(mvtEntree, cn, tx)
+                                mouvementsCree += 1
+                            ElseIf ecart < 0D Then
+                                Dim sortie As New StockSortie With {
+                                    .NumeroSortie = referenceInventaire & "-" & produitId.ToString(),
+                                    .ProduitId = produitId,
+                                    .QuantiteSaisie = Math.Abs(ecart),
+                                    .Unite = "base",
+                                    .QuantiteBase = Math.Abs(ecart),
+                                    .DateSortie = Date.Now,
+                                    .Source = "INVENTAIRE",
+                                    .RefSource = referenceInventaire,
+                                    .CreePar = effectuePar,
+                                    .StatutPaiement = "GRATUIT",
+                                    .MontantLigne = 0D,
+                                    .MontantPaye = 0D,
+                                    .ResteAPayer = 0D,
+                                    .Observation = If(String.IsNullOrWhiteSpace(motif), "Ajustement inventaire négatif", motif)
+                                }
+                                _sortieRepo.Ajouter(sortie, sortie.NumeroSortie, cn, tx)
+
+                                Dim mvtSortie As New MouvementStock With {
+                                    .NumeroMouvement = GenererNumeroMouvement(cn, tx),
+                                    .ProduitId = produitId,
+                                    .TypeMouvement = "AJUSTEMENT_NEGATIF",
+                                    .Quantite = Math.Abs(ecart),
+                                    .QuantiteBase = Math.Abs(ecart),
+                                    .Unite = "base",
+                                    .StockAvant = stockTheorique,
+                                    .StockApres = stockPhysique,
+                                    .Reference = referenceInventaire,
+                                    .Observation = If(String.IsNullOrWhiteSpace(motif), "Ajustement inventaire négatif", motif),
+                                    .EffectuePar = effectuePar
+                                }
+                                _mvtRepo.Ajouter(mvtSortie, cn, tx)
+                                mouvementsCree += 1
+                            End If
+                        Next
+
+                        Using cmdValide As New SqlCommand("UPDATE Inventaires SET Statut=N'VALIDÉ', DateValidation=SYSDATETIME(), ValidePar=@ValidePar WHERE InventaireId=@InventaireId", cn, tx)
+                            cmdValide.Parameters.AddWithValue("@ValidePar", effectuePar)
+                            cmdValide.Parameters.AddWithValue("@InventaireId", inventaireId)
+                            cmdValide.ExecuteNonQuery()
+                        End Using
+
+                        tx.Commit()
+                        Return mouvementsCree
+                    Catch
+                        tx.Rollback()
+                        Throw
+                    End Try
+                End Using
+            End Using
+        End Function
+
         ' Liste des mouvements par produit.
         Public Function ListerParProduit(produitId As Integer) As List(Of MouvementStockDTO)
             Return _mvtRepo.ListerParProduit(produitId)
