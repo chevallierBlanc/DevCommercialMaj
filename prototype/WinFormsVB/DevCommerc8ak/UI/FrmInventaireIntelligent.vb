@@ -235,7 +235,13 @@ Namespace DevCommerc8ak
             layoutHistorique.RowStyles.Add(New RowStyle(SizeType.Percent, 40))
             tabHistorique.Controls.Add(layoutHistorique)
 
-            Dim split As New SplitContainer() With {.Dock = DockStyle.Fill, .Orientation = Orientation.Vertical, .SplitterDistance = 550}
+            Dim split As New SplitContainer() With {
+                .Dock = DockStyle.Fill,
+                .Orientation = Orientation.Vertical,
+                .SplitterDistance = 400,
+                .Panel1MinSize = 320,
+                .Panel2MinSize = 520
+            }
             Dim cardEntrees As New Panel() With {.Dock = DockStyle.Fill, .BackColor = ColorCard, .Padding = New Padding(10)}
             cardEntrees.Controls.Add(New Label() With {.Text = "Historique des entrées", .Font = FontSection, .AutoSize = True, .ForeColor = ColorPrimary, .Dock = DockStyle.Top})
             gridEntrees = CreerGrille(False)
