@@ -86,9 +86,10 @@ Namespace DevCommerc8ak
                 "FROM Produits p " &
                 "LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId " &
                 "WHERE p.EstActif = 1"
-            Dim p As New List(Of SqlParameter) From {New SqlParameter("@InventaireId", inventaireId)}
-            _dal.ExecuterNonRequete(sqlDelete, CommandType.Text, p)
-            Return _dal.ExecuterNonRequete(sqlInsert, CommandType.Text, p)
+            Dim pDelete As New List(Of SqlParameter) From {New SqlParameter("@InventaireId", inventaireId)}
+            Dim pInsert As New List(Of SqlParameter) From {New SqlParameter("@InventaireId", inventaireId)}
+            _dal.ExecuterNonRequete(sqlDelete, CommandType.Text, pDelete)
+            Return _dal.ExecuterNonRequete(sqlInsert, CommandType.Text, pInsert)
         End Function
 
         Public Function ChargerLignesInventaire(inventaireId As Integer) As DataTable

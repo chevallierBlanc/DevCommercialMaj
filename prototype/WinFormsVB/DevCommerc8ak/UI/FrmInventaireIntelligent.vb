@@ -56,7 +56,6 @@ Namespace DevCommerc8ak
         Private btnImprimer As Button
         Private btnExporterPdf As Button
         Private btnReprendreInventaire As Button
-        Private btnFermer As Button
 
         Private txtRecherche As TextBox
         Private cmbCategorie As ComboBox
@@ -106,7 +105,6 @@ Namespace DevCommerc8ak
             AddHandler btnImprimer.Click, AddressOf ImprimerInventaire
             AddHandler btnExporterPdf.Click, AddressOf ExporterPdfInventaire
             AddHandler btnReprendreInventaire.Click, AddressOf ReprendreInventaireEnCours
-            AddHandler btnFermer.Click, AddressOf FermerFormulaire
             AddHandler txtRecherche.TextChanged, AddressOf TexteRechercheOuFiltreChanged
             AddHandler cmbCategorie.SelectedIndexChanged, AddressOf TexteRechercheOuFiltreChanged
             AddHandler cmbStatut.SelectedIndexChanged, AddressOf TexteRechercheOuFiltreChanged
@@ -146,9 +144,7 @@ Namespace DevCommerc8ak
             btnImprimer = CreerBoutonAction("Imprimer", ColorSecondary)
             btnExporterPdf = CreerBoutonAction("Exporter PDF", ColorPurple)
             btnReprendreInventaire = CreerBoutonAction("Reprendre inventaire en cours", ColorInfo)
-            btnFermer = CreerBoutonAction("Fermer", ColorDanger)
-            btnFermer.Width = 120
-            pnlActions.Controls.AddRange(New Control() {btnNouvelInventaire, btnEnregistrerInventaire, btnValiderEtAjuster, btnImprimer, btnExporterPdf, btnReprendreInventaire, btnFermer})
+            pnlActions.Controls.AddRange(New Control() {btnNouvelInventaire, btnEnregistrerInventaire, btnValiderEtAjuster, btnImprimer, btnExporterPdf, btnReprendreInventaire})
             layout.Controls.Add(pnlActions, 0, 0)
 
             Dim pnlFiltres As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .AutoSize = False, .WrapContents = False, .Padding = New Padding(0), .Margin = New Padding(0)}
@@ -163,8 +159,8 @@ Namespace DevCommerc8ak
             cmbStatut.Items.AddRange(New Object() {"Tous", "Non comptés", "Comptés", "Conformes", "Manques", "Surplus"})
             cmbStatut.SelectedIndex = 0
             pnlFiltres.Controls.Add(cmbStatut)
-            lblInventaireRef = New Label() With {.AutoSize = True, .Font = FontSection, .ForeColor = ColorPrimary, .Margin = New Padding(25, 10, 0, 0), .Text = "Référence: -"}
-            lblInventaireStatut = New Label() With {.AutoSize = True, .Font = FontSection, .ForeColor = ColorSecondary, .Margin = New Padding(15, 10, 0, 0), .Text = "Statut: -"}
+            lblInventaireRef = New Label() With {.AutoSize = False, .Width = 280, .Height = 24, .Font = FontSection, .ForeColor = ColorPrimary, .Margin = New Padding(25, 10, 0, 0), .TextAlign = ContentAlignment.MiddleLeft, .Text = "Référence: -"}
+            lblInventaireStatut = New Label() With {.AutoSize = False, .Width = 360, .Height = 24, .Font = FontSection, .ForeColor = ColorSecondary, .Margin = New Padding(15, 10, 0, 0), .TextAlign = ContentAlignment.MiddleLeft, .Text = "Statut: -"}
             pnlFiltres.Controls.Add(lblInventaireRef)
             pnlFiltres.Controls.Add(lblInventaireStatut)
             layout.Controls.Add(pnlFiltres, 0, 1)
@@ -940,10 +936,6 @@ Namespace DevCommerc8ak
 
         Private Sub MettreModeLectureSeule(lectureSeule As Boolean)
             AppliquerModeLectureSeule(lectureSeule)
-        End Sub
-
-        Private Sub FermerFormulaire(sender As Object, e As EventArgs)
-            Me.Close()
         End Sub
 
         Private Sub HandleGridSelection(sender As Object, e As EventArgs)
