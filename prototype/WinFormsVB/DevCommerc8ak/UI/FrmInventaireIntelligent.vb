@@ -518,7 +518,10 @@ Namespace DevCommerc8ak
             Try
                 gridInventairesHistoriques.ClearSelection()
                 gridInventairesHistoriques.Rows(index).Selected = True
-                gridInventairesHistoriques.CurrentCell = gridInventairesHistoriques.Rows(index).Cells(0)
+                Dim celluleVisible As DataGridViewCell = ObtenirPremiereCelluleVisible(gridInventairesHistoriques.Rows(index))
+                If celluleVisible IsNot Nothing Then
+                    gridInventairesHistoriques.CurrentCell = celluleVisible
+                End If
 
                 Dim rowView As DataRowView = TryCast(gridInventairesHistoriques.Rows(index).DataBoundItem, DataRowView)
                 If rowView Is Nothing Then
@@ -622,6 +625,16 @@ Namespace DevCommerc8ak
             Dim progression As Decimal = If(total = 0, 0D, (comptes * 100D) / total)
             lblHistProgression.Text = FormatageGlobal.FormatPourcentage(Math.Round(progression, 0))
         End Sub
+
+        Private Function ObtenirPremiereCelluleVisible(row As DataGridViewRow) As DataGridViewCell
+            If row Is Nothing OrElse row.DataGridView Is Nothing Then Return Nothing
+            For Each cell As DataGridViewCell In row.Cells
+                If cell IsNot Nothing AndAlso cell.Visible Then
+                    Return cell
+                End If
+            Next
+            Return Nothing
+        End Function
 
         Private Sub EffacerHistoriqueSelectionne()
             _historiqueInventaireIdSelectionne = 0
@@ -1334,6 +1347,10 @@ Namespace DevCommerc8ak
                     Exit Sub
                 End If
                 Dim idx As Integer = gridInventairesHistoriques.CurrentRow.Index
+                Dim celluleVisible As DataGridViewCell = ObtenirPremiereCelluleVisible(gridInventairesHistoriques.CurrentRow)
+                If celluleVisible IsNot Nothing AndAlso gridInventairesHistoriques.CurrentCell IsNot celluleVisible Then
+                    gridInventairesHistoriques.CurrentCell = celluleVisible
+                End If
                 ChargerInventaireHistoriqueSelectionne(idx)
             Catch ex As Exception
                 MessageBox.Show("Erreur sélection historique: " & ex.Message)
