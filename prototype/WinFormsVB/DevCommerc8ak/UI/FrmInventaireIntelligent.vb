@@ -238,10 +238,19 @@ Namespace DevCommerc8ak
             Dim split As New SplitContainer() With {
                 .Dock = DockStyle.Fill,
                 .Orientation = Orientation.Vertical,
-                .SplitterDistance = 400,
-                .Panel1MinSize = 320,
-                .Panel2MinSize = 520
+                .Panel1MinSize = 260,
+                .Panel2MinSize = 360
             }
+            AddHandler split.SizeChanged, Sub()
+                                              If split.Width <= 0 Then Return
+                                              Dim desired As Integer = CInt(split.Width * 0.32)
+                                              Dim minDistance As Integer = split.Panel1MinSize
+                                              Dim maxDistance As Integer = Math.Max(minDistance, split.Width - split.Panel2MinSize - 4)
+                                              desired = Math.Max(minDistance, Math.Min(desired, maxDistance))
+                                              If desired > 0 AndAlso desired <> split.SplitterDistance Then
+                                                  split.SplitterDistance = desired
+                                              End If
+                                          End Sub
             Dim cardEntrees As New Panel() With {.Dock = DockStyle.Fill, .BackColor = ColorCard, .Padding = New Padding(10)}
             cardEntrees.Controls.Add(New Label() With {.Text = "Historique des entrées", .Font = FontSection, .AutoSize = True, .ForeColor = ColorPrimary, .Dock = DockStyle.Top})
             gridEntrees = CreerGrille(False)
