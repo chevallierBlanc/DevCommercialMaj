@@ -208,7 +208,14 @@ Namespace DevCommerc8ak
             Next
             tableKpi.RowStyles.Add(New RowStyle(SizeType.Percent, 50))
             tableKpi.RowStyles.Add(New RowStyle(SizeType.Percent, 50))
-            Dim p1, p2, p3, p4, p5, p6, p7, p8 As Label
+            Dim p1 As Label = New Label()
+            Dim p2 As Label = New Label()
+            Dim p3 As Label = New Label()
+            Dim p4 As Label = New Label()
+            Dim p5 As Label = New Label()
+            Dim p6 As Label = New Label()
+            Dim p7 As Label = New Label()
+            Dim p8 As Label = New Label()
             tableKpi.Controls.Add(CreerCarteResume("Total produits", p1), 0, 0)
             tableKpi.Controls.Add(CreerCarteResume("Produits comptés", p2), 1, 0)
             tableKpi.Controls.Add(CreerCarteResume("Produits non comptés", p3), 2, 0)
@@ -987,7 +994,7 @@ Namespace DevCommerc8ak
                 Dim resteVentePieces As Decimal = LireDecimalTable(row, "ResteVentePieces")
                 Dim montantTotalGenere As Decimal = LireDecimalTable(row, "MontantTotalGenere")
 
-                lblAnalyseSortieGros.Text = "Entrées: " & FormatageGlobal.FormatNombre(totalEntrees) & " | Ventes: " & FormatageGlobal.FormatNombre(totalVentes) & vbCrLf &
+                lblAnalyseSortieGros.Text = "Entrées: " & FormatageGlobal.FormatNombre(totalEntrees) & " | Ventes: " & FormatageGlobal.FormatNombre(totalVentes) & Environment.NewLine &
                     "Vente en cartons: " & FormatageGlobal.FormatNombre(venteCarton) & "C + " & FormatageGlobal.FormatNombre(resteVentePieces) & "P"
                 lblAnalyseSortiePiece.Text = "Sorties manuelles: " & FormatageGlobal.FormatNombre(totalSortiesManuelles) & " | Pertes: " & FormatageGlobal.FormatNombre(totalPertes)
                 lblAnalyseRestantGros.Text = "Dons: " & FormatageGlobal.FormatNombre(totalDons) & " | Allocations: " & FormatageGlobal.FormatNombre(totalAllocations)
@@ -1039,9 +1046,9 @@ Namespace DevCommerc8ak
                 Dim dtEnCours As DataTable = _repo.ObtenirInventaireEnCours()
                 If dtEnCours IsNot Nothing AndAlso dtEnCours.Rows.Count > 0 Then
                     Dim choix As DialogResult = MessageBox.Show(
-                        "Un inventaire EN_COURS existe déjà." & vbCrLf &
-                        "Oui = continuer l'inventaire en cours" & vbCrLf &
-                        "Non = annuler l'ancien inventaire et en créer un nouveau" & vbCrLf &
+                        "Un inventaire EN_COURS existe déjà." & Environment.NewLine &
+                        "Oui = continuer l'inventaire en cours" & Environment.NewLine &
+                        "Non = annuler l'ancien inventaire et en créer un nouveau" & Environment.NewLine &
                         "Annuler = ne rien faire",
                         "Inventaire en cours",
                         MessageBoxButtons.YesNoCancel,
@@ -1151,7 +1158,7 @@ Namespace DevCommerc8ak
                 _impressionIndexLigne = 0
 
                 _printDoc.DefaultPageSettings.PaperSize = New PaperSize("A4", 827, 1169)
-                _printDoc.DefaultPageSettings.Margins = New Margins(30, 30, 30, 30)
+                _printDoc.DefaultPageSettings.Margins = New System.Drawing.Printing.Margins(30, 30, 30, 30)
                 Dim lignes As List(Of String) = ConstruireLignesInventaire()
                 If lignes.Count = 0 Then
                     MessageBox.Show("Aucune donnée à imprimer.")
@@ -1175,7 +1182,7 @@ Namespace DevCommerc8ak
                 End If
 
                 _printDoc.DefaultPageSettings.PaperSize = New PaperSize("A4", 827, 1169)
-                _printDoc.DefaultPageSettings.Margins = New Margins(30, 30, 30, 30)
+                _printDoc.DefaultPageSettings.Margins = New System.Drawing.Printing.Margins(30, 30, 30, 30)
                 _printPreview.Document = _printDoc
                 _printPreview.Width = 1000
                 _printPreview.Height = 700

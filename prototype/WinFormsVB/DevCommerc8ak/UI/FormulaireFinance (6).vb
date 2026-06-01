@@ -992,7 +992,7 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                printDoc.DefaultPageSettings.Margins = New Margins(30, 30, 30, 30)
+                printDoc.DefaultPageSettings.Margins = New System.Drawing.Printing.Margins(30, 30, 30, 30)
                 printDoc.DefaultPageSettings.Landscape = False
                 _impressionIndex = 0
                 _impressionTotalFC = 0D
