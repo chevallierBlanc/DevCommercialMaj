@@ -8,6 +8,7 @@ Imports System.Data
 Imports System.Drawing
 Imports System.Drawing.Drawing2D
 Imports System.Drawing.Printing
+Imports System.IO
 Imports System.Windows.Forms
 Imports System.Windows.Forms.DataVisualization.Charting
 Imports DevCommerc8ak.DevCommerc8ak.DTO
@@ -96,6 +97,10 @@ Namespace DevCommerc8ak
         Private ReadOnly printPreview As New PrintPreviewDialog()
         Private dtRapportAImprimer As DataTable
         Private titreRapport As String = ""
+        Private _parametres As ParametreDTO
+        Private _impressionIndex As Integer
+        Private _impressionTotalFC As Decimal
+        Private _impressionTotalUSD As Decimal
 
         ' Filtres Impression
         Private cmbAnneeRapport As ComboBox
@@ -225,6 +230,7 @@ Namespace DevCommerc8ak
             InitOngletCaisse()
             InitOngletBanque()
             InitOngletDashboard()
+            ChargerParametresApplication()
 
             ' Configuration Impression
             AddHandler printDoc.PrintPage, AddressOf PrintDoc_PrintPage
@@ -255,7 +261,7 @@ Namespace DevCommerc8ak
         Private Sub InitOngletDepenses()
             tpDepenses.BackColor = ColorBg
             Dim mainLayoutDepenses As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 1, .Padding = New Padding(24), .BackColor = ColorBg}
-            mainLayoutDepenses.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 560))
+            mainLayoutDepenses.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 500))
             mainLayoutDepenses.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
 
             ' Formulaire de saisie (Carte)
@@ -269,18 +275,18 @@ Namespace DevCommerc8ak
                 .RowCount = 11,
                 .Padding = New Padding(0)
             }
-            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 35)) ' Titre
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 32)) ' Titre
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Label Catégorie
-            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 35)) ' ComboBox Catégorie
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 32)) ' ComboBox Catégorie
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Label Montant
-            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 35)) ' TextBox Montant
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 32)) ' TextBox Montant
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Label Devise/Source/Type
-            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 35)) ' FlowLayout Devise/Source/Type
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 34)) ' FlowLayout Devise/Source/Type
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Label Description
-            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 74)) ' TextBox Description
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 64)) ' TextBox Description
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Label Date
-            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 36)) ' DatePicker
-            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 54)) ' Bouton Valider
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 32)) ' DatePicker
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 44)) ' Bouton Valider
             layoutSaisie.BackColor = Color.Transparent
 
             Dim lblSaisieTitle As New Label() With {.Text = "Nouvelle Dépense", .Font = FontTitle, .ForeColor = ColorPrimary, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
@@ -288,7 +294,7 @@ Namespace DevCommerc8ak
 
             layoutSaisie.Controls.Add(CreateLabel("Catégorie"), 0, 1)
             Dim pnlCat As New Panel() With {.Dock = DockStyle.Fill, .Height = 35}
-            cmbCategorieDepense = New ComboBox() With {.Dock = DockStyle.Fill, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
+            cmbCategorieDepense = New ComboBox() With {.Dock = DockStyle.Left, .Width = 390, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
             btnAddCategorie = New Button() With {.Text = "+", .Dock = DockStyle.Right, .Width = 35, .BackColor = ColorAccent, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat, .Cursor = Cursors.Hand}
             btnAddCategorie.FlatAppearance.BorderSize = 0
             pnlCat.Controls.Add(cmbCategorieDepense)
@@ -297,39 +303,52 @@ Namespace DevCommerc8ak
 
             layoutSaisie.Controls.Add(CreateLabel("Montant"), 0, 3)
             txtMontantDepense = CreateStyledTextBox("0.00")
+            txtMontantDepense.Dock = DockStyle.Left
+            txtMontantDepense.Width = 180
+            txtMontantDepense.Anchor = AnchorStyles.Left Or AnchorStyles.Top
             layoutSaisie.Controls.Add(txtMontantDepense, 0, 4)
 
-            Dim pnlDeviseSourceType As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.LeftToRight, .WrapContents = False, .AutoSize = True}
+            Dim pnlDeviseSourceType As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.LeftToRight, .WrapContents = False, .AutoSize = False, .Height = 34, .Padding = New Padding(0, 2, 0, 0)}
             pnlDeviseSourceType.Controls.Add(CreateLabel("Devise:", New Padding(0, 0, 5, 0)))
             cmbDeviseDepense = CreateStyledCombo(New String() {"FC", "USD"})
+            cmbDeviseDepense.Width = 68
             pnlDeviseSourceType.Controls.Add(cmbDeviseDepense)
             pnlDeviseSourceType.Controls.Add(CreateLabel("Source:", New Padding(15, 0, 5, 0)))
             cmbSourceDepense = CreateStyledCombo(New String() {"Caisse", "Banque"})
+            cmbSourceDepense.Width = 86
             pnlDeviseSourceType.Controls.Add(cmbSourceDepense)
             pnlDeviseSourceType.Controls.Add(CreateLabel("Type:", New Padding(15, 0, 5, 0)))
             cmbTypeDepense = CreateStyledCombo(New String() {"Normale", "Exceptionnelle"})
+            cmbTypeDepense.Width = 112
             pnlDeviseSourceType.Controls.Add(cmbTypeDepense)
             layoutSaisie.Controls.Add(pnlDeviseSourceType, 0, 5)
 
             layoutSaisie.Controls.Add(CreateLabel("Description"), 0, 6)
             txtDescriptionDepense = CreateStyledTextBox("Description...")
             txtDescriptionDepense.Multiline = True
-            txtDescriptionDepense.Height = 74 ' Ajuster la hauteur pour une meilleure visibilité
+            txtDescriptionDepense.Dock = DockStyle.Left
+            txtDescriptionDepense.Height = 62 ' Réduit pour rendre l'ensemble plus compact
+            txtDescriptionDepense.Width = 350
+            txtDescriptionDepense.Anchor = AnchorStyles.Left Or AnchorStyles.Top
             layoutSaisie.Controls.Add(txtDescriptionDepense, 0, 7)
 
             layoutSaisie.Controls.Add(CreateLabel("Date"), 0, 8)
-            dtpDateDepense = New DateTimePicker() With {.Dock = DockStyle.Fill, .Margin = New Padding(0, 5, 0, 15), .Font = FontControl}
+            dtpDateDepense = New DateTimePicker() With {.Dock = DockStyle.Left, .Width = 200, .Margin = New Padding(0, 4, 0, 8), .Font = FontControl}
             layoutSaisie.Controls.Add(dtpDateDepense, 0, 9)
 
             btnValiderDepense = CreateStyledButton("Valider la dépense", ColorDanger)
-            btnValiderDepense.Height = 44
+            btnValiderDepense.Dock = DockStyle.None
+            btnValiderDepense.Width = 220
+            btnValiderDepense.Height = 34
+            btnValiderDepense.Anchor = AnchorStyles.Right Or AnchorStyles.Top
+            btnValiderDepense.Margin = New Padding(0, 4, 0, 0)
             layoutSaisie.Controls.Add(btnValiderDepense, 0, 10)
 
             pnlSaisie.Controls.Add(layoutSaisie)
 
             ' Historique (Carte)
             Dim pnlHistorique As Panel = CreerCarte()
-            pnlHistorique.Padding = New Padding(20)
+            pnlHistorique.Padding = New Padding(16)
 
             Dim layoutHistorique As New TableLayoutPanel() With {
                 .Dock = DockStyle.Fill,
@@ -337,8 +356,8 @@ Namespace DevCommerc8ak
                 .RowCount = 3,
                 .Padding = New Padding(0)
             }
-            layoutHistorique.RowStyles.Add(New RowStyle(SizeType.Absolute, 35)) ' Titre
-            layoutHistorique.RowStyles.Add(New RowStyle(SizeType.Absolute, 50)) ' Outils d'impression
+            layoutHistorique.RowStyles.Add(New RowStyle(SizeType.Absolute, 32)) ' Titre
+            layoutHistorique.RowStyles.Add(New RowStyle(SizeType.Absolute, 44)) ' Outils d'impression
             layoutHistorique.RowStyles.Add(New RowStyle(SizeType.Percent, 100)) ' Grille
             layoutHistorique.BackColor = Color.Transparent
 
@@ -346,9 +365,9 @@ Namespace DevCommerc8ak
             layoutHistorique.Controls.Add(lblHistoriqueTitle, 0, 0)
 
             ' Barre d'outils impression
-            Dim pnlPrintTools As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.LeftToRight, .WrapContents = False, .AutoSize = True, .Padding = New Padding(0, 5, 0, 5)}
+            Dim pnlPrintTools As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.LeftToRight, .WrapContents = False, .AutoSize = False, .Padding = New Padding(0, 4, 0, 4)}
             pnlPrintTools.Controls.Add(CreateLabel("Année:", New Padding(0, 5, 5, 0)))
-            cmbAnneeRapport = New ComboBox() With {.Width = 80, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
+            cmbAnneeRapport = New ComboBox() With {.Width = 70, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
             For i As Integer = DateTime.Now.Year To DateTime.Now.Year - 5 Step -1
                 cmbAnneeRapport.Items.Add(i)
             Next
@@ -356,14 +375,14 @@ Namespace DevCommerc8ak
             pnlPrintTools.Controls.Add(cmbAnneeRapport)
 
             pnlPrintTools.Controls.Add(CreateLabel("Mois:", New Padding(15, 5, 5, 0)))
-            cmbMoisRapport = New ComboBox() With {.Width = 120, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
+            cmbMoisRapport = New ComboBox() With {.Width = 110, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
             cmbMoisRapport.Items.Add("Toute l'année")
             cmbMoisRapport.Items.AddRange(New String() {"Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"})
             cmbMoisRapport.SelectedIndex = DateTime.Now.Month
             pnlPrintTools.Controls.Add(cmbMoisRapport)
 
             btnImprimerRapport = CreateStyledButton("🖨️ Imprimer Rapport", ColorAccent)
-            btnImprimerRapport.Width = 180
+            btnImprimerRapport.Width = 150
             btnImprimerRapport.Margin = New Padding(20, 0, 0, 0)
             pnlPrintTools.Controls.Add(btnImprimerRapport)
             layoutHistorique.Controls.Add(pnlPrintTools, 0, 1)
@@ -407,7 +426,7 @@ Namespace DevCommerc8ak
         Private Sub InitOngletBanque()
             tpBanque.BackColor = ColorBg
             Dim mainLayoutBanque As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 2, .Padding = New Padding(24), .BackColor = ColorBg}
-            mainLayoutBanque.RowStyles.Add(New RowStyle(SizeType.Absolute, 150))
+            mainLayoutBanque.RowStyles.Add(New RowStyle(SizeType.Absolute, 120))
             mainLayoutBanque.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
 
             Dim pnlSoldes As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.LeftToRight, .WrapContents = True}
@@ -511,6 +530,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub ChargerDonnees()
+            ChargerParametresApplication()
             ChargerHistoriqueDepenses(Nothing, EventArgs.Empty)
             ChargerCaisse()
             ChargerBanque()
@@ -566,12 +586,12 @@ Namespace DevCommerc8ak
         Private Sub ChargerCaisse()
             Try
                 Dim dateJour As DateTime = DateTime.Now
-                lblEncaisseFC.Text = _caisseService.GetEncaisse(dateJour, "FC").ToString("N2") & " FC"
-                lblEncaisseUSD.Text = _caisseService.GetEncaisse(dateJour, "USD").ToString("N2") & " USD"
-                lblDepensesCaisseFC.Text = _caisseService.GetDepensesCaisse(dateJour, "FC").ToString("N2") & " FC"
-                lblDepensesCaisseUSD.Text = _caisseService.GetDepensesCaisse(dateJour, "USD").ToString("N2") & " USD"
-                lblSoldeCaisseFC.Text = _caisseService.GetSoldeCaisse(dateJour, "FC").ToString("N2") & " FC"
-                lblSoldeCaisseUSD.Text = _caisseService.GetSoldeCaisse(dateJour, "USD").ToString("N2") & " USD"
+                lblEncaisseFC.Text = FormatMontant(_caisseService.GetEncaisse(dateJour, "FC"), "FC")
+                lblEncaisseUSD.Text = FormaterSoldeUsd(_caisseService.GetEncaisse(dateJour, "USD"))
+                lblDepensesCaisseFC.Text = FormatMontant(_caisseService.GetDepensesCaisse(dateJour, "FC"), "FC")
+                lblDepensesCaisseUSD.Text = FormaterSoldeUsd(_caisseService.GetDepensesCaisse(dateJour, "USD"))
+                lblSoldeCaisseFC.Text = FormatMontant(_caisseService.GetSoldeCaisse(dateJour, "FC"), "FC")
+                lblSoldeCaisseUSD.Text = FormaterSoldeUsd(_caisseService.GetSoldeCaisse(dateJour, "USD"))
                 ' lblStatusCloture.Text = If(caisse.EstCloture, "Statut : Clôturé", "Statut : Ouvert")
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement caisse: " & ex.Message)
@@ -581,8 +601,8 @@ Namespace DevCommerc8ak
         Private Sub ChargerBanque()
             Try
                 'Dim banque As BanqueDTO = _banqueService.ObtenirSoldeBanque()
-                lblSoldeBanqueFC.Text = _banqueService.GetSolde("FC").ToString("N2") & " FC"
-                lblSoldeBanqueUSD.Text = _banqueService.GetSolde("USD").ToString("N2") & " USD"
+                lblSoldeBanqueFC.Text = FormatMontant(_banqueService.GetSolde("FC"), "FC")
+                lblSoldeBanqueUSD.Text = FormaterSoldeUsd(_banqueService.GetSolde("USD"))
                 'lblSoldeBanqueFC.Text = FormatMontant(banque.SoldeFC)
                 'lblSoldeBanqueUSD.Text = FormatMontant(banque.SoldeUSD, "USD")
 
@@ -701,13 +721,13 @@ Namespace DevCommerc8ak
 
             ' Configuration des colonnes pour l'historique des dépenses
             ConfigurerColonne(gridHistoriqueDepenses, "Id", "", 0, Nothing, True)
-            ConfigurerColonne(gridHistoriqueDepenses, "DateDepense", "Date", 100, "dd/MM/yyyy")
-            ConfigurerColonne(gridHistoriqueDepenses, "NomCategorie", "Catégorie", 150)
-            ConfigurerColonne(gridHistoriqueDepenses, "Description", "Description", 200)
-            ConfigurerColonne(gridHistoriqueDepenses, "Montant", "Montant", 100, "N0")
-            ConfigurerColonne(gridHistoriqueDepenses, "Devise", "Devise", 80)
-            ConfigurerColonne(gridHistoriqueDepenses, "Source", "Source", 100)
-            ConfigurerColonne(gridHistoriqueDepenses, "TypeDepense", "Type", 100)
+            ConfigurerColonne(gridHistoriqueDepenses, "DateDepense", "Date", 90, "dd/MM/yyyy")
+            ConfigurerColonne(gridHistoriqueDepenses, "NomCategorie", "Catégorie", 120)
+            ConfigurerColonne(gridHistoriqueDepenses, "Description", "Description", 160)
+            ConfigurerColonne(gridHistoriqueDepenses, "Montant", "Montant", 80, "N0")
+            ConfigurerColonne(gridHistoriqueDepenses, "Devise", "Devise", 60)
+            ConfigurerColonne(gridHistoriqueDepenses, "Source", "Source", 80)
+            ConfigurerColonne(gridHistoriqueDepenses, "TypeDepense", "Type", 80)
         End Sub
 
         Private Sub ConfigurerGrilleBanque()
@@ -715,13 +735,15 @@ Namespace DevCommerc8ak
 
             ' Configuration des colonnes pour l'historique bancaire
             ConfigurerColonne(gridHistoriqueBanque, "Id", "", 0, Nothing, True)
-            ConfigurerColonne(gridHistoriqueBanque, "DateTransaction", "Date", 100, "dd/MM/yyyy")
-            ConfigurerColonne(gridHistoriqueBanque, "DateOperation", "Date", 100, "dd/MM/yyyy")
-            ConfigurerColonne(gridHistoriqueBanque, "Description", "Description", 250)
-            ConfigurerColonne(gridHistoriqueBanque, "Montant", "Montant", 120, "N0")
-            ConfigurerColonne(gridHistoriqueBanque, "Devise", "Devise", 80)
-            ConfigurerColonne(gridHistoriqueBanque, "TypeTransaction", "Type", 100)
-            ConfigurerColonne(gridHistoriqueBanque, "TypeOperation", "Type", 100)
+            ConfigurerColonne(gridHistoriqueBanque, "DateTransaction", "Date", 90, "dd/MM/yyyy")
+            ConfigurerColonne(gridHistoriqueBanque, "DateOperation", "Date", 90, "dd/MM/yyyy")
+            ConfigurerColonne(gridHistoriqueBanque, "Description", "Description", 180)
+            ConfigurerColonne(gridHistoriqueBanque, "Reference", "Reference", 140)
+            ConfigurerColonne(gridHistoriqueBanque, "Montant", "Montant", 90, "N0")
+            ConfigurerColonne(gridHistoriqueBanque, "Devise", "Devise", 60)
+            ConfigurerColonne(gridHistoriqueBanque, "TypeTransaction", "Type", 90)
+            ConfigurerColonne(gridHistoriqueBanque, "TypeOperation", "Type", 90)
+            ConfigurerColonne(gridHistoriqueBanque, "CreatedAt", "Créé le", 110, "dd/MM/yyyy HH:mm")
         End Sub
 
         Private Sub ConfigurerColonne(grid As DataGridView, nom As String, titre As String, largeur As Integer, Optional format As String = Nothing, Optional cacher As Boolean = False)
@@ -970,6 +992,21 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
+                printDoc.DefaultPageSettings.Margins = New Margins(30, 30, 30, 30)
+                printDoc.DefaultPageSettings.Landscape = False
+                _impressionIndex = 0
+                _impressionTotalFC = 0D
+                _impressionTotalUSD = 0D
+                For Each row As DataRow In dtRapportAImprimer.Rows
+                    Dim montant As Decimal = If(IsDBNull(row("Montant")), 0D, Convert.ToDecimal(row("Montant")))
+                    Dim devise As String = If(IsDBNull(row("Devise")), "", Convert.ToString(row("Devise"))).Trim().ToUpperInvariant()
+                    If devise = "USD" Then
+                        _impressionTotalUSD += montant
+                    Else
+                        _impressionTotalFC += montant
+                    End If
+                Next
+
                 printPreview.ShowDialog()
             Catch ex As Exception
                 MessageBox.Show("Erreur lors de la préparation de l'impression : " & ex.Message)
@@ -977,52 +1014,127 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub PrintDoc_PrintPage(sender As Object, e As PrintPageEventArgs)
-            Dim yPos As Single = e.MarginBounds.Top
-            Dim xPos As Single = e.MarginBounds.Left
-            Dim lineHeight As Single = 20
-            Dim headerFont As New Font("Arial", 12, FontStyle.Bold)
-            Dim bodyFont As New Font("Arial", 10)
+            Dim param As ParametreDTO = _parametres
+            Dim x As Integer = 30
+            Dim y As Integer = 30
+            Dim pinceauBleu As New SolidBrush(Color.FromArgb(17, 35, 74))
+            Dim pinceauGris As New SolidBrush(Color.FromArgb(92, 104, 120))
+            Dim fontTitre As New Font("Segoe UI", 16, FontStyle.Bold)
+            Dim fontSousTitre As New Font("Segoe UI", 10, FontStyle.Regular)
+            Dim fontBloc As New Font("Segoe UI", 9.5F, FontStyle.Regular)
+            Dim fontBlocGras As New Font("Segoe UI", 10, FontStyle.Bold)
+            Dim pageWidth As Integer = 760
 
-            ' Titre du rapport
-            e.Graphics.DrawString(titreRapport, headerFont, Brushes.Black, xPos, yPos)
-            yPos += lineHeight * 2
+            If param IsNot Nothing AndAlso param.LogoPath <> "" AndAlso File.Exists(param.LogoPath) Then
+                Using logo As Image = Image.FromFile(param.LogoPath)
+                    e.Graphics.DrawImage(logo, x, y, 70, 70)
+                End Using
+                x += 84
+            End If
 
-            ' En-têtes de colonnes
-            Dim columns As New List(Of String) From {"Date", "Catégorie", "Description", "Montant", "Devise", "Source", "Type"}
-            Dim widths As New List(Of Single) From {100, 120, 200, 80, 60, 80, 80}
-            Dim currentX As Single = xPos
-            For i As Integer = 0 To columns.Count - 1
-                e.Graphics.DrawString(columns(i), headerFont, Brushes.Black, currentX, yPos)
-                currentX += widths(i)
-            Next
-            yPos += lineHeight
+            e.Graphics.DrawString(If(param IsNot Nothing AndAlso param.NomMagasin <> "", param.NomMagasin, "Paon Rehoboth"), fontTitre, pinceauBleu, x, y)
+            y += 28
+            e.Graphics.DrawString(If(param IsNot Nothing, param.AdresseMagasin, ""), fontSousTitre, pinceauGris, x, y)
+            y += 18
+            e.Graphics.DrawString(If(param IsNot Nothing, param.TelephoneMagasin, ""), fontSousTitre, pinceauGris, x, y)
+            y = 118
 
-            ' Lignes de données
-            For Each row As DataRow In dtRapportAImprimer.Rows
-                currentX = xPos
-                e.Graphics.DrawString(DirectCast(row("DateDepense"), Date).ToString("dd/MM/yyyy"), bodyFont, Brushes.Black, currentX, yPos)
-                currentX += widths(0)
-                e.Graphics.DrawString(row("NomCategorie").ToString(), bodyFont, Brushes.Black, currentX, yPos)
-                currentX += widths(1)
-                e.Graphics.DrawString(row("Description").ToString(), bodyFont, Brushes.Black, currentX, yPos)
-                currentX += widths(2)
-                e.Graphics.DrawString(FormatMontant(DirectCast(row("Montant"), Decimal), row("Devise").ToString()), bodyFont, Brushes.Black, currentX, yPos)
-                currentX += widths(3)
-                e.Graphics.DrawString(row("Devise").ToString(), bodyFont, Brushes.Black, currentX, yPos)
-                currentX += widths(4)
-                e.Graphics.DrawString(row("Source").ToString(), bodyFont, Brushes.Black, currentX, yPos)
-                currentX += widths(5)
-                e.Graphics.DrawString(row("TypeDepense").ToString(), bodyFont, Brushes.Black, currentX, yPos)
-                yPos += lineHeight
+            e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(17, 35, 74)), 30, y, pageWidth, 32)
+            e.Graphics.DrawString("RAPPORT DES DÉPENSES", New Font("Segoe UI", 12, FontStyle.Bold), Brushes.White, 42, y + 7)
+            y += 48
 
-                If yPos + lineHeight > e.MarginBounds.Bottom Then
+            e.Graphics.DrawRectangle(New Pen(Color.FromArgb(210, 219, 232)), 30, y, 360, 92)
+            e.Graphics.DrawRectangle(New Pen(Color.FromArgb(210, 219, 232)), 430, y, 360, 92)
+            e.Graphics.DrawString("Informations du rapport", fontBlocGras, pinceauBleu, 42, y + 10)
+            e.Graphics.DrawString("Période : " & titreRapport, fontBloc, Brushes.Black, 42, y + 34)
+            e.Graphics.DrawString("Lignes : " & dtRapportAImprimer.Rows.Count.ToString(), fontBloc, Brushes.Black, 42, y + 54)
+            e.Graphics.DrawString("Date impression : " & Date.Now.ToString("dd/MM/yyyy HH:mm"), fontBloc, Brushes.Black, 42, y + 74)
+            e.Graphics.DrawString("Synthèse", fontBlocGras, pinceauBleu, 442, y + 10)
+            e.Graphics.DrawString("FC : " & _impressionTotalFC.ToString("N0") & " FC", fontBloc, Brushes.Black, 442, y + 34)
+            e.Graphics.DrawString("USD : " & _impressionTotalUSD.ToString("N0") & " USD", fontBloc, Brushes.Black, 442, y + 54)
+            e.Graphics.DrawString("Source : Dépenses", fontBloc, Brushes.Black, 442, y + 74)
+            y += 116
+
+            Dim colDate As Integer = 42
+            Dim colCategorie As Integer = 132
+            Dim colDescription As Integer = 252
+            Dim colMontant As Integer = 502
+            Dim colDevise As Integer = 592
+            Dim colSource As Integer = 652
+            Dim colType As Integer = 722
+
+            e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(229, 239, 252)), 30, y, pageWidth, 28)
+            e.Graphics.DrawString("Date", fontBlocGras, pinceauBleu, colDate, y + 6)
+            e.Graphics.DrawString("Catégorie", fontBlocGras, pinceauBleu, colCategorie, y + 6)
+            e.Graphics.DrawString("Description", fontBlocGras, pinceauBleu, colDescription, y + 6)
+            e.Graphics.DrawString("Montant", fontBlocGras, pinceauBleu, colMontant, y + 6)
+            e.Graphics.DrawString("Devise", fontBlocGras, pinceauBleu, colDevise, y + 6)
+            e.Graphics.DrawString("Source", fontBlocGras, pinceauBleu, colSource, y + 6)
+            e.Graphics.DrawString("Type", fontBlocGras, pinceauBleu, colType, y + 6)
+            y += 34
+
+            Dim ligneHauteur As Integer = 24
+            While _impressionIndex < dtRapportAImprimer.Rows.Count
+                If y + ligneHauteur > e.MarginBounds.Bottom - 130 Then
                     e.HasMorePages = True
                     Return
                 End If
-            Next
+
+                Dim row As DataRow = dtRapportAImprimer.Rows(_impressionIndex)
+                e.Graphics.DrawLine(New Pen(Color.FromArgb(232, 236, 242)), 30, y + 16, 790, y + 16)
+                e.Graphics.DrawString(DirectCast(row("DateDepense"), Date).ToString("dd/MM/yyyy"), fontBloc, Brushes.Black, colDate, y)
+                e.Graphics.DrawString(Convert.ToString(row("NomCategorie")), fontBloc, Brushes.Black, colCategorie, y)
+                e.Graphics.DrawString(Convert.ToString(row("Description")), fontBloc, Brushes.Black, colDescription, y)
+                e.Graphics.DrawString(FormatMontant(If(IsDBNull(row("Montant")), 0D, Convert.ToDecimal(row("Montant"))), Convert.ToString(row("Devise"))), fontBloc, Brushes.Black, colMontant, y)
+                e.Graphics.DrawString(Convert.ToString(row("Devise")), fontBloc, Brushes.Black, colDevise, y)
+                e.Graphics.DrawString(Convert.ToString(row("Source")), fontBloc, Brushes.Black, colSource, y)
+                e.Graphics.DrawString(Convert.ToString(row("TypeDepense")), fontBloc, Brushes.Black, colType, y)
+                y += ligneHauteur
+                _impressionIndex += 1
+            End While
+
+            y += 12
+            e.Graphics.DrawRectangle(New Pen(Color.FromArgb(17, 35, 74), 1.4F), 470, y, 320, 44)
+            e.Graphics.DrawString("TOTAL GÉNÉRAL FC", fontBlocGras, pinceauBleu, 486, y + 7)
+            e.Graphics.DrawString(_impressionTotalFC.ToString("N0") & " FC", New Font("Segoe UI", 12, FontStyle.Bold), Brushes.Black, 650, y + 8)
+            y += 56
+
+            e.Graphics.DrawRectangle(New Pen(Color.FromArgb(17, 35, 74), 1.4F), 470, y, 320, 44)
+            e.Graphics.DrawString("TOTAL GÉNÉRAL USD", fontBlocGras, pinceauBleu, 486, y + 7)
+            e.Graphics.DrawString(_impressionTotalUSD.ToString("N0") & " USD", New Font("Segoe UI", 12, FontStyle.Bold), Brushes.Black, 650, y + 8)
+            y += 70
+
+            e.Graphics.DrawString("Observation : rapport généré à partir des données filtrées et validées.", fontBloc, pinceauGris, 30, y)
+            y += 38
+            e.Graphics.DrawLine(Pens.Black, 70, y + 38, 250, y + 38)
+            e.Graphics.DrawLine(Pens.Black, 530, y + 38, 710, y + 38)
+            e.Graphics.DrawString("Responsable financier", fontBloc, Brushes.Black, 102, y + 42)
+            e.Graphics.DrawString("Vérification / Contrôle", fontBloc, Brushes.Black, 552, y + 42)
 
             e.HasMorePages = False
         End Sub
+
+        Private Sub ChargerParametresApplication()
+            Try
+                Dim connectionString As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                Dim dal As New DAL(connectionString)
+                Dim paramService As New ParametreService(New ParametreRepository(dal))
+                _parametres = paramService.Charger()
+            Catch
+                _parametres = Nothing
+            End Try
+        End Sub
+
+        Private Function FormaterSoldeUsd(montant As Decimal) As String
+            Dim taux As Decimal = If(_parametres Is Nothing, 0D, _parametres.TauxUsd)
+            Dim valeurAffichee As Decimal = montant
+            If taux > 0D Then
+                valeurAffichee = Decimal.Round((montant / taux) * taux, 0, MidpointRounding.AwayFromZero)
+            Else
+                valeurAffichee = Decimal.Round(montant, 0, MidpointRounding.AwayFromZero)
+            End If
+            Return valeurAffichee.ToString("N0") & " USD"
+        End Function
 
     End Class
 
