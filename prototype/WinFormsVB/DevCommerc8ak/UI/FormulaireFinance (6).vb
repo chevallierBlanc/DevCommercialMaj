@@ -272,21 +272,21 @@ Namespace DevCommerc8ak
             Dim layoutSaisie As New TableLayoutPanel() With {
                 .Dock = DockStyle.Fill,
                 .ColumnCount = 1,
-                .RowCount = 11,
+                .RowCount = 12,
                 .Padding = New Padding(0)
             }
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 32)) ' Titre
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Label Catégorie
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 32)) ' ComboBox Catégorie
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Label Montant
-            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 32)) ' TextBox Montant
-            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Label Devise/Source/Type
-            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 34)) ' FlowLayout Devise/Source/Type
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 34)) ' Montant + Devise
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Label Source/Type
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 34)) ' Source + Type
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Label Description
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 64)) ' TextBox Description
             layoutSaisie.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Label Date
-            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 32)) ' DatePicker
-            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 44)) ' Bouton Valider
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 28)) ' DatePicker
+            layoutSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 42)) ' Bouton Valider
             layoutSaisie.BackColor = Color.Transparent
 
             Dim lblSaisieTitle As New Label() With {.Text = "Nouvelle Dépense", .Font = FontTitle, .ForeColor = ColorPrimary, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
@@ -302,47 +302,57 @@ Namespace DevCommerc8ak
             layoutSaisie.Controls.Add(pnlCat, 0, 2)
 
             layoutSaisie.Controls.Add(CreateLabel("Montant"), 0, 3)
+            Dim pnlMontantDevise As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 1, .Margin = New Padding(0), .Padding = New Padding(0)}
+            pnlMontantDevise.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 68))
+            pnlMontantDevise.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 32))
             txtMontantDepense = CreateStyledTextBox("0.00")
-            txtMontantDepense.Dock = DockStyle.Left
-            txtMontantDepense.Width = 180
-            txtMontantDepense.Anchor = AnchorStyles.Left Or AnchorStyles.Top
-            layoutSaisie.Controls.Add(txtMontantDepense, 0, 4)
-
-            Dim pnlDeviseSourceType As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.LeftToRight, .WrapContents = False, .AutoSize = False, .Height = 34, .Padding = New Padding(0, 2, 0, 0)}
-            pnlDeviseSourceType.Controls.Add(CreateLabel("Devise:", New Padding(0, 0, 5, 0)))
+            txtMontantDepense.Dock = DockStyle.Fill
+            txtMontantDepense.Margin = New Padding(0, 0, 10, 0)
             cmbDeviseDepense = CreateStyledCombo(New String() {"FC", "USD"})
-            cmbDeviseDepense.Width = 68
-            pnlDeviseSourceType.Controls.Add(cmbDeviseDepense)
-            pnlDeviseSourceType.Controls.Add(CreateLabel("Source:", New Padding(15, 0, 5, 0)))
-            cmbSourceDepense = CreateStyledCombo(New String() {"Caisse", "Banque"})
-            cmbSourceDepense.Width = 86
-            pnlDeviseSourceType.Controls.Add(cmbSourceDepense)
-            pnlDeviseSourceType.Controls.Add(CreateLabel("Type:", New Padding(15, 0, 5, 0)))
-            cmbTypeDepense = CreateStyledCombo(New String() {"Normale", "Exceptionnelle"})
-            cmbTypeDepense.Width = 112
-            pnlDeviseSourceType.Controls.Add(cmbTypeDepense)
-            layoutSaisie.Controls.Add(pnlDeviseSourceType, 0, 5)
+            cmbDeviseDepense.Dock = DockStyle.Fill
+            pnlMontantDevise.Controls.Add(txtMontantDepense, 0, 0)
+            pnlMontantDevise.Controls.Add(cmbDeviseDepense, 1, 0)
+            layoutSaisie.Controls.Add(pnlMontantDevise, 0, 4)
 
-            layoutSaisie.Controls.Add(CreateLabel("Description"), 0, 6)
+            layoutSaisie.Controls.Add(CreateLabel("Source / Type"), 0, 5)
+            Dim pnlSourceType As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 1, .Margin = New Padding(0), .Padding = New Padding(0)}
+            pnlSourceType.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50))
+            pnlSourceType.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50))
+            cmbSourceDepense = CreateStyledCombo(New String() {"Caisse", "Banque"})
+            cmbSourceDepense.Dock = DockStyle.Fill
+            cmbSourceDepense.Margin = New Padding(0, 0, 10, 0)
+            cmbTypeDepense = CreateStyledCombo(New String() {"Normale", "Exceptionnelle"})
+            cmbTypeDepense.Dock = DockStyle.Fill
+            pnlSourceType.Controls.Add(cmbSourceDepense, 0, 0)
+            pnlSourceType.Controls.Add(cmbTypeDepense, 1, 0)
+            layoutSaisie.Controls.Add(pnlSourceType, 0, 6)
+
+            layoutSaisie.Controls.Add(CreateLabel("Description"), 0, 7)
             txtDescriptionDepense = CreateStyledTextBox("Description...")
             txtDescriptionDepense.Multiline = True
             txtDescriptionDepense.Dock = DockStyle.Left
             txtDescriptionDepense.Height = 62 ' Réduit pour rendre l'ensemble plus compact
             txtDescriptionDepense.Width = 350
             txtDescriptionDepense.Anchor = AnchorStyles.Left Or AnchorStyles.Top
-            layoutSaisie.Controls.Add(txtDescriptionDepense, 0, 7)
+            layoutSaisie.Controls.Add(txtDescriptionDepense, 0, 8)
 
-            layoutSaisie.Controls.Add(CreateLabel("Date"), 0, 8)
-            dtpDateDepense = New DateTimePicker() With {.Dock = DockStyle.Left, .Width = 200, .Margin = New Padding(0, 4, 0, 8), .Font = FontControl}
-            layoutSaisie.Controls.Add(dtpDateDepense, 0, 9)
+            layoutSaisie.Controls.Add(CreateLabel("Date"), 0, 9)
+            dtpDateDepense = New DateTimePicker() With {.Dock = DockStyle.Left, .Width = 200, .Margin = New Padding(0, -2, 0, 4), .Font = FontControl}
+            layoutSaisie.Controls.Add(dtpDateDepense, 0, 10)
 
+            Dim pnlValidation As New Panel() With {.Dock = DockStyle.Fill, .Margin = New Padding(0, 4, 0, 0)}
             btnValiderDepense = CreateStyledButton("Valider la dépense", ColorDanger)
-            btnValiderDepense.Dock = DockStyle.None
             btnValiderDepense.Width = 220
             btnValiderDepense.Height = 34
-            btnValiderDepense.Anchor = AnchorStyles.Right Or AnchorStyles.Top
-            btnValiderDepense.Margin = New Padding(0, 4, 0, 0)
-            layoutSaisie.Controls.Add(btnValiderDepense, 0, 10)
+            btnValiderDepense.Dock = DockStyle.None
+            btnValiderDepense.Anchor = AnchorStyles.None
+            pnlValidation.Controls.Add(btnValiderDepense)
+            AddHandler pnlValidation.Resize,
+                Sub()
+                    btnValiderDepense.Left = (pnlValidation.ClientSize.Width - btnValiderDepense.Width) \ 2
+                    btnValiderDepense.Top = (pnlValidation.ClientSize.Height - btnValiderDepense.Height) \ 2
+                End Sub
+            layoutSaisie.Controls.Add(pnlValidation, 0, 11)
 
             pnlSaisie.Controls.Add(layoutSaisie)
 
@@ -735,15 +745,15 @@ Namespace DevCommerc8ak
 
             ' Configuration des colonnes pour l'historique bancaire
             ConfigurerColonne(gridHistoriqueBanque, "Id", "", 0, Nothing, True)
-            ConfigurerColonne(gridHistoriqueBanque, "DateTransaction", "Date", 90, "dd/MM/yyyy")
-            ConfigurerColonne(gridHistoriqueBanque, "DateOperation", "Date", 90, "dd/MM/yyyy")
-            ConfigurerColonne(gridHistoriqueBanque, "Description", "Description", 180)
-            ConfigurerColonne(gridHistoriqueBanque, "Reference", "Reference", 140)
-            ConfigurerColonne(gridHistoriqueBanque, "Montant", "Montant", 90, "N0")
-            ConfigurerColonne(gridHistoriqueBanque, "Devise", "Devise", 60)
-            ConfigurerColonne(gridHistoriqueBanque, "TypeTransaction", "Type", 90)
-            ConfigurerColonne(gridHistoriqueBanque, "TypeOperation", "Type", 90)
-            ConfigurerColonne(gridHistoriqueBanque, "CreatedAt", "Créé le", 110, "dd/MM/yyyy HH:mm")
+            ConfigurerColonne(gridHistoriqueBanque, "DateTransaction", "Date", 95, "dd/MM/yyyy")
+            ConfigurerColonne(gridHistoriqueBanque, "DateOperation", "Date", 95, "dd/MM/yyyy")
+            ConfigurerColonne(gridHistoriqueBanque, "Description", "Description", 220)
+            ConfigurerColonne(gridHistoriqueBanque, "Reference", "Reference", 160)
+            ConfigurerColonne(gridHistoriqueBanque, "Montant", "Montant", 100, "N0")
+            ConfigurerColonne(gridHistoriqueBanque, "Devise", "Devise", 70)
+            ConfigurerColonne(gridHistoriqueBanque, "TypeTransaction", "Type", 100)
+            ConfigurerColonne(gridHistoriqueBanque, "TypeOperation", "Type", 100)
+            ConfigurerColonne(gridHistoriqueBanque, "CreatedAt", "Créé le", 130, "dd/MM/yyyy HH:mm")
         End Sub
 
         Private Sub ConfigurerColonne(grid As DataGridView, nom As String, titre As String, largeur As Integer, Optional format As String = Nothing, Optional cacher As Boolean = False)
