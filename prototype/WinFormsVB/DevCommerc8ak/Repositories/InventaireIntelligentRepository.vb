@@ -164,6 +164,43 @@ Namespace DevCommerc8ak
             Return Convert.ToInt32(v)
         End Function
 
+        Public Function ListerAnneesInventaires() As DataTable
+            Dim sql As String = "SELECT DISTINCT YEAR(DateCreation) AS Annee FROM Inventaires ORDER BY Annee DESC"
+            Return _dal.ExecuterTable(sql, CommandType.Text, Nothing)
+        End Function
+
+        Public Function ListerInventairesParPeriode(mois As Integer, annee As Integer) As DataTable
+            Dim sql As String = "" &
+                "SELECT i.InventaireId, i.ReferenceInventaire, i.DateCreation, i.DateValidation, i.Statut, ISNULL(i.Observation, '') AS Observation, " &
+                "       ISNULL(lc.TotalLignes, 0) AS TotalLignes, " &
+                "       ISNULL(lc.NombreComptes, 0) AS NombreComptes, " &
+                "       ISNULL(lc.NombreNonComptes, 0) AS NombreNonComptes, " &
+                "       ISNULL(lc.NombreConformes, 0) AS NombreConformes, " &
+                "       ISNULL(lc.NombreManques, 0) AS NombreManques, " &
+                "       ISNULL(lc.NombreSurplus, 0) AS NombreSurplus, " &
+                "       ISNULL(lc.ValeurEcarts, 0) AS ValeurEcarts " &
+                "FROM Inventaires i " &
+                "OUTER APPLY ( " &
+                "    SELECT COUNT(*) AS TotalLignes, " &
+                "           SUM(CASE WHEN il.StockPhysique IS NOT NULL THEN 1 ELSE 0 END) AS NombreComptes, " &
+                "           SUM(CASE WHEN il.StockPhysique IS NULL THEN 1 ELSE 0 END) AS NombreNonComptes, " &
+                "           SUM(CASE WHEN UPPER(ISNULL(il.Statut, '')) = N'CONFORME' THEN 1 ELSE 0 END) AS NombreConformes, " &
+                "           SUM(CASE WHEN UPPER(ISNULL(il.Statut, '')) = N'MANQUE' THEN 1 ELSE 0 END) AS NombreManques, " &
+                "           SUM(CASE WHEN UPPER(ISNULL(il.Statut, '')) = N'SURPLUS' THEN 1 ELSE 0 END) AS NombreSurplus, " &
+                "           SUM(ABS(ISNULL(il.Ecart, 0)) * ISNULL(p.PrixAchat, 0)) AS ValeurEcarts " &
+                "    FROM InventaireLignes il " &
+                "    LEFT JOIN Produits p ON p.ProduitId = il.ProduitId " &
+                "    WHERE il.InventaireId = i.InventaireId " &
+                ") lc " &
+                "WHERE YEAR(i.DateCreation) = @Annee AND MONTH(i.DateCreation) = @Mois " &
+                "ORDER BY i.DateCreation DESC"
+            Dim p As New List(Of SqlParameter) From {
+                New SqlParameter("@Mois", mois),
+                New SqlParameter("@Annee", annee)
+            }
+            Return _dal.ExecuterTable(sql, CommandType.Text, p)
+        End Function
+
         Public Function ChargerHistoriqueStockInventaire(produitId As Integer) As DataTable
             Dim sql As String = "" &
                 "SELECT StockInventaireId, ProduitId, StockTheorique, StockReel, Ecart, DateInventaire, CreePar, Observation " &

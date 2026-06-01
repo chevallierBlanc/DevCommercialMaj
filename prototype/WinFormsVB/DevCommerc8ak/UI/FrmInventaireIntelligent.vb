@@ -6,6 +6,7 @@ Imports System.Data
 Imports System.Data.SqlClient
 Imports System.Drawing
 Imports System.Drawing.Printing
+Imports System.IO
 Imports System.Collections.Generic
 Imports System.Configuration
 Imports System.Windows.Forms
@@ -49,6 +50,7 @@ Namespace DevCommerc8ak
         Private tabMain As TabControl
         Private tabInventaire As TabPage
         Private tabConsultation As TabPage
+        Private tabHistoriqueInventaires As TabPage
 
         Private btnNouvelInventaire As Button
         Private btnEnregistrerInventaire As Button
@@ -85,6 +87,35 @@ Namespace DevCommerc8ak
         Private gridSorties As DataGridView
         Private gridAncienInventaire As DataGridView
 
+        Private cmbMoisHistorique As ComboBox
+        Private cmbAnneeHistorique As ComboBox
+        Private btnChargerHistorique As Button
+        Private btnImprimerHistorique As Button
+        Private gridInventairesHistoriques As DataGridView
+        Private gridHistoriqueLignes As DataGridView
+        Private lblHistoriqueRef As Label
+        Private lblHistoriqueStatut As Label
+        Private lblHistoriqueDate As Label
+        Private lblHistTotalProduits As Label
+        Private lblHistProduitsComptes As Label
+        Private lblHistProduitsNonComptes As Label
+        Private lblHistProduitsConformes As Label
+        Private lblHistProduitsManques As Label
+        Private lblHistProduitsSurplus As Label
+        Private lblHistValeurEcarts As Label
+        Private lblHistProgression As Label
+
+        Private _historiqueInventairesTable As DataTable
+        Private _historiqueInventaireIdSelectionne As Integer
+        Private _chargementHistoriqueEnCours As Boolean
+        Private _impressionInventaireTable As DataTable
+        Private _impressionInventaireTitre As String = "RAPPORT D'INVENTAIRE"
+        Private _impressionInventaireReference As String = "-"
+        Private _impressionInventaireStatut As String = "-"
+        Private _impressionInventaireDate As String = "-"
+        Private _impressionInventaireObservation As String = ""
+        Private _impressionIndexLigne As Integer
+
         Public Sub New()
             Me.Text = "FrmInventaireIntelligent"
             Me.StartPosition = FormStartPosition.CenterScreen
@@ -109,6 +140,9 @@ Namespace DevCommerc8ak
             AddHandler cmbCategorie.SelectedIndexChanged, AddressOf TexteRechercheOuFiltreChanged
             AddHandler cmbStatut.SelectedIndexChanged, AddressOf TexteRechercheOuFiltreChanged
             AddHandler btnChargerConsultation.Click, AddressOf ChargerConsultationProduit
+            AddHandler btnChargerHistorique.Click, AddressOf ChargerInventairesHistoriquesDepuisFiltres
+            AddHandler btnImprimerHistorique.Click, AddressOf ImprimerInventaireHistorique
+            AddHandler gridInventairesHistoriques.SelectionChanged, AddressOf GridInventairesHistoriques_SelectionChanged
             AddHandler gridInventaire.CellEndEdit, AddressOf GridInventaire_CellEndEdit
             AddHandler gridInventaire.CellValidating, AddressOf GridInventaire_CellValidating
             AddHandler gridInventaire.DataError, AddressOf GridInventaire_DataError
@@ -121,12 +155,15 @@ Namespace DevCommerc8ak
             tabMain = New TabControl() With {.Dock = DockStyle.Fill, .Font = FontLabel}
             tabInventaire = New TabPage("Inventaire") With {.BackColor = ColorBg}
             tabConsultation = New TabPage("Consultation") With {.BackColor = ColorBg}
+            tabHistoriqueInventaires = New TabPage("Historique inventaires") With {.BackColor = ColorBg}
             tabMain.TabPages.Add(tabInventaire)
             tabMain.TabPages.Add(tabConsultation)
+            tabMain.TabPages.Add(tabHistoriqueInventaires)
             Me.Controls.Add(tabMain)
 
             ConstruireTabInventaire()
             ConstruireTabConsultation()
+            ConstruireTabHistoriqueInventaires()
         End Sub
 
         Private Sub ConstruireTabInventaire()
@@ -235,37 +272,24 @@ Namespace DevCommerc8ak
             layoutHistorique.RowStyles.Add(New RowStyle(SizeType.Percent, 40))
             tabHistorique.Controls.Add(layoutHistorique)
 
-            Dim split As New SplitContainer() With {
-                .Dock = DockStyle.Fill,
-                .Orientation = Orientation.Vertical,
-                .Panel1MinSize = 260,
-                .Panel2MinSize = 360
-            }
-            AddHandler split.SizeChanged, Sub()
-                                              If split.Width <= 0 Then Return
-                                              Dim desired As Integer = CInt(split.Width * 0.32)
-                                              Dim minDistance As Integer = split.Panel1MinSize
-                                              Dim maxDistance As Integer = Math.Max(minDistance, split.Width - split.Panel2MinSize - 4)
-                                              desired = Math.Max(minDistance, Math.Min(desired, maxDistance))
-                                              If desired > 0 AndAlso desired <> split.SplitterDistance Then
-                                                  split.SplitterDistance = desired
-                                              End If
-                                          End Sub
-            Dim cardEntrees As New Panel() With {.Dock = DockStyle.Fill, .BackColor = ColorCard, .Padding = New Padding(10)}
+            Dim grilleComparatif As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 1}
+            grilleComparatif.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 38))
+            grilleComparatif.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 62))
+            Dim cardEntrees As New Panel() With {.Dock = DockStyle.Fill, .BackColor = ColorCard, .Padding = New Padding(10), .Margin = New Padding(0, 0, 8, 0)}
             cardEntrees.Controls.Add(New Label() With {.Text = "Historique des entrées", .Font = FontSection, .AutoSize = True, .ForeColor = ColorPrimary, .Dock = DockStyle.Top})
             gridEntrees = CreerGrille(False)
             gridEntrees.Dock = DockStyle.Fill
             cardEntrees.Controls.Add(gridEntrees)
-            split.Panel1.Controls.Add(cardEntrees)
+            grilleComparatif.Controls.Add(cardEntrees, 0, 0)
 
-            Dim cardSorties As New Panel() With {.Dock = DockStyle.Fill, .BackColor = ColorCard, .Padding = New Padding(10)}
+            Dim cardSorties As New Panel() With {.Dock = DockStyle.Fill, .BackColor = ColorCard, .Padding = New Padding(10), .Margin = New Padding(8, 0, 0, 0)}
             cardSorties.Controls.Add(New Label() With {.Text = "Historique des sorties", .Font = FontSection, .AutoSize = True, .ForeColor = ColorPrimary, .Dock = DockStyle.Top})
             gridSorties = CreerGrille(False)
             gridSorties.Dock = DockStyle.Fill
             cardSorties.Controls.Add(gridSorties)
-            split.Panel2.Controls.Add(cardSorties)
+            grilleComparatif.Controls.Add(cardSorties, 1, 0)
 
-            layoutHistorique.Controls.Add(split, 0, 0)
+            layoutHistorique.Controls.Add(grilleComparatif, 0, 0)
 
             Dim cardAncien As New Panel() With {.Dock = DockStyle.Fill, .BackColor = ColorCard, .Padding = New Padding(10)}
             cardAncien.Controls.Add(New Label() With {.Text = "Historique ancien StockInventaire", .Font = FontSection, .AutoSize = True, .ForeColor = ColorPrimary, .Dock = DockStyle.Top})
@@ -273,6 +297,349 @@ Namespace DevCommerc8ak
             gridAncienInventaire.Dock = DockStyle.Fill
             cardAncien.Controls.Add(gridAncienInventaire)
             layoutHistorique.Controls.Add(cardAncien, 0, 1)
+        End Sub
+
+        Private Sub ConstruireTabHistoriqueInventaires()
+            Dim layout As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 4, .Padding = New Padding(20)}
+            layout.RowStyles.Add(New RowStyle(SizeType.Absolute, 58))
+            layout.RowStyles.Add(New RowStyle(SizeType.Absolute, 92))
+            layout.RowStyles.Add(New RowStyle(SizeType.Absolute, 190))
+            layout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+            tabHistoriqueInventaires.Controls.Add(layout)
+
+            Dim pnlFiltres As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .WrapContents = False, .AutoScroll = True}
+            pnlFiltres.Controls.Add(New Label() With {.Text = "Mois:", .AutoSize = True, .Margin = New Padding(0, 10, 8, 0), .Font = FontLabel, .ForeColor = ColorSecondary})
+            cmbMoisHistorique = New ComboBox() With {.Width = 180, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontLabel, .Margin = New Padding(0, 6, 15, 0)}
+            pnlFiltres.Controls.Add(cmbMoisHistorique)
+            pnlFiltres.Controls.Add(New Label() With {.Text = "Année:", .AutoSize = True, .Margin = New Padding(0, 10, 8, 0), .Font = FontLabel, .ForeColor = ColorSecondary})
+            cmbAnneeHistorique = New ComboBox() With {.Width = 120, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontLabel, .Margin = New Padding(0, 6, 15, 0)}
+            pnlFiltres.Controls.Add(cmbAnneeHistorique)
+            btnChargerHistorique = CreerBoutonAction("Charger", ColorAccent)
+            btnChargerHistorique.Width = 120
+            btnImprimerHistorique = CreerBoutonAction("Imprimer A4", ColorSecondary)
+            btnImprimerHistorique.Width = 140
+            pnlFiltres.Controls.Add(btnChargerHistorique)
+            pnlFiltres.Controls.Add(btnImprimerHistorique)
+            layout.Controls.Add(pnlFiltres, 0, 0)
+
+            Dim cardInfos As New Panel() With {.Dock = DockStyle.Fill, .BackColor = ColorCard, .Padding = New Padding(16), .Margin = New Padding(0, 0, 0, 8)}
+            Dim lblTitre As New Label() With {.Text = "Historique des inventaires", .Font = FontSection, .ForeColor = ColorPrimary, .AutoSize = True, .Location = New Point(10, 10)}
+            lblHistoriqueRef = New Label() With {.Text = "Référence: -", .Font = FontLabel, .ForeColor = ColorSecondary, .AutoSize = False, .Width = 300, .Height = 22, .Location = New Point(10, 40)}
+            lblHistoriqueStatut = New Label() With {.Text = "Statut: -", .Font = FontLabel, .ForeColor = ColorSecondary, .AutoSize = False, .Width = 250, .Height = 22, .Location = New Point(340, 40)}
+            lblHistoriqueDate = New Label() With {.Text = "Date: -", .Font = FontLabel, .ForeColor = ColorSecondary, .AutoSize = False, .Width = 250, .Height = 22, .Location = New Point(620, 40)}
+            cardInfos.Controls.Add(lblTitre)
+            cardInfos.Controls.Add(lblHistoriqueRef)
+            cardInfos.Controls.Add(lblHistoriqueStatut)
+            cardInfos.Controls.Add(lblHistoriqueDate)
+            layout.Controls.Add(cardInfos, 0, 1)
+
+            Dim kpiTable As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 4, .RowCount = 2, .Margin = New Padding(0), .Padding = New Padding(0)}
+            For i As Integer = 1 To 4
+                kpiTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25))
+            Next
+            kpiTable.RowStyles.Add(New RowStyle(SizeType.Percent, 50))
+            kpiTable.RowStyles.Add(New RowStyle(SizeType.Percent, 50))
+            Dim h1, h2, h3, h4, h5, h6, h7, h8 As Label
+            kpiTable.Controls.Add(CreerCarteResume("Total produits", h1), 0, 0)
+            kpiTable.Controls.Add(CreerCarteResume("Produits comptés", h2), 1, 0)
+            kpiTable.Controls.Add(CreerCarteResume("Produits non comptés", h3), 2, 0)
+            kpiTable.Controls.Add(CreerCarteResume("Produits conformes", h4), 3, 0)
+            kpiTable.Controls.Add(CreerCarteResume("Produits avec manque", h5), 0, 1)
+            kpiTable.Controls.Add(CreerCarteResume("Produits avec surplus", h6), 1, 1)
+            kpiTable.Controls.Add(CreerCarteResume("Valeur des écarts", h7), 2, 1)
+            kpiTable.Controls.Add(CreerCarteResume("Progression", h8), 3, 1)
+            lblHistTotalProduits = h1
+            lblHistProduitsComptes = h2
+            lblHistProduitsNonComptes = h3
+            lblHistProduitsConformes = h4
+            lblHistProduitsManques = h5
+            lblHistProduitsSurplus = h6
+            lblHistValeurEcarts = h7
+            lblHistProgression = h8
+            layout.Controls.Add(kpiTable, 0, 2)
+
+            Dim layoutGrilles As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 2}
+            layoutGrilles.RowStyles.Add(New RowStyle(SizeType.Absolute, 220))
+            layoutGrilles.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+
+            Dim cardInventaires As New Panel() With {.Dock = DockStyle.Fill, .BackColor = ColorCard, .Padding = New Padding(10), .Margin = New Padding(0, 0, 0, 8)}
+            cardInventaires.Controls.Add(New Label() With {.Text = "Inventaires de la période", .Font = FontSection, .ForeColor = ColorPrimary, .AutoSize = True, .Dock = DockStyle.Top})
+            gridInventairesHistoriques = CreerGrille(False)
+            gridInventairesHistoriques.Dock = DockStyle.Fill
+            cardInventaires.Controls.Add(gridInventairesHistoriques)
+            layoutGrilles.Controls.Add(cardInventaires, 0, 0)
+
+            Dim cardLignes As New Panel() With {.Dock = DockStyle.Fill, .BackColor = ColorCard, .Padding = New Padding(10), .Margin = New Padding(0)}
+            cardLignes.Controls.Add(New Label() With {.Text = "Détail inventaire sélectionné", .Font = FontSection, .ForeColor = ColorPrimary, .AutoSize = True, .Dock = DockStyle.Top})
+            gridHistoriqueLignes = CreerGrille(False)
+            gridHistoriqueLignes.Dock = DockStyle.Fill
+            cardLignes.Controls.Add(gridHistoriqueLignes)
+            layoutGrilles.Controls.Add(cardLignes, 0, 1)
+
+            layout.Controls.Add(layoutGrilles, 0, 3)
+        End Sub
+
+        Private Sub ChargerFiltresHistoriqueInventaires()
+            If cmbMoisHistorique Is Nothing OrElse cmbAnneeHistorique Is Nothing Then Return
+
+            Dim mois As String() = {"Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"}
+            cmbMoisHistorique.DataSource = Nothing
+            cmbMoisHistorique.Items.Clear()
+            cmbMoisHistorique.Items.AddRange(mois)
+
+            cmbAnneeHistorique.DataSource = Nothing
+            cmbAnneeHistorique.Items.Clear()
+
+            Dim dtAnnees As DataTable = _repo.ListerAnneesInventaires()
+            If dtAnnees IsNot Nothing AndAlso dtAnnees.Rows.Count > 0 Then
+                For Each r As DataRow In dtAnnees.Rows
+                    cmbAnneeHistorique.Items.Add(Convert.ToInt32(r("Annee")))
+                Next
+            End If
+
+            If cmbAnneeHistorique.Items.Count = 0 Then
+                For annee As Integer = Date.Now.Year To Date.Now.Year - 5 Step -1
+                    cmbAnneeHistorique.Items.Add(annee)
+                Next
+            End If
+
+            cmbMoisHistorique.SelectedIndex = Date.Now.Month - 1
+            Dim anneeCourante As Integer = Date.Now.Year
+            If cmbAnneeHistorique.Items.Contains(anneeCourante) Then
+                cmbAnneeHistorique.SelectedItem = anneeCourante
+            ElseIf cmbAnneeHistorique.Items.Count > 0 Then
+                cmbAnneeHistorique.SelectedIndex = 0
+            End If
+        End Sub
+
+        Private Sub ChargerInventairesHistoriques()
+            If cmbMoisHistorique Is Nothing OrElse cmbAnneeHistorique Is Nothing Then Return
+            If cmbMoisHistorique.SelectedIndex < 0 OrElse cmbAnneeHistorique.SelectedItem Is Nothing Then Return
+
+            _chargementHistoriqueEnCours = True
+            Try
+                Dim mois As Integer = cmbMoisHistorique.SelectedIndex + 1
+                Dim annee As Integer = Convert.ToInt32(cmbAnneeHistorique.SelectedItem)
+                Dim dt As DataTable = _repo.ListerInventairesParPeriode(mois, annee)
+                _historiqueInventairesTable = dt
+                If gridInventairesHistoriques IsNot Nothing Then
+                    gridInventairesHistoriques.DataSource = If(dt Is Nothing, Nothing, dt.DefaultView)
+                    ConfigurerGrilleInventairesHistoriques()
+                End If
+                If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
+                    ChargerInventaireHistoriqueSelectionne(0)
+                Else
+                    EffacerHistoriqueSelectionne()
+                End If
+            Finally
+                _chargementHistoriqueEnCours = False
+            End Try
+        End Sub
+
+        Private Sub ConfigurerGrilleInventairesHistoriques()
+            If gridInventairesHistoriques Is Nothing OrElse gridInventairesHistoriques.Columns.Count = 0 Then Return
+
+            For Each col As DataGridViewColumn In gridInventairesHistoriques.Columns
+                col.Visible = True
+                col.ReadOnly = True
+            Next
+
+            If gridInventairesHistoriques.Columns.Contains("InventaireId") Then gridInventairesHistoriques.Columns("InventaireId").Visible = False
+            If gridInventairesHistoriques.Columns.Contains("Observation") Then gridInventairesHistoriques.Columns("Observation").Visible = False
+            If gridInventairesHistoriques.Columns.Contains("ReferenceInventaire") Then
+                gridInventairesHistoriques.Columns("ReferenceInventaire").HeaderText = "Référence"
+                gridInventairesHistoriques.Columns("ReferenceInventaire").Width = 140
+            End If
+            If gridInventairesHistoriques.Columns.Contains("DateCreation") Then
+                gridInventairesHistoriques.Columns("DateCreation").HeaderText = "Date"
+                gridInventairesHistoriques.Columns("DateCreation").DefaultCellStyle.Format = "dd/MM/yyyy HH:mm"
+                gridInventairesHistoriques.Columns("DateCreation").Width = 150
+            End If
+            If gridInventairesHistoriques.Columns.Contains("DateValidation") Then
+                gridInventairesHistoriques.Columns("DateValidation").HeaderText = "Validation"
+                gridInventairesHistoriques.Columns("DateValidation").DefaultCellStyle.Format = "dd/MM/yyyy HH:mm"
+                gridInventairesHistoriques.Columns("DateValidation").Width = 150
+            End If
+            If gridInventairesHistoriques.Columns.Contains("Statut") Then
+                gridInventairesHistoriques.Columns("Statut").HeaderText = "Statut"
+                gridInventairesHistoriques.Columns("Statut").Width = 110
+            End If
+            If gridInventairesHistoriques.Columns.Contains("TotalLignes") Then
+                gridInventairesHistoriques.Columns("TotalLignes").HeaderText = "Lignes"
+                gridInventairesHistoriques.Columns("TotalLignes").DefaultCellStyle.Format = "N0"
+                gridInventairesHistoriques.Columns("TotalLignes").Width = 90
+            End If
+            If gridInventairesHistoriques.Columns.Contains("NombreComptes") Then
+                gridInventairesHistoriques.Columns("NombreComptes").HeaderText = "Comptés"
+                gridInventairesHistoriques.Columns("NombreComptes").DefaultCellStyle.Format = "N0"
+                gridInventairesHistoriques.Columns("NombreComptes").Width = 90
+            End If
+            If gridInventairesHistoriques.Columns.Contains("NombreNonComptes") Then
+                gridInventairesHistoriques.Columns("NombreNonComptes").HeaderText = "Non comptés"
+                gridInventairesHistoriques.Columns("NombreNonComptes").DefaultCellStyle.Format = "N0"
+                gridInventairesHistoriques.Columns("NombreNonComptes").Width = 110
+            End If
+            If gridInventairesHistoriques.Columns.Contains("NombreConformes") Then
+                gridInventairesHistoriques.Columns("NombreConformes").HeaderText = "Conformes"
+                gridInventairesHistoriques.Columns("NombreConformes").DefaultCellStyle.Format = "N0"
+                gridInventairesHistoriques.Columns("NombreConformes").Width = 100
+            End If
+            If gridInventairesHistoriques.Columns.Contains("NombreManques") Then
+                gridInventairesHistoriques.Columns("NombreManques").HeaderText = "Manques"
+                gridInventairesHistoriques.Columns("NombreManques").DefaultCellStyle.Format = "N0"
+                gridInventairesHistoriques.Columns("NombreManques").Width = 90
+            End If
+            If gridInventairesHistoriques.Columns.Contains("NombreSurplus") Then
+                gridInventairesHistoriques.Columns("NombreSurplus").HeaderText = "Surplus"
+                gridInventairesHistoriques.Columns("NombreSurplus").DefaultCellStyle.Format = "N0"
+                gridInventairesHistoriques.Columns("NombreSurplus").Width = 90
+            End If
+            If gridInventairesHistoriques.Columns.Contains("ValeurEcarts") Then
+                gridInventairesHistoriques.Columns("ValeurEcarts").HeaderText = "Valeur écarts"
+                gridInventairesHistoriques.Columns("ValeurEcarts").DefaultCellStyle.Format = "N0"
+                gridInventairesHistoriques.Columns("ValeurEcarts").Width = 120
+            End If
+
+            If gridInventairesHistoriques.CurrentRow Is Nothing AndAlso gridInventairesHistoriques.Rows.Count > 0 Then
+                gridInventairesHistoriques.Rows(0).Selected = True
+            End If
+        End Sub
+
+        Private Sub ChargerInventaireHistoriqueSelectionne(index As Integer)
+            If gridInventairesHistoriques Is Nothing OrElse gridInventairesHistoriques.Rows.Count = 0 Then
+                EffacerHistoriqueSelectionne()
+                Return
+            End If
+            If index < 0 OrElse index >= gridInventairesHistoriques.Rows.Count Then
+                index = 0
+            End If
+
+            _chargementHistoriqueEnCours = True
+            Try
+                gridInventairesHistoriques.ClearSelection()
+                gridInventairesHistoriques.Rows(index).Selected = True
+                gridInventairesHistoriques.CurrentCell = gridInventairesHistoriques.Rows(index).Cells(0)
+
+                Dim rowView As DataRowView = TryCast(gridInventairesHistoriques.Rows(index).DataBoundItem, DataRowView)
+                If rowView Is Nothing Then
+                    EffacerHistoriqueSelectionne()
+                    Return
+                End If
+
+                Dim row As DataRow = rowView.Row
+                _historiqueInventaireIdSelectionne = Convert.ToInt32(row("InventaireId"))
+                _impressionInventaireTitre = "RAPPORT D'INVENTAIRE"
+                _impressionInventaireReference = Convert.ToString(row("ReferenceInventaire"))
+                _impressionInventaireStatut = Convert.ToString(row("Statut"))
+                _impressionInventaireDate = Convert.ToDateTime(row("DateCreation")).ToString("dd/MM/yyyy HH:mm")
+                _impressionInventaireObservation = If(row.IsNull("Observation"), "", Convert.ToString(row("Observation")))
+                lblHistoriqueRef.Text = "Référence: " & Convert.ToString(row("ReferenceInventaire"))
+                lblHistoriqueStatut.Text = "Statut: " & Convert.ToString(row("Statut"))
+                lblHistoriqueDate.Text = "Date: " & Convert.ToDateTime(row("DateCreation")).ToString("dd/MM/yyyy HH:mm")
+                ActualiserResumeInventaireHistorique(row)
+
+                Dim dtLignes As DataTable = _repo.ChargerLignesInventaire(_historiqueInventaireIdSelectionne)
+                _impressionInventaireTable = dtLignes
+                If gridHistoriqueLignes IsNot Nothing Then
+                    gridHistoriqueLignes.DataSource = If(dtLignes Is Nothing, Nothing, dtLignes.DefaultView)
+                    ConfigurerGrilleHistoriqueLignes()
+                End If
+            Finally
+                _chargementHistoriqueEnCours = False
+            End Try
+        End Sub
+
+        Private Sub ConfigurerGrilleHistoriqueLignes()
+            If gridHistoriqueLignes Is Nothing OrElse gridHistoriqueLignes.Columns.Count = 0 Then Return
+
+            For Each col As DataGridViewColumn In gridHistoriqueLignes.Columns
+                col.Visible = True
+                col.ReadOnly = True
+            Next
+
+            Dim colonnesCachees As String() = {"LigneInventaireId", "InventaireId", "ProduitId", "ConversionUnite", "PrixAchat"}
+            For Each nom As String In colonnesCachees
+                If gridHistoriqueLignes.Columns.Contains(nom) Then
+                    gridHistoriqueLignes.Columns(nom).Visible = False
+                End If
+            Next
+
+            If gridHistoriqueLignes.Columns.Contains("NomProduit") Then
+                gridHistoriqueLignes.Columns("NomProduit").HeaderText = "Produit"
+                gridHistoriqueLignes.Columns("NomProduit").MinimumWidth = 180
+            End If
+            If gridHistoriqueLignes.Columns.Contains("Categorie") Then
+                gridHistoriqueLignes.Columns("Categorie").HeaderText = "Catégorie"
+                gridHistoriqueLignes.Columns("Categorie").Width = 140
+            End If
+            If gridHistoriqueLignes.Columns.Contains("StockTheorique") Then
+                gridHistoriqueLignes.Columns("StockTheorique").HeaderText = "Stock théorique"
+                gridHistoriqueLignes.Columns("StockTheorique").DefaultCellStyle.Format = "N0"
+            End If
+            If gridHistoriqueLignes.Columns.Contains("StockPhysique") Then
+                gridHistoriqueLignes.Columns("StockPhysique").HeaderText = "Stock physique"
+                gridHistoriqueLignes.Columns("StockPhysique").DefaultCellStyle.Format = "N0"
+            End If
+            If gridHistoriqueLignes.Columns.Contains("Ecart") Then
+                gridHistoriqueLignes.Columns("Ecart").HeaderText = "Écart"
+                gridHistoriqueLignes.Columns("Ecart").DefaultCellStyle.Format = "N0"
+            End If
+            If gridHistoriqueLignes.Columns.Contains("Statut") Then
+                gridHistoriqueLignes.Columns("Statut").HeaderText = "Statut"
+                gridHistoriqueLignes.Columns("Statut").Width = 110
+            End If
+            If gridHistoriqueLignes.Columns.Contains("Motif") Then
+                gridHistoriqueLignes.Columns("Motif").HeaderText = "Motif"
+                gridHistoriqueLignes.Columns("Motif").MinimumWidth = 200
+            End If
+            If gridHistoriqueLignes.Columns.Contains("StatutComptage") Then
+                gridHistoriqueLignes.Columns("StatutComptage").HeaderText = "Comptage"
+                gridHistoriqueLignes.Columns("StatutComptage").Width = 110
+            End If
+        End Sub
+
+        Private Sub ActualiserResumeInventaireHistorique(row As DataRow)
+            If row Is Nothing Then
+                EffacerHistoriqueSelectionne()
+                Return
+            End If
+
+            Dim total As Integer = If(row.IsNull("TotalLignes"), 0, Convert.ToInt32(row("TotalLignes")))
+            Dim comptes As Integer = If(row.IsNull("NombreComptes"), 0, Convert.ToInt32(row("NombreComptes")))
+            Dim nonComptes As Integer = If(row.IsNull("NombreNonComptes"), 0, Convert.ToInt32(row("NombreNonComptes")))
+            Dim conformes As Integer = If(row.IsNull("NombreConformes"), 0, Convert.ToInt32(row("NombreConformes")))
+            Dim manques As Integer = If(row.IsNull("NombreManques"), 0, Convert.ToInt32(row("NombreManques")))
+            Dim surplus As Integer = If(row.IsNull("NombreSurplus"), 0, Convert.ToInt32(row("NombreSurplus")))
+            Dim valeurEcarts As Decimal = If(row.IsNull("ValeurEcarts"), 0D, Convert.ToDecimal(row("ValeurEcarts")))
+
+            lblHistTotalProduits.Text = FormatageGlobal.FormatNombre(total)
+            lblHistProduitsComptes.Text = FormatageGlobal.FormatNombre(comptes)
+            lblHistProduitsNonComptes.Text = FormatageGlobal.FormatNombre(nonComptes)
+            lblHistProduitsConformes.Text = FormatageGlobal.FormatNombre(conformes)
+            lblHistProduitsManques.Text = FormatageGlobal.FormatNombre(manques)
+            lblHistProduitsSurplus.Text = FormatageGlobal.FormatNombre(surplus)
+            lblHistValeurEcarts.Text = FormatageGlobal.FormatMontant(valeurEcarts)
+            Dim progression As Decimal = If(total = 0, 0D, (comptes * 100D) / total)
+            lblHistProgression.Text = FormatageGlobal.FormatPourcentage(Math.Round(progression, 0))
+        End Sub
+
+        Private Sub EffacerHistoriqueSelectionne()
+            _historiqueInventaireIdSelectionne = 0
+            _impressionInventaireTable = Nothing
+            lblHistoriqueRef.Text = "Référence: -"
+            lblHistoriqueStatut.Text = "Statut: -"
+            lblHistoriqueDate.Text = "Date: -"
+            lblHistTotalProduits.Text = "0"
+            lblHistProduitsComptes.Text = "0"
+            lblHistProduitsNonComptes.Text = "0"
+            lblHistProduitsConformes.Text = "0"
+            lblHistProduitsManques.Text = "0"
+            lblHistProduitsSurplus.Text = "0"
+            lblHistValeurEcarts.Text = "0 FC"
+            lblHistProgression.Text = "0 %"
+            If gridHistoriqueLignes IsNot Nothing Then
+                gridHistoriqueLignes.DataSource = Nothing
+            End If
         End Sub
 
         Private Function CreerCarteResume(titre As String, ByRef valeur As Label) As Panel
@@ -330,8 +697,10 @@ Namespace DevCommerc8ak
             Try
                 ChargerProduitsConsultation()
                 ChargerEtatInventaireCourant()
+                ChargerFiltresHistoriqueInventaires()
                 AjouterFiltresStatuts()
                 MettreModeLectureSeule(True)
+                ChargerInventairesHistoriques()
             Catch ex As Exception
                 MessageBox.Show("Erreur initialisation inventaire: " & ex.Message)
             End Try
@@ -363,6 +732,11 @@ Namespace DevCommerc8ak
             _inventaireId = Convert.ToInt32(row("InventaireId"))
             _referenceInventaire = Convert.ToString(row("ReferenceInventaire"))
             _inventaireStatut = Convert.ToString(row("Statut"))
+            _impressionInventaireTitre = "RAPPORT D'INVENTAIRE"
+            _impressionInventaireReference = _referenceInventaire
+            _impressionInventaireStatut = _inventaireStatut
+            _impressionInventaireDate = If(row.IsNull("DateCreation"), Date.Now.ToString("dd/MM/yyyy HH:mm"), Convert.ToDateTime(row("DateCreation")).ToString("dd/MM/yyyy HH:mm"))
+            _impressionInventaireObservation = If(row.IsNull("Observation"), "", Convert.ToString(row("Observation")))
             lblInventaireRef.Text = "Référence: " & _referenceInventaire
             lblInventaireStatut.Text = "Statut: " & _inventaireStatut
 
@@ -754,6 +1128,17 @@ Namespace DevCommerc8ak
 
         Private Sub ImprimerInventaire(sender As Object, e As EventArgs)
             Try
+                _impressionInventaireTitre = "RAPPORT D'INVENTAIRE"
+                _impressionInventaireReference = If(String.IsNullOrWhiteSpace(_referenceInventaire), "-", _referenceInventaire)
+                _impressionInventaireStatut = If(String.IsNullOrWhiteSpace(_inventaireStatut), "EN_COURS", _inventaireStatut)
+                If String.IsNullOrWhiteSpace(_impressionInventaireDate) Then
+                    _impressionInventaireDate = Date.Now.ToString("dd/MM/yyyy HH:mm")
+                End If
+                _impressionInventaireTable = _inventaireTable
+                _impressionIndexLigne = 0
+
+                _printDoc.DefaultPageSettings.PaperSize = New PaperSize("A4", 827, 1169)
+                _printDoc.DefaultPageSettings.Margins = New Margins(30, 30, 30, 30)
                 Dim lignes As List(Of String) = ConstruireLignesInventaire()
                 If lignes.Count = 0 Then
                     MessageBox.Show("Aucune donnée à imprimer.")
@@ -762,9 +1147,29 @@ Namespace DevCommerc8ak
                 _printPreview.Document = _printDoc
                 _printPreview.Width = 1000
                 _printPreview.Height = 700
+                _impressionIndexLigne = 0
                 _printPreview.ShowDialog(Me)
             Catch ex As Exception
                 MessageBox.Show("Erreur impression inventaire: " & ex.Message)
+            End Try
+        End Sub
+
+        Private Sub ImprimerInventaireHistorique(sender As Object, e As EventArgs)
+            Try
+                If _historiqueInventaireIdSelectionne <= 0 OrElse _impressionInventaireTable Is Nothing OrElse _impressionInventaireTable.Rows.Count = 0 Then
+                    MessageBox.Show("Sélectionnez un inventaire historique à imprimer.")
+                    Return
+                End If
+
+                _printDoc.DefaultPageSettings.PaperSize = New PaperSize("A4", 827, 1169)
+                _printDoc.DefaultPageSettings.Margins = New Margins(30, 30, 30, 30)
+                _printPreview.Document = _printDoc
+                _printPreview.Width = 1000
+                _printPreview.Height = 700
+                _impressionIndexLigne = 0
+                _printPreview.ShowDialog(Me)
+            Catch ex As Exception
+                MessageBox.Show("Erreur impression inventaire historique: " & ex.Message)
             End Try
         End Sub
 
@@ -790,13 +1195,17 @@ Namespace DevCommerc8ak
 
         Private Function ConstruireLignesInventaire() As List(Of String)
             Dim lignes As New List(Of String)()
-            lignes.Add("Référence: " & If(String.IsNullOrWhiteSpace(_referenceInventaire), "-", _referenceInventaire))
-            lignes.Add("Date: " & Date.Now.ToString("dd/MM/yyyy HH:mm"))
-            lignes.Add("Statut: " & If(String.IsNullOrWhiteSpace(_inventaireStatut), "EN_COURS", _inventaireStatut))
+            lignes.Add("Référence: " & _impressionInventaireReference)
+            lignes.Add("Date: " & _impressionInventaireDate)
+            lignes.Add("Statut: " & _impressionInventaireStatut)
+            If Not String.IsNullOrWhiteSpace(_impressionInventaireObservation) Then
+                lignes.Add("Observation: " & _impressionInventaireObservation)
+            End If
             lignes.Add("")
 
-            If _inventaireTable IsNot Nothing Then
-                For Each row As DataRow In _inventaireTable.Rows
+            Dim source As DataTable = If(_impressionInventaireTable IsNot Nothing, _impressionInventaireTable, _inventaireTable)
+            If source IsNot Nothing Then
+                For Each row As DataRow In source.Rows
                     Dim produit As String = If(row.IsNull("NomProduit"), "", Convert.ToString(row("NomProduit")))
                     Dim theo As Decimal = If(row.IsNull("StockTheorique"), 0D, Convert.ToDecimal(row("StockTheorique")))
                     Dim phys As String = If(row.IsNull("StockPhysique"), "N/C", Convert.ToDecimal(row("StockPhysique")).ToString("N0"))
@@ -809,27 +1218,126 @@ Namespace DevCommerc8ak
         End Function
 
         Private Sub ImprimerPageInventaire(sender As Object, e As PrintPageEventArgs)
-            Dim lignes As List(Of String) = ConstruireLignesInventaire()
-            Dim y As Integer = 40
-            e.Graphics.DrawString("RAPPORT D'INVENTAIRE", New Font("Segoe UI", 14, FontStyle.Bold), Brushes.Black, 40, y)
-            y += 25
-            e.Graphics.DrawString("Référence: " & If(String.IsNullOrWhiteSpace(_referenceInventaire), "-", _referenceInventaire), FontLabel, Brushes.Black, 40, y)
-            y += 20
-            e.Graphics.DrawString("Statut: " & If(String.IsNullOrWhiteSpace(_inventaireStatut), "EN_COURS", _inventaireStatut), FontLabel, Brushes.Black, 40, y)
-            y += 25
-            For Each line As String In lignes
-                e.Graphics.DrawString(line, FontLabel, Brushes.Black, 40, y)
-                y += 18
-                If y > e.MarginBounds.Bottom - 40 Then
+            Try
+                Dim dt As DataTable = If(_impressionInventaireTable IsNot Nothing, _impressionInventaireTable, _inventaireTable)
+                If dt Is Nothing OrElse dt.Rows.Count = 0 Then
                     e.HasMorePages = False
-                    Exit Sub
+                    Return
                 End If
-            Next
-            e.HasMorePages = False
+
+                Dim param As ParametreDTO = (New ParametreService(New ParametreRepository(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)))).Charger()
+                Dim y As Integer = 30
+                Dim x As Integer = 30
+                Dim pinceauBleu As New SolidBrush(Color.FromArgb(17, 35, 74))
+                Dim pinceauGris As New SolidBrush(Color.FromArgb(92, 104, 120))
+                Dim fontTitre As New Font("Segoe UI", 16, FontStyle.Bold)
+                Dim fontSousTitre As New Font("Segoe UI", 10, FontStyle.Regular)
+                Dim fontBloc As New Font("Segoe UI", 9.5F, FontStyle.Regular)
+                Dim fontBlocGras As New Font("Segoe UI", 10, FontStyle.Bold)
+                Dim penBordure As New Pen(Color.FromArgb(210, 219, 232))
+                Dim rowPen As New Pen(Color.FromArgb(232, 236, 242))
+
+                If param IsNot Nothing AndAlso param.LogoPath <> "" AndAlso File.Exists(param.LogoPath) Then
+                    Using logo As Image = Image.FromFile(param.LogoPath)
+                        e.Graphics.DrawImage(logo, x, y, 70, 70)
+                    End Using
+                    x += 84
+                End If
+
+                e.Graphics.DrawString(If(param IsNot Nothing AndAlso param.NomMagasin <> "", param.NomMagasin, "Paons Rehoboth"), fontTitre, pinceauBleu, x, y)
+                y += 28
+                e.Graphics.DrawString(If(param IsNot Nothing, param.AdresseMagasin, ""), fontSousTitre, pinceauGris, x, y)
+                y += 18
+                e.Graphics.DrawString(If(param IsNot Nothing, param.TelephoneMagasin, ""), fontSousTitre, pinceauGris, x, y)
+                y = 118
+
+                e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(17, 35, 74)), 30, y, 760, 32)
+                e.Graphics.DrawString(_impressionInventaireTitre, New Font("Segoe UI", 12, FontStyle.Bold), Brushes.White, 42, y + 7)
+                y += 48
+
+                e.Graphics.DrawRectangle(penBordure, 30, y, 360, 92)
+                e.Graphics.DrawRectangle(penBordure, 430, y, 360, 92)
+                e.Graphics.DrawString("Informations inventaire", fontBlocGras, pinceauBleu, 42, y + 10)
+                e.Graphics.DrawString("Référence : " & _impressionInventaireReference, fontBloc, Brushes.Black, 42, y + 34)
+                e.Graphics.DrawString("Date : " & _impressionInventaireDate, fontBloc, Brushes.Black, 42, y + 54)
+                e.Graphics.DrawString("Statut : " & _impressionInventaireStatut, fontBloc, Brushes.Black, 42, y + 74)
+                e.Graphics.DrawString("Observation", fontBlocGras, pinceauBleu, 442, y + 10)
+                e.Graphics.DrawString(If(String.IsNullOrWhiteSpace(_impressionInventaireObservation), "-", _impressionInventaireObservation), fontBloc, Brushes.Black, 442, y + 34)
+                e.Graphics.DrawString("Lignes : " & dt.Rows.Count.ToString(), fontBloc, Brushes.Black, 442, y + 74)
+                y += 116
+
+                Dim colProduit As Integer = 42
+                Dim colTheorique As Integer = 360
+                Dim colPhysique As Integer = 460
+                Dim colEcart As Integer = 560
+                Dim colStatut As Integer = 640
+                Dim colMotif As Integer = 720
+
+                e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(229, 239, 252)), 30, y, 760, 28)
+                e.Graphics.DrawString("Produit", fontBlocGras, pinceauBleu, colProduit, y + 6)
+                e.Graphics.DrawString("Théorique", fontBlocGras, pinceauBleu, colTheorique, y + 6)
+                e.Graphics.DrawString("Physique", fontBlocGras, pinceauBleu, colPhysique, y + 6)
+                e.Graphics.DrawString("Écart", fontBlocGras, pinceauBleu, colEcart, y + 6)
+                e.Graphics.DrawString("Statut", fontBlocGras, pinceauBleu, colStatut, y + 6)
+                e.Graphics.DrawString("Motif", fontBlocGras, pinceauBleu, colMotif, y + 6)
+                y += 34
+
+                For i As Integer = _impressionIndexLigne To dt.Rows.Count - 1
+                    Dim row As DataRow = dt.Rows(i)
+                    If y > e.MarginBounds.Bottom - 40 Then
+                        _impressionIndexLigne = i
+                        e.HasMorePages = True
+                        Return
+                    End If
+                    e.Graphics.DrawLine(rowPen, 30, y + 16, 790, y + 16)
+                    e.Graphics.DrawString(Convert.ToString(row("NomProduit")), fontBloc, Brushes.Black, colProduit, y)
+                    e.Graphics.DrawString(Convert.ToDecimal(If(row.IsNull("StockTheorique"), 0D, row("StockTheorique"))).ToString("N0"), fontBloc, Brushes.Black, colTheorique, y)
+                    If row.IsNull("StockPhysique") Then
+                        e.Graphics.DrawString("N/C", fontBloc, Brushes.Black, colPhysique, y)
+                    Else
+                        e.Graphics.DrawString(Convert.ToDecimal(row("StockPhysique")).ToString("N0"), fontBloc, Brushes.Black, colPhysique, y)
+                    End If
+                    If row.IsNull("Ecart") Then
+                        e.Graphics.DrawString("N/C", fontBloc, Brushes.Black, colEcart, y)
+                    Else
+                        e.Graphics.DrawString(Convert.ToDecimal(row("Ecart")).ToString("N0"), fontBloc, Brushes.Black, colEcart, y)
+                    End If
+                    e.Graphics.DrawString(Convert.ToString(row("Statut")), fontBloc, Brushes.Black, colStatut, y)
+                    e.Graphics.DrawString(If(row.IsNull("Motif"), "", Convert.ToString(row("Motif"))), fontBloc, Brushes.Black, colMotif, y)
+                    y += 24
+                Next
+
+                _impressionIndexLigne = 0
+                e.HasMorePages = False
+            Catch ex As Exception
+                MessageBox.Show("Erreur impression inventaire: " & ex.Message)
+                e.HasMorePages = False
+            End Try
         End Sub
 
         Private Sub TexteRechercheOuFiltreChanged(sender As Object, e As EventArgs)
             AppliquerFiltresInventaire()
+        End Sub
+
+        Private Sub ChargerInventairesHistoriquesDepuisFiltres(sender As Object, e As EventArgs)
+            Try
+                ChargerInventairesHistoriques()
+            Catch ex As Exception
+                MessageBox.Show("Erreur chargement historique inventaires: " & ex.Message)
+            End Try
+        End Sub
+
+        Private Sub GridInventairesHistoriques_SelectionChanged(sender As Object, e As EventArgs)
+            Try
+                If _chargementHistoriqueEnCours Then Return
+                If gridInventairesHistoriques Is Nothing OrElse gridInventairesHistoriques.CurrentRow Is Nothing Then
+                    Exit Sub
+                End If
+                Dim idx As Integer = gridInventairesHistoriques.CurrentRow.Index
+                ChargerInventaireHistoriqueSelectionne(idx)
+            Catch ex As Exception
+                MessageBox.Show("Erreur sélection historique: " & ex.Message)
+            End Try
         End Sub
 
         Private Sub GridInventaire_CellEndEdit(sender As Object, e As DataGridViewCellEventArgs)
