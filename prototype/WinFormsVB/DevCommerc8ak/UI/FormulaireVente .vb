@@ -221,7 +221,7 @@ Namespace DevCommerc8ak
                 .BackColor = ColorBg
             }
             pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Absolute, 130)) ' Filtres
-            pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Absolute, 48)) ' Actions
+            pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Absolute, 56)) ' Actions
             pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Percent, 100)) ' Grille
 
             Dim pnlFiltresVentesCard As Panel = CreerCarte()
@@ -300,13 +300,13 @@ Namespace DevCommerc8ak
                 .Dock = DockStyle.Fill,
                 .FlowDirection = FlowDirection.RightToLeft,
                 .WrapContents = False,
-                .Padding = New Padding(0, 2, 0, 0),
+                .Padding = New Padding(0, 4, 20, 0),
                 .Margin = New Padding(0)
             }
             btnImprimerVentes = New Button() With {
                 .Text = "Imprimer A4",
-                .Width = 120,
-                .Height = 32,
+                .Width = 136,
+                .Height = 34,
                 .BackColor = ColorSecondary,
                 .ForeColor = Color.White,
                 .FlatStyle = FlatStyle.Flat,
@@ -316,8 +316,8 @@ Namespace DevCommerc8ak
             btnImprimerVentes.FlatAppearance.BorderSize = 0
             btnExporterPdfVentes = New Button() With {
                 .Text = "Exporter PDF",
-                .Width = 120,
-                .Height = 32,
+                .Width = 136,
+                .Height = 34,
                 .BackColor = ColorAccent,
                 .ForeColor = Color.White,
                 .FlatStyle = FlatStyle.Flat,
@@ -335,7 +335,7 @@ Namespace DevCommerc8ak
 
             gridVentes = CreerGrille()
             gridVentes.Dock = DockStyle.Fill
-            gridVentes.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+            gridVentes.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
             gridVentes.ScrollBars = ScrollBars.Both
 
             pnlVentesContent.Controls.Add(pnlFiltresVentesCard, 0, 0)
@@ -383,8 +383,8 @@ Namespace DevCommerc8ak
 
             btnImprimerStock = New Button() With {
                 .Text = "Imprimer A4",
-                .Width = 110,
-                .Height = 36,
+                .Width = 136,
+                .Height = 34,
                 .BackColor = ColorSecondary,
                 .ForeColor = Color.White,
                 .FlatStyle = FlatStyle.Flat,
@@ -396,8 +396,8 @@ Namespace DevCommerc8ak
 
             btnExporterPdfStock = New Button() With {
                 .Text = "Exporter PDF",
-                .Width = 110,
-                .Height = 36,
+                .Width = 136,
+                .Height = 34,
                 .BackColor = ColorAccent,
                 .ForeColor = Color.White,
                 .FlatStyle = FlatStyle.Flat,
@@ -424,7 +424,7 @@ Namespace DevCommerc8ak
 
             gridStock = CreerGrille()
             gridStock.Dock = DockStyle.Fill
-            gridStock.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+            gridStock.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
             gridStock.ScrollBars = ScrollBars.Both
 
             pnlStockContent.Controls.Add(pnlStockCard, 0, 0)
@@ -912,18 +912,23 @@ Namespace DevCommerc8ak
 
                 Dim lignes As New List(Of String)()
                 lignes.Add("RAPPORT DES VENTES")
+                lignes.Add("------------------------------------------------------------")
                 lignes.Add("Période : " & Convert.ToString(cmbPeriode.SelectedItem))
                 lignes.Add("Jour : " & dtpJour.Value.ToString("dd/MM/yyyy"))
                 lignes.Add("Mois : " & Convert.ToString(cmbMois.SelectedItem))
                 lignes.Add("Année : " & Convert.ToString(cmbAnnee.SelectedItem))
+                lignes.Add("Total lignes : " & dt.Rows.Count.ToString("N0"))
                 lignes.Add("")
+                lignes.Add("Date | Produit | Prix achat | Qté | Montant | Bénéfice")
+                lignes.Add("------------------------------------------------------------")
                 For Each row As DataRow In dt.Rows
                     Dim dateVente As String = If(dt.Columns.Contains("DateVente") AndAlso Not row.IsNull("DateVente"), Convert.ToDateTime(row("DateVente")).ToString("dd/MM/yyyy HH:mm"), "")
                     Dim produit As String = If(dt.Columns.Contains("Produit") AndAlso Not row.IsNull("Produit"), Convert.ToString(row("Produit")), "")
                     Dim qte As String = If(dt.Columns.Contains("QuantiteVenduePieces") AndAlso Not row.IsNull("QuantiteVenduePieces"), Convert.ToDecimal(row("QuantiteVenduePieces")).ToString("N0"), "0")
+                    Dim prixAchat As String = If(dt.Columns.Contains("PrixAchatCarton") AndAlso Not row.IsNull("PrixAchatCarton"), Convert.ToDecimal(row("PrixAchatCarton")).ToString("N0"), "0")
                     Dim montant As String = If(dt.Columns.Contains("MontantGenere") AndAlso Not row.IsNull("MontantGenere"), FormatageGlobal.FormatMontant(Convert.ToDecimal(row("MontantGenere"))), "0 FC")
                     Dim benefice As String = If(dt.Columns.Contains("Benefice") AndAlso Not row.IsNull("Benefice"), FormatageGlobal.FormatMontant(Convert.ToDecimal(row("Benefice"))), "0 FC")
-                    lignes.Add(dateVente & " | " & produit & " | Qté:" & qte & " | Mt:" & montant & " | B:" & benefice)
+                    lignes.Add(dateVente & " | " & produit & " | " & prixAchat & " | " & qte & " | " & montant & " | " & benefice)
                 Next
                 PdfHelper.GenererPdfSimple(sfd.FileName, "RAPPORT DES VENTES", lignes)
             End Using
@@ -963,6 +968,9 @@ Namespace DevCommerc8ak
 
                 Dim lignes As New List(Of String)()
                 lignes.Add("RAPPORT STOCK")
+                lignes.Add("------------------------------------------------------------")
+                lignes.Add("Produit | Stock P | Stock C | Ventes P | Sorties P | Restant P")
+                lignes.Add("------------------------------------------------------------")
                 lignes.Add("")
                 For Each row As DataRow In dt.Rows
                     Dim produit As String = If(dt.Columns.Contains("Produit") AndAlso Not row.IsNull("Produit"), Convert.ToString(row("Produit")), "")
@@ -971,7 +979,7 @@ Namespace DevCommerc8ak
                     Dim ventes As String = If(dt.Columns.Contains("QuantiteVenduePieces") AndAlso Not row.IsNull("QuantiteVenduePieces"), Convert.ToDecimal(row("QuantiteVenduePieces")).ToString("N0"), "0")
                     Dim sorties As String = If(dt.Columns.Contains("QuantiteSortieManuellePieces") AndAlso Not row.IsNull("QuantiteSortieManuellePieces"), Convert.ToDecimal(row("QuantiteSortieManuellePieces")).ToString("N0"), "0")
                     Dim restant As String = If(dt.Columns.Contains("RestantPieces") AndAlso Not row.IsNull("RestantPieces"), Convert.ToDecimal(row("RestantPieces")).ToString("N0"), "0")
-                    lignes.Add(produit & " | Stock:" & stockPieces & "P/" & stockCartons & "C | Ventes:" & ventes & " | Sorties:" & sorties & " | Restant:" & restant)
+                    lignes.Add(produit & " | " & stockPieces & " | " & stockCartons & " | " & ventes & " | " & sorties & " | " & restant)
                 Next
                 PdfHelper.GenererPdfSimple(sfd.FileName, "RAPPORT STOCK", lignes)
             End Using

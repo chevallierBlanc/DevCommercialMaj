@@ -149,7 +149,7 @@ Namespace DevCommerc8ak
             btnReceptionner.FlatAppearance.BorderSize = 0
             btnImprimer = New Button() With {.Text = "Imprimer A4", .Left = 1115, .Top = 78, .Width = 100, .Height = 35, .BackColor = Color.SlateGray, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat, .Font = FontLabel, .Cursor = Cursors.Hand}
             btnImprimer.FlatAppearance.BorderSize = 0
-            btnSupprimerBon = New Button() With {.Text = "Supprimer", .Left = 865, .Top = 78, .Width = 100, .Height = 35, .BackColor = Color.Crimson, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat, .Font = FontLabel, .Cursor = Cursors.Hand, .Visible = False}
+            btnSupprimerBon = New Button() With {.Text = "Supprimer bon", .Left = 1225, .Top = 78, .Width = 110, .Height = 35, .BackColor = Color.Crimson, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat, .Font = FontLabel, .Cursor = Cursors.Hand, .Visible = True}
             btnSupprimerBon.FlatAppearance.BorderSize = 0
 
             lblTotalBon = New Label() With {.Text = "Total bon: 0", .Left = 20, .Top = 90, .AutoSize = True, .Font = New Font("Segoe UI", 12.0F, FontStyle.Bold), .ForeColor = ColorPrimary}
@@ -173,7 +173,7 @@ Namespace DevCommerc8ak
             panelTopActions.Controls.Add(lblTotalBon)
             panelTopActions.Controls.Add(lblStatutBon)
 
-            gridBons = New DataGridView() With {.Left = 20, .Top = 145, .Width = 1280, .Height = 230, .ReadOnly = True, .AllowUserToAddRows = False, .AllowUserToDeleteRows = False, .AutoGenerateColumns = True, .SelectionMode = DataGridViewSelectionMode.FullRowSelect, .BackgroundColor = Color.White, .BorderStyle = BorderStyle.None, .EnableHeadersVisualStyles = False, .RowHeadersVisible = False, .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill}
+            gridBons = New DataGridView() With {.Left = 20, .Top = 145, .Width = 1310, .Height = 230, .ReadOnly = True, .AllowUserToAddRows = False, .AllowUserToDeleteRows = False, .AutoGenerateColumns = True, .SelectionMode = DataGridViewSelectionMode.FullRowSelect, .BackgroundColor = Color.White, .BorderStyle = BorderStyle.None, .EnableHeadersVisualStyles = False, .RowHeadersVisible = False, .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, .Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right}
             gridBons.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245)
             gridBons.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
             gridBons.ColumnHeadersHeight = 40
@@ -184,7 +184,7 @@ Namespace DevCommerc8ak
             lblPagination = New Label() With {.Text = "Page 1/1", .Left = 1110, .Top = 392, .AutoSize = True, .Font = FontLabel}
             btnPageSuivante = New Button() With {.Text = ">", .Left = 1200, .Top = 385, .Width = 45, .Height = 30, .BackColor = Color.LightGray, .FlatStyle = FlatStyle.Flat}
 
-            grpApproManuel = New GroupBox() With {.Text = "Approvisionnement manuel", .Left = 20, .Top = 425, .Width = 1280, .Height = 130, .Font = FontLabel, .ForeColor = ColorPrimary}
+            grpApproManuel = New GroupBox() With {.Text = "Approvisionnement manuel", .Left = 20, .Top = 425, .Width = 1310, .Height = 130, .Font = FontLabel, .ForeColor = ColorPrimary, .Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right}
             txtRechercheProduit = New TextBox() With {.Left = 20, .Top = 55, .Width = 180, .Font = FontControl, .BorderStyle = BorderStyle.FixedSingle}
             txtProduitChoisi = New TextBox() With {.Left = 215, .Top = 55, .Width = 250, .Font = FontControl, .BorderStyle = BorderStyle.FixedSingle}
             txtPrixPrecedent = New TextBox() With {.Left = 480, .Top = 55, .Width = 110, .ReadOnly = True, .Font = FontControl, .BorderStyle = BorderStyle.FixedSingle, .BackColor = Color.FromArgb(245, 245, 245)}
@@ -193,7 +193,7 @@ Namespace DevCommerc8ak
             lblTotalLigne = New Label() With {.Text = "Total ligne: 0", .Left = 850, .Top = 60, .AutoSize = True, .Font = New Font("Segoe UI", 10.0F, FontStyle.Bold)}
             btnAjouterLigne = New Button() With {.Text = "Ajouter ligne", .Left = 980, .Top = 48, .Width = 120, .Height = 35, .BackColor = ColorPrimary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat, .Font = FontLabel, .Cursor = Cursors.Hand}
             btnAjouterLigne.FlatAppearance.BorderSize = 0
-            btnRetirerLigne = New Button() With {.Text = "Supprimer ligne", .Left = 1060, .Top = 48, .Width = 155, .Height = 35, .BackColor = Color.FromArgb(220, 220, 220), .FlatStyle = FlatStyle.Flat, .Font = FontLabel, .Cursor = Cursors.Hand}
+            btnRetirerLigne = New Button() With {.Text = "Retirer ligne", .Left = 1060, .Top = 48, .Width = 155, .Height = 35, .BackColor = Color.FromArgb(220, 220, 220), .FlatStyle = FlatStyle.Flat, .Font = FontLabel, .Cursor = Cursors.Hand}
             btnRetirerLigne.FlatAppearance.BorderSize = 0
 
             grpApproManuel.Controls.Add(New Label() With {.Text = "Produit", .Left = 20, .Top = 30, .AutoSize = True, .Font = FontLabel, .ForeColor = Color.Gray})
@@ -210,7 +210,7 @@ Namespace DevCommerc8ak
             grpApproManuel.Controls.Add(btnAjouterLigne)
             grpApproManuel.Controls.Add(btnRetirerLigne)
 
-            gridLignes = New DataGridView() With {.Left = 20, .Top = 565, .Width = 1280, .Height = 190, .ReadOnly = True, .AllowUserToAddRows = False, .AllowUserToDeleteRows = False, .AutoGenerateColumns = True, .SelectionMode = DataGridViewSelectionMode.FullRowSelect, .BackgroundColor = Color.White, .BorderStyle = BorderStyle.None, .EnableHeadersVisualStyles = False, .RowHeadersVisible = False, .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill}
+            gridLignes = New DataGridView() With {.Left = 20, .Top = 565, .Width = 1310, .Height = 190, .ReadOnly = True, .AllowUserToAddRows = False, .AllowUserToDeleteRows = False, .AutoGenerateColumns = True, .SelectionMode = DataGridViewSelectionMode.FullRowSelect, .BackgroundColor = Color.White, .BorderStyle = BorderStyle.None, .EnableHeadersVisualStyles = False, .RowHeadersVisible = False, .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, .Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right}
             gridLignes.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245)
             gridLignes.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
             gridLignes.ColumnHeadersHeight = 40
