@@ -17,6 +17,7 @@ Namespace DevCommerc8ak
         Private ReadOnly ColorOriginalHeaderBg As Color = Color.FromArgb(52, 73, 94) ' Couleur originale du Header
         Private ReadOnly ColorCardBg As Color = Color.White ' Fond des cartes blanc
         Private ReadOnly ColorPrimary As Color = Color.FromArgb(63, 81, 181) ' Indigo (plus doux)
+        Private ReadOnly ColorSecondary As Color = Color.FromArgb(88, 101, 121) ' Gris bleuté
         Private ReadOnly ColorAccent As Color = Color.FromArgb(103, 58, 183) ' Violet (conservé)
         Private ReadOnly ColorSuccess As Color = Color.FromArgb(76, 175, 80) ' Vert (conservé)
         Private ReadOnly ColorDanger As Color = Color.FromArgb(244, 67, 54) ' Rouge (plus doux)

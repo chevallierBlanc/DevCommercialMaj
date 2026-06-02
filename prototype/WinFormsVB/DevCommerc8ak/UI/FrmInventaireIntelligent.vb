@@ -346,7 +346,14 @@ Namespace DevCommerc8ak
             Next
             kpiTable.RowStyles.Add(New RowStyle(SizeType.Percent, 50))
             kpiTable.RowStyles.Add(New RowStyle(SizeType.Percent, 50))
-            Dim h1, h2, h3, h4, h5, h6, h7, h8 As Label
+            Dim h1 As New Label()
+            Dim h2 As New Label()
+            Dim h3 As New Label()
+            Dim h4 As New Label()
+            Dim h5 As New Label()
+            Dim h6 As New Label()
+            Dim h7 As New Label()
+            Dim h8 As New Label()
             kpiTable.Controls.Add(CreerCarteResume("Total produits", h1), 0, 0)
             kpiTable.Controls.Add(CreerCarteResume("Produits comptés", h2), 1, 0)
             kpiTable.Controls.Add(CreerCarteResume("Produits non comptés", h3), 2, 0)
@@ -1443,7 +1450,7 @@ Namespace DevCommerc8ak
             End If
             Dim stockPhysiqueVide As Boolean = False
             If gridInventaire.Columns.Contains("StockPhysique") Then
-                stockPhysiqueVide = row.Cells("StockPhysique").Value Is Nothing OrElse IsDBNull(row.Cells("StockPhysique").Value)
+                stockPhysiqueVide = row.Cells("StockPhysique").Value Is Nothing OrElse row.Cells("StockPhysique").Value Is DBNull.Value
             End If
 
             If String.Equals(_inventaireStatut, "VALIDÉ", StringComparison.OrdinalIgnoreCase) OrElse String.Equals(_inventaireStatut, "ANNULÉ", StringComparison.OrdinalIgnoreCase) Then

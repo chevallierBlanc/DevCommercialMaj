@@ -50,19 +50,20 @@ Namespace DevCommerc8ak
                 contentObjectIds.Add(firstPageId + (i * 2) + 1)
             Next
 
-            Dim objets(fontId) As Byte()
+            Dim objets(fontId)() As Byte
 
-            Dim catalogObj As String = catalogId.ToString(CultureInfo.InvariantCulture) & " 0 obj" & vbCrLf &
-                "<< /Type /Catalog /Pages 2 0 R >>" & vbCrLf &
-                "endobj" & vbCrLf
+            Dim nl As String = Environment.NewLine
+            Dim catalogObj As String = catalogId.ToString(CultureInfo.InvariantCulture) & " 0 obj" & nl &
+                "<< /Type /Catalog /Pages 2 0 R >>" & nl &
+                "endobj" & nl
             Dim kids As String = String.Join(" ", pageObjectIds.Select(Function(id) id.ToString(CultureInfo.InvariantCulture) & " 0 R"))
-            Dim pagesObj As String = pagesId.ToString(CultureInfo.InvariantCulture) & " 0 obj" & vbCrLf &
+            Dim pagesObj As String = pagesId.ToString(CultureInfo.InvariantCulture) & " 0 obj" & nl &
                 "<< /Type /Pages /Kids [" & kids & "] /Count " & totalPages.ToString(CultureInfo.InvariantCulture) &
-                " /MediaBox [0 0 " & PdfWidth.ToString(CultureInfo.InvariantCulture) & " " & PdfHeight.ToString(CultureInfo.InvariantCulture) & "] >>" & vbCrLf &
-                "endobj" & vbCrLf
-            Dim fontObj As String = fontId.ToString(CultureInfo.InvariantCulture) & " 0 obj" & vbCrLf &
-                "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>" & vbCrLf &
-                "endobj" & vbCrLf
+                " /MediaBox [0 0 " & PdfWidth.ToString(CultureInfo.InvariantCulture) & " " & PdfHeight.ToString(CultureInfo.InvariantCulture) & "] >>" & nl &
+                "endobj" & nl
+            Dim fontObj As String = fontId.ToString(CultureInfo.InvariantCulture) & " 0 obj" & nl &
+                "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>" & nl &
+                "endobj" & nl
 
             objets(catalogId) = enc.GetBytes(catalogObj)
             objets(pagesId) = enc.GetBytes(pagesObj)
@@ -77,26 +78,26 @@ Namespace DevCommerc8ak
 
                 Dim content As String = ConstruireContenuPage(titre, lignesPage, pageIndex + 1, totalPages)
                 Dim contentBytes As Byte() = enc.GetBytes(content)
-                Dim contentObj As String = contentObjectIds(pageIndex).ToString(CultureInfo.InvariantCulture) & " 0 obj" & vbCrLf &
-                    "<< /Length " & contentBytes.Length.ToString(CultureInfo.InvariantCulture) & " >>" & vbCrLf &
-                    "stream" & vbCrLf &
+                Dim contentObj As String = contentObjectIds(pageIndex).ToString(CultureInfo.InvariantCulture) & " 0 obj" & nl &
+                    "<< /Length " & contentBytes.Length.ToString(CultureInfo.InvariantCulture) & " >>" & nl &
+                    "stream" & nl &
                     content &
-                    vbCrLf & "endstream" & vbCrLf &
-                    "endobj" & vbCrLf
+                    nl & "endstream" & nl &
+                    "endobj" & nl
                 objets(contentObjectIds(pageIndex)) = enc.GetBytes(contentObj)
 
-                Dim pageObj As String = pageObjectIds(pageIndex).ToString(CultureInfo.InvariantCulture) & " 0 obj" & vbCrLf &
+                Dim pageObj As String = pageObjectIds(pageIndex).ToString(CultureInfo.InvariantCulture) & " 0 obj" & nl &
                     "<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 " & fontId.ToString(CultureInfo.InvariantCulture) & " 0 R >> >> " &
                     "/Contents " & contentObjectIds(pageIndex).ToString(CultureInfo.InvariantCulture) & " 0 R " &
-                    "/MediaBox [0 0 " & PdfWidth.ToString(CultureInfo.InvariantCulture) & " " & PdfHeight.ToString(CultureInfo.InvariantCulture) & "] >>" & vbCrLf &
-                    "endobj" & vbCrLf
+                    "/MediaBox [0 0 " & PdfWidth.ToString(CultureInfo.InvariantCulture) & " " & PdfHeight.ToString(CultureInfo.InvariantCulture) & "] >>" & nl &
+                    "endobj" & nl
                 objets(pageObjectIds(pageIndex)) = enc.GetBytes(pageObj)
             Next
 
             objets(fontId) = enc.GetBytes(fontObj)
 
             Using ms As New MemoryStream()
-                WriteAscii(ms, "%PDF-1.4" & vbCrLf)
+                WriteAscii(ms, "%PDF-1.4" & nl)
                 Dim offsets As New List(Of Long) From {0L}
 
                 For i As Integer = 1 To objets.Length - 1
@@ -108,16 +109,16 @@ Namespace DevCommerc8ak
                 Next
 
                 Dim xrefStart As Long = ms.Position
-                WriteAscii(ms, "xref" & vbCrLf)
-                WriteAscii(ms, "0 " & objets.Length.ToString(CultureInfo.InvariantCulture) & vbCrLf)
-                WriteAscii(ms, "0000000000 65535 f " & vbCrLf)
+                WriteAscii(ms, "xref" & nl)
+                WriteAscii(ms, "0 " & objets.Length.ToString(CultureInfo.InvariantCulture) & nl)
+                WriteAscii(ms, "0000000000 65535 f " & nl)
                 For i As Integer = 1 To objets.Length - 1
-                    WriteAscii(ms, offsets(i).ToString("0000000000", CultureInfo.InvariantCulture) & " 00000 n " & vbCrLf)
+                    WriteAscii(ms, offsets(i).ToString("0000000000", CultureInfo.InvariantCulture) & " 00000 n " & nl)
                 Next
-                WriteAscii(ms, "trailer" & vbCrLf)
-                WriteAscii(ms, "<< /Size " & objets.Length.ToString(CultureInfo.InvariantCulture) & " /Root 1 0 R >>" & vbCrLf)
-                WriteAscii(ms, "startxref" & vbCrLf)
-                WriteAscii(ms, xrefStart.ToString(CultureInfo.InvariantCulture) & vbCrLf)
+                WriteAscii(ms, "trailer" & nl)
+                WriteAscii(ms, "<< /Size " & objets.Length.ToString(CultureInfo.InvariantCulture) & " /Root 1 0 R >>" & nl)
+                WriteAscii(ms, "startxref" & nl)
+                WriteAscii(ms, xrefStart.ToString(CultureInfo.InvariantCulture) & nl)
                 WriteAscii(ms, "%%EOF")
                 Return ms.ToArray()
             End Using
@@ -165,17 +166,18 @@ Namespace DevCommerc8ak
         Private Function NormaliserTexte(texte As String) As String
             If String.IsNullOrEmpty(texte) Then Return String.Empty
 
-            Dim normalise As String = texte.Replace(vbCr, " ").Replace(vbLf, " ").Trim()
+            Dim normalise As String = texte.Replace(ControlChars.Cr, " ").Replace(ControlChars.Lf, " ").Trim()
             Dim sb As New StringBuilder(normalise.Length)
             For Each ch As Char In normalise.Normalize(NormalizationForm.FormD)
                 Dim category As UnicodeCategory = CharUnicodeInfo.GetUnicodeCategory(ch)
                 If category = UnicodeCategory.NonSpacingMark Then
                     Continue For
                 End If
-                If AscW(ch) < 32 Then
+                Dim codePoint As Integer = Convert.ToInt32(ch)
+                If codePoint < 32 Then
                     Continue For
                 End If
-                If AscW(ch) > 126 Then
+                If codePoint > 126 Then
                     sb.Append("?")
                 Else
                     sb.Append(ch)
