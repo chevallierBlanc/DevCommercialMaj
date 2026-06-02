@@ -5,6 +5,7 @@ Imports System
 Imports System.Configuration
 Imports System.Data
 Imports System.Drawing
+Imports System.Drawing.Printing
 Imports System.Windows.Forms
 Imports System.Drawing.Drawing2D
 
@@ -55,6 +56,8 @@ Namespace DevCommerc8ak
         Private ReadOnly btnActualiser As Button
         Private ReadOnly btnOuvrirVentes As Button
         Private ReadOnly lblContexte As Label
+        Private ReadOnly btnImprimerVentes As Button
+        Private ReadOnly btnExporterPdfVentes As Button
 
         Private ReadOnly gridDetailVentes As DataGridView
         Private ReadOnly panelEvaluationCard As Panel
@@ -66,6 +69,11 @@ Namespace DevCommerc8ak
 
         Private ReadOnly timerAnimation As Timer
         Private ReadOnly timerFade As Timer
+        Private ReadOnly printDocDetailVentes As New PrintDocument()
+        Private ReadOnly printPreviewDetailVentes As New PrintPreviewDialog()
+        Private dtDetailVentesAImprimer As DataTable
+        Private _impressionIndexDetailVentes As Integer
+        Private _titreDetailVentes As String = String.Empty
 
         Private lblValeurStockEntree As Label
         Private lblCoutMarchandisesVendues As Label
@@ -399,9 +407,58 @@ Namespace DevCommerc8ak
             tabSynthese.Controls.Add(pnlSynthese)
 
             ' --- DETAIL VENTES TAB CONTENT ---
+            Dim layoutDetail As New TableLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .ColumnCount = 1,
+                .RowCount = 2,
+                .Padding = New Padding(20)
+            }
+            layoutDetail.RowStyles.Add(New RowStyle(SizeType.Absolute, 56))
+            layoutDetail.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+
+            Dim pnlActionsDetail As New FlowLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .FlowDirection = FlowDirection.LeftToRight,
+                .WrapContents = False,
+                .Padding = New Padding(0),
+                .Margin = New Padding(0)
+            }
+
+            btnImprimerVentes = New Button() With {
+                .Text = "Imprimer A4",
+                .Width = 140,
+                .Height = 36,
+                .BackColor = Color.FromArgb(96, 125, 139),
+                .ForeColor = Color.White,
+                .FlatStyle = FlatStyle.Flat,
+                .Font = FontButton,
+                .Cursor = Cursors.Hand,
+                .Margin = New Padding(0, 0, 8, 0)
+            }
+            btnImprimerVentes.FlatAppearance.BorderSize = 0
+
+            btnExporterPdfVentes = New Button() With {
+                .Text = "Exporter PDF",
+                .Width = 140,
+                .Height = 36,
+                .BackColor = ColorAccent,
+                .ForeColor = Color.White,
+                .FlatStyle = FlatStyle.Flat,
+                .Font = FontButton,
+                .Cursor = Cursors.Hand,
+                .Margin = New Padding(0, 0, 8, 0)
+            }
+            btnExporterPdfVentes.FlatAppearance.BorderSize = 0
+
+            pnlActionsDetail.Controls.Add(btnImprimerVentes)
+            pnlActionsDetail.Controls.Add(btnExporterPdfVentes)
+
             gridDetailVentes = CreerGrille()
             gridDetailVentes.Dock = DockStyle.Fill
-            tabDetail.Controls.Add(gridDetailVentes)
+
+            layoutDetail.Controls.Add(pnlActionsDetail, 0, 0)
+            layoutDetail.Controls.Add(gridDetailVentes, 0, 1)
+            tabDetail.Controls.Add(layoutDetail)
 
             ' Ajout des contrôles au layout principal
             mainLayout.Controls.Add(pnlHeader, 0, 0)
@@ -420,6 +477,9 @@ Namespace DevCommerc8ak
             AddHandler cmbAnnee.SelectedIndexChanged, AddressOf ChargerDonnees
             AddHandler btnActualiser.Click, AddressOf ChargerDonnees
             AddHandler btnOuvrirVentes.Click, AddressOf OuvrirFormulaireVentes
+            AddHandler btnImprimerVentes.Click, AddressOf ImprimerDetailVentes
+            AddHandler btnExporterPdfVentes.Click, AddressOf ExporterPdfDetailVentes
+            AddHandler printDocDetailVentes.PrintPage, AddressOf PrintDocDetailVentes_PrintPage
             AddHandler tabs.SelectedIndexChanged, AddressOf ChargerDetailSiBesoin
             AddHandler Me.Load, AddressOf FormulaireAnalyseVente_Load
 
@@ -598,6 +658,141 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
+
+        Private Sub ImprimerDetailVentes(sender As Object, e As EventArgs)
+            Try
+                Dim dt As DataTable = ObtenirTableDetailVentes()
+                If dt Is Nothing OrElse dt.Rows.Count = 0 Then
+                    MessageBox.Show("Aucune vente disponible à imprimer pour cette période.", "Analyse ventes", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    Return
+                End If
+
+                dtDetailVentesAImprimer = dt
+                _impressionIndexDetailVentes = 0
+                _titreDetailVentes = "RAPPORT DES VENTES - " & Convert.ToString(cmbPeriode.SelectedItem).ToUpperInvariant()
+                printDocDetailVentes.DefaultPageSettings.Margins = New System.Drawing.Printing.Margins(30, 30, 30, 30)
+                printDocDetailVentes.DefaultPageSettings.Landscape = False
+                printPreviewDetailVentes.Document = printDocDetailVentes
+                printPreviewDetailVentes.Width = 1000
+                printPreviewDetailVentes.Height = 720
+                printPreviewDetailVentes.ShowDialog(Me)
+            Catch ex As Exception
+                MessageBox.Show("Impossible d'imprimer les ventes : " & ex.Message, "Analyse ventes", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
+        End Sub
+
+        Private Sub ExporterPdfDetailVentes(sender As Object, e As EventArgs)
+            Try
+                Dim dt As DataTable = ObtenirTableDetailVentes()
+                If dt Is Nothing OrElse dt.Rows.Count = 0 Then
+                    MessageBox.Show("Aucune vente disponible à exporter pour cette période.", "Analyse ventes", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    Return
+                End If
+
+                Dim lignes As New List(Of String)()
+                lignes.Add("Période: " & Convert.ToString(cmbPeriode.SelectedItem) & " - " & ChargerContexteTexte())
+                lignes.Add(" ")
+                For Each row As DataRow In dt.Rows
+                    Dim dateVente As String = If(row.IsNull("DateVente"), "", Convert.ToDateTime(row("DateVente")).ToString("dd/MM/yyyy HH:mm"))
+                    Dim produit As String = LireTexte(row, "Produit")
+                    Dim prix As String = Convert.ToDecimal(If(row.IsNull("PrixAchatCarton"), 0D, row("PrixAchatCarton"))).ToString("N0")
+                    Dim qte As String = Convert.ToDecimal(If(row.IsNull("QuantiteVenduePieces"), 0D, row("QuantiteVenduePieces"))).ToString("N0")
+                    Dim montant As String = Convert.ToDecimal(If(row.IsNull("MontantGenere"), 0D, row("MontantGenere"))).ToString("N0")
+                    Dim benefice As String = Convert.ToDecimal(If(row.IsNull("Benefice"), 0D, row("Benefice"))).ToString("N0")
+                    lignes.Add(dateVente & " | " & produit & " | Prix:" & prix & " | Qte:" & qte & " | Mnt:" & montant & " | Bénéf:" & benefice)
+                Next
+
+                Using sfd As New SaveFileDialog()
+                    sfd.Filter = "PDF (*.pdf)|*.pdf"
+                    sfd.FileName = "Analyse_Ventes_" & Date.Now.ToString("yyyyMMdd_HHmmss") & ".pdf"
+                    If sfd.ShowDialog(Me) = DialogResult.OK Then
+                        PdfHelper.GenererPdfSimple(sfd.FileName, "ANALYSE DES VENTES", lignes)
+                        MessageBox.Show("PDF généré avec succès.", "Analyse ventes", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    End If
+                End Using
+            Catch ex As Exception
+                MessageBox.Show("Impossible d'exporter les ventes en PDF : " & ex.Message, "Analyse ventes", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
+        End Sub
+
+        Private Function ObtenirTableDetailVentes() As DataTable
+            Return TryCast(gridDetailVentes.DataSource, DataTable)
+        End Function
+
+        Private Function ChargerContexteTexte() As String
+            Return Convert.ToString(cmbMois.SelectedItem) & " " & Convert.ToString(cmbAnnee.SelectedItem)
+        End Function
+
+        Private Sub PrintDocDetailVentes_PrintPage(sender As Object, e As PrintPageEventArgs)
+            Try
+                Dim dt As DataTable = dtDetailVentesAImprimer
+                If dt Is Nothing OrElse dt.Rows.Count = 0 Then
+                    e.HasMorePages = False
+                    Return
+                End If
+
+                Dim y As Integer = 30
+                Dim x As Integer = 30
+                Dim pinceauBleu As New SolidBrush(Color.FromArgb(17, 35, 74))
+                Dim pinceauGris As New SolidBrush(Color.FromArgb(92, 104, 120))
+                Dim fontTitre As New Font("Segoe UI", 16, FontStyle.Bold)
+                Dim fontSousTitre As New Font("Segoe UI", 10, FontStyle.Regular)
+                Dim fontBloc As New Font("Segoe UI", 9.5F, FontStyle.Regular)
+                Dim fontBlocGras As New Font("Segoe UI", 10, FontStyle.Bold)
+                Dim rowPen As New Pen(Color.FromArgb(232, 236, 242))
+
+                e.Graphics.DrawString("ANALYSE DES VENTES", fontTitre, pinceauBleu, x, y)
+                y += 28
+                e.Graphics.DrawString("Période : " & ChargerContexteTexte(), fontSousTitre, pinceauGris, x, y)
+                y += 18
+                e.Graphics.DrawString("Date d'impression : " & Date.Now.ToString("dd/MM/yyyy HH:mm"), fontSousTitre, pinceauGris, x, y)
+                y = 110
+
+                e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(17, 35, 74)), 30, y, 760, 32)
+                e.Graphics.DrawString(_titreDetailVentes, fontBlocGras, Brushes.White, 42, y + 7)
+                y += 46
+
+                Dim colDate As Integer = 42
+                Dim colProduit As Integer = 162
+                Dim colPrix As Integer = 370
+                Dim colQte As Integer = 500
+                Dim colMontant As Integer = 595
+                Dim colBenefice As Integer = 700
+
+                e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(229, 239, 252)), 30, y, 760, 28)
+                e.Graphics.DrawString("Date", fontBlocGras, pinceauBleu, colDate, y + 6)
+                e.Graphics.DrawString("Produit", fontBlocGras, pinceauBleu, colProduit, y + 6)
+                e.Graphics.DrawString("Prix achat", fontBlocGras, pinceauBleu, colPrix, y + 6)
+                e.Graphics.DrawString("Qté", fontBlocGras, pinceauBleu, colQte, y + 6)
+                e.Graphics.DrawString("Montant", fontBlocGras, pinceauBleu, colMontant, y + 6)
+                e.Graphics.DrawString("Bénéfice", fontBlocGras, pinceauBleu, colBenefice, y + 6)
+                y += 34
+
+                For i As Integer = _impressionIndexDetailVentes To dt.Rows.Count - 1
+                    Dim row As DataRow = dt.Rows(i)
+                    If y > e.MarginBounds.Bottom - 40 Then
+                        _impressionIndexDetailVentes = i
+                        e.HasMorePages = True
+                        Return
+                    End If
+
+                    e.Graphics.DrawLine(rowPen, 30, y + 16, 790, y + 16)
+                    e.Graphics.DrawString(If(row.IsNull("DateVente"), "", Convert.ToDateTime(row("DateVente")).ToString("dd/MM/yyyy HH:mm")), fontBloc, Brushes.Black, colDate, y)
+                    e.Graphics.DrawString(LireTexte(row, "Produit"), fontBloc, Brushes.Black, colProduit, y)
+                    e.Graphics.DrawString(Convert.ToDecimal(If(row.IsNull("PrixAchatCarton"), 0D, row("PrixAchatCarton"))).ToString("N0"), fontBloc, Brushes.Black, colPrix, y)
+                    e.Graphics.DrawString(Convert.ToDecimal(If(row.IsNull("QuantiteVenduePieces"), 0D, row("QuantiteVenduePieces"))).ToString("N0"), fontBloc, Brushes.Black, colQte, y)
+                    e.Graphics.DrawString(Convert.ToDecimal(If(row.IsNull("MontantGenere"), 0D, row("MontantGenere"))).ToString("N0"), fontBloc, Brushes.Black, colMontant, y)
+                    e.Graphics.DrawString(Convert.ToDecimal(If(row.IsNull("Benefice"), 0D, row("Benefice"))).ToString("N0"), fontBloc, Brushes.Black, colBenefice, y)
+                    y += 24
+                Next
+
+                _impressionIndexDetailVentes = 0
+                e.HasMorePages = False
+            Catch ex As Exception
+                MessageBox.Show("Erreur impression ventes: " & ex.Message, "Analyse ventes", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                e.HasMorePages = False
+            End Try
+        End Sub
 
         Private Sub OuvrirFormulaireVentes(sender As Object, e As EventArgs)
             Using frm As New FormulaireVente()

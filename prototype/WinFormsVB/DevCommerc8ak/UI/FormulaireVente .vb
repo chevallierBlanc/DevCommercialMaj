@@ -2,6 +2,7 @@ Option Strict On
 Option Explicit On
 
 Imports System
+Imports System.Collections.Generic
 Imports System.Data
 Imports System.Drawing
 Imports System.Drawing.Printing
@@ -53,7 +54,10 @@ Namespace DevCommerc8ak
         Private ReadOnly cmbMoisDepenses As ComboBox
         Private ReadOnly cmbAnneeDepenses As ComboBox
         Private ReadOnly btnRafraichirDepenses As Button
-        Private ReadOnly btnImprimerDepenses As Button
+        Private ReadOnly btnImprimerVentes As Button
+        Private ReadOnly btnExporterPdfVentes As Button
+        Private ReadOnly btnImprimerStock As Button
+        Private ReadOnly btnExporterPdfStock As Button
 
         Private ReadOnly lblResumeVentes As Label
         Private ReadOnly lblResumeStock As Label
@@ -64,10 +68,18 @@ Namespace DevCommerc8ak
         Private ReadOnly btnTabDepenses As Button
 
         Private ReadOnly pdocDepenses As PrintDocument
+        Private ReadOnly pdocVentes As PrintDocument
+        Private ReadOnly pdocStock As PrintDocument
 
         Private ReadOnly _service As VenteService
         Private _depensesCourantes As DataTable
         Private _depensePrintRowIndex As Integer
+        Private _ventesCourantes As DataTable
+        Private _stockCourant As DataTable
+        Private _ventePrintRowIndex As Integer
+        Private _stockPrintRowIndex As Integer
+        Private _venteRapportTitre As String = String.Empty
+        Private _stockRapportTitre As String = String.Empty
 
         Public Sub New()
             Me.Text = "Ventes"
@@ -134,24 +146,7 @@ Namespace DevCommerc8ak
             btnRafraichirVentes.FlatAppearance.MouseDownBackColor = Color.FromArgb(ColorPrimary.R - 20, ColorPrimary.G - 20, ColorPrimary.B - 20)
             btnRafraichirVentes.FlatAppearance.MouseOverBackColor = Color.FromArgb(ColorPrimary.R + 20, ColorPrimary.G + 20, ColorPrimary.B + 20)
 
-            btnImprimerDepenses = New Button() With {
-                .Text = "Imprimer Dépenses",
-                 .Left = 1275,
-                .Top = 34,
-                .Width = 150,
-                .Height = 36,
-                .BackColor = ColorAccent,
-                .ForeColor = Color.White,
-                .FlatStyle = FlatStyle.Flat,
-                .Font = FontButton,
-                .Cursor = Cursors.Hand
-                           }
-            btnImprimerDepenses.FlatAppearance.BorderSize = 0
-            btnImprimerDepenses.FlatAppearance.MouseDownBackColor = Color.FromArgb(ColorAccent.R - 20, ColorAccent.G - 20, ColorAccent.B - 20)
-            btnImprimerDepenses.FlatAppearance.MouseOverBackColor = Color.FromArgb(ColorAccent.R + 20, ColorAccent.G + 20, ColorAccent.B + 20)
-
             pnlHeader.Controls.Add(btnRafraichirVentes)
-            pnlHeader.Controls.Add(btnImprimerDepenses)
 
             ' --- NAVIGATION PAR ONGLET PERSONNALISÉE ---
             Dim pnlTabNavigation As New FlowLayoutPanel() With {
@@ -221,10 +216,11 @@ Namespace DevCommerc8ak
             Dim pnlVentesContent As New TableLayoutPanel() With {
                 .Dock = DockStyle.Fill,
                 .ColumnCount = 1,
-                .RowCount = 2,
+                .RowCount = 3,
                 .BackColor = ColorBg
             }
-            pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Absolute, 120)) ' Filtres et résumé
+            pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Absolute, 130)) ' Filtres
+            pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Absolute, 48)) ' Actions
             pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Percent, 100)) ' Grille
 
             Dim pnlFiltresVentesCard As Panel = CreerCarte()
@@ -233,7 +229,7 @@ Namespace DevCommerc8ak
             Dim filtresVentesLayout As New TableLayoutPanel() With {
                 .Dock = DockStyle.Fill,
                 .ColumnCount = 8,
-                .RowCount = 2,
+                .RowCount = 3,
                 .AutoSize = True
             }
             filtresVentesLayout.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
@@ -299,13 +295,50 @@ Namespace DevCommerc8ak
             filtresVentesLayout.SetColumnSpan(lblResumeVentes, 8)
             filtresVentesLayout.Controls.Add(lblResumeVentes, 0, 1)
 
+            Dim pnlActionsVentes As New FlowLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .FlowDirection = FlowDirection.RightToLeft,
+                .WrapContents = False,
+                .Padding = New Padding(0, 2, 0, 0),
+                .Margin = New Padding(0)
+            }
+            btnImprimerVentes = New Button() With {
+                .Text = "Imprimer A4",
+                .Width = 120,
+                .Height = 32,
+                .BackColor = ColorSecondary,
+                .ForeColor = Color.White,
+                .FlatStyle = FlatStyle.Flat,
+                .Font = FontButton,
+                .Cursor = Cursors.Hand
+            }
+            btnImprimerVentes.FlatAppearance.BorderSize = 0
+            btnExporterPdfVentes = New Button() With {
+                .Text = "Exporter PDF",
+                .Width = 120,
+                .Height = 32,
+                .BackColor = ColorAccent,
+                .ForeColor = Color.White,
+                .FlatStyle = FlatStyle.Flat,
+                .Font = FontButton,
+                .Cursor = Cursors.Hand,
+                .Margin = New Padding(0, 0, 8, 0)
+            }
+            btnExporterPdfVentes.FlatAppearance.BorderSize = 0
+            pnlActionsVentes.Controls.Add(btnImprimerVentes)
+            pnlActionsVentes.Controls.Add(btnExporterPdfVentes)
+            filtresVentesLayout.Controls.Add(pnlActionsVentes, 0, 2)
+            filtresVentesLayout.SetColumnSpan(pnlActionsVentes, 8)
+
             pnlFiltresVentesCard.Controls.Add(filtresVentesLayout)
 
             gridVentes = CreerGrille()
             gridVentes.Dock = DockStyle.Fill
+            gridVentes.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+            gridVentes.ScrollBars = ScrollBars.Both
 
             pnlVentesContent.Controls.Add(pnlFiltresVentesCard, 0, 0)
-            pnlVentesContent.Controls.Add(gridVentes, 0, 1)
+            pnlVentesContent.Controls.Add(gridVentes, 0, 2)
             tabVentes.Controls.Add(pnlVentesContent)
 
             ' --- Onglet 2 : stock ---
@@ -323,10 +356,12 @@ Namespace DevCommerc8ak
 
             Dim stockLayout As New TableLayoutPanel() With {
                 .Dock = DockStyle.Fill,
-                .ColumnCount = 2,
+                .ColumnCount = 4,
                 .RowCount = 1
             }
             stockLayout.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 180))
+            stockLayout.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 120))
+            stockLayout.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 120))
             stockLayout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
             stockLayout.BackColor = Color.Transparent
 
@@ -345,6 +380,32 @@ Namespace DevCommerc8ak
             btnRafraichirStock.FlatAppearance.MouseDownBackColor = Color.FromArgb(ColorAccent.R - 20, ColorAccent.G - 20, ColorAccent.B - 20)
             btnRafraichirStock.FlatAppearance.MouseOverBackColor = Color.FromArgb(ColorAccent.R + 20, ColorAccent.G + 20, ColorAccent.B + 20)
 
+            btnImprimerStock = New Button() With {
+                .Text = "Imprimer A4",
+                .Width = 110,
+                .Height = 36,
+                .BackColor = ColorSecondary,
+                .ForeColor = Color.White,
+                .FlatStyle = FlatStyle.Flat,
+                .Font = FontButton,
+                .Cursor = Cursors.Hand,
+                .Anchor = AnchorStyles.Left
+            }
+            btnImprimerStock.FlatAppearance.BorderSize = 0
+
+            btnExporterPdfStock = New Button() With {
+                .Text = "Exporter PDF",
+                .Width = 110,
+                .Height = 36,
+                .BackColor = ColorAccent,
+                .ForeColor = Color.White,
+                .FlatStyle = FlatStyle.Flat,
+                .Font = FontButton,
+                .Cursor = Cursors.Hand,
+                .Anchor = AnchorStyles.Left
+            }
+            btnExporterPdfStock.FlatAppearance.BorderSize = 0
+
             lblResumeStock = New Label() With {
                 .Text = "Stock global: 0 | Sorties ventes: 0 | Sorties manuelles: 0",
                 .Font = New Font("Segoe UI", 10, FontStyle.Bold),
@@ -355,11 +416,15 @@ Namespace DevCommerc8ak
             }
 
             stockLayout.Controls.Add(btnRafraichirStock, 0, 0)
-            stockLayout.Controls.Add(lblResumeStock, 1, 0)
+            stockLayout.Controls.Add(btnImprimerStock, 1, 0)
+            stockLayout.Controls.Add(btnExporterPdfStock, 2, 0)
+            stockLayout.Controls.Add(lblResumeStock, 3, 0)
             pnlStockCard.Controls.Add(stockLayout)
 
             gridStock = CreerGrille()
             gridStock.Dock = DockStyle.Fill
+            gridStock.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+            gridStock.ScrollBars = ScrollBars.Both
 
             pnlStockContent.Controls.Add(pnlStockCard, 0, 0)
             pnlStockContent.Controls.Add(gridStock, 0, 1)
@@ -483,6 +548,18 @@ Namespace DevCommerc8ak
             }
             pdocDepenses.DefaultPageSettings.Margins = New Margins(50, 50, 60, 60)
             AddHandler pdocDepenses.PrintPage, AddressOf PdocDepenses_PrintPage
+            pdocVentes = New PrintDocument() With {
+                .DocumentName = "Ventes",
+                .OriginAtMargins = True
+            }
+            pdocVentes.DefaultPageSettings.Margins = New Margins(35, 35, 50, 50)
+            AddHandler pdocVentes.PrintPage, AddressOf PdocVentes_PrintPage
+            pdocStock = New PrintDocument() With {
+                .DocumentName = "Stock",
+                .OriginAtMargins = True
+            }
+            pdocStock.DefaultPageSettings.Margins = New Margins(35, 35, 50, 50)
+            AddHandler pdocStock.PrintPage, AddressOf PdocStock_PrintPage
 
             AddHandler cmbPeriode.SelectedIndexChanged, AddressOf ActualiserFiltresPeriode
             ' AddHandler dtpJour.ValueChanged, AddressOf ChargerVentes
@@ -497,7 +574,10 @@ Namespace DevCommerc8ak
             'AddHandler cmbMoisDepenses.SelectedIndexChanged, AddressOf ChargerDepenses
             'AddHandler cmbAnneeDepenses.SelectedIndexChanged, AddressOf ChargerDepenses
             AddHandler btnRafraichirDepenses.Click, Sub() ChargerDepenses()
-            AddHandler btnImprimerDepenses.Click, AddressOf ImprimerDepenses
+            AddHandler btnImprimerVentes.Click, AddressOf ImprimerVentes
+            AddHandler btnExporterPdfVentes.Click, AddressOf ExporterPdfVentes
+            AddHandler btnImprimerStock.Click, AddressOf ImprimerStock
+            AddHandler btnExporterPdfStock.Click, AddressOf ExporterPdfStock
 
             AddHandler tabs.SelectedIndexChanged, AddressOf ChargerOngletActif
             AddHandler Me.Load, AddressOf FormulaireVente_Load
@@ -609,6 +689,7 @@ Namespace DevCommerc8ak
                         dt = _service.ListerVentesJour(dtpJour.Value.Date)
                 End Select
 
+                _ventesCourantes = dt
                 gridVentes.DataSource = dt
                 ConfigurerGrilleVentes()
                 MettreAJourResumeVentes(dt)
@@ -671,6 +752,7 @@ Namespace DevCommerc8ak
         Private Sub ChargerStock()
             Try
                 Dim dt As DataTable = _service.ListerStockResume()
+                _stockCourant = dt
                 gridStock.DataSource = dt
                 ConfigurerGrilleStock()
                 MettreAJourResumeStock(dt)
@@ -742,11 +824,11 @@ Namespace DevCommerc8ak
             If gridVentes.Columns.Count = 0 Then Return
 
             ConfigurerColonne(gridVentes, "DateVente", "Date", 120, "dd/MM/yyyy")
-            ConfigurerColonne(gridVentes, "Produit", "Produit", 200)
-            ConfigurerColonne(gridVentes, "QuantiteVendue", "Qté", 80, "N0")
-            ConfigurerColonne(gridVentes, "PrixUnitaire", "Prix U.", 100, "N0")
-            ConfigurerColonne(gridVentes, "MontantTotal", "Montant", 120, "N0")
-            ConfigurerColonne(gridVentes, "BeneficeTotal", "Bénéfice", 120, "N0")
+            ConfigurerColonne(gridVentes, "Produit", "Produit", 220)
+            ConfigurerColonne(gridVentes, "PrixAchatCarton", "Prix achat carton", 130, "N0")
+            ConfigurerColonne(gridVentes, "QuantiteVenduePieces", "Qté vendue (P)", 130, "N0")
+            ConfigurerColonne(gridVentes, "MontantGenere", "Montant", 130, "N0")
+            ConfigurerColonne(gridVentes, "Benefice", "Bénéfice", 130, "N0")
         End Sub
 
         Private Sub ConfigurerGrilleStock()
@@ -772,13 +854,15 @@ Namespace DevCommerc8ak
         Private Sub ConfigurerGrilleDepenses()
             If gridDepenses.Columns.Count = 0 Then Return
 
-            ConfigurerColonne(gridDepenses, "Categorie", "Catégorie", 200)
+            If gridDepenses.Columns.Contains("Id") Then
+                gridDepenses.Columns("Id").Visible = False
+            End If
+            ConfigurerColonne(gridDepenses, "Categorie", "Catégorie", 220)
             ConfigurerColonne(gridDepenses, "NombreDepenses", "Nombre", 100, "N0")
-            ConfigurerColonne(gridDepenses, "MontantTotal", "Montant (FC)", 150, "N0")
+            ConfigurerColonne(gridDepenses, "MontantTotal", "Montant (FC)", 140, "N0")
             ConfigurerColonne(gridDepenses, "PremiereDate", "Première date", 120, "dd/MM/yyyy")
             ConfigurerColonne(gridDepenses, "DerniereDate", "Dernière date", 120, "dd/MM/yyyy")
         End Sub
-
         Private Sub ConfigurerColonne(grid As DataGridView, nom As String, titre As String, largeur As Integer, Optional format As String = Nothing)
             If Not grid.Columns.Contains(nom) Then Return
 
@@ -791,6 +875,258 @@ Namespace DevCommerc8ak
             Else
                 col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft
             End If
+        End Sub
+
+        Private Sub ImprimerVentes(sender As Object, e As EventArgs)
+            Dim dt As DataTable = If(_ventesCourantes, TryCast(gridVentes.DataSource, DataTable))
+            If dt Is Nothing OrElse dt.Rows.Count = 0 Then
+                MessageBox.Show("Aucune vente à imprimer.", "Ventes", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+
+            _ventePrintRowIndex = 0
+            _venteRapportTitre = "RAPPORT DES VENTES"
+            Using preview As New PrintPreviewDialog()
+                preview.Document = pdocVentes
+                preview.Width = 1200
+                preview.Height = 800
+                preview.StartPosition = FormStartPosition.CenterParent
+                preview.ShowDialog(Me)
+            End Using
+        End Sub
+
+        Private Sub ExporterPdfVentes(sender As Object, e As EventArgs)
+            Dim dt As DataTable = If(_ventesCourantes, TryCast(gridVentes.DataSource, DataTable))
+            If dt Is Nothing OrElse dt.Rows.Count = 0 Then
+                MessageBox.Show("Aucune vente à exporter.", "Ventes", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+
+            Using sfd As New SaveFileDialog()
+                sfd.Filter = "PDF (*.pdf)|*.pdf"
+                sfd.FileName = "Rapport_Ventes_" & Date.Now.ToString("yyyyMMdd_HHmmss") & ".pdf"
+                If sfd.ShowDialog(Me) <> DialogResult.OK Then
+                    Return
+                End If
+
+                Dim lignes As New List(Of String)()
+                lignes.Add("RAPPORT DES VENTES")
+                lignes.Add("Période : " & Convert.ToString(cmbPeriode.SelectedItem))
+                lignes.Add("Jour : " & dtpJour.Value.ToString("dd/MM/yyyy"))
+                lignes.Add("Mois : " & Convert.ToString(cmbMois.SelectedItem))
+                lignes.Add("Année : " & Convert.ToString(cmbAnnee.SelectedItem))
+                lignes.Add("")
+                For Each row As DataRow In dt.Rows
+                    Dim dateVente As String = If(dt.Columns.Contains("DateVente") AndAlso Not row.IsNull("DateVente"), Convert.ToDateTime(row("DateVente")).ToString("dd/MM/yyyy HH:mm"), "")
+                    Dim produit As String = If(dt.Columns.Contains("Produit") AndAlso Not row.IsNull("Produit"), Convert.ToString(row("Produit")), "")
+                    Dim qte As String = If(dt.Columns.Contains("QuantiteVenduePieces") AndAlso Not row.IsNull("QuantiteVenduePieces"), Convert.ToDecimal(row("QuantiteVenduePieces")).ToString("N0"), "0")
+                    Dim montant As String = If(dt.Columns.Contains("MontantGenere") AndAlso Not row.IsNull("MontantGenere"), FormatageGlobal.FormatMontant(Convert.ToDecimal(row("MontantGenere"))), "0 FC")
+                    Dim benefice As String = If(dt.Columns.Contains("Benefice") AndAlso Not row.IsNull("Benefice"), FormatageGlobal.FormatMontant(Convert.ToDecimal(row("Benefice"))), "0 FC")
+                    lignes.Add(dateVente & " | " & produit & " | Qté:" & qte & " | Mt:" & montant & " | B:" & benefice)
+                Next
+                PdfHelper.GenererPdfSimple(sfd.FileName, "RAPPORT DES VENTES", lignes)
+            End Using
+        End Sub
+
+        Private Sub ImprimerStock(sender As Object, e As EventArgs)
+            Dim dt As DataTable = If(_stockCourant, TryCast(gridStock.DataSource, DataTable))
+            If dt Is Nothing OrElse dt.Rows.Count = 0 Then
+                MessageBox.Show("Aucun stock à imprimer.", "Ventes", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+
+            _stockPrintRowIndex = 0
+            _stockRapportTitre = "RAPPORT STOCK PRODUITS"
+            Using preview As New PrintPreviewDialog()
+                preview.Document = pdocStock
+                preview.Width = 1200
+                preview.Height = 800
+                preview.StartPosition = FormStartPosition.CenterParent
+                preview.ShowDialog(Me)
+            End Using
+        End Sub
+
+        Private Sub ExporterPdfStock(sender As Object, e As EventArgs)
+            Dim dt As DataTable = If(_stockCourant, TryCast(gridStock.DataSource, DataTable))
+            If dt Is Nothing OrElse dt.Rows.Count = 0 Then
+                MessageBox.Show("Aucun stock à exporter.", "Ventes", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+
+            Using sfd As New SaveFileDialog()
+                sfd.Filter = "PDF (*.pdf)|*.pdf"
+                sfd.FileName = "Rapport_Stock_" & Date.Now.ToString("yyyyMMdd_HHmmss") & ".pdf"
+                If sfd.ShowDialog(Me) <> DialogResult.OK Then
+                    Return
+                End If
+
+                Dim lignes As New List(Of String)()
+                lignes.Add("RAPPORT STOCK")
+                lignes.Add("")
+                For Each row As DataRow In dt.Rows
+                    Dim produit As String = If(dt.Columns.Contains("Produit") AndAlso Not row.IsNull("Produit"), Convert.ToString(row("Produit")), "")
+                    Dim stockPieces As String = If(dt.Columns.Contains("StockActuelPieces") AndAlso Not row.IsNull("StockActuelPieces"), Convert.ToDecimal(row("StockActuelPieces")).ToString("N0"), "0")
+                    Dim stockCartons As String = If(dt.Columns.Contains("StockActuelCartons") AndAlso Not row.IsNull("StockActuelCartons"), Convert.ToDecimal(row("StockActuelCartons")).ToString("N0"), "0")
+                    Dim ventes As String = If(dt.Columns.Contains("QuantiteVenduePieces") AndAlso Not row.IsNull("QuantiteVenduePieces"), Convert.ToDecimal(row("QuantiteVenduePieces")).ToString("N0"), "0")
+                    Dim sorties As String = If(dt.Columns.Contains("QuantiteSortieManuellePieces") AndAlso Not row.IsNull("QuantiteSortieManuellePieces"), Convert.ToDecimal(row("QuantiteSortieManuellePieces")).ToString("N0"), "0")
+                    Dim restant As String = If(dt.Columns.Contains("RestantPieces") AndAlso Not row.IsNull("RestantPieces"), Convert.ToDecimal(row("RestantPieces")).ToString("N0"), "0")
+                    lignes.Add(produit & " | Stock:" & stockPieces & "P/" & stockCartons & "C | Ventes:" & ventes & " | Sorties:" & sorties & " | Restant:" & restant)
+                Next
+                PdfHelper.GenererPdfSimple(sfd.FileName, "RAPPORT STOCK", lignes)
+            End Using
+        End Sub
+
+        Private Sub PdocVentes_PrintPage(sender As Object, e As PrintPageEventArgs)
+            Dim data As DataTable = If(_ventesCourantes, TryCast(gridVentes.DataSource, DataTable))
+            If data Is Nothing OrElse data.Rows.Count = 0 Then
+                e.HasMorePages = False
+                Return
+            End If
+
+            Dim left As Integer = e.MarginBounds.Left
+            Dim top As Integer = e.MarginBounds.Top
+            Dim pageWidth As Integer = e.MarginBounds.Width
+            Dim y As Integer = top
+
+            Using titreFont As New Font("Segoe UI", 14.0F, FontStyle.Bold),
+                  sousTitreFont As New Font("Segoe UI", 9.0F, FontStyle.Regular),
+                  enteteFont As New Font("Segoe UI", 9.0F, FontStyle.Bold),
+                  ligneFont As New Font("Segoe UI", 9.0F, FontStyle.Regular)
+
+                e.Graphics.DrawString("Rapport des ventes", titreFont, Brushes.Black, left, y)
+                y += 24
+                e.Graphics.DrawString("Période : " & Convert.ToString(cmbPeriode.SelectedItem) & " | " & lblResumeVentes.Text, sousTitreFont, Brushes.Black, left, y)
+                y += 26
+
+                Dim colonnes As String() = {"DateVente", "Produit", "PrixAchatCarton", "QuantiteVenduePieces", "MontantGenere", "Benefice"}
+                Dim largeurs As Integer() = {
+                    CInt(pageWidth * 0.16),
+                    CInt(pageWidth * 0.28),
+                    CInt(pageWidth * 0.14),
+                    CInt(pageWidth * 0.14),
+                    CInt(pageWidth * 0.14),
+                    CInt(pageWidth * 0.14)
+                }
+                Dim titres As String() = {"Date", "Produit", "Prix achat", "Qté", "Montant", "Bénéfice"}
+                Dim hauteurEntete As Integer = 24
+                Dim hauteurLigne As Integer = 22
+
+                Dim x As Integer = left
+                For i As Integer = 0 To titres.Length - 1
+                    e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(240, 240, 240)), x, y, largeurs(i), hauteurEntete)
+                    e.Graphics.DrawRectangle(Pens.Gray, x, y, largeurs(i), hauteurEntete)
+                    e.Graphics.DrawString(titres(i), enteteFont, Brushes.Black, New RectangleF(x + 4, y + 4, largeurs(i) - 8, hauteurEntete - 8))
+                    x += largeurs(i)
+                Next
+                y += hauteurEntete
+
+                While _ventePrintRowIndex < data.Rows.Count
+                    Dim row As DataRow = data.Rows(_ventePrintRowIndex)
+                    If y + hauteurLigne > e.MarginBounds.Bottom Then
+                        e.HasMorePages = True
+                        Return
+                    End If
+
+                    x = left
+                    For i As Integer = 0 To colonnes.Length - 1
+                        Dim valeur As String = ""
+                        If Not row.IsNull(colonnes(i)) Then
+                            Select Case colonnes(i)
+                                Case "DateVente"
+                                    valeur = Convert.ToDateTime(row(colonnes(i))).ToString("dd/MM/yyyy HH:mm")
+                                Case "Produit"
+                                    valeur = Convert.ToString(row(colonnes(i)))
+                                Case Else
+                                    valeur = Convert.ToDecimal(row(colonnes(i))).ToString("N0")
+                            End Select
+                        End If
+                        e.Graphics.DrawRectangle(Pens.Gray, x, y, largeurs(i), hauteurLigne)
+                        e.Graphics.DrawString(valeur, ligneFont, Brushes.Black, New RectangleF(x + 4, y + 3, largeurs(i) - 8, hauteurLigne - 6))
+                        x += largeurs(i)
+                    Next
+
+                    y += hauteurLigne
+                    _ventePrintRowIndex += 1
+                End While
+            End Using
+
+            _ventePrintRowIndex = 0
+            e.HasMorePages = False
+        End Sub
+
+        Private Sub PdocStock_PrintPage(sender As Object, e As PrintPageEventArgs)
+            Dim data As DataTable = If(_stockCourant, TryCast(gridStock.DataSource, DataTable))
+            If data Is Nothing OrElse data.Rows.Count = 0 Then
+                e.HasMorePages = False
+                Return
+            End If
+
+            Dim left As Integer = e.MarginBounds.Left
+            Dim top As Integer = e.MarginBounds.Top
+            Dim pageWidth As Integer = e.MarginBounds.Width
+            Dim y As Integer = top
+
+            Using titreFont As New Font("Segoe UI", 14.0F, FontStyle.Bold),
+                  sousTitreFont As New Font("Segoe UI", 9.0F, FontStyle.Regular),
+                  enteteFont As New Font("Segoe UI", 9.0F, FontStyle.Bold),
+                  ligneFont As New Font("Segoe UI", 9.0F, FontStyle.Regular)
+
+                e.Graphics.DrawString("Rapport stock produits", titreFont, Brushes.Black, left, y)
+                y += 24
+                e.Graphics.DrawString("Synthèse actuelle du stock | " & lblResumeStock.Text, sousTitreFont, Brushes.Black, left, y)
+                y += 26
+
+                Dim colonnes As String() = {"Produit", "StockActuelPieces", "StockActuelCartons", "QuantiteVenduePieces", "QuantiteSortieManuellePieces", "RestantPieces"}
+                Dim largeurs As Integer() = {
+                    CInt(pageWidth * 0.32),
+                    CInt(pageWidth * 0.12),
+                    CInt(pageWidth * 0.12),
+                    CInt(pageWidth * 0.14),
+                    CInt(pageWidth * 0.14),
+                    CInt(pageWidth * 0.16)
+                }
+                Dim titres As String() = {"Produit", "Stock P", "Stock C", "Ventes P", "Sorties P", "Restant P"}
+                Dim hauteurEntete As Integer = 24
+                Dim hauteurLigne As Integer = 22
+
+                Dim x As Integer = left
+                For i As Integer = 0 To titres.Length - 1
+                    e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(240, 240, 240)), x, y, largeurs(i), hauteurEntete)
+                    e.Graphics.DrawRectangle(Pens.Gray, x, y, largeurs(i), hauteurEntete)
+                    e.Graphics.DrawString(titres(i), enteteFont, Brushes.Black, New RectangleF(x + 4, y + 4, largeurs(i) - 8, hauteurEntete - 8))
+                    x += largeurs(i)
+                Next
+                y += hauteurEntete
+
+                While _stockPrintRowIndex < data.Rows.Count
+                    Dim row As DataRow = data.Rows(_stockPrintRowIndex)
+                    If y + hauteurLigne > e.MarginBounds.Bottom Then
+                        e.HasMorePages = True
+                        Return
+                    End If
+
+                    x = left
+                    For i As Integer = 0 To colonnes.Length - 1
+                        Dim valeur As String = ""
+                        If Not row.IsNull(colonnes(i)) Then
+                            If String.Equals(colonnes(i), "Produit", StringComparison.OrdinalIgnoreCase) Then
+                                valeur = Convert.ToString(row(colonnes(i)))
+                            Else
+                                valeur = Convert.ToDecimal(row(colonnes(i))).ToString("N0")
+                            End If
+                        End If
+                        e.Graphics.DrawRectangle(Pens.Gray, x, y, largeurs(i), hauteurLigne)
+                        e.Graphics.DrawString(valeur, ligneFont, Brushes.Black, New RectangleF(x + 4, y + 3, largeurs(i) - 8, hauteurLigne - 6))
+                        x += largeurs(i)
+                    Next
+
+                    y += hauteurLigne
+                    _stockPrintRowIndex += 1
+                End While
+            End Using
+
+            _stockPrintRowIndex = 0
+            e.HasMorePages = False
         End Sub
 
         Private Sub ImprimerDepenses(sender As Object, e As EventArgs)

@@ -261,7 +261,7 @@ Namespace DevCommerc8ak
         Private Sub InitOngletDepenses()
             tpDepenses.BackColor = ColorBg
             Dim mainLayoutDepenses As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 1, .Padding = New Padding(24), .BackColor = ColorBg}
-            mainLayoutDepenses.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 500))
+            mainLayoutDepenses.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 460))
             mainLayoutDepenses.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
 
             ' Formulaire de saisie (Carte)
@@ -294,7 +294,7 @@ Namespace DevCommerc8ak
 
             layoutSaisie.Controls.Add(CreateLabel("Catégorie"), 0, 1)
             Dim pnlCat As New Panel() With {.Dock = DockStyle.Fill, .Height = 35}
-            cmbCategorieDepense = New ComboBox() With {.Dock = DockStyle.Left, .Width = 390, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
+            cmbCategorieDepense = New ComboBox() With {.Dock = DockStyle.Fill, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl, .Margin = New Padding(0, 0, 8, 0)}
             btnAddCategorie = New Button() With {.Text = "+", .Dock = DockStyle.Right, .Width = 35, .BackColor = ColorAccent, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat, .Cursor = Cursors.Hand}
             btnAddCategorie.FlatAppearance.BorderSize = 0
             pnlCat.Controls.Add(cmbCategorieDepense)
@@ -303,8 +303,8 @@ Namespace DevCommerc8ak
 
             layoutSaisie.Controls.Add(CreateLabel("Montant"), 0, 3)
             Dim pnlMontantDevise As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 1, .Margin = New Padding(0), .Padding = New Padding(0)}
-            pnlMontantDevise.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 68))
-            pnlMontantDevise.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 32))
+            pnlMontantDevise.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 74))
+            pnlMontantDevise.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 26))
             txtMontantDepense = CreateStyledTextBox("0.00")
             txtMontantDepense.Dock = DockStyle.Fill
             txtMontantDepense.Margin = New Padding(0, 0, 10, 0)
@@ -330,20 +330,19 @@ Namespace DevCommerc8ak
             layoutSaisie.Controls.Add(CreateLabel("Description"), 0, 7)
             txtDescriptionDepense = CreateStyledTextBox("Description...")
             txtDescriptionDepense.Multiline = True
-            txtDescriptionDepense.Dock = DockStyle.Left
+            txtDescriptionDepense.Dock = DockStyle.Fill
             txtDescriptionDepense.Height = 62 ' Réduit pour rendre l'ensemble plus compact
-            txtDescriptionDepense.Width = 350
-            txtDescriptionDepense.Anchor = AnchorStyles.Left Or AnchorStyles.Top
+            txtDescriptionDepense.Margin = New Padding(0)
             layoutSaisie.Controls.Add(txtDescriptionDepense, 0, 8)
 
             layoutSaisie.Controls.Add(CreateLabel("Date"), 0, 9)
-            dtpDateDepense = New DateTimePicker() With {.Dock = DockStyle.Left, .Width = 200, .Margin = New Padding(0, -2, 0, 4), .Font = FontControl}
+            dtpDateDepense = New DateTimePicker() With {.Dock = DockStyle.Fill, .Margin = New Padding(0, -6, 0, 4), .Font = FontControl}
             layoutSaisie.Controls.Add(dtpDateDepense, 0, 10)
 
             Dim pnlValidation As New Panel() With {.Dock = DockStyle.Fill, .Margin = New Padding(0, 4, 0, 0)}
             btnValiderDepense = CreateStyledButton("Valider la dépense", ColorDanger)
-            btnValiderDepense.Width = 220
-            btnValiderDepense.Height = 34
+            btnValiderDepense.Width = 190
+            btnValiderDepense.Height = 32
             btnValiderDepense.Dock = DockStyle.None
             btnValiderDepense.Anchor = AnchorStyles.None
             pnlValidation.Controls.Add(btnValiderDepense)
@@ -436,10 +435,10 @@ Namespace DevCommerc8ak
         Private Sub InitOngletBanque()
             tpBanque.BackColor = ColorBg
             Dim mainLayoutBanque As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 2, .Padding = New Padding(24), .BackColor = ColorBg}
-            mainLayoutBanque.RowStyles.Add(New RowStyle(SizeType.Absolute, 120))
+            mainLayoutBanque.RowStyles.Add(New RowStyle(SizeType.Absolute, 155))
             mainLayoutBanque.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
 
-            Dim pnlSoldes As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.LeftToRight, .WrapContents = True}
+            Dim pnlSoldes As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.LeftToRight, .WrapContents = False, .AutoSize = False, .Padding = New Padding(0)}
             lblSoldeBanqueFC = CreerKpiCard(pnlSoldes, "Solde Banque (FC)", ColorPrimary)
             lblSoldeBanqueUSD = CreerKpiCard(pnlSoldes, "Solde Banque (USD)", ColorPrimary)
 
@@ -730,30 +729,58 @@ Namespace DevCommerc8ak
             If gridHistoriqueDepenses.Columns.Count = 0 Then Return
 
             ' Configuration des colonnes pour l'historique des dépenses
+            gridHistoriqueDepenses.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+            gridHistoriqueDepenses.ScrollBars = ScrollBars.Both
             ConfigurerColonne(gridHistoriqueDepenses, "Id", "", 0, Nothing, True)
-            ConfigurerColonne(gridHistoriqueDepenses, "DateDepense", "Date", 90, "dd/MM/yyyy")
-            ConfigurerColonne(gridHistoriqueDepenses, "NomCategorie", "Catégorie", 120)
-            ConfigurerColonne(gridHistoriqueDepenses, "Description", "Description", 160)
-            ConfigurerColonne(gridHistoriqueDepenses, "Montant", "Montant", 80, "N0")
-            ConfigurerColonne(gridHistoriqueDepenses, "Devise", "Devise", 60)
-            ConfigurerColonne(gridHistoriqueDepenses, "Source", "Source", 80)
-            ConfigurerColonne(gridHistoriqueDepenses, "TypeDepense", "Type", 80)
+            If gridHistoriqueDepenses.Columns.Contains("DateDepense") Then
+                ConfigurerColonne(gridHistoriqueDepenses, "DateDepense", "Date", 100, "dd/MM/yyyy")
+            ElseIf gridHistoriqueDepenses.Columns.Contains("Date") Then
+                ConfigurerColonne(gridHistoriqueDepenses, "Date", "Date", 100, "dd/MM/yyyy")
+            End If
+            If gridHistoriqueDepenses.Columns.Contains("NomCategorie") Then
+                ConfigurerColonne(gridHistoriqueDepenses, "NomCategorie", "Catégorie", 150)
+            ElseIf gridHistoriqueDepenses.Columns.Contains("Categorie") Then
+                ConfigurerColonne(gridHistoriqueDepenses, "Categorie", "Catégorie", 150)
+            End If
+            ConfigurerColonne(gridHistoriqueDepenses, "Description", "Description", 220)
+            If gridHistoriqueDepenses.Columns.Contains("Montant") Then
+                ConfigurerColonne(gridHistoriqueDepenses, "Montant", "Montant", 100, "N0")
+            ElseIf gridHistoriqueDepenses.Columns.Contains("MontantTotal") Then
+                ConfigurerColonne(gridHistoriqueDepenses, "MontantTotal", "Montant", 100, "N0")
+            End If
+            ConfigurerColonne(gridHistoriqueDepenses, "Devise", "Devise", 70)
+            ConfigurerColonne(gridHistoriqueDepenses, "Source", "Source", 95)
+            ConfigurerColonne(gridHistoriqueDepenses, "CreePar", "Créé par", 120)
+            ConfigurerColonne(gridHistoriqueDepenses, "CreatedAt", "Créé le", 150, "dd/MM/yyyy HH:mm")
+            If gridHistoriqueDepenses.Columns.Contains("TypeDepense") Then
+                ConfigurerColonne(gridHistoriqueDepenses, "TypeDepense", "Type", 100)
+            ElseIf gridHistoriqueDepenses.Columns.Contains("Type") Then
+                ConfigurerColonne(gridHistoriqueDepenses, "Type", "Type", 100)
+            End If
         End Sub
 
         Private Sub ConfigurerGrilleBanque()
             If gridHistoriqueBanque.Columns.Count = 0 Then Return
 
             ' Configuration des colonnes pour l'historique bancaire
+            gridHistoriqueBanque.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+            gridHistoriqueBanque.ScrollBars = ScrollBars.Both
             ConfigurerColonne(gridHistoriqueBanque, "Id", "", 0, Nothing, True)
-            ConfigurerColonne(gridHistoriqueBanque, "DateTransaction", "Date", 95, "dd/MM/yyyy")
-            ConfigurerColonne(gridHistoriqueBanque, "DateOperation", "Date", 95, "dd/MM/yyyy")
+            If gridHistoriqueBanque.Columns.Contains("DateTransaction") Then
+                ConfigurerColonne(gridHistoriqueBanque, "DateTransaction", "Date", 100, "dd/MM/yyyy")
+            ElseIf gridHistoriqueBanque.Columns.Contains("DateOperation") Then
+                ConfigurerColonne(gridHistoriqueBanque, "DateOperation", "Date", 100, "dd/MM/yyyy")
+            End If
             ConfigurerColonne(gridHistoriqueBanque, "Description", "Description", 220)
-            ConfigurerColonne(gridHistoriqueBanque, "Reference", "Reference", 160)
-            ConfigurerColonne(gridHistoriqueBanque, "Montant", "Montant", 100, "N0")
+            ConfigurerColonne(gridHistoriqueBanque, "Reference", "Référence", 160)
+            ConfigurerColonne(gridHistoriqueBanque, "Montant", "Montant", 120, "N0")
             ConfigurerColonne(gridHistoriqueBanque, "Devise", "Devise", 70)
-            ConfigurerColonne(gridHistoriqueBanque, "TypeTransaction", "Type", 100)
-            ConfigurerColonne(gridHistoriqueBanque, "TypeOperation", "Type", 100)
-            ConfigurerColonne(gridHistoriqueBanque, "CreatedAt", "Créé le", 130, "dd/MM/yyyy HH:mm")
+            If gridHistoriqueBanque.Columns.Contains("TypeTransaction") Then
+                ConfigurerColonne(gridHistoriqueBanque, "TypeTransaction", "Type", 120)
+            ElseIf gridHistoriqueBanque.Columns.Contains("TypeOperation") Then
+                ConfigurerColonne(gridHistoriqueBanque, "TypeOperation", "Type", 120)
+            End If
+            ConfigurerColonne(gridHistoriqueBanque, "CreatedAt", "Créé le", 150, "dd/MM/yyyy HH:mm")
         End Sub
 
         Private Sub ConfigurerColonne(grid As DataGridView, nom As String, titre As String, largeur As Integer, Optional format As String = Nothing, Optional cacher As Boolean = False)
@@ -885,7 +912,7 @@ Namespace DevCommerc8ak
 
         Private Function CreerKpiCard(parentPanel As FlowLayoutPanel, title As String, valueColor As Color) As Label
             Dim cardPanel As New Panel() With {
-                .Width = 280,
+                .Width = 285,
                 .Height = 120,
                 .BackColor = ColorCardBg,
                 .Margin = New Padding(8),

@@ -193,7 +193,7 @@ Namespace DevCommerc8ak
             lblTotalLigne = New Label() With {.Text = "Total ligne: 0", .Left = 850, .Top = 60, .AutoSize = True, .Font = New Font("Segoe UI", 10.0F, FontStyle.Bold)}
             btnAjouterLigne = New Button() With {.Text = "Ajouter ligne", .Left = 980, .Top = 48, .Width = 120, .Height = 35, .BackColor = ColorPrimary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat, .Font = FontLabel, .Cursor = Cursors.Hand}
             btnAjouterLigne.FlatAppearance.BorderSize = 0
-            btnRetirerLigne = New Button() With {.Text = "Retirer", .Left = 1115, .Top = 48, .Width = 100, .Height = 35, .BackColor = Color.FromArgb(220, 220, 220), .FlatStyle = FlatStyle.Flat, .Font = FontLabel, .Cursor = Cursors.Hand}
+            btnRetirerLigne = New Button() With {.Text = "Supprimer ligne", .Left = 1060, .Top = 48, .Width = 155, .Height = 35, .BackColor = Color.FromArgb(220, 220, 220), .FlatStyle = FlatStyle.Flat, .Font = FontLabel, .Cursor = Cursors.Hand}
             btnRetirerLigne.FlatAppearance.BorderSize = 0
 
             grpApproManuel.Controls.Add(New Label() With {.Text = "Produit", .Left = 20, .Top = 30, .AutoSize = True, .Font = FontLabel, .ForeColor = Color.Gray})
@@ -348,7 +348,27 @@ Namespace DevCommerc8ak
                 dtPage.ImportRow(_bonsSource.Rows(i))
             Next
             gridBons.DataSource = dtPage
+            gridBons.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
             If gridBons.Columns.Contains("BonId") Then gridBons.Columns("BonId").Visible = False
+            If gridBons.Columns.Contains("FournisseurId") Then gridBons.Columns("FournisseurId").Visible = False
+            If gridBons.Columns.Contains("NomFournisseur") Then
+                gridBons.Columns("NomFournisseur").HeaderText = "Fournisseur"
+                gridBons.Columns("NomFournisseur").Width = 180
+            End If
+            If gridBons.Columns.Contains("TotalBon") Then
+                gridBons.Columns("TotalBon").HeaderText = "Total bon"
+                gridBons.Columns("TotalBon").DefaultCellStyle.Format = "N0"
+                gridBons.Columns("TotalBon").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+                gridBons.Columns("TotalBon").Width = 120
+            End If
+            If gridBons.Columns.Contains("NombreLignes") Then
+                gridBons.Columns("NombreLignes").HeaderText = "Lignes"
+                gridBons.Columns("NombreLignes").DefaultCellStyle.Format = "N0"
+                gridBons.Columns("NombreLignes").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+                gridBons.Columns("NombreLignes").Width = 80
+            End If
+            If gridBons.Columns.Contains("TypePaiement") Then gridBons.Columns("TypePaiement").Width = 100
+            If gridBons.Columns.Contains("Statut") Then gridBons.Columns("Statut").Width = 100
         End Sub
 
         Private Sub ChangerPage(delta As Integer)
@@ -381,6 +401,7 @@ Namespace DevCommerc8ak
             txtPrixAchat.Clear()
             txtQuantite.Clear()
             gridLignes.DataSource = _repo.ListerLignes(_bonCourantId)
+            ConfigurerGrilleLignes()
             gridLignes.ClearSelection()
             lblTotalBon.Text = "Total bon: 0"
             DefinirStatutAffiche("EnAttente")
@@ -399,9 +420,47 @@ Namespace DevCommerc8ak
                 cmbFournisseur.SelectedIndex = -1
             End If
             cmbTypePaiement.Text = Convert.ToString(gridBons.CurrentRow.Cells("TypePaiement").Value)
-            lblTotalBon.Text = "Total bon: " & Convert.ToDecimal(gridBons.CurrentRow.Cells("TotalBon").Value).ToString("N2")
+            lblTotalBon.Text = "Total bon: " & Convert.ToDecimal(gridBons.CurrentRow.Cells("TotalBon").Value).ToString("N0")
             DefinirStatutAffiche(Convert.ToString(gridBons.CurrentRow.Cells("Statut").Value))
             gridLignes.DataSource = _repo.ListerLignes(_bonCourantId)
+            ConfigurerGrilleLignes()
+        End Sub
+
+        Private Sub ConfigurerGrilleLignes()
+            If gridLignes.Columns.Count = 0 Then Return
+
+            gridLignes.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+            gridLignes.ScrollBars = ScrollBars.Both
+            If gridLignes.Columns.Contains("BonLigneId") Then gridLignes.Columns("BonLigneId").Visible = False
+            If gridLignes.Columns.Contains("ProduitId") Then gridLignes.Columns("ProduitId").Visible = False
+            If gridLignes.Columns.Contains("Libelle") Then
+                gridLignes.Columns("Libelle").HeaderText = "Produit"
+                gridLignes.Columns("Libelle").Width = 260
+            End If
+            If gridLignes.Columns.Contains("Quantite") Then
+                gridLignes.Columns("Quantite").HeaderText = "Qté"
+                gridLignes.Columns("Quantite").DefaultCellStyle.Format = "N0"
+                gridLignes.Columns("Quantite").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+                gridLignes.Columns("Quantite").Width = 90
+            End If
+            If gridLignes.Columns.Contains("PrixAchatPrecedent") Then
+                gridLignes.Columns("PrixAchatPrecedent").HeaderText = "Prix précédent"
+                gridLignes.Columns("PrixAchatPrecedent").DefaultCellStyle.Format = "N0"
+                gridLignes.Columns("PrixAchatPrecedent").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+                gridLignes.Columns("PrixAchatPrecedent").Width = 120
+            End If
+            If gridLignes.Columns.Contains("PrixAchat") Then
+                gridLignes.Columns("PrixAchat").HeaderText = "Prix achat"
+                gridLignes.Columns("PrixAchat").DefaultCellStyle.Format = "N0"
+                gridLignes.Columns("PrixAchat").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+                gridLignes.Columns("PrixAchat").Width = 120
+            End If
+            If gridLignes.Columns.Contains("TotalLigne") Then
+                gridLignes.Columns("TotalLigne").HeaderText = "Total ligne"
+                gridLignes.Columns("TotalLigne").DefaultCellStyle.Format = "N0"
+                gridLignes.Columns("TotalLigne").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+                gridLignes.Columns("TotalLigne").Width = 130
+            End If
         End Sub
 
         Private Sub ChargerFournisseurs()
@@ -438,7 +497,7 @@ Namespace DevCommerc8ak
         Private Sub MettreAJourTotalLigne(sender As Object, e As EventArgs)
             Dim quantite As Decimal = LireDecimal(txtQuantite.Text)
             Dim prix As Decimal = LireDecimal(txtPrixAchat.Text)
-            lblTotalLigne.Text = "Total ligne: " & (quantite * prix).ToString("N2")
+            lblTotalLigne.Text = "Total ligne: " & (quantite * prix).ToString("N0")
         End Sub
 
         Private Sub AjouterLigne(sender As Object, e As EventArgs)
@@ -471,7 +530,8 @@ Namespace DevCommerc8ak
             _repo.MettreAJourEntete(_bonCourantId, LireFournisseurIdSelectionne(), cmbTypePaiement.Text)
             _repo.AjouterLigne(_bonCourantId, produitId, quantite, LireDecimal(txtPrixAchat.Text))
             gridLignes.DataSource = _repo.ListerLignes(_bonCourantId)
-            lblTotalBon.Text = "Total bon: " & CalculerTotalBon(_bonCourantId).ToString("N2")
+            ConfigurerGrilleLignes()
+            lblTotalBon.Text = "Total bon: " & CalculerTotalBon(_bonCourantId).ToString("N0")
             DefinirStatutAffiche("EnAttente")
             ChargerBons(Nothing, EventArgs.Empty)
         End Sub
@@ -486,7 +546,8 @@ Namespace DevCommerc8ak
             If rep <> DialogResult.Yes Then Return
             _repo.SupprimerLigne(ligneId)
             gridLignes.DataSource = _repo.ListerLignes(_bonCourantId)
-            lblTotalBon.Text = "Total bon: " & CalculerTotalBon(_bonCourantId).ToString("N2")
+            ConfigurerGrilleLignes()
+            lblTotalBon.Text = "Total bon: " & CalculerTotalBon(_bonCourantId).ToString("N0")
             ChargerBons(Nothing, EventArgs.Empty)
         End Sub
 

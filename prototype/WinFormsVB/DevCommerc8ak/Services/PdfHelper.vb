@@ -2,53 +2,190 @@ Option Strict On
 Option Explicit On
 
 Imports System
-Imports System.IO
-Imports System.Text
 Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+Imports System.Linq
+Imports System.Text
 
 Namespace DevCommerc8ak
     Public Module PdfHelper
-        ' Genere un PDF tres simple avec lignes de texte.
+        Private Const PdfWidth As Integer = 595
+        Private Const PdfHeight As Integer = 842
+        Private Const MarginLeft As Integer = 36
+        Private Const MarginTop As Integer = 36
+        Private Const MarginBottom As Integer = 36
+        Private Const LignesParPage As Integer = 42
+
         Public Sub GenererPdfSimple(chemin As String, titre As String, lignes As List(Of String))
-            Using fs As New FileStream(chemin, FileMode.Create, FileAccess.Write)
-                Using w As New StreamWriter(fs, Encoding.ASCII)
-                    w.WriteLine("%PDF-1.4")
-                    w.WriteLine("1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj")
-                    w.WriteLine("2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj")
-                    w.WriteLine("3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj")
+            If String.IsNullOrWhiteSpace(chemin) Then Throw New ArgumentException("Le chemin PDF est vide.", NameOf(chemin))
 
-                    Dim sb As New StringBuilder()
-                    sb.AppendLine("BT")
-                    sb.AppendLine("/F1 12 Tf")
-                    sb.AppendLine("50 800 Td")
-                    sb.AppendLine("(" & Echaper(titre) & ") Tj")
-
-                    Dim y As Integer = 780
-                    For Each l As String In lignes
-                        y -= 14
-                        sb.AppendLine("50 " & y.ToString() & " Td")
-                        sb.AppendLine("(" & Echaper(l) & ") Tj")
-                    Next
-                    sb.AppendLine("ET")
-
-                    Dim content As String = sb.ToString()
-                    w.WriteLine("4 0 obj << /Length " & content.Length.ToString() & " >> stream")
-                    w.Write(content)
-                    w.WriteLine("endstream endobj")
-                    w.WriteLine("5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj")
-                    w.WriteLine("xref")
-                    w.WriteLine("0 6")
-                    w.WriteLine("0000000000 65535 f ")
-                    w.WriteLine("trailer << /Size 6 /Root 1 0 R >>")
-                    w.WriteLine("startxref")
-                    w.WriteLine("0")
-                    w.WriteLine("%%EOF")
-                End Using
-            End Using
+            Dim contenu As Byte() = ConstruirePdf(titre, If(lignes, New List(Of String)()))
+            File.WriteAllBytes(chemin, contenu)
         End Sub
 
-        Private Function Echaper(s As String) As String
-            Return s.Replace("\\", "\\\\").Replace("(", "\(").Replace(")", "\)")
+        Private Function ConstruirePdf(titre As String, lignes As IList(Of String)) As Byte()
+            Dim lignesNettoyees As New List(Of String)()
+
+            For Each l As String In lignes
+                lignesNettoyees.Add(NormaliserTexte(If(l, String.Empty)))
+            Next
+
+            If lignesNettoyees.Count = 0 Then
+                lignesNettoyees.Add(String.Empty)
+            End If
+
+            Dim totalPages As Integer = Math.Max(1, CInt(Math.Ceiling(lignesNettoyees.Count / CDbl(LignesParPage))))
+            Dim enc As Encoding = Encoding.ASCII
+
+            Dim catalogId As Integer = 1
+            Dim pagesId As Integer = 2
+            Dim firstPageId As Integer = 3
+            Dim fontId As Integer = 3 + (totalPages * 2)
+
+            Dim pageObjectIds As New List(Of Integer)()
+            Dim contentObjectIds As New List(Of Integer)()
+            For i As Integer = 0 To totalPages - 1
+                pageObjectIds.Add(firstPageId + (i * 2))
+                contentObjectIds.Add(firstPageId + (i * 2) + 1)
+            Next
+
+            Dim objets(fontId) As Byte()
+
+            Dim catalogObj As String = catalogId.ToString(CultureInfo.InvariantCulture) & " 0 obj" & vbCrLf &
+                "<< /Type /Catalog /Pages 2 0 R >>" & vbCrLf &
+                "endobj" & vbCrLf
+            Dim kids As String = String.Join(" ", pageObjectIds.Select(Function(id) id.ToString(CultureInfo.InvariantCulture) & " 0 R"))
+            Dim pagesObj As String = pagesId.ToString(CultureInfo.InvariantCulture) & " 0 obj" & vbCrLf &
+                "<< /Type /Pages /Kids [" & kids & "] /Count " & totalPages.ToString(CultureInfo.InvariantCulture) &
+                " /MediaBox [0 0 " & PdfWidth.ToString(CultureInfo.InvariantCulture) & " " & PdfHeight.ToString(CultureInfo.InvariantCulture) & "] >>" & vbCrLf &
+                "endobj" & vbCrLf
+            Dim fontObj As String = fontId.ToString(CultureInfo.InvariantCulture) & " 0 obj" & vbCrLf &
+                "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>" & vbCrLf &
+                "endobj" & vbCrLf
+
+            objets(catalogId) = enc.GetBytes(catalogObj)
+            objets(pagesId) = enc.GetBytes(pagesObj)
+
+            For pageIndex As Integer = 0 To totalPages - 1
+                Dim debut As Integer = pageIndex * LignesParPage
+                Dim fin As Integer = Math.Min(debut + LignesParPage, lignesNettoyees.Count) - 1
+                Dim lignesPage As New List(Of String)()
+                For i As Integer = debut To fin
+                    lignesPage.Add(lignesNettoyees(i))
+                Next
+
+                Dim content As String = ConstruireContenuPage(titre, lignesPage, pageIndex + 1, totalPages)
+                Dim contentBytes As Byte() = enc.GetBytes(content)
+                Dim contentObj As String = contentObjectIds(pageIndex).ToString(CultureInfo.InvariantCulture) & " 0 obj" & vbCrLf &
+                    "<< /Length " & contentBytes.Length.ToString(CultureInfo.InvariantCulture) & " >>" & vbCrLf &
+                    "stream" & vbCrLf &
+                    content &
+                    vbCrLf & "endstream" & vbCrLf &
+                    "endobj" & vbCrLf
+                objets(contentObjectIds(pageIndex)) = enc.GetBytes(contentObj)
+
+                Dim pageObj As String = pageObjectIds(pageIndex).ToString(CultureInfo.InvariantCulture) & " 0 obj" & vbCrLf &
+                    "<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 " & fontId.ToString(CultureInfo.InvariantCulture) & " 0 R >> >> " &
+                    "/Contents " & contentObjectIds(pageIndex).ToString(CultureInfo.InvariantCulture) & " 0 R " &
+                    "/MediaBox [0 0 " & PdfWidth.ToString(CultureInfo.InvariantCulture) & " " & PdfHeight.ToString(CultureInfo.InvariantCulture) & "] >>" & vbCrLf &
+                    "endobj" & vbCrLf
+                objets(pageObjectIds(pageIndex)) = enc.GetBytes(pageObj)
+            Next
+
+            objets(fontId) = enc.GetBytes(fontObj)
+
+            Using ms As New MemoryStream()
+                WriteAscii(ms, "%PDF-1.4" & vbCrLf)
+                Dim offsets As New List(Of Long) From {0L}
+
+                For i As Integer = 1 To objets.Length - 1
+                    If objets(i) Is Nothing Then
+                        Throw New InvalidOperationException("Objet PDF manquant: " & i.ToString(CultureInfo.InvariantCulture))
+                    End If
+                    offsets.Add(ms.Position)
+                    ms.Write(objets(i), 0, objets(i).Length)
+                Next
+
+                Dim xrefStart As Long = ms.Position
+                WriteAscii(ms, "xref" & vbCrLf)
+                WriteAscii(ms, "0 " & objets.Length.ToString(CultureInfo.InvariantCulture) & vbCrLf)
+                WriteAscii(ms, "0000000000 65535 f " & vbCrLf)
+                For i As Integer = 1 To objets.Length - 1
+                    WriteAscii(ms, offsets(i).ToString("0000000000", CultureInfo.InvariantCulture) & " 00000 n " & vbCrLf)
+                Next
+                WriteAscii(ms, "trailer" & vbCrLf)
+                WriteAscii(ms, "<< /Size " & objets.Length.ToString(CultureInfo.InvariantCulture) & " /Root 1 0 R >>" & vbCrLf)
+                WriteAscii(ms, "startxref" & vbCrLf)
+                WriteAscii(ms, xrefStart.ToString(CultureInfo.InvariantCulture) & vbCrLf)
+                WriteAscii(ms, "%%EOF")
+                Return ms.ToArray()
+            End Using
+        End Function
+
+        Private Function ConstruireContenuPage(titre As String, lignes As IList(Of String), numeroPage As Integer, totalPages As Integer) As String
+            Dim sb As New StringBuilder()
+            Dim y As Integer = PdfHeight - MarginTop
+
+            sb.AppendLine("BT")
+            sb.AppendLine("/F1 16 Tf")
+            sb.AppendLine((MarginLeft).ToString(CultureInfo.InvariantCulture) & " " & y.ToString(CultureInfo.InvariantCulture) & " Td")
+            sb.AppendLine("(" & EchaperTexte(NormaliserTexte(titre)) & ") Tj")
+            sb.AppendLine("ET")
+
+            y -= 24
+            sb.AppendLine("BT")
+            sb.AppendLine("/F1 9 Tf")
+            sb.AppendLine((MarginLeft).ToString(CultureInfo.InvariantCulture) & " " & y.ToString(CultureInfo.InvariantCulture) & " Td")
+            sb.AppendLine("(Page " & numeroPage.ToString(CultureInfo.InvariantCulture) & "/" & totalPages.ToString(CultureInfo.InvariantCulture) & ") Tj")
+            sb.AppendLine("ET")
+
+            y -= 22
+            sb.AppendLine("BT")
+            sb.AppendLine("/F1 10 Tf")
+
+            For Each ligne As String In lignes
+                If y < MarginBottom + 20 Then
+                    Exit For
+                End If
+                sb.AppendLine(MarginLeft.ToString(CultureInfo.InvariantCulture) & " " & y.ToString(CultureInfo.InvariantCulture) & " Td")
+                sb.AppendLine("(" & EchaperTexte(ligne) & ") Tj")
+                y -= 14
+            Next
+
+            sb.AppendLine("ET")
+            Return sb.ToString()
+        End Function
+
+        Private Sub WriteAscii(ms As MemoryStream, texte As String)
+            Dim buffer As Byte() = Encoding.ASCII.GetBytes(texte)
+            ms.Write(buffer, 0, buffer.Length)
+        End Sub
+
+        Private Function NormaliserTexte(texte As String) As String
+            If String.IsNullOrEmpty(texte) Then Return String.Empty
+
+            Dim normalise As String = texte.Replace(vbCr, " ").Replace(vbLf, " ").Trim()
+            Dim sb As New StringBuilder(normalise.Length)
+            For Each ch As Char In normalise.Normalize(NormalizationForm.FormD)
+                Dim category As UnicodeCategory = CharUnicodeInfo.GetUnicodeCategory(ch)
+                If category = UnicodeCategory.NonSpacingMark Then
+                    Continue For
+                End If
+                If AscW(ch) < 32 Then
+                    Continue For
+                End If
+                If AscW(ch) > 126 Then
+                    sb.Append("?")
+                Else
+                    sb.Append(ch)
+                End If
+            Next
+            Return sb.ToString()
+        End Function
+
+        Private Function EchaperTexte(texte As String) As String
+            Return texte.Replace("\\", "\\\\").Replace("(", "\(").Replace(")", "\)")
         End Function
     End Module
 End Namespace
