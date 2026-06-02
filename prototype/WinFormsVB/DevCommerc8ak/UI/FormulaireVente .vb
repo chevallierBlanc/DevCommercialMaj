@@ -221,11 +221,11 @@ Namespace DevCommerc8ak
                 .BackColor = ColorBg
             }
             pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Absolute, 130)) ' Filtres
-            pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Absolute, 56)) ' Actions
+            pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Absolute, 48)) ' Actions
             pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Percent, 100)) ' Grille
 
             Dim pnlFiltresVentesCard As Panel = CreerCarte()
-            pnlFiltresVentesCard.Padding = New Padding(16)
+            pnlFiltresVentesCard.Padding = New Padding(16, 14, 16, 12)
 
             Dim filtresVentesLayout As New TableLayoutPanel() With {
                 .Dock = DockStyle.Fill,
@@ -300,7 +300,7 @@ Namespace DevCommerc8ak
                 .Dock = DockStyle.Fill,
                 .FlowDirection = FlowDirection.RightToLeft,
                 .WrapContents = False,
-                .Padding = New Padding(0, 4, 20, 0),
+                .Padding = New Padding(0, 0, 20, 0),
                 .Margin = New Padding(0)
             }
             btnImprimerVentes = New Button() With {
@@ -314,6 +314,7 @@ Namespace DevCommerc8ak
                 .Cursor = Cursors.Hand
             }
             btnImprimerVentes.FlatAppearance.BorderSize = 0
+            btnImprimerVentes.Margin = New Padding(0)
             btnExporterPdfVentes = New Button() With {
                 .Text = "Exporter PDF",
                 .Width = 136,
@@ -326,6 +327,7 @@ Namespace DevCommerc8ak
                 .Margin = New Padding(0, 0, 8, 0)
             }
             btnExporterPdfVentes.FlatAppearance.BorderSize = 0
+            btnExporterPdfVentes.Margin = New Padding(0, 0, 8, 0)
             pnlActionsVentes.Controls.Add(btnImprimerVentes)
             pnlActionsVentes.Controls.Add(btnExporterPdfVentes)
             filtresVentesLayout.Controls.Add(pnlActionsVentes, 0, 2)
@@ -910,26 +912,7 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                Dim lignes As New List(Of String)()
-                lignes.Add("RAPPORT DES VENTES")
-                lignes.Add("------------------------------------------------------------")
-                lignes.Add("Période : " & Convert.ToString(cmbPeriode.SelectedItem))
-                lignes.Add("Jour : " & dtpJour.Value.ToString("dd/MM/yyyy"))
-                lignes.Add("Mois : " & Convert.ToString(cmbMois.SelectedItem))
-                lignes.Add("Année : " & Convert.ToString(cmbAnnee.SelectedItem))
-                lignes.Add("Total lignes : " & dt.Rows.Count.ToString("N0"))
-                lignes.Add("")
-                lignes.Add("Date | Produit | Prix achat | Qté | Montant | Bénéfice")
-                lignes.Add("------------------------------------------------------------")
-                For Each row As DataRow In dt.Rows
-                    Dim dateVente As String = If(dt.Columns.Contains("DateVente") AndAlso Not row.IsNull("DateVente"), Convert.ToDateTime(row("DateVente")).ToString("dd/MM/yyyy HH:mm"), "")
-                    Dim produit As String = If(dt.Columns.Contains("Produit") AndAlso Not row.IsNull("Produit"), Convert.ToString(row("Produit")), "")
-                    Dim qte As String = If(dt.Columns.Contains("QuantiteVenduePieces") AndAlso Not row.IsNull("QuantiteVenduePieces"), Convert.ToDecimal(row("QuantiteVenduePieces")).ToString("N0"), "0")
-                    Dim prixAchat As String = If(dt.Columns.Contains("PrixAchatCarton") AndAlso Not row.IsNull("PrixAchatCarton"), Convert.ToDecimal(row("PrixAchatCarton")).ToString("N0"), "0")
-                    Dim montant As String = If(dt.Columns.Contains("MontantGenere") AndAlso Not row.IsNull("MontantGenere"), FormatageGlobal.FormatMontant(Convert.ToDecimal(row("MontantGenere"))), "0 FC")
-                    Dim benefice As String = If(dt.Columns.Contains("Benefice") AndAlso Not row.IsNull("Benefice"), FormatageGlobal.FormatMontant(Convert.ToDecimal(row("Benefice"))), "0 FC")
-                    lignes.Add(dateVente & " | " & produit & " | " & prixAchat & " | " & qte & " | " & montant & " | " & benefice)
-                Next
+                Dim lignes As List(Of String) = ConstruireLignesPdfVentes(dt)
                 PdfHelper.GenererPdfSimple(sfd.FileName, "RAPPORT DES VENTES", lignes)
             End Using
         End Sub
@@ -966,24 +949,56 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                Dim lignes As New List(Of String)()
-                lignes.Add("RAPPORT STOCK")
-                lignes.Add("------------------------------------------------------------")
-                lignes.Add("Produit | Stock P | Stock C | Ventes P | Sorties P | Restant P")
-                lignes.Add("------------------------------------------------------------")
-                lignes.Add("")
-                For Each row As DataRow In dt.Rows
-                    Dim produit As String = If(dt.Columns.Contains("Produit") AndAlso Not row.IsNull("Produit"), Convert.ToString(row("Produit")), "")
-                    Dim stockPieces As String = If(dt.Columns.Contains("StockActuelPieces") AndAlso Not row.IsNull("StockActuelPieces"), Convert.ToDecimal(row("StockActuelPieces")).ToString("N0"), "0")
-                    Dim stockCartons As String = If(dt.Columns.Contains("StockActuelCartons") AndAlso Not row.IsNull("StockActuelCartons"), Convert.ToDecimal(row("StockActuelCartons")).ToString("N0"), "0")
-                    Dim ventes As String = If(dt.Columns.Contains("QuantiteVenduePieces") AndAlso Not row.IsNull("QuantiteVenduePieces"), Convert.ToDecimal(row("QuantiteVenduePieces")).ToString("N0"), "0")
-                    Dim sorties As String = If(dt.Columns.Contains("QuantiteSortieManuellePieces") AndAlso Not row.IsNull("QuantiteSortieManuellePieces"), Convert.ToDecimal(row("QuantiteSortieManuellePieces")).ToString("N0"), "0")
-                    Dim restant As String = If(dt.Columns.Contains("RestantPieces") AndAlso Not row.IsNull("RestantPieces"), Convert.ToDecimal(row("RestantPieces")).ToString("N0"), "0")
-                    lignes.Add(produit & " | " & stockPieces & " | " & stockCartons & " | " & ventes & " | " & sorties & " | " & restant)
-                Next
+                Dim lignes As List(Of String) = ConstruireLignesPdfStock(dt)
                 PdfHelper.GenererPdfSimple(sfd.FileName, "RAPPORT STOCK", lignes)
             End Using
         End Sub
+
+        Private Function ConstruireLignesPdfVentes(dt As DataTable) As List(Of String)
+            Dim lignes As New List(Of String)()
+            lignes.Add("RAPPORT DES VENTES")
+            lignes.Add("Période : " & Convert.ToString(cmbPeriode.SelectedItem))
+            lignes.Add("Jour : " & dtpJour.Value.ToString("dd/MM/yyyy"))
+            lignes.Add("Mois : " & Convert.ToString(cmbMois.SelectedItem))
+            lignes.Add("Année : " & Convert.ToString(cmbAnnee.SelectedItem))
+            lignes.Add("Résumé : " & lblResumeVentes.Text)
+            lignes.Add("------------------------------------------------------------")
+            lignes.Add("Date | Produit | Prix achat carton | Qté vendue (P) | Montant | Bénéfice")
+            lignes.Add("------------------------------------------------------------")
+
+            For Each row As DataRow In dt.Rows
+                Dim dateVente As String = If(dt.Columns.Contains("DateVente") AndAlso Not row.IsNull("DateVente"), Convert.ToDateTime(row("DateVente")).ToString("dd/MM/yyyy HH:mm"), "")
+                Dim produit As String = If(dt.Columns.Contains("Produit") AndAlso Not row.IsNull("Produit"), Convert.ToString(row("Produit")), "")
+                Dim qte As String = If(dt.Columns.Contains("QuantiteVenduePieces") AndAlso Not row.IsNull("QuantiteVenduePieces"), Convert.ToDecimal(row("QuantiteVenduePieces")).ToString("N0"), "0")
+                Dim prixAchat As String = If(dt.Columns.Contains("PrixAchatCarton") AndAlso Not row.IsNull("PrixAchatCarton"), Convert.ToDecimal(row("PrixAchatCarton")).ToString("N0"), "0")
+                Dim montant As String = If(dt.Columns.Contains("MontantGenere") AndAlso Not row.IsNull("MontantGenere"), FormatageGlobal.FormatMontant(Convert.ToDecimal(row("MontantGenere"))), "0 FC")
+                Dim benefice As String = If(dt.Columns.Contains("Benefice") AndAlso Not row.IsNull("Benefice"), FormatageGlobal.FormatMontant(Convert.ToDecimal(row("Benefice"))), "0 FC")
+                lignes.Add(dateVente & " | " & produit & " | " & prixAchat & " | " & qte & " | " & montant & " | " & benefice)
+            Next
+
+            Return lignes
+        End Function
+
+        Private Function ConstruireLignesPdfStock(dt As DataTable) As List(Of String)
+            Dim lignes As New List(Of String)()
+            lignes.Add("RAPPORT STOCK")
+            lignes.Add("Résumé : " & lblResumeStock.Text)
+            lignes.Add("------------------------------------------------------------")
+            lignes.Add("Produit | Stock P | Stock C | Ventes P | Sorties P | Restant P")
+            lignes.Add("------------------------------------------------------------")
+
+            For Each row As DataRow In dt.Rows
+                Dim produit As String = If(dt.Columns.Contains("Produit") AndAlso Not row.IsNull("Produit"), Convert.ToString(row("Produit")), "")
+                Dim stockPieces As String = If(dt.Columns.Contains("StockActuelPieces") AndAlso Not row.IsNull("StockActuelPieces"), Convert.ToDecimal(row("StockActuelPieces")).ToString("N0"), "0")
+                Dim stockCartons As String = If(dt.Columns.Contains("StockActuelCartons") AndAlso Not row.IsNull("StockActuelCartons"), Convert.ToDecimal(row("StockActuelCartons")).ToString("N0"), "0")
+                Dim ventes As String = If(dt.Columns.Contains("QuantiteVenduePieces") AndAlso Not row.IsNull("QuantiteVenduePieces"), Convert.ToDecimal(row("QuantiteVenduePieces")).ToString("N0"), "0")
+                Dim sorties As String = If(dt.Columns.Contains("QuantiteSortieManuellePieces") AndAlso Not row.IsNull("QuantiteSortieManuellePieces"), Convert.ToDecimal(row("QuantiteSortieManuellePieces")).ToString("N0"), "0")
+                Dim restant As String = If(dt.Columns.Contains("RestantPieces") AndAlso Not row.IsNull("RestantPieces"), Convert.ToDecimal(row("RestantPieces")).ToString("N0"), "0")
+                lignes.Add(produit & " | " & stockPieces & " | " & stockCartons & " | " & ventes & " | " & sorties & " | " & restant)
+            Next
+
+            Return lignes
+        End Function
 
         Private Sub PdocVentes_PrintPage(sender As Object, e As PrintPageEventArgs)
             Dim data As DataTable = If(_ventesCourantes, TryCast(gridVentes.DataSource, DataTable))
@@ -994,37 +1009,55 @@ Namespace DevCommerc8ak
 
             Dim left As Integer = e.MarginBounds.Left
             Dim top As Integer = e.MarginBounds.Top
-            Dim pageWidth As Integer = e.MarginBounds.Width
+            Dim largeur As Integer = e.MarginBounds.Width
             Dim y As Integer = top
 
-            Using titreFont As New Font("Segoe UI", 14.0F, FontStyle.Bold),
-                  sousTitreFont As New Font("Segoe UI", 9.0F, FontStyle.Regular),
+            Using titreFont As New Font("Segoe UI", 16.0F, FontStyle.Bold),
+                  sousTitreFont As New Font("Segoe UI", 9.5F, FontStyle.Regular),
+                  blocTitreFont As New Font("Segoe UI", 10.0F, FontStyle.Bold),
                   enteteFont As New Font("Segoe UI", 9.0F, FontStyle.Bold),
-                  ligneFont As New Font("Segoe UI", 9.0F, FontStyle.Regular)
+                  ligneFont As New Font("Segoe UI", 9.0F, FontStyle.Regular),
+                  pinceauBleu As New SolidBrush(Color.FromArgb(17, 35, 74)),
+                  pinceauGris As New SolidBrush(Color.FromArgb(92, 104, 120)),
+                  fondBande As New SolidBrush(Color.FromArgb(17, 35, 74)),
+                  fondTable As New SolidBrush(Color.FromArgb(229, 239, 252)),
+                  fondBloc As New SolidBrush(Color.White),
+                  bordure As New Pen(Color.FromArgb(210, 219, 232)),
+                  ligneSep As New Pen(Color.FromArgb(232, 236, 242))
 
-                e.Graphics.DrawString("Rapport des ventes", titreFont, Brushes.Black, left, y)
-                y += 24
-                e.Graphics.DrawString("Période : " & Convert.ToString(cmbPeriode.SelectedItem) & " | " & lblResumeVentes.Text, sousTitreFont, Brushes.Black, left, y)
-                y += 26
+                e.Graphics.FillRectangle(fondBande, left, y, largeur, 34)
+                e.Graphics.DrawString("RAPPORT DES VENTES", titreFont, Brushes.White, left + 12, y + 5)
+                y += 48
+
+                e.Graphics.DrawRectangle(bordure, left, y, CInt(largeur * 0.48), 84)
+                e.Graphics.DrawRectangle(bordure, left + CInt(largeur * 0.52), y, CInt(largeur * 0.48), 84)
+                e.Graphics.DrawString("Informations du rapport", blocTitreFont, pinceauBleu, left + 12, y + 10)
+                e.Graphics.DrawString("Période : " & Convert.ToString(cmbPeriode.SelectedItem), sousTitreFont, Brushes.Black, left + 12, y + 34)
+                e.Graphics.DrawString("Jour : " & dtpJour.Value.ToString("dd/MM/yyyy"), sousTitreFont, Brushes.Black, left + 12, y + 52)
+                e.Graphics.DrawString("Mois : " & Convert.ToString(cmbMois.SelectedItem), sousTitreFont, Brushes.Black, left + 12, y + 70)
+                e.Graphics.DrawString("Synthèse ventes", blocTitreFont, pinceauBleu, left + CInt(largeur * 0.52) + 12, y + 10)
+                e.Graphics.DrawString(lblResumeVentes.Text, sousTitreFont, pinceauGris, left + CInt(largeur * 0.52) + 12, y + 38)
+                e.Graphics.DrawString("Lignes : " & data.Rows.Count.ToString("N0"), sousTitreFont, pinceauGris, left + CInt(largeur * 0.52) + 12, y + 60)
+                y += 104
 
                 Dim colonnes As String() = {"DateVente", "Produit", "PrixAchatCarton", "QuantiteVenduePieces", "MontantGenere", "Benefice"}
+                Dim titres As String() = {"Date", "Produit", "Prix achat carton", "Qté vendue (P)", "Montant", "Bénéfice"}
                 Dim largeurs As Integer() = {
-                    CInt(pageWidth * 0.16),
-                    CInt(pageWidth * 0.28),
-                    CInt(pageWidth * 0.14),
-                    CInt(pageWidth * 0.14),
-                    CInt(pageWidth * 0.14),
-                    CInt(pageWidth * 0.14)
+                    CInt(largeur * 0.16),
+                    CInt(largeur * 0.27),
+                    CInt(largeur * 0.15),
+                    CInt(largeur * 0.15),
+                    CInt(largeur * 0.14),
+                    CInt(largeur * 0.13)
                 }
-                Dim titres As String() = {"Date", "Produit", "Prix achat", "Qté", "Montant", "Bénéfice"}
-                Dim hauteurEntete As Integer = 24
-                Dim hauteurLigne As Integer = 22
+                Dim hauteurEntete As Integer = 28
+                Dim hauteurLigne As Integer = 24
 
                 Dim x As Integer = left
                 For i As Integer = 0 To titres.Length - 1
-                    e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(240, 240, 240)), x, y, largeurs(i), hauteurEntete)
-                    e.Graphics.DrawRectangle(Pens.Gray, x, y, largeurs(i), hauteurEntete)
-                    e.Graphics.DrawString(titres(i), enteteFont, Brushes.Black, New RectangleF(x + 4, y + 4, largeurs(i) - 8, hauteurEntete - 8))
+                    e.Graphics.FillRectangle(fondTable, x, y, largeurs(i), hauteurEntete)
+                    e.Graphics.DrawRectangle(bordure, x, y, largeurs(i), hauteurEntete)
+                    e.Graphics.DrawString(titres(i), enteteFont, pinceauBleu, New RectangleF(x + 4, y + 5, largeurs(i) - 8, hauteurEntete - 8))
                     x += largeurs(i)
                 Next
                 y += hauteurEntete
@@ -1038,7 +1071,7 @@ Namespace DevCommerc8ak
 
                     x = left
                     For i As Integer = 0 To colonnes.Length - 1
-                        Dim valeur As String = ""
+                        Dim valeur As String = String.Empty
                         If Not row.IsNull(colonnes(i)) Then
                             Select Case colonnes(i)
                                 Case "DateVente"
@@ -1049,14 +1082,19 @@ Namespace DevCommerc8ak
                                     valeur = Convert.ToDecimal(row(colonnes(i))).ToString("N0")
                             End Select
                         End If
-                        e.Graphics.DrawRectangle(Pens.Gray, x, y, largeurs(i), hauteurLigne)
-                        e.Graphics.DrawString(valeur, ligneFont, Brushes.Black, New RectangleF(x + 4, y + 3, largeurs(i) - 8, hauteurLigne - 6))
+                        e.Graphics.DrawRectangle(bordure, x, y, largeurs(i), hauteurLigne)
+                        e.Graphics.DrawString(valeur, ligneFont, Brushes.Black, New RectangleF(x + 4, y + 4, largeurs(i) - 8, hauteurLigne - 8))
                         x += largeurs(i)
                     Next
 
                     y += hauteurLigne
                     _ventePrintRowIndex += 1
                 End While
+
+                y += 18
+                e.Graphics.DrawLine(ligneSep, left, y, left + largeur, y)
+                y += 16
+                e.Graphics.DrawString("Impression professionnelle générée depuis le module d'analyse des ventes.", sousTitreFont, pinceauGris, left, y)
             End Using
 
             _ventePrintRowIndex = 0
@@ -1072,37 +1110,52 @@ Namespace DevCommerc8ak
 
             Dim left As Integer = e.MarginBounds.Left
             Dim top As Integer = e.MarginBounds.Top
-            Dim pageWidth As Integer = e.MarginBounds.Width
+            Dim largeur As Integer = e.MarginBounds.Width
             Dim y As Integer = top
 
-            Using titreFont As New Font("Segoe UI", 14.0F, FontStyle.Bold),
-                  sousTitreFont As New Font("Segoe UI", 9.0F, FontStyle.Regular),
+            Using titreFont As New Font("Segoe UI", 16.0F, FontStyle.Bold),
+                  sousTitreFont As New Font("Segoe UI", 9.5F, FontStyle.Regular),
+                  blocTitreFont As New Font("Segoe UI", 10.0F, FontStyle.Bold),
                   enteteFont As New Font("Segoe UI", 9.0F, FontStyle.Bold),
-                  ligneFont As New Font("Segoe UI", 9.0F, FontStyle.Regular)
+                  ligneFont As New Font("Segoe UI", 9.0F, FontStyle.Regular),
+                  pinceauBleu As New SolidBrush(Color.FromArgb(17, 35, 74)),
+                  pinceauGris As New SolidBrush(Color.FromArgb(92, 104, 120)),
+                  fondBande As New SolidBrush(Color.FromArgb(17, 35, 74)),
+                  fondTable As New SolidBrush(Color.FromArgb(229, 239, 252)),
+                  bordure As New Pen(Color.FromArgb(210, 219, 232)),
+                  ligneSep As New Pen(Color.FromArgb(232, 236, 242))
 
-                e.Graphics.DrawString("Rapport stock produits", titreFont, Brushes.Black, left, y)
-                y += 24
-                e.Graphics.DrawString("Synthèse actuelle du stock | " & lblResumeStock.Text, sousTitreFont, Brushes.Black, left, y)
-                y += 26
+                e.Graphics.FillRectangle(fondBande, left, y, largeur, 34)
+                e.Graphics.DrawString("RAPPORT STOCK PRODUITS", titreFont, Brushes.White, left + 12, y + 5)
+                y += 48
+
+                e.Graphics.DrawRectangle(bordure, left, y, CInt(largeur * 0.48), 84)
+                e.Graphics.DrawRectangle(bordure, left + CInt(largeur * 0.52), y, CInt(largeur * 0.48), 84)
+                e.Graphics.DrawString("Synthèse du stock", blocTitreFont, pinceauBleu, left + 12, y + 10)
+                e.Graphics.DrawString("Stock global : " & lblResumeStock.Text, sousTitreFont, Brushes.Black, left + 12, y + 36)
+                e.Graphics.DrawString("Produits visibles : " & data.Rows.Count.ToString("N0"), sousTitreFont, Brushes.Black, left + 12, y + 58)
+                e.Graphics.DrawString("Répartition", blocTitreFont, pinceauBleu, left + CInt(largeur * 0.52) + 12, y + 10)
+                e.Graphics.DrawString("Ventes / sorties manuelles / restant", sousTitreFont, pinceauGris, left + CInt(largeur * 0.52) + 12, y + 38)
+                y += 104
 
                 Dim colonnes As String() = {"Produit", "StockActuelPieces", "StockActuelCartons", "QuantiteVenduePieces", "QuantiteSortieManuellePieces", "RestantPieces"}
-                Dim largeurs As Integer() = {
-                    CInt(pageWidth * 0.32),
-                    CInt(pageWidth * 0.12),
-                    CInt(pageWidth * 0.12),
-                    CInt(pageWidth * 0.14),
-                    CInt(pageWidth * 0.14),
-                    CInt(pageWidth * 0.16)
-                }
                 Dim titres As String() = {"Produit", "Stock P", "Stock C", "Ventes P", "Sorties P", "Restant P"}
-                Dim hauteurEntete As Integer = 24
-                Dim hauteurLigne As Integer = 22
+                Dim largeurs As Integer() = {
+                    CInt(largeur * 0.32),
+                    CInt(largeur * 0.12),
+                    CInt(largeur * 0.12),
+                    CInt(largeur * 0.14),
+                    CInt(largeur * 0.14),
+                    CInt(largeur * 0.16)
+                }
+                Dim hauteurEntete As Integer = 28
+                Dim hauteurLigne As Integer = 24
 
                 Dim x As Integer = left
                 For i As Integer = 0 To titres.Length - 1
-                    e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(240, 240, 240)), x, y, largeurs(i), hauteurEntete)
-                    e.Graphics.DrawRectangle(Pens.Gray, x, y, largeurs(i), hauteurEntete)
-                    e.Graphics.DrawString(titres(i), enteteFont, Brushes.Black, New RectangleF(x + 4, y + 4, largeurs(i) - 8, hauteurEntete - 8))
+                    e.Graphics.FillRectangle(fondTable, x, y, largeurs(i), hauteurEntete)
+                    e.Graphics.DrawRectangle(bordure, x, y, largeurs(i), hauteurEntete)
+                    e.Graphics.DrawString(titres(i), enteteFont, pinceauBleu, New RectangleF(x + 4, y + 5, largeurs(i) - 8, hauteurEntete - 8))
                     x += largeurs(i)
                 Next
                 y += hauteurEntete
@@ -1116,7 +1169,7 @@ Namespace DevCommerc8ak
 
                     x = left
                     For i As Integer = 0 To colonnes.Length - 1
-                        Dim valeur As String = ""
+                        Dim valeur As String = String.Empty
                         If Not row.IsNull(colonnes(i)) Then
                             If String.Equals(colonnes(i), "Produit", StringComparison.OrdinalIgnoreCase) Then
                                 valeur = Convert.ToString(row(colonnes(i)))
@@ -1124,14 +1177,19 @@ Namespace DevCommerc8ak
                                 valeur = Convert.ToDecimal(row(colonnes(i))).ToString("N0")
                             End If
                         End If
-                        e.Graphics.DrawRectangle(Pens.Gray, x, y, largeurs(i), hauteurLigne)
-                        e.Graphics.DrawString(valeur, ligneFont, Brushes.Black, New RectangleF(x + 4, y + 3, largeurs(i) - 8, hauteurLigne - 6))
+                        e.Graphics.DrawRectangle(bordure, x, y, largeurs(i), hauteurLigne)
+                        e.Graphics.DrawString(valeur, ligneFont, Brushes.Black, New RectangleF(x + 4, y + 4, largeurs(i) - 8, hauteurLigne - 8))
                         x += largeurs(i)
                     Next
 
                     y += hauteurLigne
                     _stockPrintRowIndex += 1
                 End While
+
+                y += 18
+                e.Graphics.DrawLine(ligneSep, left, y, left + largeur, y)
+                y += 16
+                e.Graphics.DrawString("Impression professionnelle générée depuis le module d'analyse du stock.", sousTitreFont, pinceauGris, left, y)
             End Using
 
             _stockPrintRowIndex = 0

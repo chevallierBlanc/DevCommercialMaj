@@ -130,26 +130,25 @@ Namespace DevCommerc8ak
 
             sb.AppendLine("BT")
             sb.AppendLine("/F1 16 Tf")
-            sb.AppendLine((MarginLeft).ToString(CultureInfo.InvariantCulture) & " " & y.ToString(CultureInfo.InvariantCulture) & " Td")
+            sb.AppendLine("1 0 0 1 " & MarginLeft.ToString(CultureInfo.InvariantCulture) & " " & y.ToString(CultureInfo.InvariantCulture) & " Tm")
             sb.AppendLine("(" & EchaperTexte(NormaliserTexte(titre)) & ") Tj")
             sb.AppendLine("ET")
 
             y -= 24
             sb.AppendLine("BT")
             sb.AppendLine("/F1 9 Tf")
-            sb.AppendLine((MarginLeft).ToString(CultureInfo.InvariantCulture) & " " & y.ToString(CultureInfo.InvariantCulture) & " Td")
+            sb.AppendLine("1 0 0 1 " & MarginLeft.ToString(CultureInfo.InvariantCulture) & " " & y.ToString(CultureInfo.InvariantCulture) & " Tm")
             sb.AppendLine("(Page " & numeroPage.ToString(CultureInfo.InvariantCulture) & "/" & totalPages.ToString(CultureInfo.InvariantCulture) & ") Tj")
             sb.AppendLine("ET")
 
             y -= 22
             sb.AppendLine("BT")
             sb.AppendLine("/F1 10 Tf")
-
             For Each ligne As String In lignes
                 If y < MarginBottom + 20 Then
                     Exit For
                 End If
-                sb.AppendLine(MarginLeft.ToString(CultureInfo.InvariantCulture) & " " & y.ToString(CultureInfo.InvariantCulture) & " Td")
+                sb.AppendLine("1 0 0 1 " & MarginLeft.ToString(CultureInfo.InvariantCulture) & " " & y.ToString(CultureInfo.InvariantCulture) & " Tm")
                 sb.AppendLine("(" & EchaperTexte(ligne) & ") Tj")
                 y -= 14
             Next
