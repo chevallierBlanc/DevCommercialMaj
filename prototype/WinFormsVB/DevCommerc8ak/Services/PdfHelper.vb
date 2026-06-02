@@ -166,7 +166,7 @@ Namespace DevCommerc8ak
         Private Function NormaliserTexte(texte As String) As String
             If String.IsNullOrEmpty(texte) Then Return String.Empty
 
-            Dim normalise As String = texte.Replace(ControlChars.Cr, " ").Replace(ControlChars.Lf, " ").Trim()
+            Dim normalise As String = texte.Replace(ChrW(13), " ").Replace(ChrW(10), " ").Trim()
             Dim sb As New StringBuilder(normalise.Length)
             For Each ch As Char In normalise.Normalize(NormalizationForm.FormD)
                 Dim category As UnicodeCategory = CharUnicodeInfo.GetUnicodeCategory(ch)
