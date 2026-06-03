@@ -297,7 +297,11 @@ Namespace DevCommerc8ak
                 "  AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL') " &
                 "  AND (UPPER(ISNULL(m.Nature, '')) LIKE '%DETTE%' OR UPPER(ISNULL(m.Libelle, '')) LIKE '%DETTE%') " &
                 "  AND (UPPER(ISNULL(m.Libelle, '')) LIKE '%CLIENT%' OR (UPPER(ISNULL(ss.StatutPaiement, '')) = 'IMPAYE' AND ss.ClientId IS NOT NULL))"
-            Dim dtCreances As DataTable = _dal.ExecuterTable(sqlCreances, CommandType.Text, pCharges)
+            Dim pCreances As New List(Of SqlParameter) From {
+                New SqlParameter("@DateDebut", dateDebut.Date),
+                New SqlParameter("@DateFin", dateFin.Date)
+            }
+            Dim dtCreances As DataTable = _dal.ExecuterTable(sqlCreances, CommandType.Text, pCreances)
             For Each cre As DataRow In dtCreances.Rows
                 AjouterLigneBeneficeNet(dt, 15, "Créances", Convert.ToString(cre("Categorie")), Convert.ToDecimal(cre("QuantitePieces")), Convert.ToDecimal(cre("MontantTotal")), "Vente à crédit non déduite du bénéfice net")
             Next

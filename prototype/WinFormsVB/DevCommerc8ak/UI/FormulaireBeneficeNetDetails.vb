@@ -101,8 +101,8 @@ Namespace DevCommerc8ak
 
             Dim lblNote As New Label() With {
                 .Dock = DockStyle.Top,
-                .Height = 28,
-                .Text = "Le détail ci-dessous regroupe les dépenses et les charges qui réduisent réellement le résultat final.",
+                .Height = 44,
+                .Text = "Le détail ci-dessous regroupe les dépenses et les charges qui réduisent réellement le résultat final. Les créances clients sont affichées à titre informatif et ne sont pas déduites du bénéfice net.",
                 .ForeColor = Color.FromArgb(90, 90, 90),
                 .Font = New Font("Segoe UI", 9.0F, FontStyle.Italic),
                 .Padding = New Padding(18, 2, 18, 0)
