@@ -108,9 +108,9 @@ Namespace DevCommerc8ak
                 "SELECT MAX(f.CreeLe) AS DateVente, " &
                 "p.Libelle AS Produit, " &
                 "CAST(MAX(ISNULL(p.PrixAchat, 0)) AS BIGINT) AS PrixAchatCarton, " &
-                "CAST(SUM(ISNULL(l.QuantiteBase, 0)) AS BIGINT) AS QuantiteVenduePieces, " &
+                "CAST(SUM(ISNULL(l.Quantite, 0)) AS BIGINT) AS QuantiteVenduePieces, " &
                 "CAST(SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS BIGINT) AS MontantGenere, " &
-                "CAST(SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0)) - (ISNULL(l.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0))) AS BIGINT) AS Benefice " &
+                "CAST(SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0)) - (ISNULL(l.Quantite, 0) * ISNULL(cp.CoutPiece, 0))) AS BIGINT) AS Benefice " &
                 "FROM LignesFactureVente l " &
                 "INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
                 "INNER JOIN Produits p ON p.ProduitId = l.ProduitId " &

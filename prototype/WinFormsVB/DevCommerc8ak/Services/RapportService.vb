@@ -84,7 +84,7 @@ Namespace DevCommerc8ak
                 "(" &
                 "    SELECT" &
                 "        l.ProduitId," &
-                "        SUM(ISNULL(l.QuantiteBase, 0)) AS QuantiteVenduePieces," &
+                "        SUM(ISNULL(l.Quantite, 0)) AS QuantiteVenduePieces," &
                 "        SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS ChiffreAffaires " &
                 "    FROM LignesFactureVente l " &
                 "    INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
