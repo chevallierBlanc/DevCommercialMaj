@@ -288,8 +288,8 @@ Namespace DevCommerc8ak
                 "    GROUP BY se.ProduitId, p.PrixAchat, p.ConversionUnite" &
                 ") " &
                 "SELECT 'Créances clients' AS Categorie, " &
-                "       SUM(ISNULL(ss.QuantiteBase, 0)) AS QuantitePieces, " &
-                "       SUM(ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0)) AS MontantTotal " &
+                "       ISNULL(SUM(ISNULL(ss.QuantiteBase, 0)), 0) AS QuantitePieces, " &
+                "       ISNULL(SUM(ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0)), 0) AS MontantTotal " &
                 "FROM StockSortie ss " &
                 "LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId " &
                 "LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = ss.ProduitId " &
