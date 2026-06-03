@@ -46,9 +46,13 @@ Namespace DevCommerc8ak
             Dim sql As String = "" &
                 "WITH CtePrixMoyen AS(" &
                 "    SELECT se.ProduitId," &
-                "           SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) AS CoutAchatMoyenPiece " &
+                "           CASE " &
+                "               WHEN ISNULL(p.ConversionUnite, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0) " &
+                "               ELSE SUM(ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) " &
+                "           END AS CoutAchatMoyenPiece " &
                 "    FROM StockEntree se " &
-                "    GROUP BY se.ProduitId" &
+                "    INNER JOIN Produits p ON p.ProduitId = se.ProduitId " &
+                "    GROUP BY se.ProduitId, p.PrixAchat, p.ConversionUnite" &
                 ") " &
                 "SELECT ISNULL(CAST(SUM(ISNULL(s.QuantiteStock, 0) * ISNULL(pm.CoutAchatMoyenPiece, 0)) AS BIGINT), 0) " &
                 "FROM vStockProduit s " &
@@ -66,17 +70,21 @@ Namespace DevCommerc8ak
                 "       se.ProduitId," &
                 "        SUM(ISNULL(se.QuantiteBase, 0)) AS QuantiteEntreePieces," &
                 "        SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) AS ValeurStockEntree," &
-                "        SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) AS CoutAchatMoyenPiece " &
+                "        CASE " &
+                "            WHEN ISNULL(p.ConversionUnite, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0) " &
+                "            ELSE SUM(ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) " &
+                "        END AS CoutAchatMoyenPiece " &
                 "    FROM StockEntree se " &
+                "    INNER JOIN Produits p ON p.ProduitId = se.ProduitId " &
                 "    WHERE se.DateEntree >= @DateDebut " &
                 "      AND se.DateEntree < DATEADD(DAY, 1, @DateFin) " &
-                "    GROUP BY se.ProduitId" &
+                "    GROUP BY se.ProduitId, p.PrixAchat, p.ConversionUnite" &
                 "), " &
                 "Ventes AS" &
                 "(" &
                 "    SELECT" &
                 "        l.ProduitId," &
-                "        SUM(ISNULL(l.Quantite, 0)) AS QuantiteVenduePieces," &
+                "        SUM(ISNULL(l.QuantiteBase, 0)) AS QuantiteVenduePieces," &
                 "        SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS ChiffreAffaires " &
                 "    FROM LignesFactureVente l " &
                 "    INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
@@ -195,10 +203,14 @@ Namespace DevCommerc8ak
             Dim sqlCharges As String = "" &
                 "WITH CoutPieceProduit AS (" &
                 "    SELECT se.ProduitId, " &
-                "           SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) AS CoutPiece " &
+                "           CASE " &
+                "               WHEN ISNULL(p.ConversionUnite, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0) " &
+                "               ELSE SUM(ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) " &
+                "           END AS CoutPiece " &
                 "    FROM StockEntree se " &
+                "    INNER JOIN Produits p ON p.ProduitId = se.ProduitId " &
                 "    WHERE se.DateEntree < DATEADD(DAY, 1, @DateFin) " &
-                "    GROUP BY se.ProduitId" &
+                "    GROUP BY se.ProduitId, p.PrixAchat, p.ConversionUnite" &
                 ") " &
                 "SELECT Categorie, SUM(Pieces) AS QuantitePieces, SUM(Montant) AS MontantTotal " &
                 "FROM (" &

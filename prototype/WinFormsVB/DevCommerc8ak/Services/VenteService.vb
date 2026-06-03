@@ -94,15 +94,27 @@ Namespace DevCommerc8ak
 
         Public Function ListerVentesParPeriode(dateDebut As DateTime, dateFin As DateTime) As DataTable
             Dim sql As String = "" &
+                "WITH CoutPieceProduit AS (" &
+                "    SELECT se.ProduitId, " &
+                "           CASE " &
+                "               WHEN ISNULL(p.ConversionUnite, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0) " &
+                "               ELSE SUM(ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) " &
+                "           END AS CoutPiece " &
+                "    FROM StockEntree se " &
+                "    INNER JOIN Produits p ON p.ProduitId = se.ProduitId " &
+                "    WHERE se.DateEntree < @DateFin " &
+                "    GROUP BY se.ProduitId, p.PrixAchat, p.ConversionUnite" &
+                ") " &
                 "SELECT MAX(f.CreeLe) AS DateVente, " &
                 "p.Libelle AS Produit, " &
                 "CAST(MAX(ISNULL(p.PrixAchat, 0)) AS BIGINT) AS PrixAchatCarton, " &
-                "CAST(SUM(ISNULL(l.Quantite, 0)) AS BIGINT) AS QuantiteVenduePieces, " &
+                "CAST(SUM(ISNULL(l.QuantiteBase, 0)) AS BIGINT) AS QuantiteVenduePieces, " &
                 "CAST(SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS BIGINT) AS MontantGenere, " &
-                "CAST(SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0)) - (ISNULL(l.Quantite, 0) * (ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0)))) AS BIGINT) AS Benefice " &
+                "CAST(SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0)) - (ISNULL(l.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0))) AS BIGINT) AS Benefice " &
                 "FROM LignesFactureVente l " &
                 "INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
                 "INNER JOIN Produits p ON p.ProduitId = l.ProduitId " &
+                "LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = p.ProduitId " &
                 "WHERE f.Statut = 'PAYEE' " &
                 "AND f.CreeLe >= @DateDebut AND f.CreeLe < @DateFin " &
                 "GROUP BY p.ProduitId, p.Libelle " &
