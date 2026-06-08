@@ -64,95 +64,87 @@ Namespace DevCommerc8ak
         ' Analyse vente et rentabilite sur une periode.
         Public Function AnalyseVente(dateDebut As Date, dateFin As Date) As DataTable
             Dim sql As String = "" &
-                "WITH CTEStockEntree AS" &
-                "(" &
-                "    SELECT" &
-                "       se.ProduitId," &
-                "        SUM(ISNULL(se.QuantiteBase, 0)) AS QuantiteEntreePieces," &
-                "        SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) AS ValeurStockEntree," &
-                "        CASE " &
-                "            WHEN ISNULL(p.ConversionUnite, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0) " &
-                "            ELSE SUM(ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) " &
-                "        END AS CoutAchatMoyenPiece " &
+                "WITH CTEStockEntree AS " &
+                "( " &
+                "    SELECT se.ProduitId, " &
+                "           SUM(ISNULL(se.QuantiteBase, 0)) AS QuantiteEntreePieces, " &
+                "           SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) AS ValeurStockEntree, " &
+                "           SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) AS CoutAchatMoyenPiece " &
                 "    FROM StockEntree se " &
-                "    INNER JOIN Produits p ON p.ProduitId = se.ProduitId " &
                 "    WHERE se.DateEntree >= @DateDebut " &
                 "      AND se.DateEntree < DATEADD(DAY, 1, @DateFin) " &
-                "    GROUP BY se.ProduitId, p.PrixAchat, p.ConversionUnite" &
+                "      AND (se.IdStock LIKE 'ENT%' OR se.IdStock LIKE 'INIT%') " &
+                "    GROUP BY se.ProduitId " &
                 "), " &
-                "Ventes AS" &
-                "(" &
-                "    SELECT" &
-                "        l.ProduitId," &
-                "        SUM(ISNULL(l.Quantite, 0)) AS QuantiteVenduePieces," &
-                "        SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS ChiffreAffaires " &
+                "CoutProduit AS " &
+                "( " &
+                "    SELECT se.ProduitId, " &
+                "           SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) AS CoutMoyenPiece " &
+                "    FROM StockEntree se " &
+                "    WHERE se.IdStock LIKE 'ENT%' OR se.IdStock LIKE 'INIT%' " &
+                "    GROUP BY se.ProduitId " &
+                "), " &
+                "Ventes AS " &
+                "( " &
+                "    SELECT l.ProduitId, " &
+                "           SUM(ISNULL(l.Quantite, 0)) AS QuantiteVenduePieces, " &
+                "           SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS ChiffreAffaires " &
                 "    FROM LignesFactureVente l " &
                 "    INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
                 "    WHERE f.Statut = 'PAYEE' " &
                 "      AND f.CreeLe >= @DateDebut " &
                 "      AND f.CreeLe < DATEADD(DAY, 1, @DateFin) " &
-                "    GROUP BY l.ProduitId" &
-                "), DepensesPeriode AS" &
-                "(" &
+                "    GROUP BY l.ProduitId " &
+                "), " &
+                "DepensesPeriode AS " &
+                "( " &
                 "    SELECT ISNULL(SUM(ISNULL(Montant, 0)), 0) AS TotalDepenses " &
                 "    FROM Depenses " &
                 "    WHERE DateDepense >= @DateDebut " &
-                "      AND DateDepense < DATEADD(DAY, 1, @DateFin)" &
-                "), SortiesManuelles AS" &
-                "(" &
-                "    SELECT ISNULL(SUM(ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0)), 0) AS TotalChargesManuelles " &
+                "      AND DateDepense < DATEADD(DAY, 1, @DateFin) " &
+                "), " &
+                "SortiesManuelles AS " &
+                "( " &
+                "    SELECT ISNULL(SUM(ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutMoyenPiece, 0)), 0) AS TotalChargesManuelles " &
                 "    FROM StockSortie ss " &
-                "    LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId " &
-                "    LEFT JOIN (" &
-                "        SELECT se.ProduitId, " &
-                "               SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) AS CoutPiece " &
-                "        FROM StockEntree se " &
-                "        WHERE se.DateEntree < DATEADD(DAY, 1, @DateFin) " &
-                "        GROUP BY se.ProduitId" &
-                "    ) cp ON cp.ProduitId = ss.ProduitId " &
+                "    LEFT JOIN CoutProduit cp ON cp.ProduitId = ss.ProduitId " &
                 "    WHERE ss.DateSortie >= @DateDebut " &
                 "      AND ss.DateSortie < DATEADD(DAY, 1, @DateFin) " &
                 "      AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL') " &
-                "      AND NOT (" &
-                "          (UPPER(ISNULL(m.Nature, '')) LIKE '%DETTE%' OR UPPER(ISNULL(m.Libelle, '')) LIKE '%DETTE%') " &
-                "          AND (UPPER(ISNULL(m.Libelle, '')) LIKE '%CLIENT%' OR (UPPER(ISNULL(ss.StatutPaiement, '')) = 'IMPAYE' AND ss.ClientId IS NOT NULL))" &
-                "      )" &
                 "), " &
-                "AnalyseProduit AS" &
-                "(" &
-                "    SELECT" &
-                "        p.ProduitId," &
-                "        p.Libelle AS Produit," &
-                "        ISNULL(se.ValeurStockEntree, 0) AS ValeurStockEntree," &
-                "        ISNULL(v.QuantiteVenduePieces, 0) AS QuantiteVenduePieces," &
-                "        ISNULL(v.ChiffreAffaires, 0) AS ChiffreAffaires," &
-                "        ISNULL(v.QuantiteVenduePieces, 0) * ISNULL(se.CoutAchatMoyenPiece, 0) AS CoutMarchandisesVendues," &
-                "        ISNULL(v.ChiffreAffaires, 0) - (ISNULL(v.QuantiteVenduePieces, 0) * ISNULL(se.CoutAchatMoyenPiece, 0)) AS Benefice," &
-                "        ISNULL(s.QuantiteStock, 0) AS StockRestantPieces," &
-                "        ISNULL(s.QuantiteStock, 0) * ISNULL(se.CoutAchatMoyenPiece, 0) AS CoutStockRestant " &
+                "AnalyseProduit AS " &
+                "( " &
+                "    SELECT p.ProduitId, p.Libelle AS Produit, " &
+                "           ISNULL(se.ValeurStockEntree, 0) AS ValeurStockEntree, " &
+                "           ISNULL(v.QuantiteVenduePieces, 0) AS QuantiteVenduePieces, " &
+                "           ISNULL(v.ChiffreAffaires, 0) AS ChiffreAffaires, " &
+                "           ISNULL(v.QuantiteVenduePieces, 0) * ISNULL(cp.CoutMoyenPiece, 0) AS CoutMarchandisesVendues, " &
+                "           ISNULL(v.ChiffreAffaires, 0) - (ISNULL(v.QuantiteVenduePieces, 0) * ISNULL(cp.CoutMoyenPiece, 0)) AS Benefice, " &
+                "           ISNULL(s.QuantiteStock, 0) AS StockRestantPieces, " &
+                "           ISNULL(s.QuantiteStock, 0) * ISNULL(cp.CoutMoyenPiece, 0) AS CoutStockRestant " &
                 "    FROM Produits p " &
                 "    LEFT JOIN CTEStockEntree se ON se.ProduitId = p.ProduitId " &
+                "    LEFT JOIN CoutProduit cp ON cp.ProduitId = p.ProduitId " &
                 "    LEFT JOIN Ventes v ON v.ProduitId = p.ProduitId " &
-                "    LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId" &
+                "    LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId " &
                 ") " &
-                "SELECT " &
-                "    ISNULL(CAST(SUM(ValeurStockEntree) AS BIGINT), 0) AS ValeurStockEntree, " &
-                "    ISNULL(CAST(SUM(CoutMarchandisesVendues) AS BIGINT), 0) AS CoutMarchandisesVendues, " &
-                "    ISNULL(CAST(SUM(ChiffreAffaires) AS BIGINT), 0) AS ChiffreAffaires, " &
-                "    ISNULL(CAST(SUM(Benefice) AS BIGINT), 0) AS BeneficeRealise, " &
-                "    ISNULL(CAST(MAX(dp.TotalDepenses) AS BIGINT), 0) AS DepensesTotal, " &
-                "    ISNULL(CAST(MAX(sm.TotalChargesManuelles) AS BIGINT), 0) AS ChargesSortiesManuelles, " &
-                "    ISNULL(CAST(SUM(Benefice) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) AS BIGINT), 0) AS BeneficeNetRealise, " &
-                "    ISNULL(CAST(SUM(CoutStockRestant) AS BIGINT), 0) AS CoutStockRestant, " &
-                "    ISNULL(CAST(SUM(CoutStockRestant) * (ISNULL(SUM(Benefice), 0) / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS BIGINT), 0) AS ProjectionBeneficeRestant, " &
-                "    ISNULL(CAST(((ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS DECIMAL(10,2)), 0) AS MargeBeneficiairePourcentage, " &
-                "    CASE " &
-                "        WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) < 0 THEN 'CRITIQUE / PERTE' " &
-                "        WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) = 0 THEN 'POINT MORT' " &
-                "        WHEN (ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0) < 10 THEN 'FAIBLE RENTABILITÉ' " &
-                "        WHEN (ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0) BETWEEN 10 AND 25 THEN 'PROGRÈS' " &
-                "        ELSE 'BONNE RENTABILITÉ' " &
-                "    END AS Evaluation " &
+                "SELECT ISNULL(CAST(SUM(ValeurStockEntree) AS BIGINT), 0) AS ValeurStockEntree, " &
+                "       ISNULL(CAST(SUM(CoutMarchandisesVendues) AS BIGINT), 0) AS CoutMarchandisesVendues, " &
+                "       ISNULL(CAST(SUM(ChiffreAffaires) AS BIGINT), 0) AS ChiffreAffaires, " &
+                "       ISNULL(CAST(SUM(Benefice) AS BIGINT), 0) AS BeneficeRealise, " &
+                "       ISNULL(CAST(MAX(dp.TotalDepenses) AS BIGINT), 0) AS DepensesTotal, " &
+                "       ISNULL(CAST(MAX(sm.TotalChargesManuelles) AS BIGINT), 0) AS ChargesSortiesManuelles, " &
+                "       ISNULL(CAST(SUM(Benefice) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) AS BIGINT), 0) AS BeneficeNetRealise, " &
+                "       ISNULL(CAST(SUM(CoutStockRestant) AS BIGINT), 0) AS CoutStockRestant, " &
+                "       ISNULL(CAST(SUM(CoutStockRestant) * (ISNULL(SUM(Benefice), 0) / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS BIGINT), 0) AS ProjectionBeneficeRestant, " &
+                "       ISNULL(CAST(((ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS DECIMAL(10,2)), 0) AS MargeBeneficiairePourcentage, " &
+                "       CASE " &
+                "           WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) < 0 THEN 'CRITIQUE / PERTE' " &
+                "           WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) = 0 THEN 'POINT MORT' " &
+                "           WHEN (ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0) < 10 THEN 'FAIBLE RENTABILITÉ' " &
+                "           WHEN (ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0) BETWEEN 10 AND 25 THEN 'PROGRÈS' " &
+                "           ELSE 'BONNE RENTABILITÉ' " &
+                "       END AS Evaluation " &
                 "FROM AnalyseProduit " &
                 "CROSS JOIN DepensesPeriode dp " &
                 "CROSS JOIN SortiesManuelles sm"

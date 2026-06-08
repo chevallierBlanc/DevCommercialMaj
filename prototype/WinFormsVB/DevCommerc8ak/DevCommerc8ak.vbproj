@@ -173,9 +173,6 @@
     <Compile Include="UI\FrmInventaireIntelligent.vb">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="UI\FormulaireDashboardCloud.vb">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Include="UI\FormulaireConsultationDashboard.vb">
       <SubType>Form</SubType>
     </Compile>

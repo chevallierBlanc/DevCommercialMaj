@@ -90,7 +90,7 @@ Namespace DevCommerc8ak
             btnFinance = CreerBoutonCard("Finance", "Suivi des encaissements", Color.FromArgb(54, 99, 65))
 
             ' Handlers (Logique conservée)
-            AddHandler btnDashboard.Click, Sub() OuvrirFenetre(New FormulaireDashboardCloud())
+            AddHandler btnDashboard.Click, Sub() OuvrirFenetre(New FormulaireDashboard())
             AddHandler btnProduits.Click, Sub() OuvrirFenetre(New FormulaireProduits())
             AddHandler btnClients.Click, Sub() OuvrirFenetre(New FormulaireClients())
             AddHandler btnFournisseurs.Click, Sub() OuvrirFenetre(New FormulaireFournisseurs())
