@@ -1,0 +1,125 @@
+@model DashboardWebPatron.Models.DashboardPageViewModel
+@{
+    ViewData["Title"] = "Synthèse";
+}
+
+<section class="hero">
+    <div>
+        <h1>Dashboard Patron</h1>
+        <p>Consultation en lecture seule, alimentée uniquement par l'API.</p>
+    </div>
+    <form class="filters" method="get">
+        <select name="periode">
+            <option value="jour" selected="@(Model.Periode == "jour")">Aujourd'hui</option>
+            <option value="semaine" selected="@(Model.Periode == "semaine")">Cette semaine</option>
+            <option value="mois" selected="@(Model.Periode == "mois")">Ce mois</option>
+            <option value="annee" selected="@(Model.Periode == "annee")">Cette année</option>
+        </select>
+        <input name="month" type="number" min="1" max="12" value="@Model.Month" />
+        <input name="year" type="number" min="2020" max="2100" value="@Model.Year" />
+        <button type="submit">Actualiser</button>
+    </form>
+</section>
+
+<section class="cards">
+@foreach (var metric in Model.Metrics)
+{
+    <article class="card">
+        <span>@metric.Label</span>
+        <strong>@metric.Value.ToString("N0") FC</strong>
+    </article>
+}
+</section>
+
+<section class="panel">
+    <h2>CA du jour</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Produit</th>
+                    <th>Quantité</th>
+                    <th>Montant</th>
+                    <th>Date</th>
+                    <th>Utilisateur</th>
+                </tr>
+            </thead>
+            <tbody>
+            @if (Model.Journalier?.ProduitsVendus is not null)
+            {
+                foreach (var row in Model.Journalier.ProduitsVendus)
+                {
+                    <tr>
+                        <td>@row.Product</td>
+                        <td>@row.QuantitySold.ToString("N0")</td>
+                        <td>@row.AmountGenerated.ToString("N0") FC</td>
+                        <td>@row.Hour.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>@row.Agent</td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="grid-2">
+    <article class="panel">
+        <h2>Sorties manuelles</h2>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Produit</th>
+                        <th>Quantité</th>
+                        <th>Motif</th>
+                        <th>Client</th>
+                        <th>Montant</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (Model.Journalier?.SortiesManuelles is not null)
+                {
+                    foreach (var row in Model.Journalier.SortiesManuelles)
+                    {
+                        <tr>
+                            <td>@row.Product</td>
+                            <td>@row.Quantity.ToString("N0")</td>
+                            <td>@row.Motif</td>
+                            <td>@row.Category</td>
+                            <td>@row.Amount.ToString("N0") FC</td>
+                            <td>@row.Date.ToString("dd/MM/yyyy")</td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </article>
+    <article class="panel">
+        <h2>Dépenses</h2>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Catégorie</th>
+                        <th>Montant</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (Model.Journalier?.DepensesParCategorie is not null)
+                {
+                    foreach (var row in Model.Journalier.DepensesParCategorie)
+                    {
+                        <tr>
+                            <td>@row.Category</td>
+                            <td>@row.Amount.ToString("N0") FC</td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>

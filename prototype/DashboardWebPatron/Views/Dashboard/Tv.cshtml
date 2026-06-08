@@ -1,0 +1,25 @@
+@model DashboardWebPatron.Models.DashboardPageViewModel
+@{
+    ViewData["Title"] = "Mode TV";
+}
+
+<section class="dashboard-shell dashboard-tv">
+    <header class="dashboard-header">
+        <div>
+            <p class="eyebrow">Mode TV</p>
+            <h1>Dashboard patron plein écran</h1>
+            <p class="muted">Affichage simplifié, gros KPI et actualisation rapide pour écran de salon ou téléviseur connecté.</p>
+        </div>
+        <a class="action" href="/Dashboard/Index">Retour</a>
+    </header>
+
+    <section class="kpi-grid kpi-grid-tv">
+        @foreach (var metric in Model.Metrics)
+        {
+            <article class="kpi-card">
+                <h3>@metric.Label</h3>
+                <strong>@metric.Value.ToString("N0") FC</strong>
+            </article>
+        }
+    </section>
+</section>

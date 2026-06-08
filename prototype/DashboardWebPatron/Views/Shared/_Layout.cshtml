@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Dashboard Patron</title>
+    <link rel="stylesheet" href="~/css/site.css" />
+</head>
+<body>
+    <div class="shell">
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-title">COMMERCIAL PRO</div>
+                <div class="brand-sub">Dashboard Patron</div>
+            </div>
+            <nav class="nav">
+                <a href="/Dashboard/Index">Synthèse</a>
+                <a href="/Dashboard/TV">Mode TV</a>
+                <a href="/Dashboard/Mobile">Mode Mobile</a>
+            </nav>
+        </aside>
+        <main class="content">
+            @RenderBody()
+        </main>
+    </div>
+</body>
+</html>

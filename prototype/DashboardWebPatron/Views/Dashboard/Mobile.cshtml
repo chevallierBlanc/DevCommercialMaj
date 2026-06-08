@@ -1,0 +1,22 @@
+@model DashboardWebPatron.Models.DashboardPageViewModel
+@{
+    ViewData["Title"] = "Mode Mobile";
+}
+
+<section class="hero mobile">
+    <div>
+        <h1>Mode Mobile</h1>
+        <p>Affichage responsive, cartes empilées et lecture rapide.</p>
+    </div>
+    <a class="action" href="/Dashboard/Index">Retour</a>
+</section>
+
+<section class="mobile-stack">
+@foreach (var metric in Model.Metrics)
+{
+    <article class="card">
+        <span>@metric.Label</span>
+        <strong>@metric.Value.ToString("N0") FC</strong>
+    </article>
+}
+</section>
