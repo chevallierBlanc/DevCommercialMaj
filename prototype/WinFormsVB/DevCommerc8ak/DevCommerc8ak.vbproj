@@ -120,7 +120,6 @@
     <Compile Include="Services\FormatageGlobal.vb" />
     <Compile Include="Services\SyncLogService.vb" />
     <Compile Include="Services\RemoteApiSession.vb" />
-    <Compile Include="Services\DashboardApiClient.vb" />
     <Compile Include="Services\OfflineSyncService.vb" />
     <Compile Include="Services\OfflineSyncScheduler.vb" />
     <Compile Include="Services\DepenseService.vb" />
@@ -171,9 +170,6 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FrmInventaireIntelligent.vb">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="UI\FormulaireConsultationDashboard.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FormulaireUtilisateurs.vb">
