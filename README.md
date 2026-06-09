@@ -11,3 +11,7 @@ Livrables:
 - docs/03_sfd.md
 - docs/04_plan.md
 - docs/05_prototype.md
+- PLAN_BASCULE_PRODUCTION.md
+- CHECKLIST_TESTS_PRODUCTION.md
+- README_PRODUCTION.txt
+- RAPPORT_FICHIERS_MODIFIES.md

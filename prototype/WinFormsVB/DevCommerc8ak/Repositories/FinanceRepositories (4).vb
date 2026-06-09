@@ -57,7 +57,7 @@ Namespace DevCommerc8ak.Finance
         End Sub
 
         Public Function GetSommeParDevise(dateDepense As DateTime, devise As String, source As String) As Decimal
-            Dim sql As String = "SELECT SUM(Montant) FROM Depenses WHERE DateDepense = @date AND Devise = @devise AND Source = @source"
+            Dim sql As String = "SELECT ISNULL(CAST(SUM(ISNULL(Montant,0)) AS DECIMAL(18,0)),0) FROM Depenses WHERE DateDepense = @date AND Devise = @devise AND Source = @source"
             Dim params As New List(Of SqlParameter) From {
                 New SqlParameter("@date", dateDepense.Date),
                 New SqlParameter("@devise", devise),
@@ -100,11 +100,11 @@ Namespace DevCommerc8ak.Finance
         End Function
 
         Public Function GetStatsParCategorie() As DataTable
-            Return _dal.ExecuterTable("SELECT Categorie, SUM(Montant) as Total FROM Depenses GROUP BY Categorie", CommandType.Text, Nothing)
+            Return _dal.ExecuterTable("SELECT Categorie, ISNULL(CAST(SUM(ISNULL(Montant,0)) AS BIGINT),0) as Total FROM Depenses GROUP BY Categorie", CommandType.Text, Nothing)
         End Function
 
         Public Function GetRapportDepenses(annee As Integer, Optional mois As Integer = 0) As DataTable
-            Dim sql As String = "SELECT Categorie, SUM(Montant) as Total, Devise " &
+            Dim sql As String = "SELECT Categorie, ISNULL(CAST(SUM(ISNULL(Montant,0)) AS BIGINT),0) as Total, Devise " &
                                "FROM Depenses " &
                                "WHERE YEAR(DateDepense) = @annee "
 
@@ -144,8 +144,8 @@ Namespace DevCommerc8ak.Finance
         End Sub
 
         Public Function GetSoldeParDevise(devise As String) As Decimal
-            Dim sql As String = "SELECT (SELECT ISNULL(SUM(Montant), 0) FROM Banque WHERE TypeOperation = 'Depot' AND Devise = @devise) - " &
-                               "(SELECT ISNULL(SUM(Montant), 0) FROM Banque WHERE TypeOperation = 'Retrait' AND Devise = @devise)"
+            Dim sql As String = "SELECT CAST((SELECT ISNULL(SUM(Montant), 0) FROM Banque WHERE TypeOperation = 'Depot' AND Devise = @devise) - " &
+                               "(SELECT ISNULL(SUM(Montant), 0) FROM Banque WHERE TypeOperation = 'Retrait' AND Devise = @devise) AS DECIMAL(18,0))"
             Dim params As New List(Of SqlParameter) From {New SqlParameter("@devise", devise)}
             Dim result As Object = _dal.ExecuterScalaire(sql, CommandType.Text, params)
             Return If(result Is DBNull.Value OrElse result Is Nothing, 0D, Convert.ToDecimal(result))
@@ -163,7 +163,7 @@ Namespace DevCommerc8ak.Finance
         End Sub
 
         Public Function GetEncaisse(dateJour As DateTime, devise As String) As Decimal
-            Dim sql As String = "SELECT SUM(Montant) FROM Paiements WHERE CAST(PayeLe AS DATE) = @date AND Devise = @devise"
+            Dim sql As String = "SELECT ISNULL(CAST(SUM(ISNULL(Montant,0)) AS DECIMAL(18,0)),0) FROM Paiements WHERE CAST(PayeLe AS DATE) = @date AND Devise = @devise"
             Dim params As New List(Of SqlParameter) From {
                 New SqlParameter("@date", dateJour.Date),
                 New SqlParameter("@devise", devise)

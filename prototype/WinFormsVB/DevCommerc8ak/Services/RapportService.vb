@@ -16,7 +16,7 @@ Namespace DevCommerc8ak
 
         ' CA journalier pour une date.
         Public Function CAJournalier(dateRef As Date) As Decimal
-            Dim sql As String = "SELECT ISNULL(SUM(MontantTotal),0) FROM FacturesVente WHERE CAST(CreeLe AS DATE)=@d AND Statut='PAYEE'"
+            Dim sql As String = "SELECT ISNULL(CAST(SUM(ISNULL(MontantTotal,0)) AS DECIMAL(18,0)),0) FROM FacturesVente WHERE CAST(CreeLe AS DATE)=@d AND Statut='PAYEE'"
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@d", dateRef.Date)}
             Dim v As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
             Return Convert.ToDecimal(v)
@@ -24,7 +24,7 @@ Namespace DevCommerc8ak
 
         ' CA mensuel pour une date.
         Public Function CAMensuel(dateRef As Date) As Decimal
-            Dim sql As String = "SELECT ISNULL(SUM(MontantTotal),0) FROM FacturesVente WHERE YEAR(CreeLe)=@y AND MONTH(CreeLe)=@m AND Statut='PAYEE'"
+            Dim sql As String = "SELECT ISNULL(CAST(SUM(ISNULL(MontantTotal,0)) AS DECIMAL(18,0)),0) FROM FacturesVente WHERE YEAR(CreeLe)=@y AND MONTH(CreeLe)=@m AND Statut='PAYEE'"
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@y", dateRef.Year),
                 New SqlParameter("@m", dateRef.Month)
@@ -136,7 +136,7 @@ Namespace DevCommerc8ak
                 "       ISNULL(CAST(MAX(sm.TotalChargesManuelles) AS BIGINT), 0) AS ChargesSortiesManuelles, " &
                 "       ISNULL(CAST(SUM(Benefice) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) AS BIGINT), 0) AS BeneficeNetRealise, " &
                 "       ISNULL(CAST(SUM(CoutStockRestant) AS BIGINT), 0) AS CoutStockRestant, " &
-                "       ISNULL(CAST(SUM(CoutStockRestant) * (ISNULL(SUM(Benefice), 0) / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS BIGINT), 0) AS ProjectionBeneficeRestant, " &
+                "       ISNULL(CAST(SUM(CoutStockRestant) * (1.0 * ISNULL(SUM(Benefice), 0) / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS BIGINT), 0) AS ProjectionBeneficeRestant, " &
                 "       ISNULL(CAST(((ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS DECIMAL(10,2)), 0) AS MargeBeneficiairePourcentage, " &
                 "       CASE " &
                 "           WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) < 0 THEN 'CRITIQUE / PERTE' " &
@@ -348,7 +348,7 @@ Namespace DevCommerc8ak
 
         ' Serie CA des 7 derniers jours.
         Public Function CA7Jours() As DataTable
-            Dim sql As String = "SELECT CAST(CreeLe AS DATE) AS Jour, ISNULL(SUM(MontantTotal),0) AS CA " &
+            Dim sql As String = "SELECT CAST(CreeLe AS DATE) AS Jour, ISNULL(CAST(SUM(ISNULL(MontantTotal,0)) AS BIGINT),0) AS CA " &
                                 "FROM FacturesVente WHERE CreeLe >= DATEADD(DAY,-6,CAST(GETDATE() AS DATE)) AND Statut='PAYEE' " &
                                 "GROUP BY CAST(CreeLe AS DATE) ORDER BY Jour"
             Return _dal.ExecuterTable(sql, CommandType.Text, Nothing)
@@ -356,7 +356,7 @@ Namespace DevCommerc8ak
 
         ' Ventes par mois (12 derniers mois).
         Public Function VentesParMois() As DataTable
-            Dim sql As String = "SELECT FORMAT(CreeLe,'yyyy-MM') AS Mois, ISNULL(SUM(MontantTotal),0) AS CA " &
+            Dim sql As String = "SELECT FORMAT(CreeLe,'yyyy-MM') AS Mois, ISNULL(CAST(SUM(ISNULL(MontantTotal,0)) AS BIGINT),0) AS CA " &
                                 "FROM FacturesVente WHERE CreeLe >= DATEADD(MONTH,-11,GETDATE()) AND Statut='PAYEE' " &
                                 "GROUP BY FORMAT(CreeLe,'yyyy-MM') ORDER BY Mois"
             Return _dal.ExecuterTable(sql, CommandType.Text, Nothing)
@@ -364,14 +364,14 @@ Namespace DevCommerc8ak
 
         ' Revenus par mode de paiement.
         Public Function RevenusParMode() As DataTable
-            Dim sql As String = "SELECT ModePaiement, ISNULL(SUM(Montant),0) AS Montant " &
+            Dim sql As String = "SELECT ModePaiement, ISNULL(CAST(SUM(ISNULL(Montant,0)) AS BIGINT),0) AS Montant " &
                                 "FROM Paiements GROUP BY ModePaiement"
             Return _dal.ExecuterTable(sql, CommandType.Text, Nothing)
         End Function
 
         ' Revenus par produit (top 5).
         Public Function RevenusParProduit() As DataTable
-            Dim sql As String = "SELECT TOP 5 p.Libelle, ISNULL(SUM(l.MontantLigne),0) AS Montant " &
+            Dim sql As String = "SELECT TOP 5 p.Libelle, ISNULL(CAST(SUM(ISNULL(l.MontantLigne,0)) AS BIGINT),0) AS Montant " &
                                 "FROM LignesFactureVente l " &
                                 "JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
                                 "JOIN Produits p ON p.ProduitId = l.ProduitId " &
@@ -391,10 +391,10 @@ Namespace DevCommerc8ak
 
         ' Comparatif mois actuel vs precedent.
         Public Function ComparatifMois(dateRef As Date) As DataTable
-            Dim sql As String = "SELECT 'MoisActuel' AS Periode, ISNULL(SUM(MontantTotal),0) AS CA " &
+            Dim sql As String = "SELECT 'MoisActuel' AS Periode, ISNULL(CAST(SUM(ISNULL(MontantTotal,0)) AS BIGINT),0) AS CA " &
                                 "FROM FacturesVente WHERE YEAR(CreeLe)=@y AND MONTH(CreeLe)=@m AND Statut='PAYEE' " &
                                 "UNION ALL " &
-                                "SELECT 'MoisPrecedent' AS Periode, ISNULL(SUM(MontantTotal),0) AS CA " &
+                                "SELECT 'MoisPrecedent' AS Periode, ISNULL(CAST(SUM(ISNULL(MontantTotal,0)) AS BIGINT),0) AS CA " &
                                 "FROM FacturesVente WHERE YEAR(CreeLe)=@y2 AND MONTH(CreeLe)=@m2 AND Statut='PAYEE'"
             Dim prev As Date = dateRef.AddMonths(-1)
             Dim p As New List(Of SqlParameter) From {
@@ -408,8 +408,8 @@ Namespace DevCommerc8ak
 
         ' Taux de vente vs stock (ratio).
         Public Function TauxVenteStock() As Decimal
-            Dim sql As String = "SELECT CASE WHEN (ISNULL(s.Stock,0)+ISNULL(v.Vendu,0))=0 THEN 0 ELSE " &
-                                "ISNULL(v.Vendu,0) / (ISNULL(s.Stock,0)+ISNULL(v.Vendu,0)) END " &
+            Dim sql As String = "SELECT CAST(CASE WHEN (ISNULL(s.Stock,0)+ISNULL(v.Vendu,0))=0 THEN 0 ELSE " &
+                                "1.0 * ISNULL(v.Vendu,0) / NULLIF((ISNULL(s.Stock,0)+ISNULL(v.Vendu,0)), 0) END AS DECIMAL(18,4)) " &
                                 "FROM (SELECT SUM(QuantiteStock) AS Stock FROM vStockProduit) s " &
                                 "CROSS JOIN (SELECT SUM(l.Quantite) AS Vendu FROM LignesFactureVente l JOIN FacturesVente f ON f.FactureVenteId=l.FactureVenteId WHERE f.Statut='PAYEE') v"
             Dim v As Object = _dal.ExecuterScalaire(sql, CommandType.Text, Nothing)
@@ -446,7 +446,7 @@ Namespace DevCommerc8ak
 
         ' Rapport produits les plus vendus.
         Public Function ProduitsPlusVendus(dateDebut As Date, dateFin As Date) As DataTable
-            Dim sql As String = "SELECT TOP 20 p.Libelle, SUM(l.Quantite) AS Quantite " &
+            Dim sql As String = "SELECT TOP 20 p.Libelle, ISNULL(CAST(SUM(ISNULL(l.Quantite,0)) AS BIGINT),0) AS Quantite " &
                                 "FROM LignesFactureVente l " &
                                 "JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
                                 "JOIN Produits p ON p.ProduitId = l.ProduitId " &

@@ -14,6 +14,7 @@ Name: "desktopicon"; Description: "Creer un raccourci sur le Bureau"; GroupDescr
 [Files]
 Source: "..\prototype\WinFormsVB\DevCommerc8ak\bin\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\prototype\WinFormsVB\DevCommerc8ak\Resources\*"; DestDir: "{app}\Resources"; Flags: recursesubdirs createallsubdirs
+Source: "..\README_PRODUCTION.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\DevCommerc8ak"; Filename: "{app}\DevCommerc8ak.exe"
