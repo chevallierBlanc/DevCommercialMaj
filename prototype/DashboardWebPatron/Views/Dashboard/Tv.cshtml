@@ -9,6 +9,11 @@
             <p class="eyebrow">Mode TV</p>
             <h1>Dashboard patron plein écran</h1>
             <p class="muted">Affichage simplifié, gros KPI et actualisation rapide pour écran de salon ou téléviseur connecté.</p>
+            <div class="tv-badges">
+                <span>Période: @Model.Periode</span>
+                <span>API active</span>
+                <span>Lecture seule</span>
+            </div>
         </div>
         <a class="action" href="/Dashboard/Index">Retour</a>
     </header>
@@ -22,4 +27,64 @@
             </article>
         }
     </section>
+
+    <section class="grid-2 tv-panels">
+        <article class="panel">
+            <h2>Ventes du jour</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Produit</th>
+                            <th>Qté</th>
+                            <th>Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Journalier?.ProduitsVendus is not null)
+                        {
+                            foreach (var row in Model.Journalier.ProduitsVendus.Take(8))
+                            {
+                                <tr>
+                                    <td>@row.Product</td>
+                                    <td>@row.QuantitySold.ToString("N0")</td>
+                                    <td>@row.AmountGenerated.ToString("N0") FC</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </article>
+
+        <article class="panel">
+            <h2>Alertes stock</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Produit</th>
+                            <th>Stock</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Journalier?.AlertesStockFaible is not null)
+                        {
+                            foreach (var row in Model.Journalier.AlertesStockFaible.Take(8))
+                            {
+                                <tr>
+                                    <td>@row.Product</td>
+                                    <td>@row.Stock.ToString("N0")</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </article>
+    </section>
 </section>
+
+<script>
+    setTimeout(function () { window.location.reload(); }, 60000);
+</script>

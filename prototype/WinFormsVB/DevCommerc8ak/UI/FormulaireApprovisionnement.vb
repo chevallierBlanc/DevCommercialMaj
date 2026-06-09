@@ -411,6 +411,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub ChargerLignes(sender As Object, e As EventArgs)
+            If _chargement Then Return
             If gridBons.CurrentRow Is Nothing OrElse gridBons.CurrentRow.Cells("BonId").Value Is DBNull.Value Then Return
             _bonCourantId = Convert.ToInt32(gridBons.CurrentRow.Cells("BonId").Value)
             txtNumeroBon.Text = Convert.ToString(gridBons.CurrentRow.Cells("NumeroBon").Value)
@@ -424,6 +425,25 @@ Namespace DevCommerc8ak
             DefinirStatutAffiche(Convert.ToString(gridBons.CurrentRow.Cells("Statut").Value))
             gridLignes.DataSource = _repo.ListerLignes(_bonCourantId)
             ConfigurerGrilleLignes()
+        End Sub
+
+        Private Sub ReSelectionnerBon(bonId As Integer)
+            If gridBons.Rows.Count = 0 Then Return
+            For Each row As DataGridViewRow In gridBons.Rows
+                If row.IsNewRow Then Continue For
+                If row.Cells("BonId").Value Is Nothing OrElse row.Cells("BonId").Value Is DBNull.Value Then Continue For
+                If Convert.ToInt32(row.Cells("BonId").Value) = bonId Then
+                    gridBons.ClearSelection()
+                    row.Selected = True
+                    For Each cell As DataGridViewCell In row.Cells
+                        If cell.Visible Then
+                            gridBons.CurrentCell = cell
+                            Exit For
+                        End If
+                    Next
+                    Exit For
+                End If
+            Next
         End Sub
 
         Private Sub ConfigurerGrilleLignes()
@@ -541,14 +561,21 @@ Namespace DevCommerc8ak
             Dim ligneSelectionnee As DataGridViewRow = ObtenirLigneSelectionnee(gridLignes)
             If ligneSelectionnee Is Nothing Then Return
             If ObtenirStatutCourant() <> "EnAttente" Then Return
+            Dim bonIdCourant As Integer = _bonCourantId
             Dim ligneId As Integer = Convert.ToInt32(ligneSelectionnee.Cells("BonLigneId").Value)
             Dim rep As DialogResult = MessageBox.Show("Retirer cette ligne du bon ?", "Confirmation", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
             If rep <> DialogResult.Yes Then Return
             _repo.SupprimerLigne(ligneId)
-            gridLignes.DataSource = _repo.ListerLignes(_bonCourantId)
-            ConfigurerGrilleLignes()
-            lblTotalBon.Text = "Total bon: " & CalculerTotalBon(_bonCourantId).ToString("N0")
-            ChargerBons(Nothing, EventArgs.Empty)
+            _chargement = True
+            Try
+                ChargerBons(Nothing, EventArgs.Empty)
+                ReSelectionnerBon(bonIdCourant)
+                gridLignes.DataSource = _repo.ListerLignes(bonIdCourant)
+                ConfigurerGrilleLignes()
+                lblTotalBon.Text = "Total bon: " & CalculerTotalBon(bonIdCourant).ToString("N0")
+            Finally
+                _chargement = False
+            End Try
         End Sub
 
         Private Sub SupprimerBon(sender As Object, e As EventArgs)

@@ -116,6 +116,74 @@ th { color: var(--muted); font-size: 14px; }
 .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .tv .card.big { min-height: 170px; }
 .tv-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.dashboard-tv {
+    display: grid;
+    gap: 18px;
+}
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    background: linear-gradient(135deg, #ffffff 0%, #f7f9ff 100%);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 22px 24px;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+}
+.kpi-grid-tv {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.kpi-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 22px;
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+}
+.kpi-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 7px;
+    background: linear-gradient(180deg, var(--primary), var(--accent));
+}
+.kpi-card h3 {
+    margin: 0;
+    color: var(--muted);
+    font-size: 18px;
+}
+.kpi-card strong {
+    font-size: 42px;
+    color: var(--primary);
+    line-height: 1.05;
+}
+.tv-badges {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+.tv-badges span {
+    background: #eef2ff;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 700;
+}
+.tv-panels .panel {
+    min-height: 320px;
+}
+.dashboard-header .action {
+    white-space: nowrap;
+}
 .mobile-stack { display: grid; gap: 14px; }
 .analysis-meta {
     display: flex;
@@ -188,7 +256,7 @@ tbody tr:hover {
 @media (max-width: 1100px) {
     .shell { grid-template-columns: 1fr; }
     .sidebar { display: none; }
-    .cards, .grid-2, .tv-cards, .analysis-grid { grid-template-columns: 1fr; }
+    .cards, .grid-2, .tv-cards, .analysis-grid, .kpi-grid-tv { grid-template-columns: 1fr; }
     .hero { flex-direction: column; align-items: stretch; }
     .filters-analysis { min-width: 0; width: 100%; }
     .filters-row { grid-template-columns: 1fr; }
