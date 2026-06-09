@@ -561,21 +561,14 @@ Namespace DevCommerc8ak
             Dim ligneSelectionnee As DataGridViewRow = ObtenirLigneSelectionnee(gridLignes)
             If ligneSelectionnee Is Nothing Then Return
             If ObtenirStatutCourant() <> "EnAttente" Then Return
-            Dim bonIdCourant As Integer = _bonCourantId
             Dim ligneId As Integer = Convert.ToInt32(ligneSelectionnee.Cells("BonLigneId").Value)
             Dim rep As DialogResult = MessageBox.Show("Retirer cette ligne du bon ?", "Confirmation", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
             If rep <> DialogResult.Yes Then Return
             _repo.SupprimerLigne(ligneId)
-            _chargement = True
-            Try
-                ChargerBons(Nothing, EventArgs.Empty)
-                ReSelectionnerBon(bonIdCourant)
-                gridLignes.DataSource = _repo.ListerLignes(bonIdCourant)
-                ConfigurerGrilleLignes()
-                lblTotalBon.Text = "Total bon: " & CalculerTotalBon(bonIdCourant).ToString("N0")
-            Finally
-                _chargement = False
-            End Try
+            gridLignes.DataSource = _repo.ListerLignes(_bonCourantId)
+            ConfigurerGrilleLignes()
+            lblTotalBon.Text = "Total bon: " & CalculerTotalBon(_bonCourantId).ToString("N0")
+            ChargerBons(Nothing, EventArgs.Empty)
         End Sub
 
         Private Sub SupprimerBon(sender As Object, e As EventArgs)
@@ -586,7 +579,19 @@ Namespace DevCommerc8ak
             _repo.SupprimerBon(_bonCourantId)
             AjouterNotification("Bon supprimé : " & txtNumeroBon.Text)
             ChargerBons(Nothing, EventArgs.Empty)
-            NouveauBon(Nothing, EventArgs.Empty)
+            _bonCourantId = 0
+            _bonLigneCouranteId = 0
+            txtNumeroBon.Clear()
+            cmbFournisseur.SelectedIndex = -1
+            cmbTypePaiement.SelectedIndex = -1
+            txtRechercheProduit.Clear()
+            txtProduitChoisi.Clear()
+            txtPrixPrecedent.Clear()
+            txtPrixAchat.Clear()
+            txtQuantite.Clear()
+            gridLignes.DataSource = Nothing
+            lblTotalBon.Text = "Total bon: 0"
+            DefinirStatutAffiche("EnAttente")
         End Sub
 
         Private Sub ValiderBon(sender As Object, e As EventArgs)
