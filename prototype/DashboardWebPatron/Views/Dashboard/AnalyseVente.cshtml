@@ -1,0 +1,116 @@
+@model DashboardWebPatron.Models.AnalyseVentePageViewModel
+@{
+    ViewData["Title"] = "Analyse vente";
+    var analyse = Model.Analyse;
+}
+
+<section class="hero">
+    <div>
+        <h1>Dashboard Analyse Vente</h1>
+        <p>Lecture des ventes, rentabilité, coût de stock restant et projection de bénéfice.</p>
+    </div>
+    <form class="filters" method="get">
+        <select name="periode">
+            <option value="jour" @(Model.Periode == "jour" ? "selected" : null)>Aujourd'hui</option>
+            <option value="mois" @(Model.Periode == "mois" ? "selected" : null)>Ce mois</option>
+            <option value="annee" @(Model.Periode == "annee" ? "selected" : null)>Cette année</option>
+        </select>
+        <input name="month" type="number" min="1" max="12" value="@Model.Month" />
+        <input name="year" type="number" min="2020" max="2100" value="@Model.Year" />
+        <button type="submit">Actualiser</button>
+    </form>
+</section>
+
+@if (analyse is null)
+{
+    <section class="panel">
+        <h2>Aucune donnée disponible</h2>
+        <p class="muted">L'API n'a pas retourné de résultat pour la période demandée.</p>
+    </section>
+}
+else
+{
+    <section class="analysis-meta">
+        <div>
+            <span class="muted">Période analysée</span>
+            <strong>@analyse.PeriodeLabel</strong>
+        </div>
+        <div>
+            <span class="muted">Évaluation</span>
+            <strong class="evaluation-pill">@analyse.Evaluation</strong>
+        </div>
+    </section>
+
+    <section class="analysis-grid">
+        <article class="analysis-card">
+            <span>Valeur stock entrée</span>
+            <strong>@analyse.ValeurStockEntree.ToString("N0") FC</strong>
+        </article>
+        <article class="analysis-card">
+            <span>Coût marchandises vendues</span>
+            <strong>@analyse.CoutMarchandisesVendues.ToString("N0") FC</strong>
+        </article>
+        <article class="analysis-card">
+            <span>Chiffre d'affaires</span>
+            <strong>@analyse.ChiffreAffaires.ToString("N0") FC</strong>
+        </article>
+        <article class="analysis-card">
+            <span>Bénéfice réalisé</span>
+            <strong>@analyse.BeneficeRealise.ToString("N0") FC</strong>
+        </article>
+        <article class="analysis-card">
+            <span>Dépenses</span>
+            <strong>@analyse.DepensesTotal.ToString("N0") FC</strong>
+        </article>
+        <article class="analysis-card">
+            <span>Charges sans recette</span>
+            <strong>@analyse.ChargesSortiesManuelles.ToString("N0") FC</strong>
+        </article>
+        <article class="analysis-card">
+            <span>Coût stock restant</span>
+            <strong>@analyse.CoutStockRestant.ToString("N0") FC</strong>
+        </article>
+        <article class="analysis-card">
+            <span>Projection bénéfice restant</span>
+            <strong>@analyse.ProjectionBeneficeRestant.ToString("N0") FC</strong>
+        </article>
+        <article class="analysis-card">
+            <span>Marge bénéficiaire</span>
+            <strong>@analyse.MargeBeneficiairePourcentage.ToString("N1")%</strong>
+        </article>
+        <article class="analysis-card accent">
+            <span>Bénéfice net réalisé</span>
+            <strong>@analyse.BeneficeNetRealise.ToString("N0") FC</strong>
+        </article>
+    </section>
+
+    <section class="panel">
+        <h2>Détail explicite du bénéfice net</h2>
+        <p class="muted">La synthèse reprend les dépenses et les charges métier qui réduisent réellement le résultat final.</p>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Rubrique</th>
+                        <th>Catégorie / détail</th>
+                        <th>Quantité pièces</th>
+                        <th>Montant (FC)</th>
+                        <th>Commentaire</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var row in analyse.Details.OrderBy(x => x.Ordre))
+                {
+                    <tr>
+                        <td>@row.Rubrique</td>
+                        <td>@row.Categorie</td>
+                        <td>@row.QuantitePieces.ToString("N0")</td>
+                        <td>@row.Montant.ToString("N0")</td>
+                        <td>@row.Commentaire</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}

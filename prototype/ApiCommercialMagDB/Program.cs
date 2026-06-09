@@ -120,5 +120,13 @@ dashboard.MapGet("/annuel", async (int? year, DashboardService service) =>
     var result = await service.GetAnnuelAsync(year ?? now.Year);
     return Results.Ok(result);
 });
+dashboard.MapGet("/analyse-vente", async (DateTime? start, DateTime? end, DashboardService service) =>
+{
+    var today = DateTime.Today;
+    var dateDebut = start ?? today.AddMonths(-1).AddDays(1 - today.Day);
+    var dateFin = end ?? today;
+    var result = await service.GetAnalyseVenteAsync(dateDebut, dateFin);
+    return Results.Ok(result);
+});
 
 app.Run();

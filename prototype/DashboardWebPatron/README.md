@@ -15,6 +15,7 @@ Ouvrir en priorité la solution dédiée:
 ## Points d'entrée
 
 - `/Dashboard/Index`
+- `/Dashboard/AnalyseVente`
 - `/Dashboard/TV`
 - `/Dashboard/Mobile`
 
@@ -24,6 +25,8 @@ Le client API est configuré dans `appsettings.json` via:
 
 - `DashboardApi:BaseUrl`
 - `DashboardApi:AccessToken`
+- `DashboardApi:Username`
+- `DashboardApi:Password`
 
 ## Lancement
 

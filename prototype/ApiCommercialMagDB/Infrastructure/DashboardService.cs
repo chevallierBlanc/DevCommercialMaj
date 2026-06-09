@@ -11,4 +11,7 @@ public sealed class DashboardService(DashboardRepository repository)
 
     public Task<AnnuelDashboardResponse> GetAnnuelAsync(int year, CancellationToken ct = default)
         => repository.GetAnnuelAsync(year, ct);
+
+    public Task<AnalyseVenteResponse> GetAnalyseVenteAsync(DateTime dateDebut, DateTime dateFin, CancellationToken ct = default)
+        => repository.GetAnalyseVenteAsync(dateDebut, dateFin, ct);
 }

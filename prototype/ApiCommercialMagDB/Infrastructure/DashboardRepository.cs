@@ -140,6 +140,167 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
         return response;
     }
 
+    public async Task<AnalyseVenteResponse> GetAnalyseVenteAsync(DateTime dateDebut, DateTime dateFin, CancellationToken ct = default)
+    {
+        await using var cn = factory.Create();
+        await cn.OpenAsync(ct);
+
+        const string sql = """
+            WITH CTEStockEntree AS
+            (
+                SELECT se.ProduitId,
+                       SUM(ISNULL(se.QuantiteBase, 0)) AS QuantiteEntreePieces,
+                       SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) AS ValeurStockEntree,
+                       SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0))
+                       / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) AS CoutAchatMoyenPiece
+                FROM StockEntree se
+                WHERE se.DateEntree >= @DateDebut
+                  AND se.DateEntree < DATEADD(DAY, 1, @DateFin)
+                  AND (se.IdStock LIKE 'ENT%' OR se.IdStock LIKE 'INIT%')
+                GROUP BY se.ProduitId
+            ),
+            CoutProduit AS
+            (
+                SELECT se.ProduitId,
+                       SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) AS CoutMoyenPiece
+                FROM StockEntree se
+                WHERE se.IdStock LIKE 'ENT%' OR se.IdStock LIKE 'INIT%'
+                GROUP BY se.ProduitId
+            ),
+            Ventes AS
+            (
+                SELECT l.ProduitId,
+                       SUM(ISNULL(l.Quantite, 0)) AS QuantiteVenduePieces,
+                       SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS ChiffreAffaires
+                FROM LignesFactureVente l
+                INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId
+                WHERE f.Statut = 'PAYEE'
+                  AND f.CreeLe >= @DateDebut
+                  AND f.CreeLe < DATEADD(DAY, 1, @DateFin)
+                GROUP BY l.ProduitId
+            ),
+            DepensesPeriode AS
+            (
+                SELECT ISNULL(SUM(ISNULL(Montant, 0)), 0) AS TotalDepenses
+                FROM Depenses
+                WHERE DateDepense >= @DateDebut
+                  AND DateDepense < DATEADD(DAY, 1, @DateFin)
+            ),
+            SortiesManuelles AS
+            (
+                SELECT ISNULL(SUM(ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutMoyenPiece, 0)), 0) AS TotalChargesManuelles
+                FROM StockSortie ss
+                LEFT JOIN CoutProduit cp ON cp.ProduitId = ss.ProduitId
+                WHERE ss.DateSortie >= @DateDebut
+                  AND ss.DateSortie < DATEADD(DAY, 1, @DateFin)
+                  AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL')
+            ),
+            AnalyseProduit AS
+            (
+                SELECT p.ProduitId, p.Libelle AS Produit,
+                       ISNULL(se.ValeurStockEntree, 0) AS ValeurStockEntree,
+                       ISNULL(v.QuantiteVenduePieces, 0) AS QuantiteVenduePieces,
+                       ISNULL(v.ChiffreAffaires, 0) AS ChiffreAffaires,
+                       ISNULL(v.QuantiteVenduePieces, 0) * ISNULL(cp.CoutMoyenPiece, 0) AS CoutMarchandisesVendues,
+                       ISNULL(v.ChiffreAffaires, 0) - (ISNULL(v.QuantiteVenduePieces, 0) * ISNULL(cp.CoutMoyenPiece, 0)) AS Benefice,
+                       ISNULL(s.QuantiteStock, 0) AS StockRestantPieces,
+                       ISNULL(s.QuantiteStock, 0) * ISNULL(cp.CoutMoyenPiece, 0) AS CoutStockRestant
+                FROM Produits p
+                LEFT JOIN CTEStockEntree se ON se.ProduitId = p.ProduitId
+                LEFT JOIN CoutProduit cp ON cp.ProduitId = p.ProduitId
+                LEFT JOIN Ventes v ON v.ProduitId = p.ProduitId
+                LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId
+            )
+            SELECT ISNULL(CAST(SUM(ValeurStockEntree) AS BIGINT), 0) AS ValeurStockEntree,
+                   ISNULL(CAST(SUM(CoutMarchandisesVendues) AS BIGINT), 0) AS CoutMarchandisesVendues,
+                   ISNULL(CAST(SUM(ChiffreAffaires) AS BIGINT), 0) AS ChiffreAffaires,
+                   ISNULL(CAST(SUM(Benefice) AS BIGINT), 0) AS BeneficeRealise,
+                   ISNULL(CAST(MAX(dp.TotalDepenses) AS BIGINT), 0) AS DepensesTotal,
+                   ISNULL(CAST(MAX(sm.TotalChargesManuelles) AS BIGINT), 0) AS ChargesSortiesManuelles,
+                   ISNULL(CAST(SUM(Benefice) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) AS BIGINT), 0) AS BeneficeNetRealise,
+                   ISNULL(CAST(SUM(CoutStockRestant) AS BIGINT), 0) AS CoutStockRestant,
+                   ISNULL(CAST(SUM(CoutStockRestant) * (ISNULL(SUM(Benefice), 0) / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS BIGINT), 0) AS ProjectionBeneficeRestant,
+                   ISNULL(CAST(((ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS DECIMAL(10,2)), 0) AS MargeBeneficiairePourcentage,
+                   CASE
+                       WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) < 0 THEN 'CRITIQUE / PERTE'
+                       WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) = 0 THEN 'POINT MORT'
+                       WHEN (ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0) < 10 THEN 'FAIBLE RENTABILITÉ'
+                       WHEN (ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0) BETWEEN 10 AND 25 THEN 'PROGRÈS'
+                       ELSE 'BONNE RENTABILITÉ'
+                   END AS Evaluation
+            FROM AnalyseProduit
+            CROSS JOIN DepensesPeriode dp
+            CROSS JOIN SortiesManuelles sm;
+            """;
+
+        await using var cmd = new SqlCommand(sql, cn);
+        cmd.Parameters.AddWithValue("@DateDebut", dateDebut.Date);
+        cmd.Parameters.AddWithValue("@DateFin", dateFin.Date);
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+
+        var response = new AnalyseVenteResponse
+        {
+            DateDebut = dateDebut.Date,
+            DateFin = dateFin.Date,
+            PeriodeLabel = $"{dateDebut:dd/MM/yyyy} au {dateFin:dd/MM/yyyy}"
+        };
+
+        if (await reader.ReadAsync(ct))
+        {
+            response.ValeurStockEntree = ReadDecimal(reader, 0);
+            response.CoutMarchandisesVendues = ReadDecimal(reader, 1);
+            response.ChiffreAffaires = ReadDecimal(reader, 2);
+            response.BeneficeRealise = ReadDecimal(reader, 3);
+            response.DepensesTotal = ReadDecimal(reader, 4);
+            response.ChargesSortiesManuelles = ReadDecimal(reader, 5);
+            response.BeneficeNetRealise = ReadDecimal(reader, 6);
+            response.CoutStockRestant = ReadDecimal(reader, 7);
+            response.ProjectionBeneficeRestant = ReadDecimal(reader, 8);
+            response.MargeBeneficiairePourcentage = ReadDecimal(reader, 9);
+            response.Evaluation = reader.IsDBNull(10) ? string.Empty : reader.GetValue(10)?.ToString() ?? string.Empty;
+        }
+
+        response.Details = await QueryAnalyseVenteDetailsAsync(cn, dateDebut, dateFin, ct);
+        response.Details.Insert(0, new AnalyseVenteDetailRow
+        {
+            Ordre = 0,
+            Rubrique = "Synthèse",
+            Categorie = "Bénéfice réalisé",
+            QuantitePieces = 0m,
+            Montant = response.BeneficeRealise,
+            Commentaire = "Résultat commercial avant charges"
+        });
+        response.Details.Insert(1, new AnalyseVenteDetailRow
+        {
+            Ordre = 1,
+            Rubrique = "Synthèse",
+            Categorie = "Dépenses",
+            QuantitePieces = 0m,
+            Montant = response.DepensesTotal,
+            Commentaire = "Dépenses de la période"
+        });
+        response.Details.Insert(2, new AnalyseVenteDetailRow
+        {
+            Ordre = 2,
+            Rubrique = "Synthèse",
+            Categorie = "Sorties manuelles",
+            QuantitePieces = 0m,
+            Montant = response.ChargesSortiesManuelles,
+            Commentaire = "Sorties valorisées au coût réel"
+        });
+        response.Details.Add(new AnalyseVenteDetailRow
+        {
+            Ordre = 99,
+            Rubrique = "Synthèse",
+            Categorie = "Bénéfice net réalisé",
+            QuantitePieces = 0m,
+            Montant = response.BeneficeNetRealise,
+            Commentaire = "Bénéfice après déductions"
+        });
+        response.Details = response.Details.OrderBy(x => x.Ordre).ToList();
+        return response;
+    }
+
     private static void ApplyTotals(JournalierDashboardResponse response, DashboardTotals totals)
     {
         response.TotalEntrees = totals.TotalEntrees;
@@ -524,6 +685,172 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
         }
         return list;
     }
+
+    private static async Task<List<AnalyseVenteDetailRow>> QueryAnalyseVenteDetailsAsync(SqlConnection cn, DateTime dateDebut, DateTime dateFin, CancellationToken ct)
+    {
+        const string sqlDepenses = """
+            SELECT ISNULL(NULLIF(LTRIM(RTRIM(d.Categorie)), ''), 'Sans catégorie') AS Categorie,
+                   COUNT(*) AS NombreDepenses,
+                   SUM(ISNULL(d.Montant, 0)) AS MontantTotal
+            FROM Depenses d
+            WHERE d.DateDepense >= @DateDebut
+              AND d.DateDepense < DATEADD(DAY, 1, @DateFin)
+            GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(d.Categorie)), ''), 'Sans catégorie')
+            ORDER BY SUM(ISNULL(d.Montant, 0)) DESC, Categorie ASC
+            """;
+
+        const string sqlCharges = """
+            WITH CoutPieceProduit AS (
+                SELECT se.ProduitId,
+                       CASE
+                           WHEN ISNULL(p.ConversionUnite, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0)
+                           ELSE SUM(ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0)
+                       END AS CoutPiece
+                FROM StockEntree se
+                INNER JOIN Produits p ON p.ProduitId = se.ProduitId
+                WHERE se.DateEntree < DATEADD(DAY, 1, @DateFin)
+                GROUP BY se.ProduitId, p.PrixAchat, p.ConversionUnite
+            )
+            SELECT Categorie, SUM(Pieces) AS QuantitePieces, SUM(Montant) AS MontantTotal
+            FROM (
+                SELECT 'Sorties gratuites' AS Categorie, ISNULL(ss.QuantiteBase, 0) AS Pieces, ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0) AS Montant
+                FROM StockSortie ss
+                LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = ss.ProduitId
+                WHERE ss.DateSortie >= @DateDebut AND ss.DateSortie < DATEADD(DAY, 1, @DateFin)
+                  AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL')
+                  AND UPPER(ISNULL(ss.StatutPaiement, '')) = 'GRATUIT'
+                UNION ALL
+                SELECT 'Dons' AS Categorie, ISNULL(ss.QuantiteBase, 0) AS Pieces, ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0) AS Montant
+                FROM StockSortie ss
+                LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId
+                LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = ss.ProduitId
+                WHERE ss.DateSortie >= @DateDebut AND ss.DateSortie < DATEADD(DAY, 1, @DateFin)
+                  AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL')
+                  AND (UPPER(ISNULL(m.Nature, '')) LIKE '%DON%' OR UPPER(ISNULL(m.Libelle, '')) LIKE '%DON%')
+                UNION ALL
+                SELECT 'Allocations' AS Categorie, ISNULL(ss.QuantiteBase, 0) AS Pieces, ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0) AS Montant
+                FROM StockSortie ss
+                LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId
+                LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = ss.ProduitId
+                WHERE ss.DateSortie >= @DateDebut AND ss.DateSortie < DATEADD(DAY, 1, @DateFin)
+                  AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL')
+                  AND (UPPER(ISNULL(m.Nature, '')) LIKE '%ALLOC%' OR UPPER(ISNULL(m.Libelle, '')) LIKE '%ALLOC%')
+                UNION ALL
+                SELECT 'Dettes boss' AS Categorie, ISNULL(ss.QuantiteBase, 0) AS Pieces, ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0) AS Montant
+                FROM StockSortie ss
+                LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId
+                LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = ss.ProduitId
+                WHERE ss.DateSortie >= @DateDebut AND ss.DateSortie < DATEADD(DAY, 1, @DateFin)
+                  AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL')
+                  AND (UPPER(ISNULL(m.Nature, '')) LIKE '%DETTE%' OR UPPER(ISNULL(m.Libelle, '')) LIKE '%DETTE%')
+                  AND (UPPER(ISNULL(m.Libelle, '')) LIKE '%BOSS%' OR UPPER(ISNULL(m.Libelle, '')) LIKE '%PATRON%' OR UPPER(ISNULL(m.Libelle, '')) LIKE '%MAISON%')
+                UNION ALL
+                SELECT 'Hors caisse' AS Categorie, ISNULL(ss.QuantiteBase, 0) AS Pieces, ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0) AS Montant
+                FROM StockSortie ss
+                LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId
+                LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = ss.ProduitId
+                WHERE ss.DateSortie >= @DateDebut AND ss.DateSortie < DATEADD(DAY, 1, @DateFin)
+                  AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL')
+                  AND (UPPER(ISNULL(m.Nature, '')) LIKE '%HORS%' OR UPPER(ISNULL(m.Libelle, '')) LIKE '%HORS%')
+                UNION ALL
+                SELECT 'Pertes' AS Categorie, ISNULL(sp.QuantiteBase, 0) AS Pieces, ISNULL(sp.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0) AS Montant
+                FROM StockPerte sp
+                LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = sp.ProduitId
+                WHERE sp.DatePerte >= @DateDebut AND sp.DatePerte < DATEADD(DAY, 1, @DateFin)
+            ) q
+            GROUP BY Categorie
+            ORDER BY SUM(Montant) DESC, Categorie ASC
+            """;
+
+        const string sqlCreances = """
+            WITH CoutPieceProduit AS (
+                SELECT se.ProduitId,
+                       CASE
+                           WHEN ISNULL(p.ConversionUnite, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0)
+                           ELSE SUM(ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0)
+                       END AS CoutPiece
+                FROM StockEntree se
+                INNER JOIN Produits p ON p.ProduitId = se.ProduitId
+                WHERE se.DateEntree < DATEADD(DAY, 1, @DateFin)
+                GROUP BY se.ProduitId, p.PrixAchat, p.ConversionUnite
+            )
+            SELECT 'Créances clients' AS Categorie,
+                   ISNULL(SUM(ISNULL(ss.QuantiteBase, 0)), 0) AS QuantitePieces,
+                   ISNULL(SUM(ISNULL(ss.QuantiteBase, 0) * ISNULL(cp.CoutPiece, 0)), 0) AS MontantTotal
+            FROM StockSortie ss
+            LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId
+            LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = ss.ProduitId
+            WHERE ss.DateSortie >= @DateDebut AND ss.DateSortie < DATEADD(DAY, 1, @DateFin)
+              AND UPPER(ISNULL(ss.Source, '')) IN ('SORTIE_MANUELLE', 'MANUEL')
+              AND (UPPER(ISNULL(m.Nature, '')) LIKE '%DETTE%' OR UPPER(ISNULL(m.Libelle, '')) LIKE '%DETTE%')
+              AND (UPPER(ISNULL(m.Libelle, '')) LIKE '%CLIENT%' OR (UPPER(ISNULL(ss.StatutPaiement, '')) = 'IMPAYE' AND ss.ClientId IS NOT NULL))
+            """;
+
+        var list = new List<AnalyseVenteDetailRow>();
+
+        await using (var cmd = new SqlCommand(sqlDepenses, cn))
+        {
+            cmd.Parameters.AddWithValue("@DateDebut", dateDebut.Date);
+            cmd.Parameters.AddWithValue("@DateFin", dateFin.Date);
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                list.Add(new AnalyseVenteDetailRow
+                {
+                    Ordre = 10,
+                    Rubrique = "Dépenses",
+                    Categorie = reader.GetValue(0).ToString() ?? string.Empty,
+                    QuantitePieces = 0m,
+                    Montant = reader.IsDBNull(2) ? 0m : Convert.ToDecimal(reader.GetValue(2)),
+                    Commentaire = reader.GetValue(1).ToString() ?? string.Empty + " dépense(s)"
+                });
+            }
+        }
+
+        await using (var cmd = new SqlCommand(sqlCharges, cn))
+        {
+            cmd.Parameters.AddWithValue("@DateDebut", dateDebut.Date);
+            cmd.Parameters.AddWithValue("@DateFin", dateFin.Date);
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                list.Add(new AnalyseVenteDetailRow
+                {
+                    Ordre = 20,
+                    Rubrique = "Charges",
+                    Categorie = reader.GetValue(0).ToString() ?? string.Empty,
+                    QuantitePieces = reader.IsDBNull(1) ? 0m : Convert.ToDecimal(reader.GetValue(1)),
+                    Montant = reader.IsDBNull(2) ? 0m : Convert.ToDecimal(reader.GetValue(2)),
+                    Commentaire = "Charge consommant du stock ou sans recette"
+                });
+            }
+        }
+
+        await using (var cmd = new SqlCommand(sqlCreances, cn))
+        {
+            cmd.Parameters.AddWithValue("@DateDebut", dateDebut.Date);
+            cmd.Parameters.AddWithValue("@DateFin", dateFin.Date);
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                list.Add(new AnalyseVenteDetailRow
+                {
+                    Ordre = 15,
+                    Rubrique = "Créances",
+                    Categorie = reader.GetValue(0).ToString() ?? string.Empty,
+                    QuantitePieces = reader.IsDBNull(1) ? 0m : Convert.ToDecimal(reader.GetValue(1)),
+                    Montant = reader.IsDBNull(2) ? 0m : Convert.ToDecimal(reader.GetValue(2)),
+                    Commentaire = "Vente à crédit non déduite du bénéfice net"
+                });
+            }
+        }
+
+        list.Sort((a, b) => a.Ordre.CompareTo(b.Ordre));
+        return list;
+    }
+
+    private static decimal ReadDecimal(SqlDataReader reader, int ordinal)
+        => reader.IsDBNull(ordinal) ? 0m : Convert.ToDecimal(reader.GetValue(ordinal));
 
     private sealed record DashboardTotals
     {

@@ -12,6 +12,14 @@ Le dashboard patron doit être un projet séparé de l'ERP WinForms et de l'API.
 - aucune modification des données
 - aucune connexion directe à la base locale de l'ERP
 - consommation exclusive de l'API
+- authentification automatique sur l'API en local pour afficher les données
+
+## Écrans
+
+- synthèse
+- analyse vente
+- mode TV
+- mode mobile
 
 ## Emplacements
 
@@ -24,4 +32,3 @@ Le dashboard patron doit être un projet séparé de l'ERP WinForms et de l'API.
 - consultation desktop
 - consultation mobile
 - mode TV plein écran
-

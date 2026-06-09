@@ -33,4 +33,11 @@ public sealed class DashboardController : Controller
         var model = await _client.LoadAsync("jour", year, month, date, ct);
         return View(model);
     }
+
+    [HttpGet]
+    public async Task<IActionResult> AnalyseVente(string? periode = "mois", int? year = null, int? month = null, DateTime? date = null, CancellationToken ct = default)
+    {
+        var model = await _client.LoadAnalyseAsync(periode, year, month, date, ct);
+        return View(model);
+    }
 }

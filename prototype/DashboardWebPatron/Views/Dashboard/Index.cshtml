@@ -10,10 +10,10 @@
     </div>
     <form class="filters" method="get">
         <select name="periode">
-            <option value="jour" selected="@(Model.Periode == "jour")">Aujourd'hui</option>
-            <option value="semaine" selected="@(Model.Periode == "semaine")">Cette semaine</option>
-            <option value="mois" selected="@(Model.Periode == "mois")">Ce mois</option>
-            <option value="annee" selected="@(Model.Periode == "annee")">Cette année</option>
+            <option value="jour" @(Model.Periode == "jour" ? "selected" : null)>Aujourd'hui</option>
+            <option value="semaine" @(Model.Periode == "semaine" ? "selected" : null)>Cette semaine</option>
+            <option value="mois" @(Model.Periode == "mois" ? "selected" : null)>Ce mois</option>
+            <option value="annee" @(Model.Periode == "annee" ? "selected" : null)>Cette année</option>
         </select>
         <input name="month" type="number" min="1" max="12" value="@Model.Month" />
         <input name="year" type="number" min="2020" max="2100" value="@Model.Year" />

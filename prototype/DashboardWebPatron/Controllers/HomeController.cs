@@ -4,7 +4,7 @@ namespace DashboardWebPatron.Controllers;
 
 public sealed class HomeController : Controller
 {
-    public IActionResult Index() => RedirectToAction("Index", "Dashboard");
+    public IActionResult Index() => View();
 
     public IActionResult Error()
     {
