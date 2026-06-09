@@ -49,6 +49,7 @@ body {
     border: 1px solid var(--border);
     box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
 }
+.hero-analysis { align-items: stretch; }
 .hero-text { max-width: 900px; }
 .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
 .hero h1 { margin: 0 0 6px; font-size: 34px; }
@@ -63,6 +64,22 @@ body {
 .btn-primary { background: var(--primary); color: #fff; }
 .btn-secondary { background: var(--accent); color: #fff; }
 .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.filters-analysis {
+    align-items: stretch;
+    min-width: 360px;
+}
+.filters-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    width: 100%;
+}
+.filters label {
+    display: grid;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 12px;
+}
 .filters select, .filters input {
     padding: 10px 12px;
     border: 1px solid var(--border);
@@ -131,10 +148,29 @@ th { color: var(--muted); font-size: 14px; }
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    position: relative;
+    overflow: hidden;
 }
 .analysis-card span { color: var(--muted); font-size: 14px; }
 .analysis-card strong { font-size: 32px; color: var(--primary); line-height: 1.1; }
 .analysis-card.accent strong { color: var(--accent); }
+.analysis-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 6px;
+    background: linear-gradient(180deg, var(--primary), var(--accent));
+}
+.analysis-card.accent::before {
+    background: linear-gradient(180deg, #16a34a, #7c3aed);
+}
+.analysis-meta-panel {
+    align-items: center;
+    padding: 18px 20px;
+}
+.analysis-meta-panel strong {
+    font-size: 18px;
+}
 .filters button,
 .filters .btn,
 .hero-actions .btn {
@@ -154,4 +190,6 @@ tbody tr:hover {
     .sidebar { display: none; }
     .cards, .grid-2, .tv-cards, .analysis-grid { grid-template-columns: 1fr; }
     .hero { flex-direction: column; align-items: stretch; }
+    .filters-analysis { min-width: 0; width: 100%; }
+    .filters-row { grid-template-columns: 1fr; }
 }

@@ -4,19 +4,35 @@
     var analyse = Model.Analyse;
 }
 
-<section class="hero">
-    <div>
+<section class="hero hero-analysis">
+    <div class="hero-text">
+        <p class="eyebrow">Consultation Web</p>
         <h1>Dashboard Analyse Vente</h1>
         <p>Lecture des ventes, rentabilité, coût de stock restant et projection de bénéfice.</p>
+        <div class="hero-actions">
+            <a class="btn btn-secondary" href="/Dashboard/Index">Synthèse</a>
+            <a class="btn btn-primary" href="/Dashboard/AnalyseVente">Analyse vente</a>
+        </div>
     </div>
-    <form class="filters" method="get">
-        <select name="periode">
-            <option value="jour" @(Model.Periode == "jour" ? "selected" : null)>Aujourd'hui</option>
-            <option value="mois" @(Model.Periode == "mois" ? "selected" : null)>Ce mois</option>
-            <option value="annee" @(Model.Periode == "annee" ? "selected" : null)>Cette année</option>
-        </select>
-        <input name="month" type="number" min="1" max="12" value="@Model.Month" />
-        <input name="year" type="number" min="2020" max="2100" value="@Model.Year" />
+    <form class="filters filters-analysis" method="get">
+        <div class="filters-row">
+            <label>
+                <span>Période</span>
+                <select name="periode">
+                    <option value="jour" @(Model.Periode == "jour" ? "selected" : null)>Aujourd'hui</option>
+                    <option value="mois" @(Model.Periode == "mois" ? "selected" : null)>Ce mois</option>
+                    <option value="annee" @(Model.Periode == "annee" ? "selected" : null)>Cette année</option>
+                </select>
+            </label>
+            <label>
+                <span>Mois</span>
+                <input name="month" type="number" min="1" max="12" value="@Model.Month" />
+            </label>
+            <label>
+                <span>Année</span>
+                <input name="year" type="number" min="2020" max="2100" value="@Model.Year" />
+            </label>
+        </div>
         <button type="submit">Actualiser</button>
     </form>
 </section>
@@ -30,7 +46,7 @@
 }
 else
 {
-    <section class="analysis-meta">
+    <section class="analysis-meta panel analysis-meta-panel">
         <div>
             <span class="muted">Période analysée</span>
             <strong>@analyse.PeriodeLabel</strong>
