@@ -1,6 +1,10 @@
 @model DashboardWebPatron.Models.DashboardPageViewModel
 @{
     ViewData["Title"] = "Synthèse";
+    var periodeJourSelected = Model.Periode == "jour";
+    var periodeSemaineSelected = Model.Periode == "semaine";
+    var periodeMoisSelected = Model.Periode == "mois";
+    var periodeAnneeSelected = Model.Periode == "annee";
 }
 
 <section class="hero">
@@ -10,10 +14,10 @@
     </div>
     <form class="filters" method="get">
         <select name="periode">
-            <option value="jour" @(Model.Periode == "jour" ? "selected" : null)>Aujourd'hui</option>
-            <option value="semaine" @(Model.Periode == "semaine" ? "selected" : null)>Cette semaine</option>
-            <option value="mois" @(Model.Periode == "mois" ? "selected" : null)>Ce mois</option>
-            <option value="annee" @(Model.Periode == "annee" ? "selected" : null)>Cette année</option>
+            <option value="jour"@Html.Raw(periodeJourSelected ? " selected=\"selected\"" : "")>Aujourd'hui</option>
+            <option value="semaine"@Html.Raw(periodeSemaineSelected ? " selected=\"selected\"" : "")>Cette semaine</option>
+            <option value="mois"@Html.Raw(periodeMoisSelected ? " selected=\"selected\"" : "")>Ce mois</option>
+            <option value="annee"@Html.Raw(periodeAnneeSelected ? " selected=\"selected\"" : "")>Cette année</option>
         </select>
         <input name="month" type="number" min="1" max="12" value="@Model.Month" />
         <input name="year" type="number" min="2020" max="2100" value="@Model.Year" />

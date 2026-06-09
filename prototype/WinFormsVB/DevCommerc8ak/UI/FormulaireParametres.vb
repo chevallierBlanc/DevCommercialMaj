@@ -44,8 +44,15 @@ Namespace DevCommerc8ak
         Private ReadOnly chkModeSombre As CheckBox
         Private ReadOnly txtLogoPath As TextBox
         Private ReadOnly btnLogo As Button
+        Private ReadOnly txtBackupFolder As TextBox
+        Private ReadOnly btnBackupFolder As Button
+        Private ReadOnly txtBackupInterval As TextBox
+        Private ReadOnly chkBackupAuto As CheckBox
+        Private ReadOnly chkBackupAvantSortie As CheckBox
+        Private ReadOnly btnBackupNow As Button
         Private ReadOnly btnCharger As Button
         Private ReadOnly btnEnregistrer As Button
+        Private ReadOnly backupService As BackupService
 
         ' --- Nouveaux composants de structure ---
         Private ReadOnly tabs As TabControl
@@ -63,6 +70,7 @@ Namespace DevCommerc8ak
             Me.StartPosition = FormStartPosition.CenterScreen
             Me.BackColor = ColorBackground
             Me.DoubleBuffered = True
+            backupService = New BackupService()
 
             ' --- Header / Hero Section (Style Windows 11) ---
             panelHero = New Panel() With {.Dock = DockStyle.Top, .Height = 100, .BackColor = ColorBackground}
@@ -73,7 +81,7 @@ Namespace DevCommerc8ak
             ' --- TabControl (Style Windows 11) ---
             tabs = New TabControl() With {.Dock = DockStyle.Fill, .Padding = New Point(20, 10)}
 
-            Dim tabGeneral As New TabPage("Général") With {.BackColor = ColorBackground}
+            Dim tabGeneral As New TabPage("Général") With {.BackColor = ColorBackground, .AutoScroll = True}
             Dim tabProduits As New TabPage("Règles Métier") With {.BackColor = ColorBackground}
             Dim tabImprimantes As New TabPage("Périphériques") With {.BackColor = ColorBackground}
             Dim tabMonnaie As New TabPage("Finance") With {.BackColor = ColorBackground}
@@ -84,7 +92,10 @@ Namespace DevCommerc8ak
             ' --- INITIALISATION DES COMPOSANTS (Noms conservés) ---
 
             ' Tab Général
-            Dim tableGeneral As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 2, .Padding = New Padding(20)}
+            Dim tableGeneral As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 3, .Padding = New Padding(20), .AutoSize = True, .AutoSizeMode = AutoSizeMode.GrowAndShrink}
+            tableGeneral.RowStyles.Add(New RowStyle(SizeType.Absolute, 260))
+            tableGeneral.RowStyles.Add(New RowStyle(SizeType.Absolute, 210))
+            tableGeneral.RowStyles.Add(New RowStyle(SizeType.Absolute, 240))
             Dim cardMagasin As Panel = CreateCard("Informations du Magasin")
             txtNomMagasin = CreateField(cardMagasin, "Nom du Magasin", 20, 45, 400)
             txtAdresseMagasin = CreateField(cardMagasin, "Adresse Physique", 20, 105, 500)
@@ -98,8 +109,33 @@ Namespace DevCommerc8ak
             btnLogo.Left = 480 : btnLogo.Top = 42 : btnLogo.ForeColor = ColorText
             cardLogo.Controls.Add(btnLogo)
 
+            Dim cardBackup As Panel = CreateCard("Sauvegarde Automatique")
+            txtBackupFolder = CreateField(cardBackup, "Dossier de sauvegarde", 20, 45, 420)
+            btnBackupFolder = CreateStyledButton("Parcourir...", Color.LightGray, 120, 32)
+            btnBackupFolder.Left = 450
+            btnBackupFolder.Top = 42
+            btnBackupFolder.ForeColor = ColorText
+            txtBackupInterval = CreateField(cardBackup, "Intervalle (minutes)", 20, 105, 120)
+            chkBackupAuto = New CheckBox() With {.Text = "Activer la sauvegarde automatique", .Left = 20, .Top = 155, .Font = FontControl, .AutoSize = True}
+            chkBackupAvantSortie = New CheckBox() With {.Text = "Sauvegarde avant fermeture", .Left = 20, .Top = 185, .Font = FontControl, .AutoSize = True}
+            btnBackupNow = CreateStyledButton("Lancer la sauvegarde", ColorPrimary, 180, 34)
+            btnBackupNow.Left = 20
+            btnBackupNow.Top = 215
+            Dim lblBackupInfo As New Label() With {
+                .Text = "La destination proposée doit rester facilement accessible et la sauvegarde s'exécute en sourdine.",
+                .Left = 210,
+                .Top = 220,
+                .Width = 430,
+                .Height = 36,
+                .Font = FontControl,
+                .ForeColor = ColorTextSecondary,
+                .AutoSize = False
+            }
+            cardBackup.Controls.AddRange({btnBackupFolder, chkBackupAuto, chkBackupAvantSortie, btnBackupNow, lblBackupInfo})
+
             tableGeneral.Controls.Add(cardMagasin, 0, 0)
             tableGeneral.Controls.Add(cardLogo, 0, 1)
+            tableGeneral.Controls.Add(cardBackup, 0, 2)
             tabGeneral.Controls.Add(tableGeneral)
 
             ' Tab Produits
@@ -155,6 +191,8 @@ Namespace DevCommerc8ak
 
             ' --- Liaison des événements (Logique conservée) ---
             AddHandler btnLogo.Click, AddressOf ChoisirLogo
+            AddHandler btnBackupFolder.Click, AddressOf ChoisirDossierBackup
+            AddHandler btnBackupNow.Click, AddressOf LancerSauvegardeManuelle
             AddHandler btnCharger.Click, AddressOf Charger
             AddHandler btnEnregistrer.Click, AddressOf Enregistrer
 
@@ -222,33 +260,47 @@ Namespace DevCommerc8ak
             Try
                 Dim service As ParametreService = ObtenirService()
                 Dim p As ParametreDTO = service.Charger()
-                If p Is Nothing Then Return
-
-                txtRemiseMax.Text = p.RemiseMaxPourcent.ToString()
-                txtSeuilStock.Text = p.SeuilStockCritique.ToString()
-                txtAlerteJours.Text = p.AlerteExpirationJours.ToString()
-                cmbImprimanteA4.Text = p.ImprimanteA4
-                cmbImprimanteTicket.Text = p.ImprimanteTicket
-                cmbDevise.SelectedItem = p.DeviseParDefaut
-                txtTauxUsd.Text = p.TauxUsd.ToString()
-                txtScannerIp.Text = p.ScannerIp
-                txtScannerPort.Text = p.ScannerPort.ToString()
-                chkScannerActif.Checked = p.ScannerActif
-                txtNomMagasin.Text = p.NomMagasin
-                txtAdresseMagasin.Text = p.AdresseMagasin
-                txtTelephoneMagasin.Text = p.TelephoneMagasin
-                chkModeSombre.Checked = p.ModeSombre
-                txtLogoPath.Text = p.LogoPath
-                chkApercu.Checked = p.ApercuAvantImpression
-                chkCouleur.Checked = p.ImpressionCouleur
+                If p IsNot Nothing Then
+                    txtRemiseMax.Text = p.RemiseMaxPourcent.ToString()
+                    txtSeuilStock.Text = p.SeuilStockCritique.ToString()
+                    txtAlerteJours.Text = p.AlerteExpirationJours.ToString()
+                    cmbImprimanteA4.Text = p.ImprimanteA4
+                    cmbImprimanteTicket.Text = p.ImprimanteTicket
+                    cmbDevise.SelectedItem = p.DeviseParDefaut
+                    txtTauxUsd.Text = p.TauxUsd.ToString()
+                    txtScannerIp.Text = p.ScannerIp
+                    txtScannerPort.Text = p.ScannerPort.ToString()
+                    chkScannerActif.Checked = p.ScannerActif
+                    txtNomMagasin.Text = p.NomMagasin
+                    txtAdresseMagasin.Text = p.AdresseMagasin
+                    txtTelephoneMagasin.Text = p.TelephoneMagasin
+                    chkModeSombre.Checked = p.ModeSombre
+                    txtLogoPath.Text = p.LogoPath
+                    chkApercu.Checked = p.ApercuAvantImpression
+                    chkCouleur.Checked = p.ImpressionCouleur
+                End If
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement parametres: " & ex.Message)
+            End Try
+
+            Try
+                Dim backup As BackupSettings = backupService.ChargerParametres()
+                txtBackupFolder.Text = If(String.IsNullOrWhiteSpace(backup.BackupFolder), backupService.ObtenirDossierParDefaut(), backup.BackupFolder)
+                txtBackupInterval.Text = backup.IntervalMinutes.ToString()
+                chkBackupAuto.Checked = backup.Enabled
+                chkBackupAvantSortie.Checked = backup.BackupBeforeExit
+            Catch ex As Exception
+                MessageBox.Show("Erreur chargement sauvegarde: " & ex.Message)
             End Try
         End Sub
 
         Private Sub Enregistrer(sender As Object, e As EventArgs)
             Try
                 Dim service As ParametreService = ObtenirService()
+                Dim intervalleBackup As Integer
+                If Not Integer.TryParse(If(txtBackupInterval.Text.Trim() = "", "240", txtBackupInterval.Text.Trim()), intervalleBackup) Then
+                    intervalleBackup = 240
+                End If
                 Dim p As New ParametreDTO With {
                     .RemiseMaxPourcent = Decimal.Parse(If(txtRemiseMax.Text.Trim() = "", "0", txtRemiseMax.Text.Trim())),
                     .SeuilStockCritique = Decimal.Parse(If(txtSeuilStock.Text.Trim() = "", "0", txtSeuilStock.Text.Trim())),
@@ -269,6 +321,14 @@ Namespace DevCommerc8ak
                     .ImpressionCouleur = chkCouleur.Checked
                 }
                 service.Enregistrer(p)
+
+                Dim backupSettings As New BackupSettings With {
+                    .Enabled = chkBackupAuto.Checked,
+                    .IntervalMinutes = intervalleBackup,
+                    .BackupFolder = If(String.IsNullOrWhiteSpace(txtBackupFolder.Text), backupService.ObtenirDossierParDefaut(), txtBackupFolder.Text.Trim()),
+                    .BackupBeforeExit = chkBackupAvantSortie.Checked
+                }
+                backupService.EnregistrerParametres(backupSettings)
                 MessageBox.Show("Parametres enregistres.")
             Catch ex As Exception
                 MessageBox.Show("Erreur enregistrement parametres: " & ex.Message)
@@ -280,6 +340,31 @@ Namespace DevCommerc8ak
             If ofd.ShowDialog() = DialogResult.OK Then
                 txtLogoPath.Text = ofd.FileName
             End If
+        End Sub
+
+        Private Sub ChoisirDossierBackup(sender As Object, e As EventArgs)
+            Using dlg As New FolderBrowserDialog() With {
+                .Description = "Choisissez un dossier de sauvegarde sûr et facilement récupérable.",
+                .ShowNewFolderButton = True
+            }
+                If dlg.ShowDialog() = DialogResult.OK Then
+                    txtBackupFolder.Text = dlg.SelectedPath
+                End If
+            End Using
+        End Sub
+
+        Private Sub LancerSauvegardeManuelle(sender As Object, e As EventArgs)
+            Try
+                Dim cible As String = If(String.IsNullOrWhiteSpace(txtBackupFolder.Text), backupService.ObtenirDossierParDefaut(), txtBackupFolder.Text.Trim())
+                Dim resultat As BackupResult = backupService.ExecuterSauvegarde(cible)
+                If resultat.Success Then
+                    MessageBox.Show("Sauvegarde réalisée avec succès : " & resultat.FilePath, "Sauvegarde", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Else
+                    MessageBox.Show("Sauvegarde impossible : " & resultat.Message, "Sauvegarde", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                End If
+            Catch ex As Exception
+                MessageBox.Show("Erreur sauvegarde : " & ex.Message, "Sauvegarde", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
         End Sub
     End Class
 End Namespace

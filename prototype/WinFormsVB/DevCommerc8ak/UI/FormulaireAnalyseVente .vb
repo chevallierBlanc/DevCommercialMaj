@@ -128,7 +128,7 @@ Namespace DevCommerc8ak
                 .RowCount = 4, ' Augmenté pour inclure la navigation par onglets personnalisée
                 .Padding = New Padding(0)
             }
-            mainLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 100)) ' Header
+            mainLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 112)) ' Header
             mainLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 80))  ' Filtres
             mainLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 50))  ' Navigation par onglets personnalisée
             mainLayout.RowStyles.Add(New RowStyle(SizeType.Percent, 100)) ' Contenu principal (Tabs)

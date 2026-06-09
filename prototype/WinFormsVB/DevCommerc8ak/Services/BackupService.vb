@@ -1,0 +1,187 @@
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Configuration
+Imports System.Data.SqlClient
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+Imports System.Xml.Linq
+
+Namespace DevCommerc8ak
+    Public Class BackupSettings
+        Public Property Enabled As Boolean
+        Public Property IntervalMinutes As Integer
+        Public Property BackupFolder As String
+        Public Property BackupBeforeExit As Boolean
+    End Class
+
+    Public Class BackupResult
+        Public Property Success As Boolean
+        Public Property FilePath As String
+        Public Property Message As String
+        Public Property BackedUpAt As DateTime
+    End Class
+
+    Public Class BackupService
+        Private ReadOnly _connectionString As String
+        Private ReadOnly _settingsFilePath As String
+
+        Public Sub New(Optional connectionString As String = Nothing)
+            _connectionString = If(String.IsNullOrWhiteSpace(connectionString),
+                                   ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString,
+                                   connectionString)
+            Dim settingsFolder As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CommercialPro")
+            _settingsFilePath = Path.Combine(settingsFolder, "backup-settings.xml")
+        End Sub
+
+        Public Function ObtenirDossierParDefaut() As String
+            Dim dossierConfig As String = LireAppSetting("BackupFolder", String.Empty)
+            If Not String.IsNullOrWhiteSpace(dossierConfig) Then
+                Return dossierConfig.Trim()
+            End If
+
+            Return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "CommercialPro", "Backups")
+        End Function
+
+        Public Function ChargerParametres() As BackupSettings
+            Try
+                If Not File.Exists(_settingsFilePath) Then
+                    Return CreerParametresParDefaut()
+                End If
+
+                Dim doc As XDocument = XDocument.Load(_settingsFilePath)
+                Dim racine As XElement = doc.Root
+                If racine Is Nothing Then
+                    Return CreerParametresParDefaut()
+                End If
+
+                Return New BackupSettings With {
+                    .Enabled = LireBool(racine, "Enabled", LireBoolAppSetting("BackupEnabled", True)),
+                    .IntervalMinutes = LireInt(racine, "IntervalMinutes", LireIntAppSetting("BackupIntervalMinutes", 240)),
+                    .BackupFolder = LireString(racine, "BackupFolder", ObtenirDossierParDefaut()),
+                    .BackupBeforeExit = LireBool(racine, "BackupBeforeExit", LireBoolAppSetting("BackupBeforeExit", True))
+                }
+            Catch
+                Return CreerParametresParDefaut()
+            End Try
+        End Function
+
+        Public Sub EnregistrerParametres(settings As BackupSettings)
+            If settings Is Nothing Then Throw New ArgumentNullException(NameOf(settings))
+
+            Dim dossier As String = Path.GetDirectoryName(_settingsFilePath)
+            If Not String.IsNullOrWhiteSpace(dossier) Then
+                Directory.CreateDirectory(dossier)
+            End If
+
+            Dim doc As New XDocument(
+                New XElement("BackupSettings",
+                    New XElement("Enabled", settings.Enabled.ToString(CultureInfo.InvariantCulture)),
+                    New XElement("IntervalMinutes", Math.Max(1, settings.IntervalMinutes).ToString(CultureInfo.InvariantCulture)),
+                    New XElement("BackupFolder", If(settings.BackupFolder, String.Empty)),
+                    New XElement("BackupBeforeExit", settings.BackupBeforeExit.ToString(CultureInfo.InvariantCulture))
+                )
+            )
+            doc.Save(_settingsFilePath)
+        End Sub
+
+        Public Function ExecuterSauvegarde(Optional dossierCible As String = Nothing) As BackupResult
+            Dim resultat As New BackupResult() With {.BackedUpAt = DateTime.Now}
+
+            Try
+                Dim builder As New SqlConnectionStringBuilder(_connectionString)
+                Dim database As String = If(String.IsNullOrWhiteSpace(builder.InitialCatalog), "CommercialMagDB", builder.InitialCatalog)
+                Dim dossier As String = If(String.IsNullOrWhiteSpace(dossierCible), ObtenirDossierParDefaut(), dossierCible)
+                Directory.CreateDirectory(dossier)
+
+                Dim nomFichier As String = database & "_" & DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) & ".bak"
+                Dim cheminComplet As String = Path.Combine(dossier, nomFichier)
+                Dim cheminEchappe As String = cheminComplet.Replace("'", "''")
+
+                Using cn As New SqlConnection(_connectionString)
+                    cn.Open()
+                    Using cmd As New SqlCommand("BACKUP DATABASE [" & database & "] TO DISK = N'" & cheminEchappe & "' WITH INIT, COPY_ONLY, COMPRESSION, STATS = 10;", cn)
+                        cmd.CommandTimeout = 0
+                        cmd.ExecuteNonQuery()
+                    End Using
+                End Using
+
+                resultat.Success = True
+                resultat.FilePath = cheminComplet
+                resultat.Message = "Sauvegarde réalisée avec succès."
+            Catch ex As Exception
+                resultat.Success = False
+                resultat.Message = ex.Message
+            End Try
+
+            Return resultat
+        End Function
+
+        Private Function CreerParametresParDefaut() As BackupSettings
+            Return New BackupSettings With {
+                .Enabled = LireBoolAppSetting("BackupEnabled", True),
+                .IntervalMinutes = LireIntAppSetting("BackupIntervalMinutes", 240),
+                .BackupFolder = ObtenirDossierParDefaut(),
+                .BackupBeforeExit = LireBoolAppSetting("BackupBeforeExit", True)
+            }
+        End Function
+
+        Private Function LireAppSetting(nom As String, valeurDefaut As String) As String
+            Dim brut As String = ConfigurationManager.AppSettings(nom)
+            If String.IsNullOrWhiteSpace(brut) Then Return valeurDefaut
+            Return brut.Trim()
+        End Function
+
+        Private Function LireIntAppSetting(nom As String, valeurDefaut As Integer) As Integer
+            Dim brut As String = LireAppSetting(nom, valeurDefaut.ToString(CultureInfo.InvariantCulture))
+            Dim valeur As Integer
+            If Integer.TryParse(brut, NumberStyles.Integer, CultureInfo.InvariantCulture, valeur) Then
+                Return valeur
+            End If
+            If Integer.TryParse(brut, valeur) Then
+                Return valeur
+            End If
+            Return valeurDefaut
+        End Function
+
+        Private Function LireBoolAppSetting(nom As String, valeurDefaut As Boolean) As Boolean
+            Dim brut As String = LireAppSetting(nom, valeurDefaut.ToString(CultureInfo.InvariantCulture))
+            Dim valeur As Boolean
+            If Boolean.TryParse(brut, valeur) Then
+                Return valeur
+            End If
+            Return valeurDefaut
+        End Function
+
+        Private Function LireString(racine As XElement, nom As String, valeurDefaut As String) As String
+            Dim element As XElement = racine.Element(nom)
+            If element Is Nothing Then Return valeurDefaut
+            Dim valeur As String = Convert.ToString(element.Value)
+            If String.IsNullOrWhiteSpace(valeur) Then Return valeurDefaut
+            Return valeur.Trim()
+        End Function
+
+        Private Function LireInt(racine As XElement, nom As String, valeurDefaut As Integer) As Integer
+            Dim brut As String = LireString(racine, nom, valeurDefaut.ToString(CultureInfo.InvariantCulture))
+            Dim valeur As Integer
+            If Integer.TryParse(brut, NumberStyles.Integer, CultureInfo.InvariantCulture, valeur) Then
+                Return valeur
+            End If
+            If Integer.TryParse(brut, valeur) Then
+                Return valeur
+            End If
+            Return valeurDefaut
+        End Function
+
+        Private Function LireBool(racine As XElement, nom As String, valeurDefaut As Boolean) As Boolean
+            Dim brut As String = LireString(racine, nom, valeurDefaut.ToString(CultureInfo.InvariantCulture))
+            Dim valeur As Boolean
+            If Boolean.TryParse(brut, valeur) Then
+                Return valeur
+            End If
+            Return valeurDefaut
+        End Function
+    End Class
+End Namespace

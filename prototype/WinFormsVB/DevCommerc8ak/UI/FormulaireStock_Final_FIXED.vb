@@ -237,7 +237,7 @@ Namespace DevCommerc8ak
             Me.tabDettes = New TabPage("Dettes & Créances") With {.BackColor = ColorBackground, .AutoScroll = True}
             Me.tabDashboardSorties = New TabPage("Dashboard Sorties") With {.BackColor = ColorBackground, .AutoScroll = True}
 
-            tabs.TabPages.AddRange(New TabPage() {tabEntree, tabSortie, tabSortieManuelle, Me.tabDettes, tabInventaire, tabAlertes, tabPerte, tabRapportEntrees, Me.tabDashboardSorties})
+            tabs.TabPages.AddRange(New TabPage() {tabEntree, tabSortie, tabSortieManuelle, Me.tabDettes, tabInventaire, tabAlertes, tabPerte, tabRapportEntrees})
 
             ' --- TAB ENTREE DESIGN ---
             Dim layoutEntree As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .Padding = New Padding(10), .ColumnCount = 1, .RowCount = 2}

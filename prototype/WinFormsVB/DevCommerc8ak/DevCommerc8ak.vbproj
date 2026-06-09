@@ -116,6 +116,7 @@
     <Compile Include="Services\SessionUtilisateur.vb" />
     <Compile Include="Services\ThemeHelperA.vb" />
     <Compile Include="Services\ApprovisionnementService.vb" />
+    <Compile Include="Services\BackupService.vb" />
     <Compile Include="Services\PdfHelper.vb" />
     <Compile Include="Services\FormatageGlobal.vb" />
     <Compile Include="Services\SyncLogService.vb" />

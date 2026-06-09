@@ -50,10 +50,18 @@ body {
     box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
 }
 .hero-analysis { align-items: stretch; }
-.hero-text { max-width: 900px; }
+.hero-text { max-width: 900px; min-width: 0; flex: 1 1 60%; }
 .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
 .hero h1 { margin: 0 0 6px; font-size: 34px; }
 .hero p { margin: 0; color: var(--muted); }
+.hero-analysis .analysis-subtitle {
+    display: block;
+    margin-top: 8px;
+    line-height: 1.6;
+    max-width: 960px;
+    font-size: 16px;
+    color: #475569;
+}
 .eyebrow {
     text-transform: uppercase;
     letter-spacing: .18em;
@@ -67,6 +75,7 @@ body {
 .filters-analysis {
     align-items: stretch;
     min-width: 360px;
+    flex: 0 1 420px;
 }
 .filters-row {
     display: grid;

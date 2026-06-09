@@ -220,8 +220,8 @@ Namespace DevCommerc8ak
                 .RowCount = 3,
                 .BackColor = ColorBg
             }
-            pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Absolute, 130)) ' Filtres
-            pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Absolute, 48)) ' Actions
+            pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Absolute, 142)) ' Filtres
+            pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Absolute, 56)) ' Actions
             pnlVentesContent.RowStyles.Add(New RowStyle(SizeType.Percent, 100)) ' Grille
 
             Dim pnlFiltresVentesCard As Panel = CreerCarte()
@@ -241,6 +241,9 @@ Namespace DevCommerc8ak
             filtresVentesLayout.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 100))
             filtresVentesLayout.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 10))
             filtresVentesLayout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
+            filtresVentesLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 34))
+            filtresVentesLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 32))
+            filtresVentesLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 40))
             filtresVentesLayout.BackColor = Color.Transparent
 
             Dim lblPeriodeVentes As New Label() With {.Text = "Période :", .AutoSize = True, .Font = FontLabel, .ForeColor = ColorTextSecondary, .Anchor = AnchorStyles.Left}
@@ -1007,9 +1010,10 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            Dim left As Integer = e.MarginBounds.Left
+            Dim paddingHorizontal As Integer = 18
+            Dim left As Integer = e.MarginBounds.Left + paddingHorizontal
             Dim top As Integer = e.MarginBounds.Top
-            Dim largeur As Integer = e.MarginBounds.Width
+            Dim largeur As Integer = e.MarginBounds.Width - (paddingHorizontal * 2)
             Dim y As Integer = top
 
             Using titreFont As New Font("Segoe UI", 16.0F, FontStyle.Bold),
@@ -1025,19 +1029,24 @@ Namespace DevCommerc8ak
                   bordure As New Pen(Color.FromArgb(210, 219, 232)),
                   ligneSep As New Pen(Color.FromArgb(232, 236, 242))
 
-                e.Graphics.FillRectangle(fondBande, left, y, largeur, 34)
-                e.Graphics.DrawString("RAPPORT DES VENTES", titreFont, Brushes.White, left + 12, y + 5)
+                e.Graphics.FillRectangle(fondBande, left, y, largeur, 36)
+                Using sfTitre As New StringFormat() With {.Alignment = StringAlignment.Center, .LineAlignment = StringAlignment.Center}
+                    e.Graphics.DrawString("RAPPORT DES VENTES", titreFont, Brushes.White, New RectangleF(left, y, largeur, 36), sfTitre)
+                End Using
                 y += 48
 
-                e.Graphics.DrawRectangle(bordure, left, y, CInt(largeur * 0.48), 84)
-                e.Graphics.DrawRectangle(bordure, left + CInt(largeur * 0.52), y, CInt(largeur * 0.48), 84)
+                Dim blocGaucheLargeur As Integer = CInt((largeur - 12) * 0.48)
+                Dim blocDroiteLargeur As Integer = largeur - blocGaucheLargeur - 12
+                e.Graphics.DrawRectangle(bordure, left, y, blocGaucheLargeur, 84)
+                e.Graphics.DrawRectangle(bordure, left + blocGaucheLargeur + 12, y, blocDroiteLargeur, 84)
                 e.Graphics.DrawString("Informations du rapport", blocTitreFont, pinceauBleu, left + 12, y + 10)
                 e.Graphics.DrawString("Période : " & Convert.ToString(cmbPeriode.SelectedItem), sousTitreFont, Brushes.Black, left + 12, y + 34)
                 e.Graphics.DrawString("Jour : " & dtpJour.Value.ToString("dd/MM/yyyy"), sousTitreFont, Brushes.Black, left + 12, y + 52)
                 e.Graphics.DrawString("Mois : " & Convert.ToString(cmbMois.SelectedItem), sousTitreFont, Brushes.Black, left + 12, y + 70)
-                e.Graphics.DrawString("Synthèse ventes", blocTitreFont, pinceauBleu, left + CInt(largeur * 0.52) + 12, y + 10)
-                e.Graphics.DrawString(lblResumeVentes.Text, sousTitreFont, pinceauGris, left + CInt(largeur * 0.52) + 12, y + 38)
-                e.Graphics.DrawString("Lignes : " & data.Rows.Count.ToString("N0"), sousTitreFont, pinceauGris, left + CInt(largeur * 0.52) + 12, y + 60)
+                Dim droiteX As Integer = left + blocGaucheLargeur + 12
+                e.Graphics.DrawString("Synthèse ventes", blocTitreFont, pinceauBleu, droiteX + 12, y + 10)
+                e.Graphics.DrawString(lblResumeVentes.Text, sousTitreFont, pinceauGris, droiteX + 12, y + 38)
+                e.Graphics.DrawString("Lignes : " & data.Rows.Count.ToString("N0"), sousTitreFont, pinceauGris, droiteX + 12, y + 60)
                 y += 104
 
                 Dim colonnes As String() = {"DateVente", "Produit", "PrixAchatCarton", "QuantiteVenduePieces", "MontantGenere", "Benefice"}
@@ -1108,9 +1117,10 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            Dim left As Integer = e.MarginBounds.Left
+            Dim paddingHorizontal As Integer = 18
+            Dim left As Integer = e.MarginBounds.Left + paddingHorizontal
             Dim top As Integer = e.MarginBounds.Top
-            Dim largeur As Integer = e.MarginBounds.Width
+            Dim largeur As Integer = e.MarginBounds.Width - (paddingHorizontal * 2)
             Dim y As Integer = top
 
             Using titreFont As New Font("Segoe UI", 16.0F, FontStyle.Bold),
@@ -1125,17 +1135,22 @@ Namespace DevCommerc8ak
                   bordure As New Pen(Color.FromArgb(210, 219, 232)),
                   ligneSep As New Pen(Color.FromArgb(232, 236, 242))
 
-                e.Graphics.FillRectangle(fondBande, left, y, largeur, 34)
-                e.Graphics.DrawString("RAPPORT STOCK PRODUITS", titreFont, Brushes.White, left + 12, y + 5)
+                e.Graphics.FillRectangle(fondBande, left, y, largeur, 36)
+                Using sfTitre As New StringFormat() With {.Alignment = StringAlignment.Center, .LineAlignment = StringAlignment.Center}
+                    e.Graphics.DrawString("RAPPORT STOCK PRODUITS", titreFont, Brushes.White, New RectangleF(left, y, largeur, 36), sfTitre)
+                End Using
                 y += 48
 
-                e.Graphics.DrawRectangle(bordure, left, y, CInt(largeur * 0.48), 84)
-                e.Graphics.DrawRectangle(bordure, left + CInt(largeur * 0.52), y, CInt(largeur * 0.48), 84)
+                Dim blocGaucheLargeur As Integer = CInt((largeur - 12) * 0.48)
+                Dim blocDroiteLargeur As Integer = largeur - blocGaucheLargeur - 12
+                e.Graphics.DrawRectangle(bordure, left, y, blocGaucheLargeur, 84)
+                e.Graphics.DrawRectangle(bordure, left + blocGaucheLargeur + 12, y, blocDroiteLargeur, 84)
                 e.Graphics.DrawString("Synthèse du stock", blocTitreFont, pinceauBleu, left + 12, y + 10)
                 e.Graphics.DrawString("Stock global : " & lblResumeStock.Text, sousTitreFont, Brushes.Black, left + 12, y + 36)
                 e.Graphics.DrawString("Produits visibles : " & data.Rows.Count.ToString("N0"), sousTitreFont, Brushes.Black, left + 12, y + 58)
-                e.Graphics.DrawString("Répartition", blocTitreFont, pinceauBleu, left + CInt(largeur * 0.52) + 12, y + 10)
-                e.Graphics.DrawString("Ventes / sorties manuelles / restant", sousTitreFont, pinceauGris, left + CInt(largeur * 0.52) + 12, y + 38)
+                Dim droiteX As Integer = left + blocGaucheLargeur + 12
+                e.Graphics.DrawString("Répartition", blocTitreFont, pinceauBleu, droiteX + 12, y + 10)
+                e.Graphics.DrawString("Ventes / sorties manuelles / restant", sousTitreFont, pinceauGris, droiteX + 12, y + 38)
                 y += 104
 
                 Dim colonnes As String() = {"Produit", "StockActuelPieces", "StockActuelCartons", "QuantiteVenduePieces", "QuantiteSortieManuellePieces", "RestantPieces"}

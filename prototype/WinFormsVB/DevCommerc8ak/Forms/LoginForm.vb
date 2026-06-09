@@ -36,6 +36,7 @@ Namespace DevCommerc8ak
             Me.BackColor = ColorBg
             Me.FormBorderStyle = FormBorderStyle.None ' Design sans bordures pour un look moderne
             Me.DoubleBuffered = True
+            Me.KeyPreview = True
 
             ' --- Carte de Connexion Centrale ---
             Dim pnlCard As New Panel() With {
@@ -173,6 +174,8 @@ Namespace DevCommerc8ak
             btnLogin.FlatAppearance.BorderSize = 0
             AddHandler btnLogin.Click, AddressOf OnLogin
             pnlAction.Controls.Add(btnLogin)
+            Me.AcceptButton = btnLogin
+            AddHandler Me.KeyDown, AddressOf LoginForm_KeyDown
 
             ' Statut Serveur
             lblStatus = New Label() With {
@@ -218,6 +221,14 @@ Namespace DevCommerc8ak
             'ThemeHelper.AppliquerTheme(Me)
             'IconsHelper.AppliquerIconeFormulaire(Me)
             InitialiserCompteAdminSiNecessaire()
+        End Sub
+
+        Private Sub LoginForm_KeyDown(sender As Object, e As KeyEventArgs)
+            If e.KeyCode = Keys.Enter Then
+                e.Handled = True
+                e.SuppressKeyPress = True
+                btnLogin.PerformClick()
+            End If
         End Sub
 
         ' --- Logique Métier (Inchangée) ---

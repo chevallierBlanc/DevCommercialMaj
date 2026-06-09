@@ -3,6 +3,7 @@ Imports System.Drawing
 Imports System.Configuration
 Imports System.Data
 Imports System.Collections.Generic
+Imports System.Threading.Tasks
 Imports System
 
 Namespace DevCommerc8ak
@@ -163,6 +164,11 @@ Namespace DevCommerc8ak
         Private ReadOnly panelContent As Panel
         Private ReadOnly panelHeader As Panel
         Private ReadOnly timer As Timer
+        Private ReadOnly _backupService As BackupService
+        Private ReadOnly _backupTimer As Timer
+        Private _backupSettings As BackupSettings
+        Private _backupEnCours As Boolean
+        Private _dernierBackupReussi As Boolean
         Private _dernierAlerte As Date = Date.MinValue
 
         ' Boutons de navigation
@@ -178,6 +184,8 @@ Namespace DevCommerc8ak
             Me.WindowState = FormWindowState.Maximized
             Me.BackColor = ColorBg
             Me.Font = FontMain
+            _backupService = New BackupService()
+            _backupSettings = _backupService.ChargerParametres()
 
             ' --- Sidebar (Navigation Latérale) ---
             panelSidebar = New Panel() With {
@@ -355,6 +363,12 @@ Namespace DevCommerc8ak
             timer = New Timer() With {.Interval = 5000}
             AddHandler timer.Tick, AddressOf PingSession
             timer.Start()
+
+            If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled Then
+                _backupTimer = New Timer() With {.Interval = Math.Max(1, _backupSettings.IntervalMinutes) * 60000}
+                AddHandler _backupTimer.Tick, AddressOf SauvegardeAutomatiqueTick
+                _backupTimer.Start()
+            End If
         End Sub
 
         ''' <summary>
@@ -560,6 +574,33 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
+        Private Async Sub SauvegardeAutomatiqueTick(sender As Object, e As EventArgs)
+            Try
+                If _backupSettings Is Nothing OrElse Not _backupSettings.Enabled Then Return
+                Await ExecuterSauvegardeSilencieuseAsync(False)
+            Catch
+            End Try
+        End Sub
+
+        Private Async Function ExecuterSauvegardeSilencieuseAsync(force As Boolean) As Task(Of Boolean)
+            If _backupService Is Nothing OrElse _backupSettings Is Nothing Then Return False
+            If Not force AndAlso Not _backupSettings.Enabled Then Return False
+            If _backupEnCours Then Return False
+
+            _backupEnCours = True
+            Try
+                Dim cible As String = _backupSettings.BackupFolder
+                Dim resultat As BackupResult = Await Task.Run(Function() _backupService.ExecuterSauvegarde(cible))
+                _dernierBackupReussi = resultat.Success
+                Return resultat.Success
+            Catch
+                _dernierBackupReussi = False
+                Return False
+            Finally
+                _backupEnCours = False
+            End Try
+        End Function
+
         Private Sub Deconnecter(sender As Object, e As EventArgs)
             If MessageBox.Show("Voulez-vous vraiment vous déconnecter ?", "Déconnexion", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.No Then Return
 
@@ -619,6 +660,23 @@ Namespace DevCommerc8ak
 
         Protected Overrides Sub OnFormClosing(e As FormClosingEventArgs)
             Try
+                If _backupTimer IsNot Nothing Then
+                    _backupTimer.Stop()
+                End If
+
+                If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled AndAlso _backupSettings.BackupBeforeExit Then
+                    Dim resultat As BackupResult = _backupService.ExecuterSauvegarde(_backupSettings.BackupFolder)
+                    _dernierBackupReussi = resultat.Success
+                    If Not resultat.Success Then
+                        MessageBox.Show("La sauvegarde avant fermeture a échoué : " & resultat.Message, "Sauvegarde", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                        If _backupTimer IsNot Nothing AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled Then
+                            _backupTimer.Start()
+                        End If
+                        e.Cancel = True
+                        Return
+                    End If
+                End If
+
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
                 Dim repo As New SessionRepository(dal)
