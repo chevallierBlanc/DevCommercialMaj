@@ -246,6 +246,10 @@ Namespace DevCommerc8ak
             btnDeconnexion = CreerBoutonMenu("Déconnexion")
             btnDeconnexion.ForeColor = Color.FromArgb(231, 76, 60) ' Rouge pour déconnexion
 
+            If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) Then
+                LoadForm(New FormulaireDashboard())
+            End If
+
 
 
             ' --- Header (Barre Supérieure) ---

@@ -22,9 +22,30 @@
             <label>
                 <span>Période</span>
                 <select name="periode">
-                    <option value="jour"@Html.Raw(periodeJourSelected ? " selected=\"selected\"" : "")>Aujourd'hui</option>
-                    <option value="mois"@Html.Raw(periodeMoisSelected ? " selected=\"selected\"" : "")>Ce mois</option>
-                    <option value="annee"@Html.Raw(periodeAnneeSelected ? " selected=\"selected\"" : "")>Cette année</option>
+                    @if (periodeJourSelected)
+                    {
+                        <option value="jour" selected="selected">Aujourd'hui</option>
+                    }
+                    else
+                    {
+                        <option value="jour">Aujourd'hui</option>
+                    }
+                    @if (periodeMoisSelected)
+                    {
+                        <option value="mois" selected="selected">Ce mois</option>
+                    }
+                    else
+                    {
+                        <option value="mois">Ce mois</option>
+                    }
+                    @if (periodeAnneeSelected)
+                    {
+                        <option value="annee" selected="selected">Cette année</option>
+                    }
+                    else
+                    {
+                        <option value="annee">Cette année</option>
+                    }
                 </select>
             </label>
             <label>
