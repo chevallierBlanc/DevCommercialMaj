@@ -412,8 +412,6 @@ Namespace DevCommerc8ak
         Private Function VerifierPermission(fonctionnalite As String) As Boolean
             Select Case SessionUtilisateur.Role
                 Case "ADMIN"
-
-                    LoadForm(New FormulaireDashboard())
                     Return True
 
                 Case "Pasteur"

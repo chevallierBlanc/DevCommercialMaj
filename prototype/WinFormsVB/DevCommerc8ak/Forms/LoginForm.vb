@@ -111,7 +111,8 @@ Namespace DevCommerc8ak
             Me.txtUser.PlaceholderText = "Saisir votre Nom d'utilisateur"
             Me.txtUser.SelectedText = ""
             Me.txtUser.ShadowDecoration.Parent = Me.txtUser
-            Me.txtUser.Size = New Size(35, 40)
+            Me.txtUser.MinimumSize = New Size(320, 40)
+            Me.txtUser.Size = New Size(320, 40)
             Me.txtUser.TabIndex = 41
             ' Me.txtUser.UseSystemPasswordChar = True
 
@@ -154,7 +155,8 @@ Namespace DevCommerc8ak
             Me.txtPass.PlaceholderText = "Saisir votre mot de passe"
             Me.txtPass.SelectedText = ""
             Me.txtPass.ShadowDecoration.Parent = Me.txtPass
-            Me.txtPass.Size = New Size(35, 40)
+            Me.txtPass.MinimumSize = New Size(320, 40)
+            Me.txtPass.Size = New Size(320, 40)
             Me.txtPass.TabIndex = 41
             Me.txtPass.UseSystemPasswordChar = True
 
