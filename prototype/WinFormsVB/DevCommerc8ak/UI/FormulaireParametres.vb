@@ -92,7 +92,14 @@ Namespace DevCommerc8ak
             ' --- INITIALISATION DES COMPOSANTS (Noms conservés) ---
 
             ' Tab Général
-            Dim tableGeneral As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 3, .Padding = New Padding(20), .AutoSize = True, .AutoSizeMode = AutoSizeMode.GrowAndShrink}
+            Dim pnlGeneralScroll As New Panel() With {
+                .Dock = DockStyle.Fill,
+                .AutoScroll = True,
+                .Padding = New Padding(0),
+                .BackColor = ColorBackground
+            }
+
+            Dim tableGeneral As New TableLayoutPanel() With {.Dock = DockStyle.Top, .ColumnCount = 1, .RowCount = 3, .Padding = New Padding(20), .AutoSize = True, .AutoSizeMode = AutoSizeMode.GrowAndShrink}
             tableGeneral.RowStyles.Add(New RowStyle(SizeType.Absolute, 260))
             tableGeneral.RowStyles.Add(New RowStyle(SizeType.Absolute, 210))
             tableGeneral.RowStyles.Add(New RowStyle(SizeType.Absolute, 240))
@@ -136,7 +143,8 @@ Namespace DevCommerc8ak
             tableGeneral.Controls.Add(cardMagasin, 0, 0)
             tableGeneral.Controls.Add(cardLogo, 0, 1)
             tableGeneral.Controls.Add(cardBackup, 0, 2)
-            tabGeneral.Controls.Add(tableGeneral)
+            pnlGeneralScroll.Controls.Add(tableGeneral)
+            tabGeneral.Controls.Add(pnlGeneralScroll)
 
             ' Tab Produits
             Dim tableProduits As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 1, .Padding = New Padding(20)}
