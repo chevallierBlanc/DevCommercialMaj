@@ -170,6 +170,7 @@ Namespace DevCommerc8ak
         Private _backupEnCours As Boolean
         Private _dernierBackupReussi As Boolean
         Private _dernierAlerte As Date = Date.MinValue
+        Private _accueilAdminCharge As Boolean
 
         ' Boutons de navigation
         Private ReadOnly btnFact As Button
@@ -333,10 +334,6 @@ Namespace DevCommerc8ak
             Me.Controls.Add(panelHeader)
             Me.Controls.Add(panelSidebar)
 
-            If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) Then
-                LoadForm(New FormulaireDashboard())
-            End If
-
             ' Handlers
             'AddHandler btnFact.Click, Sub()
             '                              lblPageTitle.Text = "Module Facturation"
@@ -366,10 +363,23 @@ Namespace DevCommerc8ak
             AddHandler timer.Tick, AddressOf PingSession
             timer.Start()
 
+            AddHandler Me.Shown, AddressOf MainForm_Shown
+
             If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled Then
                 _backupTimer = New Timer() With {.Interval = Math.Max(1, _backupSettings.IntervalMinutes) * 60000}
                 AddHandler _backupTimer.Tick, AddressOf SauvegardeAutomatiqueTick
                 _backupTimer.Start()
+            End If
+        End Sub
+
+        Private Sub MainForm_Shown(sender As Object, e As EventArgs)
+            If _accueilAdminCharge Then
+                Return
+            End If
+
+            If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) Then
+                _accueilAdminCharge = True
+                LoadForm(New FormulaireDashboard())
             End If
         End Sub
 
