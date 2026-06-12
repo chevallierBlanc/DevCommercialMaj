@@ -102,7 +102,7 @@ Namespace DevCommerc8ak
             Dim tableGeneral As New TableLayoutPanel() With {.Dock = DockStyle.Top, .ColumnCount = 1, .RowCount = 3, .Padding = New Padding(20), .AutoSize = True, .AutoSizeMode = AutoSizeMode.GrowAndShrink}
             tableGeneral.RowStyles.Add(New RowStyle(SizeType.Absolute, 260))
             tableGeneral.RowStyles.Add(New RowStyle(SizeType.Absolute, 210))
-            tableGeneral.RowStyles.Add(New RowStyle(SizeType.Absolute, 240))
+            tableGeneral.RowStyles.Add(New RowStyle(SizeType.Absolute, 390))
             Dim cardMagasin As Panel = CreateCard("Informations du Magasin")
             txtNomMagasin = CreateField(cardMagasin, "Nom du Magasin", 20, 45, 400)
             txtAdresseMagasin = CreateField(cardMagasin, "Adresse Physique", 20, 105, 500)
@@ -127,11 +127,11 @@ Namespace DevCommerc8ak
             chkBackupAvantSortie = New CheckBox() With {.Text = "Sauvegarde avant fermeture", .Left = 20, .Top = 185, .Font = FontControl, .AutoSize = True}
             btnBackupNow = CreateStyledButton("Lancer la sauvegarde", ColorPrimary, 180, 34)
             btnBackupNow.Left = 20
-            btnBackupNow.Top = 215
+            btnBackupNow.Top = 225
             Dim lblBackupInfo As New Label() With {
                 .Text = "La destination proposée doit rester facilement accessible et la sauvegarde s'exécute en sourdine.",
                 .Left = 210,
-                .Top = 220,
+                .Top = 230,
                 .Width = 430,
                 .Height = 36,
                 .Font = FontControl,

@@ -16,7 +16,7 @@
 {
     <article class="card">
         <span>@metric.Label</span>
-        <strong>@metric.Value.ToString("N0") FC</strong>
+        <strong>@metric.Value.ToString("N0")@(string.IsNullOrWhiteSpace(metric.Unit) ? string.Empty : " " + metric.Unit)</strong>
     </article>
 }
 </section>

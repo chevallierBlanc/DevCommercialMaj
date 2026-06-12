@@ -42,7 +42,7 @@ Namespace DevCommerc8ak
                 Return dossierConfig.Trim()
             End If
 
-            Return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "CommercialPro", "Backups")
+            Return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "CommercialPro", "Backups")
         End Function
 
         Public Function ChargerParametres() As BackupSettings
@@ -93,8 +93,46 @@ Namespace DevCommerc8ak
             Try
                 Dim builder As New SqlConnectionStringBuilder(_connectionString)
                 Dim database As String = If(String.IsNullOrWhiteSpace(builder.InitialCatalog), "CommercialMagDB", builder.InitialCatalog)
-                Dim dossier As String = If(String.IsNullOrWhiteSpace(dossierCible), ObtenirDossierParDefaut(), dossierCible)
-                Directory.CreateDirectory(dossier)
+                Dim dossierPrincipal As String = If(String.IsNullOrWhiteSpace(dossierCible), ObtenirDossierParDefaut(), dossierCible).Trim()
+                Dim dossierFallback As String = ObtenirDossierFallback()
+
+                If ExecuterSauvegardeVersDossier(database, dossierPrincipal, resultat, False) Then
+                    Return resultat
+                End If
+
+                If Not String.Equals(dossierPrincipal, dossierFallback, StringComparison.OrdinalIgnoreCase) Then
+                    Dim resultatFallback As New BackupResult() With {.BackedUpAt = DateTime.Now}
+                    If ExecuterSauvegardeVersDossier(database, dossierFallback, resultatFallback, True) Then
+                        Return resultatFallback
+                    End If
+
+                    If Not String.IsNullOrWhiteSpace(resultatFallback.Message) Then
+                        resultat.Message = resultatFallback.Message
+                    End If
+                End If
+
+                If String.IsNullOrWhiteSpace(resultat.Message) Then
+                    resultat.Message = "Sauvegarde impossible."
+                End If
+            Catch ex As Exception
+                resultat.Success = False
+                resultat.Message = ex.Message
+            End Try
+
+            Return resultat
+        End Function
+
+        Private Function ExecuterSauvegardeVersDossier(database As String, dossier As String, resultat As BackupResult, estFallback As Boolean) As Boolean
+            Try
+                If Not PeutEcrireDansDossier(dossier) Then
+                    resultat.Success = False
+                    If estFallback Then
+                        resultat.Message = "Accès refusé au dossier de secours : " & dossier
+                    Else
+                        resultat.Message = "Accès refusé au dossier de sauvegarde : " & dossier
+                    End If
+                    Return False
+                End If
 
                 Dim nomFichier As String = database & "_" & DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) & ".bak"
                 Dim cheminComplet As String = Path.Combine(dossier, nomFichier)
@@ -110,13 +148,39 @@ Namespace DevCommerc8ak
 
                 resultat.Success = True
                 resultat.FilePath = cheminComplet
-                resultat.Message = "Sauvegarde réalisée avec succès."
+                If estFallback Then
+                    resultat.Message = "Dossier principal inaccessible. Sauvegarde effectuée dans le dossier de secours."
+                Else
+                    resultat.Message = "Sauvegarde réalisée avec succès."
+                End If
+                Return True
             Catch ex As Exception
                 resultat.Success = False
                 resultat.Message = ex.Message
+                Return False
             End Try
+        End Function
 
-            Return resultat
+        Private Function PeutEcrireDansDossier(dossier As String) As Boolean
+            Try
+                If String.IsNullOrWhiteSpace(dossier) Then
+                    Return False
+                End If
+
+                Directory.CreateDirectory(dossier)
+                Dim fichierTest As String = Path.Combine(dossier, Path.GetRandomFileName())
+                Using fs As New FileStream(fichierTest, FileMode.Create, FileAccess.Write, FileShare.None)
+                    fs.WriteByte(0)
+                End Using
+                File.Delete(fichierTest)
+                Return True
+            Catch
+                Return False
+            End Try
+        End Function
+
+        Private Function ObtenirDossierFallback() As String
+            Return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CommercialPro", "Backups")
         End Function
 
         Private Function CreerParametresParDefaut() As BackupSettings

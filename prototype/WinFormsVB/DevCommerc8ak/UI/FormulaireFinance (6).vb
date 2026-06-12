@@ -662,7 +662,7 @@ Namespace DevCommerc8ak
                 Dim dtCat As DataTable = _catService.GetAll()
                 cmbCategorieDepense.DataSource = dtCat
                 cmbCategorieDepense.DisplayMember = "Libelle"
-                cmbCategorieDepense.ValueMember = "Libelle"
+                cmbCategorieDepense.ValueMember = "Id"
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement catégories: " & ex.Message)
             End Try
@@ -676,7 +676,10 @@ Namespace DevCommerc8ak
                 Dim typeDepense As String = cmbTypeDepense.SelectedItem.ToString()
                 Dim description As String = txtDescriptionDepense.Text
                 Dim dateDepense As Date = dtpDateDepense.Value
-                Dim categorieId As Integer = CInt(cmbCategorieDepense.SelectedValue)
+                If cmbCategorieDepense.SelectedValue Is Nothing OrElse IsDBNull(cmbCategorieDepense.SelectedValue) Then
+                    Throw New Exception("Sélectionnez une catégorie de dépense.")
+                End If
+                Dim categorieId As Integer = Convert.ToInt32(cmbCategorieDepense.SelectedValue)
 
                 Dim nouvelleDepense As New DepenseDTOFinance With {
                     .Montant = montant,

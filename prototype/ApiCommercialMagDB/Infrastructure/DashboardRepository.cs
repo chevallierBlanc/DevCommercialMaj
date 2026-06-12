@@ -33,12 +33,14 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
         response.DepensesParCategorie = await QueryExpensesByCategoryAsync(cn, date, ct);
         response.AlertesStockFaible = await QueryStockAlertsAsync(cn, ct);
         response.SeriesVentes = await QuerySeriesAsync(cn, """
-            SELECT CONVERT(date, ss.DateSortie) AS Label, ISNULL(SUM(ISNULL(ss.MontantLigne,0)),0) AS Value
-            FROM StockSortie ss
-            WHERE CONVERT(date, ss.DateSortie) = @DateRef
-              AND UPPER(ISNULL(ss.Source,'')) = 'VENTE'
-            GROUP BY CONVERT(date, ss.DateSortie)
-            ORDER BY CONVERT(date, ss.DateSortie)
+            SELECT CONVERT(date, f.CreeLe) AS Label,
+                   ISNULL(SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0) END), 0) AS Value
+            FROM LignesFactureVente l
+            INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId
+            WHERE CONVERT(date, f.CreeLe) = @DateRef
+              AND UPPER(ISNULL(f.Statut,'')) = 'PAYEE'
+            GROUP BY CONVERT(date, f.CreeLe)
+            ORDER BY CONVERT(date, f.CreeLe)
             """, ct, ("@DateRef", date.Date));
         response.SeriesDepenses = await QuerySeriesAsync(cn, """
             SELECT CONVERT(date, d.DateDepense) AS Label, ISNULL(SUM(ISNULL(d.Montant,0)),0) AS Value
@@ -74,12 +76,14 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
         response.TopProduits = await QueryMonthlyTopProductsAsync(cn, start, end, ct);
         response.TopDepenses = await QueryExpensesByCategoryAsync(cn, start, ct, end);
         response.EvolutionVentes = await QuerySeriesAsync(cn, """
-            SELECT CONVERT(date, ss.DateSortie) AS Label, ISNULL(SUM(ISNULL(ss.MontantLigne,0)),0) AS Value
-            FROM StockSortie ss
-            WHERE ss.DateSortie >= @StartDate AND ss.DateSortie < @EndDate
-              AND UPPER(ISNULL(ss.Source,'')) = 'VENTE'
-            GROUP BY CONVERT(date, ss.DateSortie)
-            ORDER BY CONVERT(date, ss.DateSortie)
+            SELECT CONVERT(date, f.CreeLe) AS Label,
+                   ISNULL(SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0) END), 0) AS Value
+            FROM LignesFactureVente l
+            INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId
+            WHERE f.CreeLe >= @StartDate AND f.CreeLe < @EndDate
+              AND UPPER(ISNULL(f.Statut,'')) = 'PAYEE'
+            GROUP BY CONVERT(date, f.CreeLe)
+            ORDER BY CONVERT(date, f.CreeLe)
             """, ct, ("@StartDate", start), ("@EndDate", end));
         response.EvolutionSorties = await QuerySeriesAsync(cn, """
             SELECT CONVERT(date, ss.DateSortie) AS Label, ISNULL(SUM(ISNULL(ss.QuantiteBase,0)),0) AS Value
@@ -120,12 +124,14 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
         response.BeneficeEstime = response.CaAnnuel - response.DepensesAnnuelles;
         ApplyTotals(response, totals);
         response.VentesParMois = await QueryMonthSeriesAsync(cn, """
-            SELECT RIGHT('0' + CAST(MONTH(ss.DateSortie) AS varchar(2)), 2) AS Label, ISNULL(SUM(ISNULL(ss.MontantLigne,0)),0) AS Value
-            FROM StockSortie ss
-            WHERE ss.DateSortie >= @StartDate AND ss.DateSortie < @EndDate
-              AND UPPER(ISNULL(ss.Source,'')) = 'VENTE'
-            GROUP BY MONTH(ss.DateSortie)
-            ORDER BY MONTH(ss.DateSortie)
+            SELECT RIGHT('0' + CAST(MONTH(f.CreeLe) AS varchar(2)), 2) AS Label,
+                   ISNULL(SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0) END), 0) AS Value
+            FROM LignesFactureVente l
+            INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId
+            WHERE f.CreeLe >= @StartDate AND f.CreeLe < @EndDate
+              AND UPPER(ISNULL(f.Statut,'')) = 'PAYEE'
+            GROUP BY MONTH(f.CreeLe)
+            ORDER BY MONTH(f.CreeLe)
             """, ct, ("@StartDate", start), ("@EndDate", end));
         response.DepensesParMois = await QueryMonthSeriesAsync(cn, """
             SELECT RIGHT('0' + CAST(MONTH(d.DateDepense) AS varchar(2)), 2) AS Label, ISNULL(SUM(ISNULL(d.Montant,0)),0) AS Value
@@ -376,23 +382,7 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
     private async Task<DashboardTotals> LoadTotalsAsync(SqlConnection cn, DateTime start, DateTime end, CancellationToken ct)
     {
         const string sql = """
-            WITH Sorties AS (
-                SELECT
-                    ss.QuantiteBase,
-                    ss.MontantLigne,
-                    ss.TypeVente,
-                    ss.Source,
-                    ss.StatutPaiement,
-                    ss.ClientId,
-                    ss.RefSource,
-                    ISNULL(m.Libelle, '') AS MotifLibelle,
-                    ISNULL(m.Nature, '') AS MotifNature
-                FROM StockSortie ss
-                LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId
-                WHERE ss.DateSortie >= @StartDate
-                  AND ss.DateSortie < @EndDate
-            ),
-            Entrees AS (
+            WITH Entrees AS (
                 SELECT ISNULL(SUM(ISNULL(QuantiteBase,0)),0) AS TotalEntrees
                 FROM StockEntree
                 WHERE DateEntree >= @StartDate AND DateEntree < @EndDate
@@ -402,51 +392,54 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
                 FROM StockPerte
                 WHERE DatePerte >= @StartDate AND DatePerte < @EndDate
             ),
-            Aggregats AS (
+            Ventes AS (
                 SELECT
-                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(Source,'')) = 'VENTE' OR UPPER(ISNULL(RefSource,'')) LIKE 'FACTURE:%' THEN ISNULL(QuantiteBase,0) ELSE 0 END),0) AS TotalVentes,
-                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(Source,'')) IN ('SORTIE_MANUELLE','MANUEL','ADMIN') THEN ISNULL(QuantiteBase,0) ELSE 0 END),0) AS TotalSortiesManuelles,
-                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(TypeVente,'')) = 'GROS' THEN ISNULL(QuantiteBase,0) ELSE 0 END),0) AS TotalGros,
-                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(TypeVente,'')) = 'DEMI' THEN ISNULL(QuantiteBase,0) ELSE 0 END),0) AS TotalDemi,
-                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(TypeVente,'')) = 'QUART' THEN ISNULL(QuantiteBase,0) ELSE 0 END),0) AS TotalQuart,
-                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(TypeVente,'')) IN ('PIECE','UNITE') THEN ISNULL(QuantiteBase,0) ELSE 0 END),0) AS TotalPiece,
-                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(TypeVente,'')) = 'DOUZAINE' THEN ISNULL(QuantiteBase,0) ELSE 0 END),0) AS TotalDouzaine,
-                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(MotifLibelle,'')) LIKE '%DON%' OR UPPER(ISNULL(MotifNature,'')) LIKE '%DON%' OR UPPER(ISNULL(MotifLibelle,'')) LIKE '%ECHANTILLON%' THEN ISNULL(QuantiteBase,0) ELSE 0 END),0) AS TotalDons,
-                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(MotifLibelle,'')) LIKE '%ALLOC%' OR UPPER(ISNULL(MotifNature,'')) LIKE '%ALLOC%' THEN ISNULL(QuantiteBase,0) ELSE 0 END),0) AS TotalAllocations,
-                    ISNULL(SUM(CASE WHEN (UPPER(ISNULL(MotifLibelle,'')) LIKE '%DETTE%' OR UPPER(ISNULL(MotifNature,'')) LIKE '%DETTE%') AND (UPPER(ISNULL(MotifLibelle,'')) LIKE '%CLIENT%' OR ISNULL(ClientId, 0) > 0 OR UPPER(ISNULL(StatutPaiement,'')) = 'IMPAYE') THEN ISNULL(QuantiteBase,0) ELSE 0 END),0) AS TotalDettesClients,
-                    ISNULL(SUM(CASE WHEN (UPPER(ISNULL(MotifLibelle,'')) LIKE '%DETTE%' OR UPPER(ISNULL(MotifNature,'')) LIKE '%DETTE%' OR UPPER(ISNULL(MotifLibelle,'')) LIKE '%ORDRE PATRON%') AND (UPPER(ISNULL(MotifLibelle,'')) LIKE '%BOSS%' OR UPPER(ISNULL(MotifLibelle,'')) LIKE '%PATRON%' OR UPPER(ISNULL(MotifLibelle,'')) LIKE '%MAISON%') THEN ISNULL(QuantiteBase,0) ELSE 0 END),0) AS TotalDettesBoss,
-                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(Source,'')) = 'SORTIE_MANUELLE' AND (UPPER(ISNULL(MotifLibelle,'')) LIKE '%HORS%' OR UPPER(ISNULL(MotifNature,'')) LIKE '%HORS%') THEN ISNULL(QuantiteBase,0) ELSE 0 END),0) AS TotalSortiesHorsCaisse,
-                    ISNULL(SUM(CASE
-                        WHEN UPPER(ISNULL(StatutPaiement,'')) = 'GRATUIT' THEN 0
-                        WHEN UPPER(ISNULL(MotifLibelle,'')) LIKE '%DON%' OR UPPER(ISNULL(MotifNature,'')) LIKE '%DON%' THEN 0
-                        WHEN UPPER(ISNULL(MotifLibelle,'')) LIKE '%ECHANTILLON%' THEN 0
-                        WHEN UPPER(ISNULL(MotifLibelle,'')) LIKE '%PERTE%' OR UPPER(ISNULL(MotifNature,'')) LIKE '%PERTE%' THEN 0
-                        WHEN UPPER(ISNULL(MotifLibelle,'')) LIKE '%CASSE%' OR UPPER(ISNULL(MotifNature,'')) LIKE '%CASSE%' THEN 0
-                        WHEN UPPER(ISNULL(MotifLibelle,'')) LIKE '%VOL%' OR UPPER(ISNULL(MotifNature,'')) LIKE '%VOL%' THEN 0
-                        WHEN UPPER(ISNULL(MotifLibelle,'')) LIKE '%ALLOC%' OR UPPER(ISNULL(MotifNature,'')) LIKE '%ALLOC%' THEN 0
-                        ELSE ISNULL(MontantLigne,0)
-                    END),0) AS MontantTotalGenere
-                FROM Sorties
+                    ISNULL(SUM(ISNULL(l.Quantite,0)),0) AS TotalVentes,
+                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'GROS' THEN ISNULL(l.Quantite,0) ELSE 0 END),0) AS TotalGros,
+                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'DEMI' THEN ISNULL(l.Quantite,0) ELSE 0 END),0) AS TotalDemi,
+                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'QUART' THEN ISNULL(l.Quantite,0) ELSE 0 END),0) AS TotalQuart,
+                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) IN ('PIECE','UNITE') THEN ISNULL(l.Quantite,0) ELSE 0 END),0) AS TotalPiece,
+                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'DOUZAINE' THEN ISNULL(l.Quantite,0) ELSE 0 END),0) AS TotalDouzaine,
+                    ISNULL(SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie,0) * ISNULL(l.PrixUnitaire,0) END),0) AS MontantTotalGenere
+                FROM LignesFactureVente l
+                INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId
+                WHERE f.CreeLe >= @StartDate
+                  AND f.CreeLe < @EndDate
+                  AND UPPER(ISNULL(f.Statut,'')) = 'PAYEE'
+            ),
+            Sorties AS (
+                SELECT
+                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(ss.Source,'')) IN ('SORTIE_MANUELLE','MANUEL','ADMIN') THEN ISNULL(ss.QuantiteBase,0) ELSE 0 END),0) AS TotalSortiesManuelles,
+                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(ss.Source,'')) = 'SORTIE_MANUELLE' AND (UPPER(ISNULL(m.Libelle,'')) LIKE '%HORS%' OR UPPER(ISNULL(m.Nature,'')) LIKE '%HORS%') THEN ISNULL(ss.QuantiteBase,0) ELSE 0 END),0) AS TotalSortiesHorsCaisse,
+                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(m.Libelle,'')) LIKE '%DON%' OR UPPER(ISNULL(m.Nature,'')) LIKE '%DON%' OR UPPER(ISNULL(m.Libelle,'')) LIKE '%ECHANTILLON%' THEN ISNULL(ss.QuantiteBase,0) ELSE 0 END),0) AS TotalDons,
+                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(m.Libelle,'')) LIKE '%ALLOC%' OR UPPER(ISNULL(m.Nature,'')) LIKE '%ALLOC%' THEN ISNULL(ss.QuantiteBase,0) ELSE 0 END),0) AS TotalAllocations,
+                    ISNULL(SUM(CASE WHEN (UPPER(ISNULL(m.Libelle,'')) LIKE '%DETTE%' OR UPPER(ISNULL(m.Nature,'')) LIKE '%DETTE%') AND (UPPER(ISNULL(m.Libelle,'')) LIKE '%CLIENT%' OR ISNULL(ss.ClientId, 0) > 0 OR UPPER(ISNULL(ss.StatutPaiement,'')) = 'IMPAYE') THEN ISNULL(ss.QuantiteBase,0) ELSE 0 END),0) AS TotalDettesClients,
+                    ISNULL(SUM(CASE WHEN (UPPER(ISNULL(m.Libelle,'')) LIKE '%DETTE%' OR UPPER(ISNULL(m.Nature,'')) LIKE '%DETTE%' OR UPPER(ISNULL(m.Libelle,'')) LIKE '%ORDRE PATRON%') AND (UPPER(ISNULL(m.Libelle,'')) LIKE '%BOSS%' OR UPPER(ISNULL(m.Libelle,'')) LIKE '%PATRON%' OR UPPER(ISNULL(m.Libelle,'')) LIKE '%MAISON%') THEN ISNULL(ss.QuantiteBase,0) ELSE 0 END),0) AS TotalDettesBoss
+                FROM StockSortie ss
+                LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId
+                WHERE ss.DateSortie >= @StartDate
+                  AND ss.DateSortie < @EndDate
             )
             SELECT
                 e.TotalEntrees,
                 p.TotalPertes,
-                a.TotalVentes,
-                a.TotalSortiesManuelles,
-                a.TotalGros,
-                a.TotalDemi,
-                a.TotalQuart,
-                a.TotalPiece,
-                a.TotalDouzaine,
-                a.TotalDons,
-                a.TotalAllocations,
-                a.TotalDettesClients,
-                a.TotalDettesBoss,
-                a.TotalSortiesHorsCaisse,
-                a.MontantTotalGenere
+                v.TotalVentes,
+                s.TotalSortiesManuelles,
+                v.TotalGros,
+                v.TotalDemi,
+                v.TotalQuart,
+                v.TotalPiece,
+                v.TotalDouzaine,
+                s.TotalDons,
+                s.TotalAllocations,
+                s.TotalDettesClients,
+                s.TotalDettesBoss,
+                s.TotalSortiesHorsCaisse,
+                v.MontantTotalGenere
             FROM Entrees e
             CROSS JOIN Pertes p
-            CROSS JOIN Aggregats a
+            CROSS JOIN Ventes v
+            CROSS JOIN Sorties s
             """;
         await using var cmd = new SqlCommand(sql, cn);
         cmd.Parameters.AddWithValue("@StartDate", start);
@@ -554,18 +547,19 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
     {
         const string sql = """
             SELECT TOP 10 p.Libelle,
-                   ISNULL(SUM(ss.QuantiteBase),0) AS Quantite,
-                   ISNULL(MAX(ss.TypeVente), '') AS TypeVente,
-                   ISNULL(SUM(ss.MontantLigne),0) AS Montant,
-                   ISNULL(MIN(ss.DateSortie), GETDATE()) AS Heure,
+                  ISNULL(SUM(ISNULL(l.Quantite,0)),0) AS Quantite,
+                   ISNULL(MAX(ISNULL(l.TypeVente,'')), '') AS TypeVente,
+                   ISNULL(SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie,0) * ISNULL(l.PrixUnitaire,0) END),0) AS Montant,
+                   ISNULL(MIN(f.CreeLe), GETDATE()) AS Heure,
                    ISNULL(MAX(u.NomUtilisateur), '') AS Agent
-            FROM StockSortie ss
-            INNER JOIN Produits p ON p.ProduitId = ss.ProduitId
-            LEFT JOIN Utilisateurs u ON u.UtilisateurId = ss.CreePar
-            WHERE CONVERT(date, ss.DateSortie) = @DateRef
-              AND UPPER(ISNULL(ss.Source,'')) = 'VENTE'
+            FROM LignesFactureVente l
+            INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId
+            INNER JOIN Produits p ON p.ProduitId = l.ProduitId
+            LEFT JOIN Utilisateurs u ON u.UtilisateurId = f.CreePar
+            WHERE CONVERT(date, f.CreeLe) = @DateRef
+              AND UPPER(ISNULL(f.Statut,'')) = 'PAYEE'
             GROUP BY p.Libelle
-            ORDER BY SUM(ss.MontantLigne) DESC
+            ORDER BY SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie,0) * ISNULL(l.PrixUnitaire,0) END) DESC
             """;
         await using var cmd = new SqlCommand(sql, cn);
         cmd.Parameters.AddWithValue("@DateRef", date.Date);
@@ -653,18 +647,19 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
     {
         const string sql = """
             SELECT TOP 10 p.Libelle,
-                   ISNULL(SUM(ss.QuantiteBase),0) AS Quantite,
-                   ISNULL(MAX(ss.TypeVente), '') AS TypeVente,
-                   ISNULL(SUM(ss.MontantLigne),0) AS Montant,
-                   ISNULL(MIN(ss.DateSortie), GETDATE()) AS Heure,
+                  ISNULL(SUM(ISNULL(l.Quantite,0)),0) AS Quantite,
+                   ISNULL(MAX(ISNULL(l.TypeVente,'')), '') AS TypeVente,
+                   ISNULL(SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie,0) * ISNULL(l.PrixUnitaire,0) END),0) AS Montant,
+                   ISNULL(MIN(f.CreeLe), GETDATE()) AS Heure,
                    ISNULL(MAX(u.NomUtilisateur), '') AS Agent
-            FROM StockSortie ss
-            INNER JOIN Produits p ON p.ProduitId = ss.ProduitId
-            LEFT JOIN Utilisateurs u ON u.UtilisateurId = ss.CreePar
-            WHERE ss.DateSortie >= @StartDate AND ss.DateSortie < @EndDate
-              AND UPPER(ISNULL(ss.Source,'')) = 'VENTE'
+            FROM LignesFactureVente l
+            INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId
+            INNER JOIN Produits p ON p.ProduitId = l.ProduitId
+            LEFT JOIN Utilisateurs u ON u.UtilisateurId = f.CreePar
+            WHERE f.CreeLe >= @StartDate AND f.CreeLe < @EndDate
+              AND UPPER(ISNULL(f.Statut,'')) = 'PAYEE'
             GROUP BY p.Libelle
-            ORDER BY SUM(ss.MontantLigne) DESC
+            ORDER BY SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie,0) * ISNULL(l.PrixUnitaire,0) END) DESC
             """;
         await using var cmd = new SqlCommand(sql, cn);
         cmd.Parameters.AddWithValue("@StartDate", start);

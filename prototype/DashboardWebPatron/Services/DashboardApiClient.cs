@@ -93,8 +93,9 @@ public sealed class DashboardApiClient
             }
             return null;
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine(ex);
             return null;
         }
     }

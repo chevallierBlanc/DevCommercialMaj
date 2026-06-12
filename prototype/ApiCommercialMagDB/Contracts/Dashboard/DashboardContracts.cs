@@ -4,6 +4,7 @@ public sealed class DashboardMetric
 {
     public string Label { get; set; } = string.Empty;
     public decimal Value { get; set; }
+    public string Unit { get; set; } = string.Empty;
 }
 
 public sealed class DailyProductRow

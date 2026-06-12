@@ -379,7 +379,26 @@ Namespace DevCommerc8ak
 
             If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) Then
                 _accueilAdminCharge = True
-                LoadForm(New FormulaireDashboard())
+                Me.BeginInvoke(New MethodInvoker(Sub()
+                                                     Try
+                                                         If panelContent Is Nothing OrElse panelContent.ClientSize.Width <= 0 OrElse panelContent.ClientSize.Height <= 0 Then
+                                                             If Me.IsHandleCreated Then
+                                                                 Me.BeginInvoke(New MethodInvoker(Sub()
+                                                                                                      Try
+                                                                                                          If panelContent IsNot Nothing AndAlso panelContent.ClientSize.Width > 0 AndAlso panelContent.ClientSize.Height > 0 Then
+                                                                                                              LoadForm(New FormulaireDashboard())
+                                                                                                          End If
+                                                                                                      Catch
+                                                                                                      End Try
+                                                                                                  End Sub))
+                                                             End If
+                                                             Return
+                                                         End If
+
+                                                         LoadForm(New FormulaireDashboard())
+                                                     Catch
+                                                     End Try
+                                                 End Sub))
             End If
         End Sub
 
@@ -471,12 +490,30 @@ Namespace DevCommerc8ak
         ' --- Logique Métier (Inchangée) ---
 
         Private Sub LoadForm(f As Form)
+            If f Is Nothing Then Return
+            If panelContent Is Nothing Then Return
+            If panelContent.ClientSize.Width <= 0 OrElse panelContent.ClientSize.Height <= 0 Then
+                If Me.IsHandleCreated Then
+                    Me.BeginInvoke(New MethodInvoker(Sub()
+                                                         Try
+                                                             If panelContent IsNot Nothing AndAlso panelContent.ClientSize.Width > 0 AndAlso panelContent.ClientSize.Height > 0 Then
+                                                                 LoadForm(f)
+                                                             End If
+                                                         Catch
+                                                         End Try
+                                                     End Sub))
+                End If
+                Return
+            End If
+
+            panelContent.SuspendLayout()
             panelContent.Controls.Clear()
             f.TopLevel = False
             f.FormBorderStyle = FormBorderStyle.None
             f.Dock = DockStyle.Fill
             panelContent.Controls.Add(f)
             f.Show()
+            panelContent.ResumeLayout(True)
         End Sub
         ''' <summary>
         ''' Sélectionner un bouton et mettre à jour l'affichage
@@ -677,13 +714,15 @@ Namespace DevCommerc8ak
                 If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled AndAlso _backupSettings.BackupBeforeExit Then
                     Dim resultat As BackupResult = _backupService.ExecuterSauvegarde(_backupSettings.BackupFolder)
                     _dernierBackupReussi = resultat.Success
-                    If Not resultat.Success Then
+                    If resultat.Success Then
+                        If Not String.IsNullOrWhiteSpace(resultat.Message) AndAlso resultat.Message.IndexOf("dossier de secours", StringComparison.OrdinalIgnoreCase) >= 0 Then
+                            MessageBox.Show(resultat.Message, "Sauvegarde", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                        End If
+                    Else
                         MessageBox.Show("La sauvegarde avant fermeture a échoué : " & resultat.Message, "Sauvegarde", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                         If _backupTimer IsNot Nothing AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled Then
                             _backupTimer.Start()
                         End If
-                        e.Cancel = True
-                        Return
                     End If
                 End If
 

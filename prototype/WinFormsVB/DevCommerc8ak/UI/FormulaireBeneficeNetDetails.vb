@@ -37,7 +37,7 @@ Namespace DevCommerc8ak
 
             Dim header As New Panel() With {
                 .Dock = DockStyle.Top,
-                .Height = 92,
+                .Height = 112,
                 .BackColor = Color.White,
                 .Padding = New Padding(24, 16, 24, 16)
             }
@@ -74,7 +74,7 @@ Namespace DevCommerc8ak
             btnFermer.FlatAppearance.BorderSize = 0
             AddHandler btnFermer.Click, Sub() Me.Close()
 
-            Dim pnlAction As New Panel() With {.Dock = DockStyle.Right, .Width = 130, .Padding = New Padding(0, 24, 0, 24), .BackColor = Color.Transparent}
+            Dim pnlAction As New Panel() With {.Dock = DockStyle.Right, .Width = 150, .Padding = New Padding(0, 14, 0, 14), .BackColor = Color.Transparent}
             pnlAction.Controls.Add(btnFermer)
 
             header.Controls.Add(lblTitre)

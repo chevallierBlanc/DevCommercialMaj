@@ -37,14 +37,14 @@ Namespace DevCommerc8ak
             Me.BackColor = Color.FromArgb(248, 249, 250)
             Me.DoubleBuffered = True
 
-            Dim header As New Panel() With {.Dock = DockStyle.Top, .Height = 92, .BackColor = Color.White, .Padding = New Padding(24, 16, 24, 16)}
+            Dim header As New Panel() With {.Dock = DockStyle.Top, .Height = 112, .BackColor = Color.White, .Padding = New Padding(24, 16, 24, 16)}
             Dim lblTitre As New Label() With {.Text = "Détails de l'évaluation de rentabilité", .ForeColor = Color.FromArgb(33, 33, 33), .Font = New Font("Segoe UI", 18.0F, FontStyle.Bold), .AutoSize = True, .Left = 24, .Top = 12}
             Dim lblPeriode As New Label() With {.Text = "Période : " & _dateDebut.ToString("dd/MM/yyyy") & " au " & _dateFin.ToString("dd/MM/yyyy"), .ForeColor = Color.FromArgb(90, 90, 90), .Font = New Font("Segoe UI", 10.0F, FontStyle.Regular), .AutoSize = True, .Left = 26, .Top = 48}
 
             Dim btnFermer As New Button() With {.Text = "Fermer", .Width = 110, .Height = 36, .BackColor = Color.FromArgb(63, 81, 181), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat, .Font = New Font("Segoe UI", 10.0F, FontStyle.Bold), .Cursor = Cursors.Hand, .Dock = DockStyle.Fill}
             btnFermer.FlatAppearance.BorderSize = 0
             AddHandler btnFermer.Click, Sub() Me.Close()
-            Dim pnlAction As New Panel() With {.Dock = DockStyle.Right, .Width = 130, .Padding = New Padding(0, 24, 0, 24), .BackColor = Color.Transparent}
+            Dim pnlAction As New Panel() With {.Dock = DockStyle.Right, .Width = 150, .Padding = New Padding(0, 14, 0, 14), .BackColor = Color.Transparent}
             pnlAction.Controls.Add(btnFermer)
             header.Controls.Add(lblTitre)
             header.Controls.Add(lblPeriode)

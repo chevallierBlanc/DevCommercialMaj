@@ -1649,21 +1649,22 @@ Namespace DevCommerc8ak
                 Dim motifId As Integer = Convert.ToInt32(motifRow("MotifId"))
                 Dim motifLibelle As String = Convert.ToString(motifRow("Libelle"))
                 Dim clientId As Integer? = Nothing
+                Dim clientValue As Object = cmbSortieManuelleClient.SelectedValue
                 Dim statutPaiement As String = "PAYE"
                 Dim montantPaye As Decimal = CalculerTotalPanier()
                 Dim resteAPayer As Decimal = 0D
 
                 If String.Equals(motifLibelle, "Dette Client", StringComparison.OrdinalIgnoreCase) Then
-                    If cmbSortieManuelleClient.SelectedValue Is Nothing Then
+                    If clientValue Is Nothing OrElse IsDBNull(clientValue) Then
                         MessageBox.Show("Le client est obligatoire pour une dette client.")
                         Return
                     End If
-                    clientId = Convert.ToInt32(cmbSortieManuelleClient.SelectedValue)
+                    clientId = Convert.ToInt32(clientValue)
                     statutPaiement = "IMPAYE"
                     montantPaye = 0D
                     resteAPayer = CalculerTotalPanier()
-                ElseIf cmbSortieManuelleClient.SelectedValue IsNot Nothing AndAlso Not TypeOf cmbSortieManuelleClient.SelectedValue Is DataRowView Then
-                    clientId = Convert.ToInt32(cmbSortieManuelleClient.SelectedValue)
+                ElseIf clientValue IsNot Nothing AndAlso Not IsDBNull(clientValue) AndAlso Not TypeOf clientValue Is DataRowView Then
+                    clientId = Convert.ToInt32(clientValue)
                 End If
 
                 Dim lignes As New List(Of StockSortie)()
