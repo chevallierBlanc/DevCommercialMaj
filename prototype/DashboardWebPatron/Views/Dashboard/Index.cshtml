@@ -5,7 +5,6 @@
     var periodeSemaineSelected = Model.Periode == "semaine";
     var periodeMoisSelected = Model.Periode == "mois";
     var periodeAnneeSelected = Model.Periode == "annee";
-    string RenderOption(string value, string text, bool selected) => $"<option value=\"{value}\"{(selected ? " selected=\\\"selected\\\"" : string.Empty)}>{text}</option>";
 }
 
 <section class="hero">
@@ -15,10 +14,38 @@
     </div>
     <form class="filters" method="get">
         <select name="periode">
-            @Html.Raw(RenderOption("jour", "Aujourd'hui", periodeJourSelected))
-            @Html.Raw(RenderOption("semaine", "Cette semaine", periodeSemaineSelected))
-            @Html.Raw(RenderOption("mois", "Ce mois", periodeMoisSelected))
-            @Html.Raw(RenderOption("annee", "Cette année", periodeAnneeSelected))
+            @if (periodeJourSelected)
+            {
+                <option value="jour" selected="selected">Aujourd'hui</option>
+            }
+            else
+            {
+                <option value="jour">Aujourd'hui</option>
+            }
+            @if (periodeSemaineSelected)
+            {
+                <option value="semaine" selected="selected">Cette semaine</option>
+            }
+            else
+            {
+                <option value="semaine">Cette semaine</option>
+            }
+            @if (periodeMoisSelected)
+            {
+                <option value="mois" selected="selected">Ce mois</option>
+            }
+            else
+            {
+                <option value="mois">Ce mois</option>
+            }
+            @if (periodeAnneeSelected)
+            {
+                <option value="annee" selected="selected">Cette année</option>
+            }
+            else
+            {
+                <option value="annee">Cette année</option>
+            }
         </select>
         <input name="month" type="number" min="1" max="12" value="@Model.Month" />
         <input name="year" type="number" min="2020" max="2100" value="@Model.Year" />

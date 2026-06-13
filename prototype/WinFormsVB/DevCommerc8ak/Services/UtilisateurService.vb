@@ -52,6 +52,24 @@ Namespace DevCommerc8ak
             Return _utilisateurRepo.Lister()
         End Function
 
+        ' Met a jour le compte utilisateur.
+        Public Sub MettreAJourUtilisateur(utilisateurId As Integer, nomUtilisateur As String, nomRole As String, estActif As Boolean, Optional nouveauMotDePasse As String = Nothing)
+            If utilisateurId <= 0 Then Throw New ArgumentException("Utilisateur invalide.")
+            If String.IsNullOrWhiteSpace(nomUtilisateur) Then Throw New ArgumentException("Nom utilisateur obligatoire.")
+            If String.IsNullOrWhiteSpace(nomRole) Then Throw New ArgumentException("Role obligatoire.")
+
+            Dim roleId As Integer = _roleRepo.ObtenirIdParNom(nomRole)
+            Dim hash As Byte() = Nothing
+            Dim sel As Byte() = Nothing
+
+            If Not String.IsNullOrWhiteSpace(nouveauMotDePasse) Then
+                sel = GenererSel()
+                hash = HashMotDePasse(nouveauMotDePasse, sel)
+            End If
+
+            _utilisateurRepo.MettreAJour(utilisateurId, nomUtilisateur.Trim(), estActif, roleId, hash, sel)
+        End Sub
+
         ' Met a jour mot de passe.
         Public Sub ReinitialiserMotDePasse(utilisateurId As Integer, nouveauMotDePasse As String)
             Dim sel As Byte() = GenererSel()

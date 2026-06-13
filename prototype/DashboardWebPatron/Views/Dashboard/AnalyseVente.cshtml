@@ -5,7 +5,6 @@
     var periodeJourSelected = Model.Periode == "jour";
     var periodeMoisSelected = Model.Periode == "mois";
     var periodeAnneeSelected = Model.Periode == "annee";
-    string RenderOption(string value, string text, bool selected) => $"<option value=\"{value}\"{(selected ? " selected=\\\"selected\\\"" : string.Empty)}>{text}</option>";
 }
 
 <section class="hero hero-analysis">
@@ -23,9 +22,30 @@
             <label>
                 <span>Période</span>
                 <select name="periode">
-                    @Html.Raw(RenderOption("jour", "Aujourd'hui", periodeJourSelected))
-                    @Html.Raw(RenderOption("mois", "Ce mois", periodeMoisSelected))
-                    @Html.Raw(RenderOption("annee", "Cette année", periodeAnneeSelected))
+                    @if (periodeJourSelected)
+                    {
+                        <option value="jour" selected="selected">Aujourd'hui</option>
+                    }
+                    else
+                    {
+                        <option value="jour">Aujourd'hui</option>
+                    }
+                    @if (periodeMoisSelected)
+                    {
+                        <option value="mois" selected="selected">Ce mois</option>
+                    }
+                    else
+                    {
+                        <option value="mois">Ce mois</option>
+                    }
+                    @if (periodeAnneeSelected)
+                    {
+                        <option value="annee" selected="selected">Cette année</option>
+                    }
+                    else
+                    {
+                        <option value="annee">Cette année</option>
+                    }
                 </select>
             </label>
             <label>

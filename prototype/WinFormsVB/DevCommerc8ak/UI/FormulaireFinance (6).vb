@@ -630,32 +630,106 @@ Namespace DevCommerc8ak
         End Sub
         Private Sub ChargerDashboard()
             Try
-                ' Données pour le graphique des dépenses par catégorie
-                Dim dtStats As DataTable = _depenseService.GetStatsParCategorie()
-                chartDepensesCat.Series(0).Points.Clear()
-                For Each row As DataRow In dtStats.Rows
-                    chartDepensesCat.Series(0).Points.AddXY(row("Categorie"), row("Total"))
-                Next
+                Dim dateJour As DateTime = DateTime.Now
+                Dim totalEncaisseFC As Decimal = _caisseService.GetEncaisse(dateJour, "FC")
+                Dim totalDepensesFC As Decimal = _caisseService.GetDepensesCaisse(dateJour, "FC")
+                Dim soldeGlobalBanqueFC As Decimal = _banqueService.GetSolde("FC")
 
-                '' Données pour le graphique d'évolution
-                'Dim evolution As List(Of EvolutionFinanceDTO) = _caisseService.ObtenirEvolutionFinance()
-                'chartEvolutionFinance.Series("Caisse").Points.Clear()
-                'chartEvolutionFinance.Series("Banque").Points.Clear()
-                'For Each item In evolution
-                '    chartEvolutionFinance.Series("Caisse").Points.AddXY(item.MoisAnnee, item.SoldeCaisse)
-                '    chartEvolutionFinance.Series("Banque").Points.AddXY(item.MoisAnnee, item.SoldeBanque)
-                'Next
+                lblTotalEncaisse.Text = FormatMontant(totalEncaisseFC, "FC")
+                lblTotalDepenses.Text = FormatMontant(totalDepensesFC, "FC")
+                lblSoldeGlobalBanque.Text = FormatMontant(soldeGlobalBanqueFC, "FC")
 
-                '' KPI globaux
-                'Dim kpi As GlobalKpiDTO = _caisseService.ObtenirGlobalKpi()
-                'lblTotalEncaisse.Text = FormatMontant(kpi.TotalEncaisseFC)
-                'lblTotalDepenses.Text = FormatMontant(kpi.TotalDepensesFC)
-                'lblSoldeGlobalBanque.Text = FormatMontant(kpi.SoldeGlobalBanqueFC)
-
+                ChargerRepartitionDepenses()
+                ChargerEvolutionFlux()
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement dashboard: " & ex.Message)
             End Try
         End Sub
+
+        Private Sub ChargerRepartitionDepenses()
+            chartDepensesCat.Series(0).Points.Clear()
+            chartDepensesCat.Series(0).IsVisibleInLegend = True
+            chartDepensesCat.Series(0).IsValueShownAsLabel = True
+            chartDepensesCat.Series(0).LabelForeColor = ColorTextPrimary
+            chartDepensesCat.Series(0)("PieLabelStyle") = "Outside"
+
+            Dim dtStats As DataTable = _depenseService.GetStatsParCategorie()
+            For Each row As DataRow In dtStats.Rows
+                Dim categorie As String = Convert.ToString(row("Categorie"))
+                Dim total As Decimal = If(IsDBNull(row("Total")), 0D, Convert.ToDecimal(row("Total")))
+                Dim indexPoint As Integer = chartDepensesCat.Series(0).Points.AddXY(categorie, total)
+                Dim point As DataPoint = chartDepensesCat.Series(0).Points(indexPoint)
+                point.Label = categorie & " : " & total.ToString("N0") & " FC"
+                point.LegendText = categorie
+            Next
+        End Sub
+
+        Private Sub ChargerEvolutionFlux()
+            chartEvolutionFinance.Series.Clear()
+            chartEvolutionFinance.Legends.Clear()
+            chartEvolutionFinance.Legends.Add(New Legend())
+
+            Dim serieCaisse As New Series("Caisse") With {
+                .ChartType = SeriesChartType.Line,
+                .BorderWidth = 3,
+                .IsValueShownAsLabel = False
+            }
+            Dim serieBanque As New Series("Banque") With {
+                .ChartType = SeriesChartType.Line,
+                .BorderWidth = 3,
+                .IsValueShownAsLabel = False
+            }
+
+            chartEvolutionFinance.Series.Add(serieCaisse)
+            chartEvolutionFinance.Series.Add(serieBanque)
+
+            If chartEvolutionFinance.ChartAreas.Count > 0 Then
+                chartEvolutionFinance.ChartAreas(0).AxisX.Interval = 1
+                chartEvolutionFinance.ChartAreas(0).AxisX.MajorGrid.Enabled = False
+                chartEvolutionFinance.ChartAreas(0).AxisY.MajorGrid.LineColor = Color.FromArgb(235, 235, 235)
+            End If
+
+            Dim historiqueBanque As DataTable = _banqueService.GetHistorique()
+            For i As Integer = 6 To 0 Step -1
+                Dim jour As DateTime = Date.Today.AddDays(-i)
+                Dim fluxCaisse As Decimal = _caisseService.GetEncaisse(jour, "FC") - _caisseService.GetDepensesCaisse(jour, "FC")
+                Dim fluxBanque As Decimal = CalculerFluxBanqueJour(historiqueBanque, jour)
+
+                serieCaisse.Points.AddXY(jour.ToString("dd/MM"), fluxCaisse)
+                serieBanque.Points.AddXY(jour.ToString("dd/MM"), fluxBanque)
+            Next
+        End Sub
+
+        Private Function CalculerFluxBanqueJour(historiqueBanque As DataTable, jour As DateTime) As Decimal
+            If historiqueBanque Is Nothing OrElse historiqueBanque.Rows.Count = 0 Then
+                Return 0D
+            End If
+
+            Dim colonneDate As String = If(historiqueBanque.Columns.Contains("DateOperation"), "DateOperation", "DateTransaction")
+            Dim colonneType As String = If(historiqueBanque.Columns.Contains("TypeOperation"), "TypeOperation", "TypeTransaction")
+            Dim total As Decimal = 0D
+
+            For Each row As DataRow In historiqueBanque.Rows
+                If IsDBNull(row(colonneDate)) Then
+                    Continue For
+                End If
+
+                Dim dateOperation As DateTime = Convert.ToDateTime(row(colonneDate))
+                If dateOperation.Date <> jour.Date Then
+                    Continue For
+                End If
+
+                Dim montant As Decimal = If(IsDBNull(row("Montant")), 0D, Convert.ToDecimal(row("Montant")))
+                Dim typeOperation As String = Convert.ToString(row(colonneType)).Trim().ToLowerInvariant()
+                If typeOperation.Contains("retrait") Then
+                    total -= montant
+                Else
+                    total += montant
+                End If
+            Next
+
+            Return total
+        End Function
 
         Private Sub ChargerCategoriesDepense()
             Try

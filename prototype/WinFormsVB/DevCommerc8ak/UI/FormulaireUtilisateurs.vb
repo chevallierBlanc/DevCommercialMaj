@@ -47,8 +47,10 @@ Namespace DevCommerc8ak
         Private ReadOnly cmbRole As ComboBox
         Private ReadOnly chkActif As CheckBox
         Private ReadOnly btnAjouter As Button
+        Private ReadOnly btnModifier As Button
         Private ReadOnly btnResetMdp As Button
         Private ReadOnly btnRafraichir As Button
+        Private _utilisateurSelectionneId As Integer = -1
 
         ' --- Nouveaux composants de structure (Layouts propres) ---
         Private ReadOnly panelHero As Panel
@@ -144,10 +146,11 @@ Namespace DevCommerc8ak
             }
 
             btnAjouter = CreateStyledButton("Ajouter", ColorPrimary)
+            btnModifier = CreateStyledButton("Modifier", ColorAccent)
             btnResetMdp = CreateStyledButton("Reset MDP", ColorSecondary)
             btnRafraichir = CreateStyledButton("Rafraîchir", Color.Gray)
 
-            flowButtons.Controls.AddRange(New Control() {btnAjouter, btnResetMdp, btnRafraichir})
+            flowButtons.Controls.AddRange(New Control() {btnAjouter, btnModifier, btnResetMdp, btnRafraichir})
 
             ' --- Grilles (Split Vertical) ---
             splitGrids = New TableLayoutPanel() With {
@@ -183,8 +186,11 @@ Namespace DevCommerc8ak
 
             ' --- Liaison des événements (Logique conservée) ---
             AddHandler btnAjouter.Click, AddressOf Ajouter
+            AddHandler btnModifier.Click, AddressOf Modifier
             AddHandler btnResetMdp.Click, AddressOf ResetMdp
             AddHandler btnRafraichir.Click, AddressOf Charger
+            AddHandler grid.SelectionChanged, AddressOf ChargerSelectionUtilisateur
+            AddHandler grid.CellClick, AddressOf Grid_CellClick
 
             ' --- Initialisation ---
             'ThemeHelper.AppliquerTheme(Me)
@@ -256,6 +262,25 @@ Namespace DevCommerc8ak
             Return dgv
         End Function
 
+        Private Sub ConfigurerGrilleUtilisateurs()
+            If grid.Columns.Count = 0 Then
+                Return
+            End If
+
+            If grid.Columns.Contains("UtilisateurId") Then
+                grid.Columns("UtilisateurId").Visible = False
+            End If
+            If grid.Columns.Contains("NomUtilisateur") Then
+                grid.Columns("NomUtilisateur").HeaderText = "Nom d'utilisateur"
+            End If
+            If grid.Columns.Contains("EstActif") Then
+                grid.Columns("EstActif").HeaderText = "Compte actif"
+            End If
+            If grid.Columns.Contains("Role") Then
+                grid.Columns("Role").HeaderText = "Rôle"
+            End If
+        End Sub
+
         ' --- LOGIQUE MÉTIER (STRICTEMENT IDENTIQUE À L'ORIGINAL) ---
 
         Private Function ObtenirService() As UtilisateurService
@@ -271,6 +296,8 @@ Namespace DevCommerc8ak
             Try
                 Dim service As UtilisateurService = ObtenirService()
                 grid.DataSource = service.Lister()
+                ConfigurerGrilleUtilisateurs()
+                ChargerSelectionUtilisateur(Nothing, EventArgs.Empty)
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement utilisateurs: " & ex.Message)
             End Try
@@ -301,6 +328,32 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
+        Private Sub Modifier(sender As Object, e As EventArgs)
+            Try
+                If _utilisateurSelectionneId <= 0 AndAlso grid.CurrentRow IsNot Nothing Then
+                    _utilisateurSelectionneId = Convert.ToInt32(grid.CurrentRow.Cells("UtilisateurId").Value)
+                End If
+
+                If _utilisateurSelectionneId <= 0 Then
+                    MessageBox.Show("Selectionnez un utilisateur.")
+                    Return
+                End If
+
+                If txtNom.Text.Trim() = "" OrElse cmbRole.SelectedItem Is Nothing Then
+                    MessageBox.Show("Nom utilisateur et role obligatoires.")
+                    Return
+                End If
+
+                Dim nouveauMotDePasse As String = txtMotDePasse.Text.Trim()
+                Dim service As UtilisateurService = ObtenirService()
+                service.MettreAJourUtilisateur(_utilisateurSelectionneId, txtNom.Text.Trim(), cmbRole.SelectedItem.ToString(), chkActif.Checked, If(nouveauMotDePasse = "", Nothing, nouveauMotDePasse))
+                MessageBox.Show("Utilisateur mis a jour.")
+                Charger(sender, e)
+            Catch ex As Exception
+                MessageBox.Show("Erreur modification utilisateur: " & ex.Message)
+            End Try
+        End Sub
+
         Private Sub ResetMdp(sender As Object, e As EventArgs)
             Try
                 If grid.CurrentRow Is Nothing Then
@@ -319,6 +372,35 @@ Namespace DevCommerc8ak
             Catch ex As Exception
                 MessageBox.Show("Erreur reset mot de passe: " & ex.Message)
             End Try
+        End Sub
+
+        Private Sub ChargerSelectionUtilisateur(sender As Object, e As EventArgs)
+            Try
+                If grid.CurrentRow Is Nothing OrElse grid.CurrentRow.IsNewRow Then
+                    Return
+                End If
+
+                If grid.CurrentRow.Cells("UtilisateurId") Is Nothing Then
+                    Return
+                End If
+
+                _utilisateurSelectionneId = Convert.ToInt32(grid.CurrentRow.Cells("UtilisateurId").Value)
+                txtNom.Text = Convert.ToString(grid.CurrentRow.Cells("NomUtilisateur").Value)
+                chkActif.Checked = If(grid.CurrentRow.Cells("EstActif").Value Is Nothing OrElse IsDBNull(grid.CurrentRow.Cells("EstActif").Value), False, Convert.ToBoolean(grid.CurrentRow.Cells("EstActif").Value))
+
+                Dim role As String = If(grid.CurrentRow.Cells("Role").Value Is Nothing OrElse IsDBNull(grid.CurrentRow.Cells("Role").Value), "", Convert.ToString(grid.CurrentRow.Cells("Role").Value))
+                If cmbRole.Items.Contains(role) Then
+                    cmbRole.SelectedItem = role
+                Else
+                    cmbRole.SelectedIndex = -1
+                End If
+                txtMotDePasse.Text = ""
+            Catch
+            End Try
+        End Sub
+
+        Private Sub Grid_CellClick(sender As Object, e As DataGridViewCellEventArgs)
+            ChargerSelectionUtilisateur(sender, EventArgs.Empty)
         End Sub
     End Class
 End Namespace

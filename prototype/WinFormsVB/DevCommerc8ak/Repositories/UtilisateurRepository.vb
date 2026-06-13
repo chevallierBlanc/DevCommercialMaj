@@ -43,6 +43,49 @@ Namespace DevCommerc8ak
             _dal.ExecuterNonRequete(sql, CommandType.Text, p)
         End Sub
 
+        ' Met a jour le compte et le role associe.
+        Public Sub MettreAJour(utilisateurId As Integer, nomUtilisateur As String, estActif As Boolean, roleId As Integer, Optional hash As Byte() = Nothing, Optional sel As Byte() = Nothing)
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    Try
+                        Dim sqlUpdate As String = "UPDATE Utilisateurs SET NomUtilisateur=@NomUtilisateur, EstActif=@EstActif"
+                        If hash IsNot Nothing AndAlso sel IsNot Nothing Then
+                            sqlUpdate &= ", MotDePasseHash=@MotDePasseHash, MotDePasseSel=@MotDePasseSel"
+                        End If
+                        sqlUpdate &= " WHERE UtilisateurId=@UtilisateurId"
+
+                        Using cmdUpdate As New SqlCommand(sqlUpdate, cn, tx)
+                            cmdUpdate.Parameters.AddWithValue("@NomUtilisateur", nomUtilisateur)
+                            cmdUpdate.Parameters.AddWithValue("@EstActif", estActif)
+                            cmdUpdate.Parameters.AddWithValue("@UtilisateurId", utilisateurId)
+                            If hash IsNot Nothing AndAlso sel IsNot Nothing Then
+                                cmdUpdate.Parameters.AddWithValue("@MotDePasseHash", hash)
+                                cmdUpdate.Parameters.AddWithValue("@MotDePasseSel", sel)
+                            End If
+                            cmdUpdate.ExecuteNonQuery()
+                        End Using
+
+                        Using cmdDeleteRole As New SqlCommand("DELETE FROM UtilisateurRoles WHERE UtilisateurId=@UtilisateurId", cn, tx)
+                            cmdDeleteRole.Parameters.AddWithValue("@UtilisateurId", utilisateurId)
+                            cmdDeleteRole.ExecuteNonQuery()
+                        End Using
+
+                        Using cmdInsertRole As New SqlCommand("INSERT INTO UtilisateurRoles (UtilisateurId, RoleId) VALUES (@UtilisateurId, @RoleId)", cn, tx)
+                            cmdInsertRole.Parameters.AddWithValue("@UtilisateurId", utilisateurId)
+                            cmdInsertRole.Parameters.AddWithValue("@RoleId", roleId)
+                            cmdInsertRole.ExecuteNonQuery()
+                        End Using
+
+                        tx.Commit()
+                    Catch
+                        tx.Rollback()
+                        Throw
+                    End Try
+                End Using
+            End Using
+        End Sub
+
         ' Recupere un utilisateur par nom.
         Public Function ObtenirParNom(nomUtilisateur As String) As Utilisateur
             Dim sql As String = "SELECT UtilisateurId, NomUtilisateur, MotDePasseHash, MotDePasseSel, EstActif, CreeLe " &
