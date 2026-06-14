@@ -57,24 +57,22 @@ public sealed class DashboardApiClient
         var selectedYear = year ?? today.Year;
         var selectedMonth = month ?? today.Month;
 
-        var (start, end) = mode switch
-        {
-            "jour" => (today.Date, today.Date),
-            "annee" => (new DateTime(selectedYear, 1, 1), new DateTime(selectedYear, 12, 31)),
-            _ => (new DateTime(selectedYear, selectedMonth, 1), new DateTime(selectedYear, selectedMonth, DateTime.DaysInMonth(selectedYear, selectedMonth)))
-        };
-
         var model = new AnalyseVentePageViewModel
         {
             Periode = mode,
             Year = selectedYear,
             Month = selectedMonth,
             Date = today,
-            DateDebut = start,
-            DateFin = end
+            DateDebut = mode == "annee"
+                ? new DateTime(selectedYear, 1, 1)
+                : new DateTime(selectedYear, selectedMonth, 1),
+            DateFin = mode == "annee"
+                ? new DateTime(selectedYear, 12, 31)
+                : new DateTime(selectedYear, selectedMonth, DateTime.DaysInMonth(selectedYear, selectedMonth))
         };
 
-        model.Analyse = await GetOrDefaultAsync<AnalyseVenteResponseDto>($"api/dashboard/analyse-vente?start={Uri.EscapeDataString(start.ToString("yyyy-MM-dd"))}&end={Uri.EscapeDataString(end.ToString("yyyy-MM-dd"))}", ct);
+        var query = $"api/dashboard/analyse-vente?periode={Uri.EscapeDataString(mode)}&year={selectedYear}&month={selectedMonth}&date={Uri.EscapeDataString(today.ToString("yyyy-MM-dd"))}";
+        model.Analyse = await GetOrDefaultAsync<AnalyseVenteResponseDto>(query, ct);
         return model;
     }
 

@@ -120,11 +120,37 @@ dashboard.MapGet("/annuel", async (int? year, DashboardService service) =>
     var result = await service.GetAnnuelAsync(year ?? now.Year);
     return Results.Ok(result);
 });
-dashboard.MapGet("/analyse-vente", async (DateTime? start, DateTime? end, DashboardService service) =>
+dashboard.MapGet("/analyse-vente", async (string? periode, int? year, int? month, DateTime? date, DateTime? start, DateTime? end, DashboardService service) =>
 {
-    var today = DateTime.Today;
-    var dateDebut = start ?? today.AddMonths(-1).AddDays(1 - today.Day);
-    var dateFin = end ?? today;
+    var today = date ?? DateTime.Today;
+    var selectedYear = year ?? today.Year;
+    var selectedMonth = month ?? today.Month;
+    var mode = (periode ?? "mois").Trim().ToLowerInvariant();
+
+    DateTime dateDebut;
+    DateTime dateFin;
+
+    if (start.HasValue && end.HasValue)
+    {
+        dateDebut = start.Value.Date;
+        dateFin = end.Value.Date;
+    }
+    else if (mode == "annee")
+    {
+        dateDebut = new DateTime(selectedYear, 1, 1);
+        dateFin = new DateTime(selectedYear, 12, 31);
+    }
+    else if (mode == "jour")
+    {
+        dateDebut = today.Date;
+        dateFin = today.Date;
+    }
+    else
+    {
+        dateDebut = new DateTime(selectedYear, selectedMonth, 1);
+        dateFin = new DateTime(selectedYear, selectedMonth, DateTime.DaysInMonth(selectedYear, selectedMonth));
+    }
+
     var result = await service.GetAnalyseVenteAsync(dateDebut, dateFin);
     return Results.Ok(result);
 });
