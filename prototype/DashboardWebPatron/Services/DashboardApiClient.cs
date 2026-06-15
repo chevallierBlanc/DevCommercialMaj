@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Diagnostics;
 using DashboardWebPatron.Models;
 using Microsoft.Extensions.Options;
 
@@ -71,7 +72,7 @@ public sealed class DashboardApiClient
         };
 
         var query = $"api/dashboard/analyse-vente?periode={Uri.EscapeDataString(mode)}&year={selectedYear}&month={selectedMonth}&date={Uri.EscapeDataString(today.ToString("yyyy-MM-dd"))}&start={Uri.EscapeDataString(startDate.ToString("yyyy-MM-dd"))}&end={Uri.EscapeDataString(endDate.ToString("yyyy-MM-dd"))}";
-        model.Analyse = await GetOrDefaultAsync<AnalyseVenteResponseDto>(query, ct)
+        model.Analyse = await GetAnalyseAsync(query, ct)
             ?? await GetAnalyseFallbackAsync(mode, selectedYear, selectedMonth, today, ct);
         return model;
     }
@@ -122,6 +123,28 @@ public sealed class DashboardApiClient
         }
     }
 
+    private async Task<AnalyseVenteResponseDto?> GetAnalyseAsync(string path, CancellationToken ct)
+    {
+        try
+        {
+            await EnsureAuthenticatedAsync(ct);
+            return await GetAnalyseResponseAsync(path, ct);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            if (await TryLoginAsync(ct))
+            {
+                return await GetAnalyseResponseAsync(path, ct);
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            TraceAnalyse($"ANALYSE_ERROR path={path} error={ex.GetType().Name}: {ex.Message}");
+            return null;
+        }
+    }
+
     private async Task<T?> GetJsonAsync<T>(string path, CancellationToken ct) where T : class
     {
         using var response = await _http.GetAsync(path, ct);
@@ -145,11 +168,145 @@ public sealed class DashboardApiClient
         return JsonSerializer.Deserialize<T>(raw, options);
     }
 
+    private async Task<AnalyseVenteResponseDto?> GetAnalyseResponseAsync(string path, CancellationToken ct)
+    {
+        using var response = await _http.GetAsync(path, ct);
+        var raw = await response.Content.ReadAsStringAsync(ct);
+        TraceAnalyse($"ANALYSE_HTTP path={path} status={(int)response.StatusCode} raw={raw}");
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            throw new HttpRequestException("Unauthorized", null, response.StatusCode);
+        }
+
+        response.EnsureSuccessStatusCode();
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            TraceAnalyse("ANALYSE_EMPTY_RESPONSE");
+            return null;
+        }
+
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            NumberHandling = JsonNumberHandling.AllowReadingFromString
+        };
+
+        try
+        {
+            var dto = JsonSerializer.Deserialize<AnalyseVenteResponseDto>(raw, options);
+            if (dto is not null)
+            {
+                return dto;
+            }
+        }
+        catch (Exception ex)
+        {
+            TraceAnalyse($"ANALYSE_DESERIALIZE_ERROR type={ex.GetType().Name} message={ex.Message}");
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(raw);
+            var root = doc.RootElement;
+            var fallback = new AnalyseVenteResponseDto
+            {
+                DateDebut = ReadDate(root, "DateDebut"),
+                DateFin = ReadDate(root, "DateFin"),
+                PeriodeLabel = ReadString(root, "PeriodeLabel"),
+                ValeurStockEntree = ReadDecimal(root, "ValeurStockEntree"),
+                CoutMarchandisesVendues = ReadDecimal(root, "CoutMarchandisesVendues"),
+                ChiffreAffaires = ReadDecimal(root, "ChiffreAffaires"),
+                BeneficeRealise = ReadDecimal(root, "BeneficeRealise"),
+                DepensesTotal = ReadDecimal(root, "DepensesTotal"),
+                ChargesSortiesManuelles = ReadDecimal(root, "ChargesSortiesManuelles"),
+                BeneficeNetRealise = ReadDecimal(root, "BeneficeNetRealise"),
+                CoutStockRestant = ReadDecimal(root, "CoutStockRestant"),
+                ProjectionBeneficeRestant = ReadDecimal(root, "ProjectionBeneficeRestant"),
+                MargeBeneficiairePourcentage = ReadDecimal(root, "MargeBeneficiairePourcentage"),
+                Evaluation = ReadString(root, "Evaluation")
+            };
+
+            if (root.TryGetProperty("Details", out var detailsEl) && detailsEl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in detailsEl.EnumerateArray())
+                {
+                    fallback.Details.Add(new AnalyseVenteDetailRowDto
+                    {
+                        Ordre = ReadInt(item, "Ordre"),
+                        Rubrique = ReadString(item, "Rubrique"),
+                        Categorie = ReadString(item, "Categorie"),
+                        QuantitePieces = ReadDecimal(item, "QuantitePieces"),
+                        Montant = ReadDecimal(item, "Montant"),
+                        Commentaire = ReadString(item, "Commentaire")
+                    });
+                }
+            }
+
+            var hasKnownShape = root.ValueKind == JsonValueKind.Object
+                && (root.TryGetProperty("ValeurStockEntree", out _)
+                    || root.TryGetProperty("CoutMarchandisesVendues", out _)
+                    || root.TryGetProperty("ChiffreAffaires", out _)
+                    || root.TryGetProperty("BeneficeRealise", out _)
+                    || root.TryGetProperty("DepensesTotal", out _)
+                    || root.TryGetProperty("ChargesSortiesManuelles", out _)
+                    || root.TryGetProperty("BeneficeNetRealise", out _)
+                    || root.TryGetProperty("CoutStockRestant", out _)
+                    || root.TryGetProperty("ProjectionBeneficeRestant", out _)
+                    || root.TryGetProperty("MargeBeneficiairePourcentage", out _)
+                    || root.TryGetProperty("Evaluation", out _)
+                    || root.TryGetProperty("Details", out _));
+
+            TraceAnalyse($"ANALYSE_FALLBACK_PARSED hasKnownShape={hasKnownShape} details={fallback.Details.Count}");
+            return hasKnownShape ? fallback : null;
+        }
+        catch (Exception ex)
+        {
+            TraceAnalyse($"ANALYSE_FALLBACK_ERROR type={ex.GetType().Name} message={ex.Message}");
+            return null;
+        }
+    }
+
     private async Task<AnalyseVenteResponseDto?> GetAnalyseFallbackAsync(string mode, int year, int month, DateTime today, CancellationToken ct)
     {
         var fallbackQuery = $"api/dashboard/analyse-vente?periode={Uri.EscapeDataString(mode)}&year={year}&month={month}&date={Uri.EscapeDataString(today.ToString("yyyy-MM-dd"))}";
-        return await GetOrDefaultAsync<AnalyseVenteResponseDto>(fallbackQuery, ct);
+        return await GetAnalyseAsync(fallbackQuery, ct);
     }
+
+    [Conditional("DEBUG")]
+    private static void TraceAnalyse(string message)
+    {
+        Debug.WriteLine(message);
+    }
+
+    private static string ReadString(JsonElement root, string name)
+        => root.TryGetProperty(name, out var value) ? value.ToString() ?? string.Empty : string.Empty;
+
+    private static int ReadInt(JsonElement root, string name)
+        => root.TryGetProperty(name, out var value) && value.TryGetInt32(out var n) ? n : 0;
+
+    private static decimal ReadDecimal(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var value))
+        {
+            return 0m;
+        }
+
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out var number))
+        {
+            return number;
+        }
+
+        if (value.ValueKind == JsonValueKind.String && decimal.TryParse(value.GetString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+        {
+            return parsed;
+        }
+
+        return 0m;
+    }
+
+    private static DateTime ReadDate(JsonElement root, string name)
+        => root.TryGetProperty(name, out var value) && DateTime.TryParse(value.ToString(), out var parsed) ? parsed : default;
 
     private async Task<bool> EnsureAuthenticatedAsync(CancellationToken ct)
     {
