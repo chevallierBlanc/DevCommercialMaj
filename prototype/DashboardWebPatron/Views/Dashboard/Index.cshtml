@@ -5,6 +5,9 @@
     var periodeSemaineSelected = Model.Periode == "semaine";
     var periodeMoisSelected = Model.Periode == "mois";
     var periodeAnneeSelected = Model.Periode == "annee";
+    var caTitle = periodeJourSelected ? "CA du jour" : periodeSemaineSelected ? "CA de la semaine" : periodeMoisSelected ? "CA du mois" : "CA annuel";
+    var sortiesTitle = periodeJourSelected ? "Sorties manuelles" : "Sorties de la période";
+    var depensesTitle = periodeJourSelected ? "Dépenses" : "Dépenses de la période";
 }
 
 <section class="hero">
@@ -64,7 +67,7 @@
 </section>
 
 <section class="panel">
-    <h2>CA du jour</h2>
+    <h2>@caTitle</h2>
     <div class="table-wrap">
         <table>
             <thead>
@@ -97,7 +100,7 @@
 
 <section class="grid-2">
     <article class="panel">
-        <h2>Sorties manuelles</h2>
+        <h2>@sortiesTitle</h2>
         <div class="table-wrap">
             <table>
                 <thead>
@@ -130,7 +133,7 @@
         </div>
     </article>
     <article class="panel">
-        <h2>Dépenses</h2>
+        <h2>@depensesTitle</h2>
         <div class="table-wrap">
             <table>
                 <thead>

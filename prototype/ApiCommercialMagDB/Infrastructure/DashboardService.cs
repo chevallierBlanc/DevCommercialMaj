@@ -6,6 +6,9 @@ public sealed class DashboardService(DashboardRepository repository)
     public Task<JournalierDashboardResponse> GetJournalierAsync(DateTime date, CancellationToken ct = default)
         => repository.GetJournalierAsync(date, ct);
 
+    public Task<JournalierDashboardResponse> GetJournalierAsync(DateTime start, DateTime end, CancellationToken ct = default)
+        => repository.GetJournalierAsync(start, end, ct);
+
     public Task<MensuelDashboardResponse> GetMensuelAsync(int year, int month, CancellationToken ct = default)
         => repository.GetMensuelAsync(year, month, ct);
 

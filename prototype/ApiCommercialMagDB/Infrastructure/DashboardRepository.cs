@@ -7,48 +7,54 @@ namespace CommercialMagDb.Api.Infrastructure;
 public sealed class DashboardRepository(DbConnectionFactory factory)
 {
     public async Task<JournalierDashboardResponse> GetJournalierAsync(DateTime date, CancellationToken ct = default)
+        => await GetJournalierAsync(date.Date, date.Date, ct);
+
+    public async Task<JournalierDashboardResponse> GetJournalierAsync(DateTime startDate, DateTime endDate, CancellationToken ct = default)
     {
         await using var cn = factory.Create();
         await cn.OpenAsync(ct);
-        var start = date.Date;
-        var end = start.AddDays(1);
+        var start = startDate.Date;
+        var end = endDate.Date.AddDays(1);
         var totals = await LoadTotalsAsync(cn, start, end, ct);
 
         var response = new JournalierDashboardResponse
         {
-            Date = date.Date,
+            Date = start,
             CaDuJour = totals.MontantTotalGenere,
             TotalSorties = totals.TotalVentes + totals.TotalSortiesManuelles + totals.TotalPertes,
             DepensesDuJour = await ScalarDecimalAsync(cn, """
                 SELECT ISNULL(SUM(ISNULL(d.Montant,0)),0)
                 FROM Depenses d
-                WHERE CONVERT(date, d.DateDepense) = @DateRef
-                """, ct, ("@DateRef", date.Date))
+                WHERE d.DateDepense >= @StartDate
+                  AND d.DateDepense < @EndDate
+                """, ct, ("@StartDate", start), ("@EndDate", end))
         };
         response.BeneficeEstime = response.CaDuJour - response.DepensesDuJour;
         ApplyTotals(response, totals);
 
-        response.ProduitsVendus = await QueryDailyProductsAsync(cn, date, ct);
-        response.SortiesManuelles = await QueryManualExitsAsync(cn, date, ct);
-        response.DepensesParCategorie = await QueryExpensesByCategoryAsync(cn, date, ct);
+        response.ProduitsVendus = await QueryDailyProductsAsync(cn, start, end, ct);
+        response.SortiesManuelles = await QueryManualExitsAsync(cn, start, end, ct);
+        response.DepensesParCategorie = await QueryExpensesByCategoryAsync(cn, start, ct, end);
         response.AlertesStockFaible = await QueryStockAlertsAsync(cn, ct);
         response.SeriesVentes = await QuerySeriesAsync(cn, """
             SELECT CONVERT(date, f.CreeLe) AS Label,
                    ISNULL(SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0) END), 0) AS Value
             FROM LignesFactureVente l
             INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId
-            WHERE CONVERT(date, f.CreeLe) = @DateRef
+            WHERE f.CreeLe >= @StartDate
+              AND f.CreeLe < @EndDate
               AND UPPER(ISNULL(f.Statut,'')) = 'PAYEE'
             GROUP BY CONVERT(date, f.CreeLe)
             ORDER BY CONVERT(date, f.CreeLe)
-            """, ct, ("@DateRef", date.Date));
+            """, ct, ("@StartDate", start), ("@EndDate", end));
         response.SeriesDepenses = await QuerySeriesAsync(cn, """
             SELECT CONVERT(date, d.DateDepense) AS Label, ISNULL(SUM(ISNULL(d.Montant,0)),0) AS Value
             FROM Depenses d
-            WHERE CONVERT(date, d.DateDepense) = @DateRef
+            WHERE d.DateDepense >= @StartDate
+              AND d.DateDepense < @EndDate
             GROUP BY CONVERT(date, d.DateDepense)
             ORDER BY CONVERT(date, d.DateDepense)
-            """, ct, ("@DateRef", date.Date));
+            """, ct, ("@StartDate", start), ("@EndDate", end));
         return response;
     }
 
@@ -543,7 +549,7 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
         return list;
     }
 
-    private static async Task<List<DailyProductRow>> QueryDailyProductsAsync(SqlConnection cn, DateTime date, CancellationToken ct)
+    private static async Task<List<DailyProductRow>> QueryDailyProductsAsync(SqlConnection cn, DateTime start, DateTime end, CancellationToken ct)
     {
         const string sql = """
             SELECT TOP 10 p.Libelle,
@@ -556,13 +562,15 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
             INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId
             INNER JOIN Produits p ON p.ProduitId = l.ProduitId
             LEFT JOIN Utilisateurs u ON u.UtilisateurId = f.CreePar
-            WHERE CONVERT(date, f.CreeLe) = @DateRef
+            WHERE f.CreeLe >= @StartDate
+              AND f.CreeLe < @EndDate
               AND UPPER(ISNULL(f.Statut,'')) = 'PAYEE'
             GROUP BY p.Libelle
             ORDER BY SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie,0) * ISNULL(l.PrixUnitaire,0) END) DESC
             """;
         await using var cmd = new SqlCommand(sql, cn);
-        cmd.Parameters.AddWithValue("@DateRef", date.Date);
+        cmd.Parameters.AddWithValue("@StartDate", start);
+        cmd.Parameters.AddWithValue("@EndDate", end);
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         var list = new List<DailyProductRow>();
         while (await reader.ReadAsync(ct))
@@ -573,14 +581,14 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
                 QuantitySold = reader.IsDBNull(1) ? 0m : Convert.ToDecimal(reader.GetValue(1)),
                 TypeVente = reader.GetValue(2).ToString() ?? string.Empty,
                 AmountGenerated = reader.IsDBNull(3) ? 0m : Convert.ToDecimal(reader.GetValue(3)),
-                Hour = reader.IsDBNull(4) ? date : Convert.ToDateTime(reader.GetValue(4)),
+                Hour = reader.IsDBNull(4) ? start : Convert.ToDateTime(reader.GetValue(4)),
                 Agent = reader.GetValue(5).ToString() ?? string.Empty
             });
         }
         return list;
     }
 
-    private static async Task<List<ManualExitRow>> QueryManualExitsAsync(SqlConnection cn, DateTime date, CancellationToken ct)
+    private static async Task<List<ManualExitRow>> QueryManualExitsAsync(SqlConnection cn, DateTime start, DateTime end, CancellationToken ct)
     {
         const string sql = """
             SELECT TOP 50 p.Libelle,
@@ -595,12 +603,14 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
             INNER JOIN Produits p ON p.ProduitId = ss.ProduitId
             LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId
             LEFT JOIN Utilisateurs u ON u.UtilisateurId = ss.CreePar
-            WHERE CONVERT(date, ss.DateSortie) = @DateRef
+            WHERE ss.DateSortie >= @StartDate
+              AND ss.DateSortie < @EndDate
               AND UPPER(ISNULL(ss.Source,'')) IN ('SORTIE_MANUELLE','MANUEL','ADMIN')
             ORDER BY ss.DateSortie DESC
             """;
         await using var cmd = new SqlCommand(sql, cn);
-        cmd.Parameters.AddWithValue("@DateRef", date.Date);
+        cmd.Parameters.AddWithValue("@StartDate", start);
+        cmd.Parameters.AddWithValue("@EndDate", end);
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         var list = new List<ManualExitRow>();
         while (await reader.ReadAsync(ct))
@@ -612,7 +622,7 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
                 Motif = reader.GetValue(2).ToString() ?? string.Empty,
                 Category = reader.GetValue(3).ToString() ?? string.Empty,
                 User = reader.GetValue(4).ToString() ?? string.Empty,
-                Date = reader.IsDBNull(5) ? date : Convert.ToDateTime(reader.GetValue(5)),
+                Date = reader.IsDBNull(5) ? start : Convert.ToDateTime(reader.GetValue(5)),
                 Amount = reader.IsDBNull(6) ? 0m : Convert.ToDecimal(reader.GetValue(6)),
                 Observation = reader.GetValue(7).ToString() ?? string.Empty
             });

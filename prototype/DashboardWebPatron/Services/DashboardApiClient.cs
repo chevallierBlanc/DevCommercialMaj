@@ -32,6 +32,7 @@ public sealed class DashboardApiClient
         var today = date ?? DateTime.Today;
         var selectedYear = year ?? today.Year;
         var selectedMonth = month ?? today.Month;
+        var (startDate, endDate) = ResolvePeriodRange(mode, selectedYear, selectedMonth, today);
 
         var model = new DashboardPageViewModel
         {
@@ -41,9 +42,8 @@ public sealed class DashboardApiClient
             Date = today
         };
 
-        model.Journalier = await GetOrDefaultAsync<JournalierDashboardResponseDto>($"api/dashboard/journalier?date={Uri.EscapeDataString(today.ToString("yyyy-MM-dd"))}", ct);
-        model.Mensuel = await GetOrDefaultAsync<MensuelDashboardResponseDto>($"api/dashboard/mensuel?year={selectedYear}&month={selectedMonth}", ct);
-        model.Annuel = await GetOrDefaultAsync<AnnuelDashboardResponseDto>($"api/dashboard/annuel?year={selectedYear}", ct);
+        var query = $"api/dashboard/journalier?start={Uri.EscapeDataString(startDate.ToString("yyyy-MM-dd"))}&end={Uri.EscapeDataString(endDate.ToString("yyyy-MM-dd"))}&date={Uri.EscapeDataString(today.ToString("yyyy-MM-dd"))}";
+        model.Journalier = await GetOrDefaultAsync<JournalierDashboardResponseDto>(query, ct);
 
         return model;
     }
@@ -56,6 +56,7 @@ public sealed class DashboardApiClient
         var today = date ?? DateTime.Today;
         var selectedYear = year ?? today.Year;
         var selectedMonth = month ?? today.Month;
+        var (startDate, endDate) = ResolvePeriodRange(mode, selectedYear, selectedMonth, today);
 
         var model = new AnalyseVentePageViewModel
         {
@@ -63,17 +64,37 @@ public sealed class DashboardApiClient
             Year = selectedYear,
             Month = selectedMonth,
             Date = today,
-            DateDebut = mode == "annee"
-                ? new DateTime(selectedYear, 1, 1)
-                : new DateTime(selectedYear, selectedMonth, 1),
-            DateFin = mode == "annee"
-                ? new DateTime(selectedYear, 12, 31)
-                : new DateTime(selectedYear, selectedMonth, DateTime.DaysInMonth(selectedYear, selectedMonth))
+            DateDebut = startDate,
+            DateFin = endDate
         };
 
-        var query = $"api/dashboard/analyse-vente?periode={Uri.EscapeDataString(mode)}&year={selectedYear}&month={selectedMonth}&date={Uri.EscapeDataString(today.ToString("yyyy-MM-dd"))}";
+        var query = $"api/dashboard/analyse-vente?periode={Uri.EscapeDataString(mode)}&year={selectedYear}&month={selectedMonth}&date={Uri.EscapeDataString(today.ToString("yyyy-MM-dd"))}&start={Uri.EscapeDataString(startDate.ToString("yyyy-MM-dd"))}&end={Uri.EscapeDataString(endDate.ToString("yyyy-MM-dd"))}";
         model.Analyse = await GetOrDefaultAsync<AnalyseVenteResponseDto>(query, ct);
         return model;
+    }
+
+    private static (DateTime Start, DateTime End) ResolvePeriodRange(string mode, int year, int month, DateTime referenceDate)
+    {
+        if (mode == "annee")
+        {
+            return (new DateTime(year, 1, 1), new DateTime(year, 12, 31));
+        }
+
+        if (mode == "semaine")
+        {
+            var offset = ((int)referenceDate.DayOfWeek + 6) % 7;
+            var start = referenceDate.Date.AddDays(-offset);
+            return (start, start.AddDays(6));
+        }
+
+        if (mode == "jour")
+        {
+            var start = referenceDate.Date;
+            return (start, start);
+        }
+
+        var monthStart = new DateTime(year, month, 1);
+        return (monthStart, monthStart.AddMonths(1).AddDays(-1));
     }
 
     private async Task<T?> GetOrDefaultAsync<T>(string path, CancellationToken ct) where T : class

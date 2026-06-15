@@ -15,39 +15,21 @@ public sealed class DashboardPageViewModel
 
     private IEnumerable<DashboardMetricDto> BuildMetrics()
     {
-        if (Periode.Equals("mois", StringComparison.OrdinalIgnoreCase) && Mensuel is not null)
+        if (Journalier is null)
         {
-            return new[]
-            {
-                new DashboardMetricDto { Label = "CA du mois", Value = Mensuel.CaMensuel, Unit = "FC" },
-                new DashboardMetricDto { Label = "Dépenses", Value = Mensuel.DepensesMensuelles, Unit = "FC" },
-                new DashboardMetricDto { Label = "Bénéfice", Value = Mensuel.BeneficeEstime, Unit = "FC" },
-                new DashboardMetricDto { Label = "Stock / sorties", Value = Mensuel.TotalSortiesManuelles, Unit = "pcs" }
-            };
+            return Array.Empty<DashboardMetricDto>();
         }
 
-        if (Periode.Equals("annee", StringComparison.OrdinalIgnoreCase) && Annuel is not null)
-        {
-            return new[]
-            {
-                new DashboardMetricDto { Label = "CA annuel", Value = Annuel.CaAnnuel, Unit = "FC" },
-                new DashboardMetricDto { Label = "Dépenses", Value = Annuel.DepensesAnnuelles, Unit = "FC" },
-                new DashboardMetricDto { Label = "Bénéfice", Value = Annuel.BeneficeEstime, Unit = "FC" },
-                new DashboardMetricDto { Label = "Mouvements", Value = Annuel.TotalSortiesManuelles, Unit = "pcs" }
-            };
-        }
+        var isJour = Periode.Equals("jour", StringComparison.OrdinalIgnoreCase);
+        var caLabel = isJour ? "CA du jour" : Periode.Equals("semaine", StringComparison.OrdinalIgnoreCase) ? "CA de la semaine" : Periode.Equals("annee", StringComparison.OrdinalIgnoreCase) ? "CA annuel" : "CA de la période";
+        var mouvementLabel = isJour ? "Sorties" : "Mouvements";
 
-        if (Journalier is not null)
+        return new[]
         {
-            return new[]
-            {
-                new DashboardMetricDto { Label = "CA du jour", Value = Journalier.CaDuJour, Unit = "FC" },
-                new DashboardMetricDto { Label = "Dépenses", Value = Journalier.DepensesDuJour, Unit = "FC" },
-                new DashboardMetricDto { Label = "Bénéfice", Value = Journalier.BeneficeEstime, Unit = "FC" },
-                new DashboardMetricDto { Label = "Sorties", Value = Journalier.TotalSorties, Unit = "pcs" }
-            };
-        }
-
-        return Array.Empty<DashboardMetricDto>();
+            new DashboardMetricDto { Label = caLabel, Value = Journalier.CaDuJour, Unit = "FC" },
+            new DashboardMetricDto { Label = "Dépenses", Value = Journalier.DepensesDuJour, Unit = "FC" },
+            new DashboardMetricDto { Label = "Bénéfice", Value = Journalier.BeneficeEstime, Unit = "FC" },
+            new DashboardMetricDto { Label = mouvementLabel, Value = Journalier.TotalSorties, Unit = "pcs" }
+        };
     }
 }

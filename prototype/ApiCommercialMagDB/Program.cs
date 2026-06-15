@@ -103,10 +103,16 @@ depenses.MapPost("", async (DepenseSyncRequest request, SyncService service) =>
 });
 
 var dashboard = app.MapGroup("/api/dashboard").RequireAuthorization();
-dashboard.MapGet("/journalier", async (DateTime? date, DashboardService service) =>
+dashboard.MapGet("/journalier", async (DateTime? date, DateTime? start, DateTime? end, DashboardService service) =>
 {
-    var result = await service.GetJournalierAsync(date ?? DateTime.Today);
-    return Results.Ok(result);
+    if (start.HasValue && end.HasValue)
+    {
+        var result = await service.GetJournalierAsync(start.Value, end.Value);
+        return Results.Ok(result);
+    }
+
+    var resultByDate = await service.GetJournalierAsync(date ?? DateTime.Today);
+    return Results.Ok(resultByDate);
 });
 dashboard.MapGet("/mensuel", async (int? year, int? month, DashboardService service) =>
 {

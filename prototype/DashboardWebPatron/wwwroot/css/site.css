@@ -113,9 +113,17 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    gap: 12px;
 }
 .card span { color: var(--muted); font-size: 14px; }
-.card strong { font-size: 32px; color: var(--primary); }
+.card strong {
+    font-size: clamp(20px, 2.8vw, 32px);
+    color: var(--primary);
+    line-height: 1.08;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
 .panel { padding: 18px; margin-bottom: 16px; }
 .panel h2 { margin: 0 0 14px; font-size: 22px; }
 .table-wrap { overflow-x: auto; }
@@ -229,7 +237,14 @@ th { color: var(--muted); font-size: 14px; }
     overflow: hidden;
 }
 .analysis-card span { color: var(--muted); font-size: 14px; }
-.analysis-card strong { font-size: 32px; color: var(--primary); line-height: 1.1; }
+.analysis-card strong {
+    font-size: clamp(20px, 2.8vw, 32px);
+    color: var(--primary);
+    line-height: 1.08;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
 .analysis-card.accent strong { color: var(--accent); }
 .analysis-card::before {
     content: "";
