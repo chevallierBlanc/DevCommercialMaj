@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using DashboardWebPatron.Models;
 using Microsoft.Extensions.Options;
 
@@ -69,7 +71,8 @@ public sealed class DashboardApiClient
         };
 
         var query = $"api/dashboard/analyse-vente?periode={Uri.EscapeDataString(mode)}&year={selectedYear}&month={selectedMonth}&date={Uri.EscapeDataString(today.ToString("yyyy-MM-dd"))}&start={Uri.EscapeDataString(startDate.ToString("yyyy-MM-dd"))}&end={Uri.EscapeDataString(endDate.ToString("yyyy-MM-dd"))}";
-        model.Analyse = await GetOrDefaultAsync<AnalyseVenteResponseDto>(query, ct);
+        model.Analyse = await GetOrDefaultAsync<AnalyseVenteResponseDto>(query, ct)
+            ?? await GetAnalyseFallbackAsync(mode, selectedYear, selectedMonth, today, ct);
         return model;
     }
 
@@ -102,13 +105,13 @@ public sealed class DashboardApiClient
         try
         {
             await EnsureAuthenticatedAsync(ct);
-            return await _http.GetFromJsonAsync<T>(path, ct);
+            return await GetJsonAsync<T>(path, ct);
         }
         catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
         {
             if (await TryLoginAsync(ct))
             {
-                return await _http.GetFromJsonAsync<T>(path, ct);
+                return await GetJsonAsync<T>(path, ct);
             }
             return null;
         }
@@ -117,6 +120,35 @@ public sealed class DashboardApiClient
             System.Diagnostics.Debug.WriteLine(ex);
             return null;
         }
+    }
+
+    private async Task<T?> GetJsonAsync<T>(string path, CancellationToken ct) where T : class
+    {
+        using var response = await _http.GetAsync(path, ct);
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            throw new HttpRequestException("Unauthorized", null, response.StatusCode);
+        }
+
+        response.EnsureSuccessStatusCode();
+
+        var raw = await response.Content.ReadAsStringAsync(ct);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return null;
+        }
+
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            NumberHandling = JsonNumberHandling.AllowReadingFromString
+        };
+        return JsonSerializer.Deserialize<T>(raw, options);
+    }
+
+    private async Task<AnalyseVenteResponseDto?> GetAnalyseFallbackAsync(string mode, int year, int month, DateTime today, CancellationToken ct)
+    {
+        var fallbackQuery = $"api/dashboard/analyse-vente?periode={Uri.EscapeDataString(mode)}&year={year}&month={month}&date={Uri.EscapeDataString(today.ToString("yyyy-MM-dd"))}";
+        return await GetOrDefaultAsync<AnalyseVenteResponseDto>(fallbackQuery, ct);
     }
 
     private async Task<bool> EnsureAuthenticatedAsync(CancellationToken ct)

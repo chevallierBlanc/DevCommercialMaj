@@ -127,6 +127,20 @@ body {
 .panel { padding: 18px; margin-bottom: 16px; }
 .panel h2 { margin: 0 0 14px; font-size: 22px; }
 .table-wrap { overflow-x: auto; }
+.dashboard-scroll {
+    max-height: 360px;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+}
+.dashboard-scroll table {
+    min-width: 100%;
+}
+.dashboard-scroll th {
+    position: sticky;
+    top: 0;
+    background: var(--card);
+    z-index: 1;
+}
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 12px 10px; border-bottom: 1px solid var(--border); text-align: left; }
 th { color: var(--muted); font-size: 14px; }
@@ -273,6 +287,11 @@ th { color: var(--muted); font-size: 14px; }
 }
 .table-wrap table {
     border-spacing: 0;
+}
+@media (max-width: 1100px) {
+    .dashboard-scroll {
+        max-height: 320px;
+    }
 }
 tbody tr:hover {
     background: rgba(63, 81, 181, 0.04);
