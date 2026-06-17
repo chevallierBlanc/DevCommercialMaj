@@ -15,6 +15,9 @@ public sealed class DashboardApiClient
     private readonly DashboardApiOptions _options;
     private string? _cachedAccessToken;
     private DateTime _cachedAccessTokenExpiresAtUtc;
+    private string? _cachedRefreshToken;
+    private DateTime _cachedRefreshTokenExpiresAtUtc;
+    private bool _configuredAccessTokenRejected;
     private readonly SemaphoreSlim _authLock = new(1, 1);
 
     public DashboardApiClient(HttpClient http, IOptions<DashboardApiOptions> options)
@@ -25,12 +28,17 @@ public sealed class DashboardApiClient
         if (!string.IsNullOrWhiteSpace(_options.AccessToken))
         {
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _options.AccessToken);
+            TraceAuth($"AUTH_CONFIGURED_TOKEN_PRESENT prefix={MaskToken(_options.AccessToken)}");
         }
     }
 
     public async Task<DashboardPageViewModel> LoadAsync(string? periode, int? year, int? month, DateTime? date, CancellationToken ct = default)
     {
-        await EnsureAuthenticatedAsync(ct);
+        if (!await EnsureAuthenticatedAsync(ct))
+        {
+            TraceAuth("AUTH_FAILED load=dashboard/index");
+            return new DashboardPageViewModel();
+        }
         var mode = (periode ?? "jour").Trim().ToLowerInvariant();
         var today = date ?? DateTime.Today;
         var selectedYear = year ?? today.Year;
@@ -53,7 +61,11 @@ public sealed class DashboardApiClient
 
     public async Task<AnalyseVentePageViewModel> LoadAnalyseAsync(string? periode, int? year, int? month, DateTime? date, CancellationToken ct = default)
     {
-        await EnsureAuthenticatedAsync(ct);
+        if (!await EnsureAuthenticatedAsync(ct))
+        {
+            TraceAnalyse("ANALYSE_AUTH_FAILED load=dashboard/analyse-vente");
+            return new AnalyseVentePageViewModel();
+        }
 
         var mode = (periode ?? "mois").Trim().ToLowerInvariant();
         var today = date ?? DateTime.Today;
@@ -105,12 +117,17 @@ public sealed class DashboardApiClient
     {
         try
         {
-            await EnsureAuthenticatedAsync(ct);
+            if (!await EnsureAuthenticatedAsync(ct))
+            {
+                TraceAuth($"AUTH_FAILED path={path}");
+                return null;
+            }
             return await GetJsonAsync<T>(path, ct);
         }
         catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
         {
-            if (await TryLoginAsync(ct))
+            TraceAuth($"AUTH_401 path={path} retry=refresh_or_login");
+            if (await EnsureAuthenticatedAsync(ct, forceRefresh: true))
             {
                 return await GetJsonAsync<T>(path, ct);
             }
@@ -127,12 +144,17 @@ public sealed class DashboardApiClient
     {
         try
         {
-            await EnsureAuthenticatedAsync(ct);
+            if (!await EnsureAuthenticatedAsync(ct))
+            {
+                TraceAnalyse($"ANALYSE_AUTH_FAILED path={path}");
+                return null;
+            }
             return await GetAnalyseResponseAsync(path, ct);
         }
         catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
         {
-            if (await TryLoginAsync(ct))
+            TraceAnalyse($"ANALYSE_AUTH_401 path={path} retry=refresh_or_login");
+            if (await EnsureAuthenticatedAsync(ct, forceRefresh: true))
             {
                 return await GetAnalyseResponseAsync(path, ct);
             }
@@ -147,10 +169,10 @@ public sealed class DashboardApiClient
 
     private async Task<T?> GetJsonAsync<T>(string path, CancellationToken ct) where T : class
     {
-        using var response = await _http.GetAsync(path, ct);
-        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        using var response = await SendAuthenticatedGetAsync(path, ct);
+        if (response is null)
         {
-            throw new HttpRequestException("Unauthorized", null, response.StatusCode);
+            return null;
         }
 
         response.EnsureSuccessStatusCode();
@@ -170,14 +192,14 @@ public sealed class DashboardApiClient
 
     private async Task<AnalyseVenteResponseDto?> GetAnalyseResponseAsync(string path, CancellationToken ct)
     {
-        using var response = await _http.GetAsync(path, ct);
+        using var response = await SendAuthenticatedGetAsync(path, ct);
+        if (response is null)
+        {
+            TraceAnalyse($"ANALYSE_HTTP path={path} status=0 raw=<no-response>");
+            return null;
+        }
         var raw = await response.Content.ReadAsStringAsync(ct);
         TraceAnalyse($"ANALYSE_HTTP path={path} status={(int)response.StatusCode} raw={raw}");
-
-        if (response.StatusCode == HttpStatusCode.Unauthorized)
-        {
-            throw new HttpRequestException("Unauthorized", null, response.StatusCode);
-        }
 
         response.EnsureSuccessStatusCode();
 
@@ -308,18 +330,36 @@ public sealed class DashboardApiClient
     private static DateTime ReadDate(JsonElement root, string name)
         => root.TryGetProperty(name, out var value) && DateTime.TryParse(value.ToString(), out var parsed) ? parsed : default;
 
-    private async Task<bool> EnsureAuthenticatedAsync(CancellationToken ct)
+    private async Task<bool> EnsureAuthenticatedAsync(CancellationToken ct, bool forceRefresh = false)
     {
-        if (!string.IsNullOrWhiteSpace(_options.AccessToken))
+        if (forceRefresh)
         {
-            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _options.AccessToken);
+            if (await TryRefreshAsync(ct))
+            {
+                return true;
+            }
+
+            return await TryLoginAsync(ct);
+        }
+
+        if (!_configuredAccessTokenRejected && !string.IsNullOrWhiteSpace(_options.AccessToken))
+        {
+            ApplyAuthorizationHeader(_options.AccessToken, "configured");
             return true;
         }
 
         if (!string.IsNullOrWhiteSpace(_cachedAccessToken) && _cachedAccessTokenExpiresAtUtc > DateTime.UtcNow.AddMinutes(2))
         {
-            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _cachedAccessToken);
+            ApplyAuthorizationHeader(_cachedAccessToken, $"cached expiresAtUtc={_cachedAccessTokenExpiresAtUtc:O}");
             return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_cachedRefreshToken) && _cachedRefreshTokenExpiresAtUtc > DateTime.UtcNow.AddMinutes(2))
+        {
+            if (await TryRefreshAsync(ct))
+            {
+                return true;
+            }
         }
 
         return await TryLoginAsync(ct);
@@ -330,18 +370,7 @@ public sealed class DashboardApiClient
         await _authLock.WaitAsync(ct);
         try
         {
-            if (!string.IsNullOrWhiteSpace(_options.AccessToken))
-            {
-                _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _options.AccessToken);
-                return true;
-            }
-
-            if (!string.IsNullOrWhiteSpace(_cachedAccessToken) && _cachedAccessTokenExpiresAtUtc > DateTime.UtcNow.AddMinutes(2))
-            {
-                _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _cachedAccessToken);
-                return true;
-            }
-
+            TraceAuth($"AUTH_LOGIN_ATTEMPT url=api/auth/login user={_options.Username} baseUrl={_http.BaseAddress}");
             var login = new LoginRequestDto
             {
                 Username = _options.Username,
@@ -349,25 +378,162 @@ public sealed class DashboardApiClient
             };
 
             using var response = await _http.PostAsJsonAsync("api/auth/login", login, ct);
+            var raw = await response.Content.ReadAsStringAsync(ct);
+            TraceAuth($"AUTH_LOGIN_HTTP status={(int)response.StatusCode} raw={raw}");
             if (!response.IsSuccessStatusCode)
             {
+                TraceAuth($"AUTH_LOGIN_FAILED status={(int)response.StatusCode}");
                 return false;
             }
 
-            var token = await response.Content.ReadFromJsonAsync<TokenResponseDto>(cancellationToken: ct);
+            var token = JsonSerializer.Deserialize<TokenResponseDto>(raw, new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            {
+                NumberHandling = JsonNumberHandling.AllowReadingFromString
+            });
             if (token is null || string.IsNullOrWhiteSpace(token.AccessToken))
             {
+                TraceAuth("AUTH_LOGIN_EMPTY_TOKEN");
                 return false;
             }
 
             _cachedAccessToken = token.AccessToken;
             _cachedAccessTokenExpiresAtUtc = token.AccessTokenExpiresAtUtc;
-            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _cachedAccessToken);
+            _cachedRefreshToken = token.RefreshToken;
+            _cachedRefreshTokenExpiresAtUtc = token.RefreshTokenExpiresAtUtc;
+            _configuredAccessTokenRejected = false;
+            ApplyAuthorizationHeader(_cachedAccessToken, $"login expiresAtUtc={_cachedAccessTokenExpiresAtUtc:O}");
+            TraceAuth($"AUTH_LOGIN_SUCCESS user={token.Username} role={token.Role} accessExpiresAtUtc={token.AccessTokenExpiresAtUtc:O} refreshExpiresAtUtc={token.RefreshTokenExpiresAtUtc:O}");
             return true;
+        }
+        catch (Exception ex)
+        {
+            TraceAuth($"AUTH_LOGIN_ERROR type={ex.GetType().Name} message={ex.Message}");
+            return false;
         }
         finally
         {
             _authLock.Release();
         }
+    }
+
+    private async Task<bool> TryRefreshAsync(CancellationToken ct)
+    {
+        await _authLock.WaitAsync(ct);
+        try
+        {
+            if (string.IsNullOrWhiteSpace(_cachedRefreshToken) || _cachedRefreshTokenExpiresAtUtc <= DateTime.UtcNow.AddMinutes(2))
+            {
+                TraceAuth("AUTH_REFRESH_SKIPPED no_valid_refresh_token");
+                return false;
+            }
+
+            TraceAuth($"AUTH_REFRESH_ATTEMPT url=api/auth/refresh refreshExpiresAtUtc={_cachedRefreshTokenExpiresAtUtc:O}");
+            var request = new RefreshRequestDto
+            {
+                RefreshToken = _cachedRefreshToken
+            };
+
+            using var response = await _http.PostAsJsonAsync("api/auth/refresh", request, ct);
+            var raw = await response.Content.ReadAsStringAsync(ct);
+            TraceAuth($"AUTH_REFRESH_HTTP status={(int)response.StatusCode} raw={raw}");
+            if (!response.IsSuccessStatusCode)
+            {
+                TraceAuth($"AUTH_REFRESH_FAILED status={(int)response.StatusCode}");
+                return false;
+            }
+
+            var token = JsonSerializer.Deserialize<TokenResponseDto>(raw, new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            {
+                NumberHandling = JsonNumberHandling.AllowReadingFromString
+            });
+            if (token is null || string.IsNullOrWhiteSpace(token.AccessToken))
+            {
+                TraceAuth("AUTH_REFRESH_EMPTY_TOKEN");
+                return false;
+            }
+
+            _cachedAccessToken = token.AccessToken;
+            _cachedAccessTokenExpiresAtUtc = token.AccessTokenExpiresAtUtc;
+            _cachedRefreshToken = token.RefreshToken;
+            _cachedRefreshTokenExpiresAtUtc = token.RefreshTokenExpiresAtUtc;
+            _configuredAccessTokenRejected = false;
+            ApplyAuthorizationHeader(_cachedAccessToken, $"refresh expiresAtUtc={_cachedAccessTokenExpiresAtUtc:O}");
+            TraceAuth($"AUTH_REFRESH_SUCCESS user={token.Username} role={token.Role} accessExpiresAtUtc={token.AccessTokenExpiresAtUtc:O} refreshExpiresAtUtc={token.RefreshTokenExpiresAtUtc:O}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            TraceAuth($"AUTH_REFRESH_ERROR type={ex.GetType().Name} message={ex.Message}");
+            return false;
+        }
+        finally
+        {
+            _authLock.Release();
+        }
+    }
+
+    private async Task<HttpResponseMessage?> SendAuthenticatedGetAsync(string path, CancellationToken ct)
+    {
+        if (!await EnsureAuthenticatedAsync(ct))
+        {
+            TraceAuth($"AUTH_SEND_ABORTED path={path} reason=no_token");
+            return null;
+        }
+
+        TraceAuth($"AUTH_SEND path={path} header={DescribeAuthorizationHeader()}");
+        var response = await _http.GetAsync(path, ct);
+        if (response.StatusCode != HttpStatusCode.Unauthorized)
+        {
+            return response;
+        }
+
+        var raw = await response.Content.ReadAsStringAsync(ct);
+        TraceAuth($"AUTH_401 path={path} raw={raw}");
+        response.Dispose();
+
+        _configuredAccessTokenRejected = true;
+        _http.DefaultRequestHeaders.Authorization = null;
+
+        if (!await EnsureAuthenticatedAsync(ct, forceRefresh: true))
+        {
+            TraceAuth($"AUTH_RETRY_ABORTED path={path} reason=reauth_failed");
+            return null;
+        }
+
+        TraceAuth($"AUTH_RETRY path={path} header={DescribeAuthorizationHeader()}");
+        return await _http.GetAsync(path, ct);
+    }
+
+    private void ApplyAuthorizationHeader(string token, string source)
+    {
+        _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        TraceAuth($"AUTH_APPLY source={source} header={DescribeAuthorizationHeader()}");
+    }
+
+    private string DescribeAuthorizationHeader()
+    {
+        var header = _http.DefaultRequestHeaders.Authorization;
+        if (header is null)
+        {
+            return "<none>";
+        }
+
+        return $"{header.Scheme} {MaskToken(header.Parameter)}";
+    }
+
+    private static string MaskToken(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return "<empty>";
+        }
+
+        return token.Length <= 16 ? token : token[..16] + "...";
+    }
+
+    [Conditional("DEBUG")]
+    private static void TraceAuth(string message)
+    {
+        Debug.WriteLine(message);
     }
 }

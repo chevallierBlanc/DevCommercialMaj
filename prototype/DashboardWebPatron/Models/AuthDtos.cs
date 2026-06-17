@@ -6,6 +6,11 @@ public sealed class LoginRequestDto
     public string Password { get; set; } = string.Empty;
 }
 
+public sealed class RefreshRequestDto
+{
+    public string RefreshToken { get; set; } = string.Empty;
+}
+
 public sealed class TokenResponseDto
 {
     public string AccessToken { get; set; } = string.Empty;
