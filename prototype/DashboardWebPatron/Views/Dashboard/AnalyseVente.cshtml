@@ -5,6 +5,11 @@
     var periodeJourSelected = Model.Periode == "jour";
     var periodeMoisSelected = Model.Periode == "mois";
     var periodeAnneeSelected = Model.Periode == "annee";
+    var evaluation = analyse?.Evaluation ?? string.Empty;
+    var isBonneRentabilite = evaluation.Equals("BONNE RENTABILITÉ", StringComparison.OrdinalIgnoreCase);
+    var isCritiquePerte = evaluation.Equals("CRITIQUE / PERTE", StringComparison.OrdinalIgnoreCase);
+    var evaluationZoneClass = isBonneRentabilite ? "evaluation-zone evaluation-zone-good" : isCritiquePerte ? "evaluation-zone evaluation-zone-critical" : "evaluation-zone";
+    var evaluationPillClass = isBonneRentabilite ? "evaluation-pill evaluation-pill-good" : isCritiquePerte ? "evaluation-pill evaluation-pill-critical" : "evaluation-pill";
 }
 
 <section class="hero hero-analysis">
@@ -75,9 +80,9 @@ else
             <span class="muted">Période analysée</span>
             <strong>@analyse.PeriodeLabel</strong>
         </div>
-        <div>
+        <div class="@evaluationZoneClass">
             <span class="muted">Évaluation</span>
-            <strong class="evaluation-pill">@analyse.Evaluation</strong>
+            <strong class="@evaluationPillClass">@analyse.Evaluation</strong>
         </div>
     </section>
 
@@ -127,30 +132,32 @@ else
     <section class="panel">
         <h2>Détail explicite du bénéfice net</h2>
         <p class="muted">La synthèse reprend les dépenses et les charges métier qui réduisent réellement le résultat final.</p>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Rubrique</th>
-                        <th>Catégorie / détail</th>
-                        <th>Quantité pièces</th>
-                        <th>Montant (FC)</th>
-                        <th>Commentaire</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var row in analyse.Details.OrderBy(x => x.Ordre))
-                {
-                    <tr>
-                        <td>@row.Rubrique</td>
-                        <td>@row.Categorie</td>
-                        <td>@row.QuantitePieces.ToString("N0")</td>
-                        <td>@row.Montant.ToString("N0")</td>
-                        <td>@row.Commentaire</td>
-                    </tr>
-                }
-                </tbody>
-            </table>
+        <div class="analysis-details-scroll">
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rubrique</th>
+                            <th>Catégorie / détail</th>
+                            <th>Quantité pièces</th>
+                            <th>Montant (FC)</th>
+                            <th>Commentaire</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in analyse.Details.OrderBy(x => x.Ordre))
+                    {
+                        <tr>
+                            <td>@row.Rubrique</td>
+                            <td>@row.Categorie</td>
+                            <td>@row.QuantitePieces.ToString("N0")</td>
+                            <td>@row.Montant.ToString("N0")</td>
+                            <td>@row.Commentaire</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
         </div>
     </section>
 }

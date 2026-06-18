@@ -277,6 +277,23 @@ th { color: var(--muted); font-size: 14px; }
 .analysis-meta-panel strong {
     font-size: 18px;
 }
+.evaluation-zone {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 14px;
+    border-radius: 16px;
+    border: 1px solid transparent;
+    background: #fff;
+}
+.evaluation-zone-good {
+    background: #ecfdf3;
+    border-color: #86efac;
+}
+.evaluation-zone-critical {
+    background: #fff5f5;
+    border-color: #fecaca;
+}
 .filters button,
 .filters .btn,
 .hero-actions .btn {
@@ -288,13 +305,41 @@ th { color: var(--muted); font-size: 14px; }
 .table-wrap table {
     border-spacing: 0;
 }
+.analysis-details-scroll {
+    max-height: 420px;
+    overflow-y: auto;
+    overflow-x: auto;
+    scrollbar-gutter: stable;
+}
+.analysis-details-scroll table {
+    min-width: 100%;
+}
+.analysis-details-scroll th {
+    position: sticky;
+    top: 0;
+    background: var(--card);
+    z-index: 1;
+}
 @media (max-width: 1100px) {
     .dashboard-scroll {
         max-height: 320px;
     }
+    .analysis-details-scroll {
+        max-height: 360px;
+    }
 }
 tbody tr:hover {
     background: rgba(63, 81, 181, 0.04);
+}
+.evaluation-pill-good {
+    color: #15803d !important;
+    background: #dcfce7;
+    border-color: #86efac;
+}
+.evaluation-pill-critical {
+    color: #b91c1c !important;
+    background: #fff5f5;
+    border-color: #fecaca;
 }
 @media (max-width: 1100px) {
     .shell { grid-template-columns: 1fr; }
