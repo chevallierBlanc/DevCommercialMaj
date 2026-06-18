@@ -256,8 +256,8 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
             PeriodeLabel = $"{dateDebut:dd/MM/yyyy} au {dateFin:dd/MM/yyyy}"
         };
 
-        await using (var reader = await cmd.ExecuteReaderAsync(ct))
         {
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
             if (await reader.ReadAsync(ct))
             {
                 response.ValeurStockEntree = ReadDecimal(reader, 0);
