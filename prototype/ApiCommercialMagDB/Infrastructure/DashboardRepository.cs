@@ -248,7 +248,6 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
         await using var cmd = new SqlCommand(sql, cn);
         cmd.Parameters.AddWithValue("@DateDebut", dateDebut.Date);
         cmd.Parameters.AddWithValue("@DateFin", dateFin.Date);
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
 
         var response = new AnalyseVenteResponse
         {
@@ -257,19 +256,22 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
             PeriodeLabel = $"{dateDebut:dd/MM/yyyy} au {dateFin:dd/MM/yyyy}"
         };
 
-        if (await reader.ReadAsync(ct))
+        await using (var reader = await cmd.ExecuteReaderAsync(ct))
         {
-            response.ValeurStockEntree = ReadDecimal(reader, 0);
-            response.CoutMarchandisesVendues = ReadDecimal(reader, 1);
-            response.ChiffreAffaires = ReadDecimal(reader, 2);
-            response.BeneficeRealise = ReadDecimal(reader, 3);
-            response.DepensesTotal = ReadDecimal(reader, 4);
-            response.ChargesSortiesManuelles = ReadDecimal(reader, 5);
-            response.BeneficeNetRealise = ReadDecimal(reader, 6);
-            response.CoutStockRestant = ReadDecimal(reader, 7);
-            response.ProjectionBeneficeRestant = ReadDecimal(reader, 8);
-            response.MargeBeneficiairePourcentage = ReadDecimal(reader, 9);
-            response.Evaluation = reader.IsDBNull(10) ? string.Empty : reader.GetValue(10)?.ToString() ?? string.Empty;
+            if (await reader.ReadAsync(ct))
+            {
+                response.ValeurStockEntree = ReadDecimal(reader, 0);
+                response.CoutMarchandisesVendues = ReadDecimal(reader, 1);
+                response.ChiffreAffaires = ReadDecimal(reader, 2);
+                response.BeneficeRealise = ReadDecimal(reader, 3);
+                response.DepensesTotal = ReadDecimal(reader, 4);
+                response.ChargesSortiesManuelles = ReadDecimal(reader, 5);
+                response.BeneficeNetRealise = ReadDecimal(reader, 6);
+                response.CoutStockRestant = ReadDecimal(reader, 7);
+                response.ProjectionBeneficeRestant = ReadDecimal(reader, 8);
+                response.MargeBeneficiairePourcentage = ReadDecimal(reader, 9);
+                response.Evaluation = reader.IsDBNull(10) ? string.Empty : reader.GetValue(10)?.ToString() ?? string.Empty;
+            }
         }
 
         response.Details = await QueryAnalyseVenteDetailsAsync(cn, dateDebut, dateFin, ct);
