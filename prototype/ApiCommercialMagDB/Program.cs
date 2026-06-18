@@ -102,7 +102,7 @@ depenses.MapPost("", async (DepenseSyncRequest request, SyncService service) =>
     return Results.Ok(result);
 });
 
-var dashboard = app.MapGroup("/api/dashboard").RequireAuthorization();
+var dashboard = app.MapGroup("/api/dashboard").AllowAnonymous();
 dashboard.MapGet("/journalier", async (DateTime? date, DateTime? start, DateTime? end, DashboardService service) =>
 {
     if (start.HasValue && end.HasValue)
