@@ -119,10 +119,12 @@
     <Compile Include="Services\BackupService.vb" />
     <Compile Include="Services\PdfHelper.vb" />
     <Compile Include="Services\FormatageGlobal.vb" />
+    <Compile Include="Services\ProductionLogService.vb" />
     <Compile Include="Services\SyncLogService.vb" />
     <Compile Include="Services\RemoteApiSession.vb" />
     <Compile Include="Services\OfflineSyncService.vb" />
     <Compile Include="Services\OfflineSyncScheduler.vb" />
+    <Compile Include="Services\SqlConfigurationService.vb" />
     <Compile Include="Services\DepenseService.vb" />
     <Compile Include="Services\VenteService.vb" />
     <Compile Include="Services\TypeVenteService.vb" />
@@ -189,6 +191,9 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FormulaireApprovisionnement.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormConfigurationSQL.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\NotificationPopupB.vb">

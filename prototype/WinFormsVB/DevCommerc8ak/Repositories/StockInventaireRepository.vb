@@ -19,7 +19,7 @@ Namespace DevCommerc8ak
             ' Schéma géré par le script SQL de déploiement.
         End Sub
 
-        Public Function Ajouter(inv As StockInventaire) As Integer
+        Public Function Ajouter(inv As StockInventaire, Optional cn As SqlConnection = Nothing, Optional tx As SqlTransaction = Nothing) As Integer
             Dim sql As String = "INSERT INTO StockInventaire (ProduitId, StockTheorique, StockReel, Ecart, DateInventaire, CreePar, Observation) " &
                                 "VALUES (@ProduitId, @StockTheorique, @StockReel, @Ecart, @DateInventaire, @CreePar, @Observation); " &
                                 "SELECT CAST(SCOPE_IDENTITY() AS INT);"
@@ -32,8 +32,28 @@ Namespace DevCommerc8ak
                 New SqlParameter("@CreePar", If(inv.CreePar.HasValue, CType(inv.CreePar.Value, Object), DBNull.Value)),
                 New SqlParameter("@Observation", If(inv.Observation, CType(DBNull.Value, Object)))
             }
-            Dim v As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
-            Return Convert.ToInt32(v)
+            If cn Is Nothing Then
+                Dim v As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
+                Return Convert.ToInt32(v)
+            End If
+
+            Dim ownsConnection As Boolean = False
+            If cn.State <> ConnectionState.Open Then
+                cn.Open()
+                ownsConnection = True
+            End If
+            Try
+                Using cmd As New SqlCommand(sql, cn)
+                    If tx IsNot Nothing Then cmd.Transaction = tx
+                    cmd.Parameters.AddRange(p.ToArray())
+                    Dim v As Object = cmd.ExecuteScalar()
+                    Return Convert.ToInt32(v)
+                End Using
+            Finally
+                If ownsConnection Then
+                    cn.Close()
+                End If
+            End Try
         End Function
     End Class
 End Namespace
