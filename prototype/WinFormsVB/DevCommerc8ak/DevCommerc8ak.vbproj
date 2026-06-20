@@ -193,6 +193,9 @@
     <Compile Include="UI\FormulaireApprovisionnement.vb">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="UI\FormAPropos.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="UI\FormConfigurationSQL.vb">
       <SubType>Form</SubType>
     </Compile>

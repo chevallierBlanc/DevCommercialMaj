@@ -50,9 +50,9 @@ Namespace DevCommerc8ak
                 ConfigurationManager.RefreshSection("connectionStrings")
                 ConfigurationManager.RefreshSection("appSettings")
                 _initialized = True
-                _log.Info("Configuration SQL initialisée: " & _localConfigPath)
+                _log.Info("SqlConfigurationService", "InitializeConfiguration", "Configuration SQL initialisée: " & _localConfigPath)
             Catch ex As Exception
-                _log.Error("Impossible d'initialiser la configuration SQL.", ex)
+                _log.Error("SqlConfigurationService", "InitializeConfiguration", "Impossible d'initialiser la configuration SQL.", ex)
                 Throw
             End Try
         End Sub
@@ -130,11 +130,11 @@ Namespace DevCommerc8ak
                 End Using
 
                 errorMessage = String.Empty
-                _log.Info("Test de connexion SQL réussi pour " & settings.Server)
+                _log.Info("SqlConfigurationService", "TestConnection", "Test de connexion SQL réussi pour " & settings.Server)
                 Return True
             Catch ex As Exception
                 errorMessage = ex.Message
-                _log.Error("Test de connexion SQL échoué.", ex)
+                _log.Error("SqlConfigurationService", "TestConnection", "Test de connexion SQL échoué.", ex)
                 Return False
             End Try
         End Function
@@ -164,7 +164,7 @@ Namespace DevCommerc8ak
             section.SectionInformation.ForceSave = True
             config.Save(ConfigurationSaveMode.Full)
             ConfigurationManager.RefreshSection("connectionStrings")
-            _log.Info("Configuration SQL enregistrée dans le fichier local.")
+            _log.Info("SqlConfigurationService", "SaveSettings", "Configuration SQL enregistrée dans le fichier local.")
         End Sub
 
         Private Shared Function GetActiveConnectionString() As String

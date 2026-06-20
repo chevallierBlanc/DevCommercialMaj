@@ -27,6 +27,7 @@ Namespace DevCommerc8ak
     Public Class BackupService
         Private ReadOnly _connectionString As String
         Private ReadOnly _settingsFilePath As String
+        Private ReadOnly _log As New ProductionLogService()
 
         Public Sub New(Optional connectionString As String = Nothing)
             _connectionString = If(String.IsNullOrWhiteSpace(connectionString),
@@ -97,12 +98,14 @@ Namespace DevCommerc8ak
                 Dim dossierFallback As String = ObtenirDossierFallback()
 
                 If ExecuterSauvegardeVersDossier(database, dossierPrincipal, resultat, False) Then
+                    _log.Info("BackupService", "ExecuterSauvegarde", "Sauvegarde réussie dans le dossier principal : " & resultat.FilePath)
                     Return resultat
                 End If
 
                 If Not String.Equals(dossierPrincipal, dossierFallback, StringComparison.OrdinalIgnoreCase) Then
                     Dim resultatFallback As New BackupResult() With {.BackedUpAt = DateTime.Now}
                     If ExecuterSauvegardeVersDossier(database, dossierFallback, resultatFallback, True) Then
+                        _log.Warn("BackupService", "ExecuterSauvegarde", "Sauvegarde effectuée dans le dossier de secours : " & resultatFallback.FilePath)
                         Return resultatFallback
                     End If
 
@@ -114,9 +117,11 @@ Namespace DevCommerc8ak
                 If String.IsNullOrWhiteSpace(resultat.Message) Then
                     resultat.Message = "Sauvegarde impossible."
                 End If
+                _log.Error("BackupService", "ExecuterSauvegarde", resultat.Message, Nothing)
             Catch ex As Exception
                 resultat.Success = False
                 resultat.Message = ex.Message
+                _log.Error("BackupService", "ExecuterSauvegarde", "Erreur lors de la sauvegarde SQL.", ex)
             End Try
 
             Return resultat
@@ -134,7 +139,7 @@ Namespace DevCommerc8ak
                     Return False
                 End If
 
-                Dim nomFichier As String = database & "_" & DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) & ".bak"
+                Dim nomFichier As String = "ERPCommercial_" & DateTime.Now.ToString("yyyyMMdd_HHmm", CultureInfo.InvariantCulture) & ".bak"
                 Dim cheminComplet As String = Path.Combine(dossier, nomFichier)
                 Dim cheminEchappe As String = cheminComplet.Replace("'", "''")
 
@@ -153,10 +158,16 @@ Namespace DevCommerc8ak
                 Else
                     resultat.Message = "Sauvegarde réalisée avec succès."
                 End If
+                _log.Info("BackupService", "ExecuterSauvegardeVersDossier", resultat.Message)
                 Return True
             Catch ex As Exception
                 resultat.Success = False
                 resultat.Message = ex.Message
+                If estFallback Then
+                    _log.Warn("BackupService", "ExecuterSauvegardeVersDossier", "Échec dossier de secours : " & dossier & " | " & ex.Message)
+                Else
+                    _log.Warn("BackupService", "ExecuterSauvegardeVersDossier", "Échec dossier principal : " & dossier & " | " & ex.Message)
+                End If
                 Return False
             End Try
         End Function
@@ -181,6 +192,30 @@ Namespace DevCommerc8ak
 
         Private Function ObtenirDossierFallback() As String
             Return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CommercialPro", "Backups")
+        End Function
+
+        Public Function ObtenirDerniereSauvegarde(Optional dossierCible As String = Nothing) As String
+            Dim dossier As String = If(String.IsNullOrWhiteSpace(dossierCible), ObtenirDossierParDefaut(), dossierCible)
+            If String.IsNullOrWhiteSpace(dossier) OrElse Not Directory.Exists(dossier) Then
+                dossier = ObtenirDossierFallback()
+            End If
+
+            If String.IsNullOrWhiteSpace(dossier) OrElse Not Directory.Exists(dossier) Then
+                Return String.Empty
+            End If
+
+            Dim dernier As FileInfo = Nothing
+            For Each fichier As String In Directory.GetFiles(dossier, "ERPCommercial_*.bak")
+                Dim info As New FileInfo(fichier)
+                If dernier Is Nothing OrElse info.LastWriteTimeUtc > dernier.LastWriteTimeUtc Then
+                    dernier = info
+                End If
+            Next
+
+            If dernier Is Nothing Then
+                Return String.Empty
+            End If
+            Return dernier.FullName
         End Function
 
         Private Function CreerParametresParDefaut() As BackupSettings

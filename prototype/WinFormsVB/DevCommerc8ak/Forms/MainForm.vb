@@ -4,6 +4,7 @@ Imports System.Configuration
 Imports System.Data
 Imports System.Collections.Generic
 Imports System.Threading.Tasks
+Imports System.Net.NetworkInformation
 Imports System
 
 Namespace DevCommerc8ak
@@ -166,11 +167,17 @@ Namespace DevCommerc8ak
         Private ReadOnly timer As Timer
         Private ReadOnly _backupService As BackupService
         Private ReadOnly _backupTimer As Timer
+        Private ReadOnly _etatTimer As Timer
+        Private ReadOnly _statusStrip As StatusStrip
+        Private ReadOnly _lblServeurStatus As ToolStripStatusLabel
+        Private ReadOnly _lblSqlStatus As ToolStripStatusLabel
+        Private ReadOnly _lblBackupStatus As ToolStripStatusLabel
         Private _backupSettings As BackupSettings
         Private _backupEnCours As Boolean
         Private _dernierBackupReussi As Boolean
         Private _dernierAlerte As Date = Date.MinValue
         Private _accueilAdminCharge As Boolean
+        Private _dernierMessageBackup As String = String.Empty
 
         ' Boutons de navigation
         Private ReadOnly btnFact As Button
@@ -187,6 +194,23 @@ Namespace DevCommerc8ak
             Me.Font = FontMain
             _backupService = New BackupService()
             _backupSettings = _backupService.ChargerParametres()
+            panelHeader = New Panel() With {
+                .Dock = DockStyle.Top,
+                .Height = 0,
+                .Visible = False
+            }
+            _statusStrip = New StatusStrip() With {
+                .Dock = DockStyle.Bottom,
+                .SizingGrip = False,
+                .RenderMode = ToolStripRenderMode.System,
+                .BackColor = Color.White
+            }
+            _lblServeurStatus = New ToolStripStatusLabel("Serveur : ...") With {.Spring = True}
+            _lblSqlStatus = New ToolStripStatusLabel("SQL : ...") With {.Spring = True}
+            _lblBackupStatus = New ToolStripStatusLabel("Sauvegarde : en attente") With {.Spring = True}
+            _statusStrip.Items.Add(_lblServeurStatus)
+            _statusStrip.Items.Add(_lblSqlStatus)
+            _statusStrip.Items.Add(_lblBackupStatus)
 
             ' --- Sidebar (Navigation Latérale) ---
             panelSidebar = New Panel() With {
@@ -324,6 +348,9 @@ Namespace DevCommerc8ak
                 y += 50
             End If
 
+            AjouterBoutonSidebar(flowPnlMenu, "À propos", y, AddressOf AfficherAPropos)
+            y += 50
+
             ' Bouton Accueil
             btnDeconnexion.ForeColor = Color.FromArgb(231, 76, 60) ' Rouge pour déconnexion
             AjouterBoutonSidebar(flowPnlMenu, "Déconnexion", y, AddressOf Deconnecter)
@@ -333,6 +360,7 @@ Namespace DevCommerc8ak
             Me.Controls.Add(panelContent)
             Me.Controls.Add(panelHeader)
             Me.Controls.Add(panelSidebar)
+            Me.Controls.Add(_statusStrip)
 
             ' Handlers
             'AddHandler btnFact.Click, Sub()
@@ -363,10 +391,14 @@ Namespace DevCommerc8ak
             AddHandler timer.Tick, AddressOf PingSession
             timer.Start()
 
+            _etatTimer = New Timer() With {.Interval = 60000}
+            AddHandler _etatTimer.Tick, AddressOf ActualiserEtatPlateformeTick
+            _etatTimer.Start()
+
             AddHandler Me.Shown, AddressOf MainForm_Shown
 
             If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled Then
-                _backupTimer = New Timer() With {.Interval = Math.Max(1, _backupSettings.IntervalMinutes) * 60000}
+                _backupTimer = New Timer() With {.Interval = 21600000}
                 AddHandler _backupTimer.Tick, AddressOf SauvegardeAutomatiqueTick
                 _backupTimer.Start()
             End If
@@ -398,8 +430,10 @@ Namespace DevCommerc8ak
                                                          LoadForm(New FormulaireDashboard())
                                                      Catch
                                                      End Try
-                                                 End Sub))
+                End Sub))
             End If
+
+            ActualiserEtatPlateforme()
         End Sub
 
         ''' <summary>
@@ -580,8 +614,93 @@ Namespace DevCommerc8ak
                         _dernierPopupNotificationId = derniereId
                     End If
                 End If
-            Catch
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Warn("MainForm", "PingSession", "Erreur lors du ping de session : " & ex.Message)
             End Try
+        End Sub
+
+        Private Sub ActualiserEtatPlateformeTick(sender As Object, e As EventArgs)
+            ActualiserEtatPlateforme()
+        End Sub
+
+        Private Sub ActualiserEtatPlateforme()
+            Try
+                Dim settings As SqlConnectionSettings = SqlConfigurationService.LoadSettings()
+                Dim serveurConnecte As Boolean = TesterHoteServeur(If(settings Is Nothing, String.Empty, settings.Server))
+                Dim erreurSql As String = Nothing
+                Dim sqlConnecte As Boolean = SqlConfigurationService.HasValidConnection(erreurSql)
+
+                MettreAJourStatusServeur(serveurConnecte)
+                MettreAJourStatusSql(sqlConnecte)
+                MettreAJourStatusSauvegarde()
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("MainForm", "ActualiserEtatPlateforme", "Erreur lors de la mise à jour des statuts.", ex)
+                MettreAJourStatusServeur(False)
+                MettreAJourStatusSql(False)
+                MettreAJourStatusSauvegarde()
+            End Try
+        End Sub
+
+        Private Function TesterHoteServeur(serveur As String) As Boolean
+            If String.IsNullOrWhiteSpace(serveur) Then
+                Return False
+            End If
+
+            Dim normalise As String = serveur.Trim()
+            If normalise = "." OrElse normalise.Equals("(local)", StringComparison.OrdinalIgnoreCase) OrElse normalise.Equals("localhost", StringComparison.OrdinalIgnoreCase) Then
+                Return True
+            End If
+
+            Dim indexPort As Integer = normalise.IndexOf(","c)
+            If indexPort > 0 Then
+                normalise = normalise.Substring(0, indexPort).Trim()
+            End If
+
+            Try
+                Using ping As New Ping()
+                    Dim reply As PingReply = ping.Send(normalise, 1000)
+                    Return reply IsNot Nothing AndAlso reply.Status = IPStatus.Success
+                End Using
+            Catch
+                Return False
+            End Try
+        End Function
+
+        Private Sub MettreAJourStatusServeur(connecte As Boolean)
+            If _lblServeurStatus Is Nothing Then Return
+            _lblServeurStatus.Text = If(connecte, "Serveur : connecté", "Serveur : indisponible")
+            _lblServeurStatus.ForeColor = If(connecte, Color.FromArgb(22, 163, 74), Color.FromArgb(185, 28, 28))
+        End Sub
+
+        Private Sub MettreAJourStatusSql(connecte As Boolean)
+            If _lblSqlStatus Is Nothing Then Return
+            _lblSqlStatus.Text = If(connecte, "SQL : connecté", "SQL : indisponible")
+            _lblSqlStatus.ForeColor = If(connecte, Color.FromArgb(22, 163, 74), Color.FromArgb(185, 28, 28))
+        End Sub
+
+        Private Sub MettreAJourStatusSauvegarde()
+            If _lblBackupStatus Is Nothing Then Return
+            Dim texte As String
+            Dim couleur As Color
+
+            If _backupSettings Is Nothing OrElse Not _backupSettings.Enabled Then
+                texte = "Sauvegarde : en attente"
+                couleur = Color.FromArgb(107, 114, 128)
+            ElseIf _dernierBackupReussi Then
+                texte = "Sauvegarde : OK"
+                couleur = Color.FromArgb(22, 163, 74)
+            ElseIf Not String.IsNullOrWhiteSpace(_dernierMessageBackup) Then
+                texte = "Sauvegarde : erreur"
+                couleur = Color.FromArgb(185, 28, 28)
+            Else
+                texte = "Sauvegarde : en attente"
+                couleur = Color.FromArgb(107, 114, 128)
+            End If
+
+            _lblBackupStatus.Text = texte
+            _lblBackupStatus.ForeColor = couleur
         End Sub
 
         Private Sub VerifierRuptures(dal As DAL)
@@ -639,9 +758,15 @@ Namespace DevCommerc8ak
                 Dim cible As String = _backupSettings.BackupFolder
                 Dim resultat As BackupResult = Await Task.Run(Function() _backupService.ExecuterSauvegarde(cible))
                 _dernierBackupReussi = resultat.Success
+                _dernierMessageBackup = If(resultat Is Nothing, String.Empty, resultat.Message)
+                MettreAJourStatusSauvegarde()
                 Return resultat.Success
-            Catch
+            Catch ex As Exception
                 _dernierBackupReussi = False
+                _dernierMessageBackup = ex.Message
+                Dim log As New ProductionLogService()
+                log.Error("MainForm", "ExecuterSauvegardeSilencieuseAsync", "Erreur lors de la sauvegarde automatique.", ex)
+                MettreAJourStatusSauvegarde()
                 Return False
             Finally
                 _backupEnCours = False
@@ -687,6 +812,12 @@ Namespace DevCommerc8ak
             LoadForm(New FrmInventaireIntelligent())
         End Sub
 
+        Private Sub AfficherAPropos(sender As Object, e As EventArgs)
+            Using frm As New FormAPropos()
+                frm.ShowDialog(Me)
+            End Using
+        End Sub
+
         ''' <summary>
         ''' Afficher factureir
         ''' </summary>
@@ -710,19 +841,18 @@ Namespace DevCommerc8ak
                 If _backupTimer IsNot Nothing Then
                     _backupTimer.Stop()
                 End If
+                If _etatTimer IsNot Nothing Then
+                    _etatTimer.Stop()
+                End If
 
                 If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled AndAlso _backupSettings.BackupBeforeExit Then
                     Dim resultat As BackupResult = _backupService.ExecuterSauvegarde(_backupSettings.BackupFolder)
                     _dernierBackupReussi = resultat.Success
-                    If resultat.Success Then
-                        If Not String.IsNullOrWhiteSpace(resultat.Message) AndAlso resultat.Message.IndexOf("dossier de secours", StringComparison.OrdinalIgnoreCase) >= 0 Then
-                            MessageBox.Show(resultat.Message, "Sauvegarde", MessageBoxButtons.OK, MessageBoxIcon.Information)
-                        End If
-                    Else
-                        MessageBox.Show("La sauvegarde avant fermeture a échoué : " & resultat.Message, "Sauvegarde", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-                        If _backupTimer IsNot Nothing AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled Then
-                            _backupTimer.Start()
-                        End If
+                    _dernierMessageBackup = If(resultat Is Nothing, String.Empty, resultat.Message)
+                    MettreAJourStatusSauvegarde()
+                    If Not resultat.Success Then
+                        Dim log As New ProductionLogService()
+                        log.Warn("MainForm", "OnFormClosing", "La sauvegarde avant fermeture a échoué : " & resultat.Message)
                     End If
                 End If
 

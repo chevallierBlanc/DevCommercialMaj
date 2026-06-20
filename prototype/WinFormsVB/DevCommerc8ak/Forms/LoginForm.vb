@@ -241,7 +241,7 @@ Namespace DevCommerc8ak
             Dim log As New ProductionLogService()
             Dim erreurSql As String = Nothing
             If Not SqlConfigurationService.HasValidConnection(erreurSql) Then
-                log.Warn("Connexion SQL indisponible lors de la tentative de login.")
+                log.Warn("LoginForm", "OnLogin", "Connexion SQL indisponible lors de la tentative de login.")
                 MessageBox.Show("La connexion SQL est indisponible ou invalide. Ouvrez la configuration SQL pour corriger le serveur, la base ou les identifiants." &
                                 If(String.IsNullOrWhiteSpace(erreurSql), String.Empty, Environment.NewLine & erreurSql),
                                 "Connexion SQL",
@@ -250,15 +250,15 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            log.Info("Tentative de login utilisateur: " & txtUser.Text.Trim())
+            log.Info("LoginForm", "OnLogin", "Tentative de login utilisateur: " & txtUser.Text.Trim())
             Dim ok As Boolean = Authentifier(txtUser.Text.Trim(), txtPass.Text)
             If Not ok Then
-                log.Warn("Login échoué pour l'utilisateur: " & txtUser.Text.Trim())
+                log.Warn("LoginForm", "OnLogin", "Login échoué pour l'utilisateur: " & txtUser.Text.Trim())
                 MessageBox.Show("Identifiants invalides.")
                 Return
             End If
 
-            log.Info("Login réussi pour l'utilisateur: " & txtUser.Text.Trim())
+            log.Info("LoginForm", "OnLogin", "Login réussi pour l'utilisateur: " & txtUser.Text.Trim())
             Dim apiOk As Boolean = RemoteApiSession.Authentifier(txtUser.Text.Trim(), txtPass.Text)
             lblStatus.Text = If(apiOk, "Etat serveur: API connectee", "Etat serveur: API indisponible, mode local")
 
@@ -281,7 +281,7 @@ Namespace DevCommerc8ak
                 Return service.VerifierConnexion(nomUtilisateur, motDePasse)
             Catch ex As Exception
                 Dim log As New ProductionLogService()
-                log.Error("Erreur technique lors de l'authentification utilisateur.", ex)
+                log.Error("LoginForm", "Authentifier", "Erreur technique lors de l'authentification utilisateur.", ex)
                 Return False
             End Try
         End Function
@@ -326,7 +326,7 @@ Namespace DevCommerc8ak
                 MessageBox.Show("Compte administrateur initial créé. Utilisez l'utilisateur 'admin'.")
             Catch ex As Exception
                 Dim log As New ProductionLogService()
-                log.Error("Erreur lors de l'initialisation du compte administrateur.", ex)
+                log.Error("LoginForm", "InitialiserCompteAdminSiNecessaire", "Erreur lors de l'initialisation du compte administrateur.", ex)
                 MessageBox.Show("Impossible d'initialiser le compte administrateur initial : " & ex.Message)
                 Me.Close()
             End Try

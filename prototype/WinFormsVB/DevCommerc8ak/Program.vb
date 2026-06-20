@@ -21,7 +21,7 @@ Namespace DevCommerc8ak
                 If Not SqlConfigurationService.HasValidConnection(erreurSql) Then
                     Using configForm As New FormConfigurationSQL()
                         If configForm.ShowDialog() <> DialogResult.OK Then
-                            log.Warn("Configuration SQL annulée au premier démarrage.")
+                            log.Warn("Program", "Main", "Configuration SQL annulée au premier démarrage.")
                             Return
                         End If
                     End Using
@@ -31,7 +31,7 @@ Namespace DevCommerc8ak
                                         "Configuration SQL",
                                         MessageBoxButtons.OK,
                                         MessageBoxIcon.Warning)
-                        log.Warn("Connexion SQL invalide après passage par le formulaire de configuration.")
+                        log.Warn("Program", "Main", "Connexion SQL invalide après passage par le formulaire de configuration.")
                         Return
                     End If
                 End If
@@ -45,7 +45,7 @@ Namespace DevCommerc8ak
 
                 Application.Run(New LoginForm())
             Catch ex As Exception
-                log.Error("Erreur fatale au démarrage de l'application.", ex)
+                log.Error("Program", "Main", "Erreur fatale au démarrage de l'application.", ex)
                 MessageBox.Show("Impossible de démarrer l'application." & Environment.NewLine & ex.Message,
                                 "Erreur de démarrage",
                                 MessageBoxButtons.OK,
@@ -55,7 +55,7 @@ Namespace DevCommerc8ak
 
         Private Sub HandleThreadException(sender As Object, e As ThreadExceptionEventArgs)
             Dim log As New ProductionLogService()
-            log.Error("Erreur WinForms non gérée.", e.Exception)
+            log.Error("Program", "HandleThreadException", "Erreur WinForms non gérée.", e.Exception)
             MessageBox.Show("Une erreur inattendue est survenue. Consultez le journal local pour plus de détails.",
                             "Erreur",
                             MessageBoxButtons.OK,
@@ -69,7 +69,7 @@ Namespace DevCommerc8ak
             End If
 
             Dim log As New ProductionLogService()
-            log.Error("Erreur AppDomain non gérée.", ex)
+            log.Error("Program", "HandleUnhandledException", "Erreur AppDomain non gérée.", ex)
         End Sub
     End Module
 End Namespace
