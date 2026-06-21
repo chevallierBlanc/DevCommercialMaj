@@ -72,4 +72,57 @@ Namespace DevCommerc8ak
             log.Error("Program", "HandleUnhandledException", "Erreur AppDomain non gérée.", ex)
         End Sub
     End Module
+
+    Public Module ApplicationLifecycle
+        Private ReadOnly _syncRoot As New Object()
+        Private _returnToLoginRequested As Boolean
+        Private _shutdownRequested As Boolean
+
+        Public Sub RequestReturnToLogin()
+            SyncLock _syncRoot
+                _returnToLoginRequested = True
+                _shutdownRequested = False
+            End SyncLock
+
+            StopBackgroundServices()
+        End Sub
+
+        Public Function IsReturnToLoginRequested() As Boolean
+            SyncLock _syncRoot
+                Return _returnToLoginRequested
+            End SyncLock
+        End Function
+
+        Public Function ConsumeReturnToLoginRequested() As Boolean
+            SyncLock _syncRoot
+                Dim requested As Boolean = _returnToLoginRequested
+                _returnToLoginRequested = False
+                Return requested
+            End SyncLock
+        End Function
+
+        Public Sub StopBackgroundServices()
+            Try
+                OfflineSyncScheduler.StopScheduler()
+            Catch
+            End Try
+        End Sub
+
+        Public Sub RequestShutdown()
+            SyncLock _syncRoot
+                If _shutdownRequested Then
+                    Return
+                End If
+                _shutdownRequested = True
+                _returnToLoginRequested = False
+            End SyncLock
+
+            StopBackgroundServices()
+
+            Try
+                Application.Exit()
+            Catch
+            End Try
+        End Sub
+    End Module
 End Namespace

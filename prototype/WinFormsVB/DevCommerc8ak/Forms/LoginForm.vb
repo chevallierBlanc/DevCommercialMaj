@@ -270,6 +270,14 @@ Namespace DevCommerc8ak
             Me.Hide()
         End Sub
 
+        Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+            Try
+                ApplicationLifecycle.StopBackgroundServices()
+            Catch
+            End Try
+            MyBase.OnFormClosed(e)
+        End Sub
+
         Private Function Authentifier(nomUtilisateur As String, motDePasse As String) As Boolean
             Try
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString

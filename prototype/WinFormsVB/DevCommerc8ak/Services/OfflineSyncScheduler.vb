@@ -32,6 +32,32 @@ Namespace DevCommerc8ak
             End SyncLock
         End Sub
 
+        Public Sub StopScheduler()
+            SyncLock GetType(OfflineSyncScheduler)
+                If Not _started Then
+                    Return
+                End If
+
+                Try
+                    RemoveHandler _syncTimer.Elapsed, AddressOf OnElapsed
+                Catch
+                End Try
+
+                Try
+                    _syncTimer.Enabled = False
+                    _syncTimer.AutoReset = False
+                Catch
+                End Try
+
+                Try
+                    _dal = Nothing
+                Catch
+                End Try
+
+                _started = False
+            End SyncLock
+        End Sub
+
         Private Sub OnElapsed(sender As Object, e As ElapsedEventArgs)
             Try
                 _log.Info("Cycle de synchronisation démarré")

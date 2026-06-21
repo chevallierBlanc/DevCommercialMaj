@@ -541,7 +541,11 @@ Namespace DevCommerc8ak
             End If
 
             panelContent.SuspendLayout()
-            panelContent.Controls.Clear()
+            While panelContent.Controls.Count > 0
+                Dim ancienControle As Control = panelContent.Controls(0)
+                panelContent.Controls.RemoveAt(0)
+                ancienControle.Dispose()
+            End While
             f.TopLevel = False
             f.FormBorderStyle = FormBorderStyle.None
             f.Dock = DockStyle.Fill
@@ -783,8 +787,24 @@ Namespace DevCommerc8ak
                 repo.FermerSession(SessionUtilisateur.SessionId)
             Catch
             End Try
-            Dim login As New LoginForm()
+            ApplicationLifecycle.RequestReturnToLogin()
+
+            Dim login As LoginForm = Nothing
+            For Each frm As Form In Application.OpenForms
+                If TypeOf frm Is LoginForm Then
+                    login = DirectCast(frm, LoginForm)
+                    Exit For
+                End If
+            Next
+
+            If login Is Nothing Then
+                login = New LoginForm()
+            End If
+
             login.Show()
+            login.WindowState = FormWindowState.Normal
+            login.Activate()
+            login.BringToFront()
             Me.Close()
         End Sub
 
@@ -838,21 +858,37 @@ Namespace DevCommerc8ak
 
         Protected Overrides Sub OnFormClosing(e As FormClosingEventArgs)
             Try
+                If timer IsNot Nothing Then
+                    timer.Stop()
+                    timer.Dispose()
+                End If
                 If _backupTimer IsNot Nothing Then
                     _backupTimer.Stop()
+                    _backupTimer.Dispose()
                 End If
                 If _etatTimer IsNot Nothing Then
                     _etatTimer.Stop()
+                    _etatTimer.Dispose()
                 End If
 
-                If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled AndAlso _backupSettings.BackupBeforeExit Then
-                    Dim resultat As BackupResult = _backupService.ExecuterSauvegarde(_backupSettings.BackupFolder)
-                    _dernierBackupReussi = resultat.Success
-                    _dernierMessageBackup = If(resultat Is Nothing, String.Empty, resultat.Message)
-                    MettreAJourStatusSauvegarde()
-                    If Not resultat.Success Then
+                If Not ApplicationLifecycle.IsReturnToLoginRequested() AndAlso String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled AndAlso _backupSettings.BackupBeforeExit Then
+                    Dim resultat As BackupResult = Nothing
+                    Dim tacheBackup As Task(Of BackupResult) = Task.Run(Function() _backupService.ExecuterSauvegarde(_backupSettings.BackupFolder))
+                    If tacheBackup.Wait(TimeSpan.FromSeconds(60)) Then
+                        resultat = tacheBackup.Result
+                        _dernierBackupReussi = resultat.Success
+                        _dernierMessageBackup = If(resultat Is Nothing, String.Empty, resultat.Message)
+                        MettreAJourStatusSauvegarde()
+                        If Not resultat.Success Then
+                            Dim log As New ProductionLogService()
+                            log.Warn("MainForm", "OnFormClosing", "La sauvegarde avant fermeture a échoué : " & resultat.Message)
+                        End If
+                    Else
+                        _dernierBackupReussi = False
+                        _dernierMessageBackup = "Timeout de sauvegarde avant fermeture."
+                        MettreAJourStatusSauvegarde()
                         Dim log As New ProductionLogService()
-                        log.Warn("MainForm", "OnFormClosing", "La sauvegarde avant fermeture a échoué : " & resultat.Message)
+                        log.Warn("MainForm", "OnFormClosing", "La sauvegarde avant fermeture a dépassé le délai autorisé.")
                     End If
                 End If
 
@@ -863,6 +899,19 @@ Namespace DevCommerc8ak
             Catch
             End Try
             MyBase.OnFormClosing(e)
+        End Sub
+
+        Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+            Try
+                If ApplicationLifecycle.ConsumeReturnToLoginRequested() Then
+                    ApplicationLifecycle.StopBackgroundServices()
+                Else
+                    ApplicationLifecycle.RequestShutdown()
+                End If
+            Catch
+            End Try
+
+            MyBase.OnFormClosed(e)
         End Sub
     End Class
 End Namespace
