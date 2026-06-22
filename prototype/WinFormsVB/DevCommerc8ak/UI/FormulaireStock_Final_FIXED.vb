@@ -1529,16 +1529,37 @@ Namespace DevCommerc8ak
         'End Sub
         Private Sub EnregistrerEntree(sender As Object, e As EventArgs)
             Try
+                If cmbUniteBase.SelectedIndex < 0 OrElse String.IsNullOrWhiteSpace(cmbUniteBase.Text) Then
+                    MessageBox.Show("Sélectionnez l'unité de base avant d'enregistrer l'entrée.")
+                    cmbUniteBase.Focus()
+                    Return
+                End If
+
                 Dim qte As Decimal = LireDecimal(txtQuantiteEntree.Text)
                 If qte <= 0D Then
-                    MessageBox.Show("Quantite invalide.")
+                    MessageBox.Show("La quantité entrée doit être supérieure à zéro.")
+                    txtQuantiteEntree.Focus()
+                    Return
+                End If
+
+                Dim prixAchatVal As Decimal = LireDecimal(txtPrixAchat.Text)
+                If prixAchatVal <= 0D Then
+                    MessageBox.Show("Le prix d'achat doit être renseigné et supérieur à zéro.")
+                    txtPrixAchat.Focus()
+                    Return
+                End If
+
+                If String.IsNullOrWhiteSpace(txtCoefficientInput.Text) OrElse _coefficientCalcule <= 0D Then
+                    MessageBox.Show("Le coefficient gros doit être renseigné avant l'enregistrement.")
+                    txtCoefficientInput.Focus()
                     Return
                 End If
 
                 Dim produitId As Integer
                 If chkProduitExistant.Checked Then
-                    If cmbProduitExistant.SelectedValue Is Nothing Then
+                    If cmbProduitExistant.SelectedValue Is Nothing OrElse IsDBNull(cmbProduitExistant.SelectedValue) Then
                         MessageBox.Show("Selectionnez un produit.")
+                        cmbProduitExistant.Focus()
                         Return
                     End If
                     produitId = Convert.ToInt32(cmbProduitExistant.SelectedValue)
@@ -1546,6 +1567,7 @@ Namespace DevCommerc8ak
                     Dim nom As String = txtNomProduit.Text.Trim()
                     If nom = "" Then
                         MessageBox.Show("Nom produit obligatoire.")
+                        txtNomProduit.Focus()
                         Return
                     End If
                     If txtReference.Text.Trim() = "" Then
@@ -1594,8 +1616,6 @@ Namespace DevCommerc8ak
                     cmbProduitExistant.SelectedValue = produitId
                 End If
                 Dim service As StockService = ObtenirStockService()
-
-                Dim prixAchatVal As Decimal = LireDecimal(txtPrixAchat.Text)
                 service.EnregistrerEntree(produitId, qte, cmbUniteBase.Text, txtReference.Text.Trim(), txtObservationEntree.Text.Trim(), SessionUtilisateur.UtilisateurId, prixAchatVal)
 
                 MessageBox.Show("Entrée stock enregistrée.")
