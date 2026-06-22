@@ -219,7 +219,7 @@ Namespace DevCommerc8ak
             txtReference = New TextBox() With {.Dock = DockStyle.Top, .Height = 30, .BorderStyle = BorderStyle.FixedSingle}
             pnlRef.Controls.AddRange({txtReference, lblRefTitre})
 
-            Dim pnlActions As New Panel() With {.Dock = DockStyle.Bottom, .Height = 180}
+            Dim pnlActions As New FlowLayoutPanel() With {.Dock = DockStyle.Bottom, .Height = 220, .FlowDirection = FlowDirection.TopDown, .WrapContents = False, .Padding = New Padding(0, 0, 0, 0)}
             btnEncaisser = New Button() With {
                 .Text = "VALIDER L'ENCAISSEMENT", .Dock = DockStyle.Top, .Height = 55,
                 .FlatStyle = FlatStyle.Flat, .BackColor = ColorAccent, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand
@@ -248,7 +248,12 @@ Namespace DevCommerc8ak
             }
             btnAnnulerFacture.FlatAppearance.BorderSize = 0
 
-            pnlActions.Controls.AddRange({btnAnnulerFacture, btnAnnuler, btnSep2, btnImprimer, btnSep1, btnEncaisser})
+            pnlActions.Controls.Add(btnEncaisser)
+            pnlActions.Controls.Add(btnSep1)
+            pnlActions.Controls.Add(btnImprimer)
+            pnlActions.Controls.Add(btnSep2)
+            pnlActions.Controls.Add(btnAnnulerFacture)
+            pnlActions.Controls.Add(btnAnnuler)
 
             pnlDroite.Controls.AddRange({pnlActions, pnlRef, pnlMode, lblMonnaie, pnlRecu, lblTotal, lblTotalTitre})
 
@@ -420,17 +425,15 @@ Namespace DevCommerc8ak
                 service.EncaisserFacture(factureId, cmbMode.SelectedItem.ToString(), txtReference.Text.Trim(), montantFC, monnaieFC, devise, SessionUtilisateur.UtilisateurId)
 
                 _dernierTicket = ConstruireTicketDepuisSelection(montantFC, monnaieFC, devise)
-                Try
-                    ImprimerTicket(_dernierTicket, 2, True)
-                Catch exImpression As Exception
+                If Not ImprimerTicket(_dernierTicket, 2, True) Then
                     Dim log As New ProductionLogService()
-                    log.Warn("CaisseForm", "Encaisser", "Le paiement a été validé mais l'impression automatique a échoué.")
-                    log.Error("CaisseForm", "Encaisser", "Erreur impression automatique après encaissement.", exImpression)
-                    MessageBox.Show("Le paiement a été validé, mais l'impression automatique a échoué." & Environment.NewLine & exImpression.Message,
+                    log.Warn("CaisseForm", "Encaisser", "Le paiement a été validé, mais aucune imprimante ticket n'est configurée ou disponible.")
+                    MessageBox.Show("Le paiement a été validé, mais aucune imprimante ticket n'est configurée ou disponible." & Environment.NewLine &
+                                    "Le ticket n'a pas été imprimé.",
                                     "Impression",
                                     MessageBoxButtons.OK,
                                     MessageBoxIcon.Warning)
-                End Try
+                End If
                 MessageBox.Show("Paiement reussi.")
                 ChargerFactures(Nothing, EventArgs.Empty)
                 AnnulerSelection(Nothing, EventArgs.Empty)
@@ -476,36 +479,66 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                ImprimerTicket(ticket, 1, False)
+                If Not ImprimerTicket(ticket, 2, True) Then
+                    MessageBox.Show("Aucune imprimante ticket n'est configurée ou disponible.")
+                End If
             Catch ex As Exception
                 MessageBox.Show("Erreur impression: " & ex.Message)
             End Try
         End Sub
 
-        Private Sub ImprimerTicket(ticket As TicketData, Optional copies As Integer = 1, Optional forcerImpressionDirecte As Boolean = False)
-            If ticket Is Nothing Then
-                Throw New ArgumentNullException(NameOf(ticket))
-            End If
+        Private Function ImprimerTicket(ticket As TicketData, Optional copies As Integer = 1, Optional afficherApercu As Boolean = True) As Boolean
+            Try
+                If ticket Is Nothing Then
+                    Return False
+                End If
 
-            Dim doc As New Printing.PrintDocument()
-            If _param IsNot Nothing AndAlso _param.ImprimanteTicket <> "" Then
+                If _param Is Nothing Then
+                    Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                    Dim dal As New DAL(cs)
+                    _param = (New ParametreService(New ParametreRepository(dal))).Charger()
+                End If
+
+                If _param Is Nothing OrElse String.IsNullOrWhiteSpace(_param.ImprimanteTicket) Then
+                    Dim log As New ProductionLogService()
+                    log.Warn("CaisseForm", "ImprimerTicket", "Aucune imprimante ticket configurée.")
+                    Return False
+                End If
+
+                Dim doc As New Printing.PrintDocument()
                 doc.PrinterSettings.PrinterName = _param.ImprimanteTicket
-            End If
-
-            If copies > 1 Then
                 doc.PrinterSettings.Copies = CShort(Math.Max(1, copies))
-            End If
+                ConfigurerTicket80Mm(doc)
 
-            doc.DefaultPageSettings.Color = If(_param IsNot Nothing, _param.ImpressionCouleur, True)
-            AddHandler doc.PrintPage, Sub(s, eV) ImprimerPageTicket(eV, ticket)
+                doc.DefaultPageSettings.Color = If(_param IsNot Nothing, _param.ImpressionCouleur, True)
+                AddHandler doc.PrintPage, Sub(s, eV) ImprimerPageTicket(eV, ticket)
 
-            If Not forcerImpressionDirecte AndAlso _param IsNot Nothing AndAlso _param.ApercuAvantImpression Then
-                Dim preview As New PrintPreviewDialog()
-                preview.Document = doc
-                preview.ShowDialog()
-            Else
-                doc.Print()
-            End If
+                If afficherApercu AndAlso _param IsNot Nothing AndAlso _param.ApercuAvantImpression Then
+                    Dim preview As New PrintPreviewDialog()
+                    preview.Document = doc
+                    preview.ShowDialog()
+                Else
+                    doc.Print()
+                End If
+                Return True
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("CaisseForm", "ImprimerTicket", "Erreur lors de l'impression du ticket.", ex)
+                Return False
+            End Try
+        End Function
+
+        Private Sub ConfigurerTicket80Mm(doc As Printing.PrintDocument)
+            Try
+                Dim largeur As Integer = CInt(Math.Round(80D / 25.4D * 100D))
+                Dim hauteur As Integer = 1200
+                doc.DefaultPageSettings.PaperSize = New Printing.PaperSize("Ticket80mm", largeur, hauteur)
+                doc.DefaultPageSettings.Margins = New Printing.Margins(5, 5, 5, 5)
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Warn("CaisseForm", "ConfigurerTicket80Mm", "Impossible de configurer le format ticket 80mm.")
+                log.Error("CaisseForm", "ConfigurerTicket80Mm", "Erreur configuration ticket 80mm.", ex)
+            End Try
         End Sub
 
         Private Sub ImprimerPageTicket(e As Printing.PrintPageEventArgs, ticket As TicketData)

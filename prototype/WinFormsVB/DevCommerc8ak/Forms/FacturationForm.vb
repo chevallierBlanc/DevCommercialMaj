@@ -867,8 +867,7 @@ Namespace DevCommerc8ak
                         .MontantRemise = remiseMontant,
                         .MontantTaxe = 0D,
                         .MontantTotal = total,
-                        .Statut = "EN_ATTENTE",
-                        .ModifierPar = SessionUtilisateur.UtilisateurId
+                        .Statut = "EN_ATTENTE"
                     }
                     factureRepo.MettreAJour(factureMaj)
 

@@ -551,7 +551,6 @@ Namespace DevCommerc8ak
             AddHandler btnProduit.Click, Sub() Ouvrir(New FormulaireProduits())
             AddHandler btnAppro.Click, Sub() Ouvrir(New FormulaireApprovisionnement())
             AddHandler gridAlertes.CellContentClick, AddressOf ActionsAlertes
-            AddHandler btnRafraichirVentes.Click, Sub() Charger()
 
             timerClock = New Timer() With {.Interval = 1000}
             AddHandler timerClock.Tick, AddressOf MajHorloge

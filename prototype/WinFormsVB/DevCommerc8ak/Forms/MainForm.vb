@@ -325,11 +325,15 @@ Namespace DevCommerc8ak
             If VerifierPermission("Facturier") Then
                 AjouterBoutonSidebar(flowPnlMenu, "Facturier", y, AddressOf AfficherFacturier)
                 y += 50
+                AjouterBoutonSidebar(flowPnlMenu, "Historique factures", y, AddressOf AfficherHistoriqueFactures)
+                y += 50
             End If
 
             ' Bouton Recettes
             If VerifierPermission("Caisse") Then
                 AjouterBoutonSidebar(flowPnlMenu, "Caisse", y, AddressOf AfficherCaisse)
+                y += 50
+                AjouterBoutonSidebar(flowPnlMenu, "Finance", y, AddressOf AfficherFinance)
 
                 y += 50
             End If
@@ -338,6 +342,8 @@ Namespace DevCommerc8ak
             If VerifierPermission("ADMIN") Then
                 AjouterBoutonSidebar(flowPnlMenu, "Administration", y, AddressOf Dashbord)
 
+                y += 50
+                AjouterBoutonSidebar(flowPnlMenu, "Stock / Inventaire", y, AddressOf AfficherStockAdmin)
                 y += 50
             End If
 
@@ -486,6 +492,8 @@ Namespace DevCommerc8ak
                     Select Case fonctionnalite
                         Case "Facturier"
                             Return True
+                        Case "HistoriqueFactures"
+                            Return True
                         Case Else
                             Return False
                     End Select
@@ -493,6 +501,8 @@ Namespace DevCommerc8ak
                 Case "CAISSIERE"
                     Select Case fonctionnalite
                         Case "Caisse"
+                            Return True
+                        Case "Finance"
                             Return True
                         Case Else
                             Return False
@@ -842,10 +852,7 @@ Namespace DevCommerc8ak
         ''' Afficher factureir
         ''' </summary>
         Private Sub AfficherFacturier(sender As Object, e As EventArgs)
-
-
             LoadForm(New FacturationForm())
-
         End Sub
 
         ''' <summary>
@@ -853,7 +860,18 @@ Namespace DevCommerc8ak
         ''' </summary>
         Private Sub AfficherCaisse(sender As Object, e As EventArgs)
             LoadForm(New CaisseForm())
+        End Sub
 
+        Private Sub AfficherFinance(sender As Object, e As EventArgs)
+            LoadForm(New FormulaireFinance())
+        End Sub
+
+        Private Sub AfficherHistoriqueFactures(sender As Object, e As EventArgs)
+            LoadForm(New FormulaireFactures())
+        End Sub
+
+        Private Sub AfficherStockAdmin(sender As Object, e As EventArgs)
+            LoadForm(New FormulaireStock_Final_FIXED())
         End Sub
 
         Protected Overrides Sub OnFormClosing(e As FormClosingEventArgs)
