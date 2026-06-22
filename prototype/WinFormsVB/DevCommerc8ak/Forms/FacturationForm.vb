@@ -55,7 +55,6 @@ Namespace DevCommerc8ak
         Private ReadOnly btnValider As Button
         Private ReadOnly btnImprimer As Button
         Private ReadOnly btnPdf As Button
-        Private ReadOnly btnExcel As Button
         Private ReadOnly btnHistorique As Button
         Private ReadOnly btnAnnuler As Button
         Private ReadOnly btnDeconnexion As Button
@@ -66,7 +65,8 @@ Namespace DevCommerc8ak
         Private _produitsTable As DataTable
         Private _produitsView As DataView
         Private _parametres As ParametreDTO
-        Private _typesVenteCourants As List(Of TypeVenteDTO) 'nouveau 
+        Private _typesVenteCourants As List(Of TypeVenteDTO) 'nouveau
+        Private _factureEnEditionId As Integer?
 
         Private Class PanierLigne
             Public Property ProduitId As Integer
@@ -89,6 +89,7 @@ Namespace DevCommerc8ak
             Me.StartPosition = FormStartPosition.CenterScreen
             Me.FormBorderStyle = FormBorderStyle.FixedDialog
             Me.MaximizeBox = False
+            Me.KeyPreview = True
 
             _panier = New List(Of PanierLigne)()
             _typeVenteService = New TypeVenteService()
@@ -261,8 +262,7 @@ Namespace DevCommerc8ak
             }
             pnlTotals.BorderStyle = BorderStyle.FixedSingle
 
-            Dim lblRemiseLabel As New Label() With {.Text = "REMISE (%)", .Left = 20, .Top = 15, .AutoSize = True, .Font = FontBold}
-            txtRemise = New TextBox() With {.Left = 120, .Top = 12, .Width = 60, .BorderStyle = BorderStyle.FixedSingle, .TextAlign = HorizontalAlignment.Center}
+            txtRemise = New TextBox() With {.Left = 120, .Top = 12, .Width = 60, .BorderStyle = BorderStyle.FixedSingle, .TextAlign = HorizontalAlignment.Center, .Visible = False}
 
             lblSousTotal = New Label() With {
                 .Text = "SOUS-TOTAL : 0.00", .Left = 200, .Top = 15, .Width = 200,
@@ -274,7 +274,7 @@ Namespace DevCommerc8ak
                 .Font = New Font("Segoe UI", 14, FontStyle.Bold), .ForeColor = ColorPrimary,
                 .TextAlign = ContentAlignment.MiddleRight
             }
-            pnlTotals.Controls.AddRange({lblRemiseLabel, txtRemise, lblSousTotal, lblTotal})
+            pnlTotals.Controls.AddRange({lblSousTotal, lblTotal})
 
             ' Actions Panel
             Dim pnlActions As New FlowLayoutPanel() With {
@@ -285,16 +285,25 @@ Namespace DevCommerc8ak
             btnValider = New Button() With {.Text = "VALIDER LA VENTE", .Width = 210, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorAccent, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
             btnImprimer = New Button() With {.Text = "IMPRIMER A4", .Width = 140, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
             btnPdf = New Button() With {.Text = "PDF", .Width = 100, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
-            btnExcel = New Button() With {.Text = "EXCEL", .Width = 100, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
 
             btnHistorique = New Button() With {.Text = "HISTORIQUE", .Width = 150, .Height = 40, .FlatStyle = FlatStyle.Flat, .BackColor = ColorPrimary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
             btnAnnuler = New Button() With {.Text = "ANNULER", .Width = 150, .Height = 40, .FlatStyle = FlatStyle.Flat, .BackColor = ColorDanger, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
             btnDeconnexion = New Button() With {.Text = "DÉCONNEXION", .Width = 150, .Height = 40, .FlatStyle = FlatStyle.Flat, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
 
-            For Each btn As Button In {btnValider, btnImprimer, btnPdf, btnExcel, btnHistorique, btnAnnuler, btnDeconnexion}
+            For Each btn As Button In {btnValider, btnImprimer, btnPdf, btnHistorique, btnAnnuler, btnDeconnexion}
                 btn.FlatAppearance.BorderSize = 0
                 pnlActions.Controls.Add(btn)
             Next
+
+            Dim pnlRaccourcis As New Panel() With {.Dock = DockStyle.Bottom, .Height = 44, .BackColor = Color.White, .Padding = New Padding(6, 0, 0, 0)}
+            Dim lblRaccourcis As New Label() With {
+                .Dock = DockStyle.Fill,
+                .Font = New Font("Segoe UI", 7.5F),
+                .ForeColor = Color.FromArgb(120, 120, 120),
+                .Text = "F2: Rechercher produit    Entrée: Ajouter au panier    F5: Actualiser    Ctrl+P: Imprimer    Échap: Effacer"
+            }
+            pnlRaccourcis.Controls.Add(lblRaccourcis)
+            pnlActions.Controls.Add(pnlRaccourcis)
 
             pnlRight.Controls.Add(pnlActions)
             pnlRight.Controls.Add(pnlTotals)
@@ -319,7 +328,6 @@ Namespace DevCommerc8ak
             AddHandler btnValider.Click, AddressOf ValiderFacture
             AddHandler btnImprimer.Click, AddressOf ImprimerA4
             AddHandler btnPdf.Click, AddressOf ExporterPdf
-            AddHandler btnExcel.Click, AddressOf ExporterExcel
             AddHandler btnHistorique.Click, AddressOf OuvrirHistorique
             AddHandler btnAnnuler.Click, AddressOf AnnulerFacture
             AddHandler btnDeconnexion.Click, AddressOf Deconnecter
@@ -330,7 +338,40 @@ Namespace DevCommerc8ak
             ChargerProduits()
             GenererNouveauNumeroFacture()
             ConfigurerGrilleChargerProduit()
+            MettreAJourBoutonsPanier()
         End Sub
+
+        Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+            If keyData = Keys.F2 Then
+                txtRecherche.Focus()
+                txtRecherche.SelectAll()
+                Return True
+            End If
+
+            If keyData = Keys.F5 Then
+                RechargerProduits(Nothing, EventArgs.Empty)
+                Return True
+            End If
+
+            If keyData = (Keys.Control Or Keys.P) Then
+                ImprimerA4(Nothing, EventArgs.Empty)
+                Return True
+            End If
+
+            If keyData = Keys.Escape Then
+                AnnulerFacture(Nothing, EventArgs.Empty)
+                Return True
+            End If
+
+            If keyData = Keys.Enter Then
+                If txtQuantite.Focused OrElse cmbUnite.Focused OrElse gridProduits.Focused OrElse txtPrixUnitaire.Focused Then
+                    AjouterAuPanier(Nothing, EventArgs.Empty)
+                    Return True
+                End If
+            End If
+
+            Return MyBase.ProcessCmdKey(msg, keyData)
+        End Function
 
 
 
@@ -595,7 +636,6 @@ Namespace DevCommerc8ak
 
             RafraichirPanier()
         End Sub
-
         Private Sub RetirerDuPanier(sender As Object, e As EventArgs)
             If gridPanier.CurrentRow Is Nothing Then Return
             Dim produitId As Integer = Convert.ToInt32(gridPanier.CurrentRow.Cells(0).Value)
@@ -603,7 +643,6 @@ Namespace DevCommerc8ak
             _panier.RemoveAll(Function(x) x.ProduitId = produitId AndAlso x.Unite = unite)
             RafraichirPanier()
         End Sub
-
         Private Sub RafraichirPanier()
             gridPanier.DataSource = Nothing
             gridPanier.DataSource = _panier
@@ -634,6 +673,14 @@ Namespace DevCommerc8ak
             lblSousTotal.Text = "Sous-total: " & sousTotal.ToString()
             lblTotal.Text = "Total: " & total.ToString()
             MettreAJourAffichageStockProduit()
+            MettreAJourBoutonsPanier()
+        End Sub
+
+        Private Sub MettreAJourBoutonsPanier()
+            Dim panierVide As Boolean = (_panier Is Nothing OrElse _panier.Count = 0)
+            btnValider.Enabled = Not panierVide
+            btnImprimer.Enabled = Not panierVide
+            btnPdf.Enabled = Not panierVide
         End Sub
 
         Private Sub RechercherClientParTelephone(sender As Object, e As EventArgs)
@@ -679,6 +726,57 @@ Namespace DevCommerc8ak
             Return 0D
         End Function
 
+        Public Sub ChargerFacturePourEdition(factureVenteId As Integer, numeroFacture As String, clientNom As String, telephone As String)
+            Try
+                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                Dim dal As New DAL(cs)
+                Dim factureRepo As New FactureVenteRepository(dal)
+                Dim facture As FactureVenteDTO = factureRepo.ObtenirParId(factureVenteId)
+                If facture Is Nothing OrElse facture.Statut <> "EN_ATTENTE" Then
+                    MessageBox.Show("Seules les factures brouillon peuvent être modifiees.")
+                    Return
+                End If
+
+                Dim ligneRepo As New LigneFactureVenteRepository(dal)
+                Dim dtLignes As DataTable = ligneRepo.ListerDetailsParFacture(factureVenteId)
+
+                _factureEnEditionId = factureVenteId
+                txtNumeroFacture.Text = numeroFacture
+                txtClientNom.Text = clientNom
+                txtClientTel.Text = telephone
+                txtClientId.Text = ""
+                txtRemise.Text = ""
+                btnValider.Text = "METTRE À JOUR LA VENTE"
+
+                _panier.Clear()
+                For Each row As DataRow In dtLignes.Rows
+                    Dim qteSaisie As Decimal = If(dtLignes.Columns.Contains("QuantiteSaisie") AndAlso Not row.IsNull("QuantiteSaisie"), Convert.ToDecimal(row("QuantiteSaisie")), Convert.ToDecimal(row("Quantite")))
+                    Dim qteBase As Decimal = If(dtLignes.Columns.Contains("QuantiteBase") AndAlso Not row.IsNull("QuantiteBase"), Convert.ToDecimal(row("QuantiteBase")), qteSaisie)
+                    Dim prix As Decimal = Convert.ToDecimal(row("PrixUnitaire"))
+                    Dim totalLigne As Decimal = Convert.ToDecimal(row("MontantLigne"))
+                    Dim unite As String = Convert.ToString(row("TypeVente"))
+                    Dim quantiteEquivalente As Decimal = If(qteSaisie = 0D, qteBase, qteBase / qteSaisie)
+
+                    _panier.Add(New PanierLigne With {
+                        .ProduitId = Convert.ToInt32(row("ProduitId")),
+                        .Libelle = Convert.ToString(row("Libelle")),
+                        .Unite = unite,
+                        .PrixUnitaire = prix,
+                        .Quantite = qteSaisie,
+                        .QuantiteBase = qteBase,
+                        .QuantiteEquivalente = quantiteEquivalente,
+                        .QuantiteReelle = qteBase,
+                        .Total = totalLigne
+                    })
+                Next
+
+                RafraichirPanier()
+                ChargerProduits()
+            Catch ex As Exception
+                MessageBox.Show("Erreur chargement facture brouillon: " & ex.Message)
+            End Try
+        End Sub
+
         Private Sub ValiderFacture(sender As Object, e As EventArgs)
             Try
                 If _panier.Count = 0 Then
@@ -700,7 +798,16 @@ Namespace DevCommerc8ak
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
                 Dim service As New FacturationService(dal)
+                Dim factureRepo As New FactureVenteRepository(dal)
                 Dim clientService As New ClientService(New ClientRepository(dal))
+
+                If _factureEnEditionId.HasValue Then
+                    Dim factureExistante As FactureVenteDTO = factureRepo.ObtenirParId(_factureEnEditionId.Value)
+                    If factureExistante Is Nothing OrElse factureExistante.Statut <> "EN_ATTENTE" Then
+                        MessageBox.Show("Seules les factures brouillon peuvent être modifiees.")
+                        Return
+                    End If
+                End If
 
                 Dim sousTotal As Decimal = 0D
                 For Each l As PanierLigne In _panier
@@ -747,13 +854,40 @@ Namespace DevCommerc8ak
                     clientId = clientService.Ajouter(nouveau)
                 End If
 
-                Dim factureId As Integer = service.CreerFacture(numeroFacture, clientId, sousTotal, remiseMontant, 0D, total, SessionUtilisateur.UtilisateurId)
+                Dim factureId As Integer
+                If _factureEnEditionId.HasValue Then
+                    factureId = _factureEnEditionId.Value
+                    Dim ligneRepo As New LigneFactureVenteRepository(dal)
+
+                    Dim factureMaj As New FactureVente With {
+                        .FactureVenteId = factureId,
+                        .NumeroFacture = numeroFacture,
+                        .ClientId = clientId,
+                        .SousTotal = sousTotal,
+                        .MontantRemise = remiseMontant,
+                        .MontantTaxe = 0D,
+                        .MontantTotal = total,
+                        .Statut = "EN_ATTENTE",
+                        .ModifierPar = SessionUtilisateur.UtilisateurId
+                    }
+                    factureRepo.MettreAJour(factureMaj)
+
+                    Dim lignesExistantes As List(Of LigneFactureVenteDTO) = ligneRepo.ListerParFacture(factureId)
+                    For Each ligneExistante As LigneFactureVenteDTO In lignesExistantes
+                        ligneRepo.Supprimer(ligneExistante.LigneFactureVenteId)
+                    Next
+                Else
+                    factureId = service.CreerFacture(numeroFacture, clientId, sousTotal, remiseMontant, 0D, total, SessionUtilisateur.UtilisateurId)
+                End If
+
                 For Each l As PanierLigne In _panier
                     service.AjouterLigne(factureId, l.ProduitId, l.QuantiteBase, l.QuantiteEquivalente, l.Unite, l.PrixUnitaire, 0D, l.Quantite)
                 Next
 
-                MessageBox.Show("Facture en attente: " & numeroFacture)
+                MessageBox.Show(If(_factureEnEditionId.HasValue, "Facture brouillon mise a jour: ", "Facture en attente: ") & numeroFacture)
                 _panier.Clear()
+                _factureEnEditionId = Nothing
+                btnValider.Text = "VALIDER LA VENTE"
                 RafraichirPanier()
                 ChargerProduits()
                 GenererNouveauNumeroFacture()
@@ -777,6 +911,10 @@ Namespace DevCommerc8ak
 
         Private Sub ImprimerA4(sender As Object, e As EventArgs)
             Try
+                If _panier Is Nothing OrElse _panier.Count = 0 Then
+                    MessageBox.Show("Panier vide.")
+                    Return
+                End If
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
                 _parametres = (New ParametreService(New ParametreRepository(dal))).Charger()
@@ -802,6 +940,10 @@ Namespace DevCommerc8ak
 
         Private Sub ExporterPdf(sender As Object, e As EventArgs)
             Try
+                If _panier Is Nothing OrElse _panier.Count = 0 Then
+                    MessageBox.Show("Panier vide.")
+                    Return
+                End If
                 Dim sfd As New SaveFileDialog() With {.Filter = "PDF (*.pdf)|*.pdf"}
                 If sfd.ShowDialog() <> DialogResult.OK Then Return
                 Dim lignes As List(Of String) = ConstruireLignesExport()
@@ -809,18 +951,6 @@ Namespace DevCommerc8ak
                 MessageBox.Show("PDF genere.")
             Catch ex As Exception
                 MessageBox.Show("Erreur PDF: " & ex.Message)
-            End Try
-        End Sub
-
-        Private Sub ExporterExcel(sender As Object, e As EventArgs)
-            Try
-                Dim sfd As New SaveFileDialog() With {.Filter = "Excel CSV (*.csv)|*.csv"}
-                If sfd.ShowDialog() <> DialogResult.OK Then Return
-                Dim lignes As List(Of String) = ConstruireLignesExportCsv()
-                File.WriteAllLines(sfd.FileName, lignes)
-                MessageBox.Show("Export CSV genere.")
-            Catch ex As Exception
-                MessageBox.Show("Erreur export CSV: " & ex.Message)
             End Try
         End Sub
 
@@ -954,10 +1084,12 @@ Namespace DevCommerc8ak
 
         Private Sub AnnulerFacture(sender As Object, e As EventArgs)
             _panier.Clear()
+            _factureEnEditionId = Nothing
             txtClientId.Text = ""
             txtClientNom.Text = ""
             txtClientTel.Text = ""
             txtRemise.Text = ""
+            btnValider.Text = "VALIDER LA VENTE"
             RafraichirPanier()
             GenererNouveauNumeroFacture()
         End Sub

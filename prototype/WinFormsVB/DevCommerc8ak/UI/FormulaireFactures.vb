@@ -270,7 +270,15 @@ Namespace DevCommerc8ak
                 lblTotalAttente.Text = totalAttente.ToString("N2") & " FC"
                 lblTotalPaye.Text = totalPaye.ToString("N2") & " FC"
 
-                gridFactures.DataSource = dt
+            gridFactures.DataSource = dt
+            For Each ligne As DataGridViewRow In gridFactures.Rows
+                If ligne Is Nothing OrElse ligne.IsNewRow Then Continue For
+                Dim statutDbLigne As String = Convert.ToString(ligne.Cells(1).Value)
+                If String.Equals(statutDbLigne, "ANNULEE", StringComparison.OrdinalIgnoreCase) Then
+                    ligne.DefaultCellStyle.ForeColor = ColorDanger
+                    ligne.DefaultCellStyle.SelectionForeColor = ColorDanger
+                End If
+            Next
             Catch ex As Exception
                 ' MessageBox.Show("Erreur chargement factures: " & ex.Message)
             End Try
@@ -340,10 +348,11 @@ Namespace DevCommerc8ak
                         Return
                     End If
                     Dim f As New FacturationForm()
+                    f.ChargerFacturePourEdition(factureId, numero, client, tel)
                     f.ShowDialog()
                 Case "ActionAnnuler"
-                    If statutDb <> "PAYEE" Then
-                        MessageBox.Show("Annulation autorisée uniquement pour les factures validées.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    If statutDb <> "EN_ATTENTE" Then
+                        MessageBox.Show("Seules les factures brouillon peuvent être annulées depuis l'historique.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information)
                         Return
                     End If
                     If MessageBox.Show("Confirmer l'annulation de la facture ?", "Annuler", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then

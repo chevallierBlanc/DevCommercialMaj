@@ -45,6 +45,7 @@ Namespace DevCommerc8ak
         Private ReadOnly btnEncaisser As Button
         Private ReadOnly btnImprimer As Button
         Private ReadOnly btnAnnuler As Button
+        Private ReadOnly btnAnnulerFacture As Button
 
         ' --- Données ---
         Private _param As ParametreDTO
@@ -236,12 +237,18 @@ Namespace DevCommerc8ak
             Dim btnSep2 As New Panel() With {.Dock = DockStyle.Top, .Height = 10}
 
             btnAnnuler = New Button() With {
-                .Text = "ANNULER / EFFACER", .Dock = DockStyle.Top, .Height = 45,
+                .Text = "EFFACER SÉLECTION", .Dock = DockStyle.Top, .Height = 45,
                 .FlatStyle = FlatStyle.Flat, .BackColor = ColorDanger, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand
             }
             btnAnnuler.FlatAppearance.BorderSize = 0
 
-            pnlActions.Controls.AddRange({btnAnnuler, btnSep2, btnImprimer, btnSep1, btnEncaisser})
+            btnAnnulerFacture = New Button() With {
+                .Text = "ANNULER FACTURE BROUILLON", .Dock = DockStyle.Top, .Height = 45,
+                .FlatStyle = FlatStyle.Flat, .BackColor = ColorDanger, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand
+            }
+            btnAnnulerFacture.FlatAppearance.BorderSize = 0
+
+            pnlActions.Controls.AddRange({btnAnnulerFacture, btnAnnuler, btnSep2, btnImprimer, btnSep1, btnEncaisser})
 
             pnlDroite.Controls.AddRange({pnlActions, pnlRef, pnlMode, lblMonnaie, pnlRecu, lblTotal, lblTotalTitre})
 
@@ -263,6 +270,7 @@ Namespace DevCommerc8ak
             AddHandler btnEncaisser.Click, AddressOf Encaisser
             AddHandler btnImprimer.Click, AddressOf ImprimerTicket
             AddHandler btnAnnuler.Click, AddressOf AnnulerSelection
+            AddHandler btnAnnulerFacture.Click, AddressOf AnnulerFactureBrouillon
 
             ' Initialisation
             ConfigurerGrilleFactures()
@@ -292,7 +300,8 @@ Namespace DevCommerc8ak
             Dim colTel As New DataGridViewTextBoxColumn() With {.DataPropertyName = "Telephone", .HeaderText = "Telephone", .Width = 120}
             Dim colDate As New DataGridViewTextBoxColumn() With {.DataPropertyName = "CreeLe", .HeaderText = "Date", .Width = 90}
             Dim colTotal As New DataGridViewTextBoxColumn() With {.DataPropertyName = "MontantTotal", .HeaderText = "Total", .Width = 80}
-            gridFactures.Columns.AddRange(New DataGridViewColumn() {colId, colNumero, colClient, colTel, colDate, colTotal})
+            Dim colStatut As New DataGridViewTextBoxColumn() With {.DataPropertyName = "Statut", .Name = "Statut", .Visible = False}
+            gridFactures.Columns.AddRange(New DataGridViewColumn() {colId, colNumero, colClient, colTel, colDate, colTotal, colStatut})
         End Sub
 
         Private Sub ConfigurerGrilleChargerLignes()
@@ -328,6 +337,14 @@ Namespace DevCommerc8ak
                 Dim dateAu As Date? = If(chkDate.Checked, CType(dtDate.Value.Date, Date?), Nothing)
                 Dim dt As DataTable = repo.ListerValideesNonPayees(txtRecherche.Text.Trim(), dateDu, dateAu)
                 gridFactures.DataSource = dt
+                For Each row As DataGridViewRow In gridFactures.Rows
+                    If row Is Nothing OrElse row.IsNewRow Then Continue For
+                    Dim statut As String = Convert.ToString(row.Cells("Statut").Value)
+                    If String.Equals(statut, "ANNULEE", StringComparison.OrdinalIgnoreCase) Then
+                        row.DefaultCellStyle.ForeColor = ColorDanger
+                        row.DefaultCellStyle.SelectionForeColor = ColorDanger
+                    End If
+                Next
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement factures: " & ex.Message)
             End Try
@@ -403,8 +420,18 @@ Namespace DevCommerc8ak
                 service.EncaisserFacture(factureId, cmbMode.SelectedItem.ToString(), txtReference.Text.Trim(), montantFC, monnaieFC, devise, SessionUtilisateur.UtilisateurId)
 
                 _dernierTicket = ConstruireTicketDepuisSelection(montantFC, monnaieFC, devise)
+                Try
+                    ImprimerTicket(_dernierTicket, 2, True)
+                Catch exImpression As Exception
+                    Dim log As New ProductionLogService()
+                    log.Warn("CaisseForm", "Encaisser", "Le paiement a été validé mais l'impression automatique a échoué.")
+                    log.Error("CaisseForm", "Encaisser", "Erreur impression automatique après encaissement.", exImpression)
+                    MessageBox.Show("Le paiement a été validé, mais l'impression automatique a échoué." & Environment.NewLine & exImpression.Message,
+                                    "Impression",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Warning)
+                End Try
                 MessageBox.Show("Paiement reussi.")
-                ImprimerTicket(Nothing, EventArgs.Empty)
                 ChargerFactures(Nothing, EventArgs.Empty)
                 AnnulerSelection(Nothing, EventArgs.Empty)
             Catch ex As Exception
@@ -449,24 +476,36 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                Dim doc As New Printing.PrintDocument()
-                If _param IsNot Nothing AndAlso _param.ImprimanteTicket <> "" Then
-                    doc.PrinterSettings.PrinterName = _param.ImprimanteTicket
-                End If
-
-                doc.DefaultPageSettings.Color = If(_param IsNot Nothing, _param.ImpressionCouleur, True)
-                AddHandler doc.PrintPage, Sub(s, eV) ImprimerPageTicket(eV, ticket)
-
-                If _param IsNot Nothing AndAlso _param.ApercuAvantImpression Then
-                    Dim preview As New PrintPreviewDialog()
-                    preview.Document = doc
-                    preview.ShowDialog()
-                Else
-                    doc.Print()
-                End If
+                ImprimerTicket(ticket, 1, False)
             Catch ex As Exception
                 MessageBox.Show("Erreur impression: " & ex.Message)
             End Try
+        End Sub
+
+        Private Sub ImprimerTicket(ticket As TicketData, Optional copies As Integer = 1, Optional forcerImpressionDirecte As Boolean = False)
+            If ticket Is Nothing Then
+                Throw New ArgumentNullException(NameOf(ticket))
+            End If
+
+            Dim doc As New Printing.PrintDocument()
+            If _param IsNot Nothing AndAlso _param.ImprimanteTicket <> "" Then
+                doc.PrinterSettings.PrinterName = _param.ImprimanteTicket
+            End If
+
+            If copies > 1 Then
+                doc.PrinterSettings.Copies = CShort(Math.Max(1, copies))
+            End If
+
+            doc.DefaultPageSettings.Color = If(_param IsNot Nothing, _param.ImpressionCouleur, True)
+            AddHandler doc.PrintPage, Sub(s, eV) ImprimerPageTicket(eV, ticket)
+
+            If Not forcerImpressionDirecte AndAlso _param IsNot Nothing AndAlso _param.ApercuAvantImpression Then
+                Dim preview As New PrintPreviewDialog()
+                preview.Document = doc
+                preview.ShowDialog()
+            Else
+                doc.Print()
+            End If
         End Sub
 
         Private Sub ImprimerPageTicket(e As Printing.PrintPageEventArgs, ticket As TicketData)
@@ -531,6 +570,40 @@ Namespace DevCommerc8ak
             lblTotal.Text = "0 FC"
             txtMontantRecu.Text = ""
             lblMonnaie.Text = ""
+        End Sub
+
+        Private Sub AnnulerFactureBrouillon(sender As Object, e As EventArgs)
+            Try
+                If gridFactures.CurrentRow Is Nothing Then
+                    MessageBox.Show("Sélectionnez une facture brouillon à annuler.")
+                    Return
+                End If
+
+                Dim statut As String = Convert.ToString(gridFactures.CurrentRow.Cells("Statut").Value)
+                If Not String.Equals(statut, "EN_ATTENTE", StringComparison.OrdinalIgnoreCase) Then
+                    MessageBox.Show("Seules les factures brouillon peuvent être annulées depuis la caisse.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    Return
+                End If
+
+                If MessageBox.Show("Confirmer l'annulation de la facture brouillon ?", "Annuler facture", MessageBoxButtons.YesNo, MessageBoxIcon.Question) <> DialogResult.Yes Then
+                    Return
+                End If
+
+                Dim factureId As Integer = Convert.ToInt32(gridFactures.CurrentRow.Cells(0).Value)
+                Dim dal As New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)
+                Dim repo As New FactureVenteRepository(dal)
+                repo.MettreAJourStatut(factureId, "ANNULEE")
+
+                Dim log As New ProductionLogService()
+                log.Info("CaisseForm", "AnnulerFactureBrouillon", "Facture brouillon annulée: " & factureId.ToString())
+
+                ChargerFactures(Nothing, EventArgs.Empty)
+                AnnulerSelection(Nothing, EventArgs.Empty)
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("CaisseForm", "AnnulerFactureBrouillon", "Erreur lors de l'annulation de la facture brouillon.", ex)
+                MessageBox.Show("Erreur annulation facture: " & ex.Message)
+            End Try
         End Sub
     End Class
 End Namespace

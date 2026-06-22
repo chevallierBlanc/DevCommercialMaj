@@ -25,6 +25,7 @@ Namespace DevCommerc8ak
         ' --- Composants (Noms conservés) ---
         Private ReadOnly txtUser As Guna.UI2.WinForms.Guna2TextBox
         Private ReadOnly txtPass As Guna.UI2.WinForms.Guna2TextBox
+        Private ReadOnly chkAfficherMotDePasse As CheckBox
         Private ReadOnly btnLogin As Button
         Private ReadOnly lblStatus As Label
 
@@ -160,7 +161,19 @@ Namespace DevCommerc8ak
             Me.txtPass.TabIndex = 41
             Me.txtPass.UseSystemPasswordChar = True
 
-            pnlInputs.Controls.AddRange({txtPass, lblPass, pnlSpace1, txtUser, lblUser})
+            chkAfficherMotDePasse = New CheckBox() With {
+                .Text = "Afficher le mot de passe",
+                .Dock = DockStyle.Top,
+                .Height = 28,
+                .Font = New Font("Segoe UI", 8),
+                .ForeColor = ColorTextSecondary,
+                .Checked = False
+            }
+            AddHandler chkAfficherMotDePasse.CheckedChanged, Sub()
+                                                                  txtPass.UseSystemPasswordChar = Not chkAfficherMotDePasse.Checked
+                                                              End Sub
+
+            pnlInputs.Controls.AddRange({chkAfficherMotDePasse, txtPass, lblPass, pnlSpace1, txtUser, lblUser})
 
             ' Bouton de connexion
             Dim pnlAction As New Panel() With {.Dock = DockStyle.Top, .Height = 80, .Padding = New Padding(40, 10, 40, 0)}
@@ -200,7 +213,10 @@ Namespace DevCommerc8ak
                 .Cursor = Cursors.Hand
             }
             btnClose.FlatAppearance.BorderSize = 0
-            AddHandler btnClose.Click, Sub() Me.Close()
+            AddHandler btnClose.Click, Sub()
+                                           ApplicationLifecycle.RequestShutdown()
+                                           Me.Close()
+                                       End Sub
             pnlCard.Controls.Add(btnClose)
 
             ' Assemblage de la carte

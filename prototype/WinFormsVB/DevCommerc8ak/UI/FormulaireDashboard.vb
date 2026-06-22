@@ -6,6 +6,7 @@ Imports System.Configuration
 Imports System.Data
 Imports System.Drawing
 Imports System.Collections.Generic
+Imports System.Threading.Tasks
 Imports System.Windows.Forms
 Imports System.Windows.Forms.DataVisualization.Charting
 
@@ -402,6 +403,26 @@ Namespace DevCommerc8ak
 
         Private ReadOnly kpiTargets As Dictionary(Of Label, Decimal)
         Private ReadOnly kpiCurrent As Dictionary(Of Label, Decimal)
+        Private _chargementEnCours As Boolean
+
+        Private Class DashboardSnapshot
+            Public Property NomMagasin As String = String.Empty
+            Public Property SeuilStockCritique As Decimal
+            Public Property AlerteExpirationJours As Integer
+            Public Property KpiCAJour As Decimal
+            Public Property KpiCAMois As Decimal
+            Public Property KpiValeurStock As Decimal
+            Public Property KpiStockCritique As Decimal
+            Public Property KpiClients As Decimal
+            Public Property KpiFacturesAttente As Decimal
+            Public Property VentesMois As DataTable
+            Public Property RevenusParProduit As DataTable
+            Public Property ComparatifMois As DataTable
+            Public Property TauxVenteStock As Decimal
+            Public Property Alertes As DataTable
+            Public Property Activites As DataTable
+            Public Property NotificationsCount As Integer
+        End Class
 
         Public Sub New()
             ' Configuration de base
@@ -530,6 +551,7 @@ Namespace DevCommerc8ak
             AddHandler btnProduit.Click, Sub() Ouvrir(New FormulaireProduits())
             AddHandler btnAppro.Click, Sub() Ouvrir(New FormulaireApprovisionnement())
             AddHandler gridAlertes.CellContentClick, AddressOf ActionsAlertes
+            AddHandler btnRafraichirVentes.Click, Sub() Charger()
 
             timerClock = New Timer() With {.Interval = 1000}
             AddHandler timerClock.Tick, AddressOf MajHorloge
@@ -659,59 +681,123 @@ Namespace DevCommerc8ak
             lblDateHeure.Text = Date.Now.ToString("dddd d MMMM yyyy, HH:mm:ss")
         End Sub
 
-        Private Sub Charger()
+        Private Async Sub Charger()
+            If _chargementEnCours OrElse IsDisposed Then
+                Return
+            End If
+
+            _chargementEnCours = True
             Try
-                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
-                Dim dal As New DAL(cs)
-                Dim paramService As New ParametreService(New ParametreRepository(dal))
-                Dim param As ParametreDTO = paramService.Charger()
-                If param IsNot Nothing AndAlso Not String.IsNullOrEmpty(param.NomMagasin) Then
-                    lblEntreprise.Text = param.NomMagasin.ToUpper()
+                Dim snapshot As DashboardSnapshot = Await Task.Run(Function() ChargerSnapshot())
+                If snapshot Is Nothing OrElse IsDisposed OrElse Not IsHandleCreated Then
+                    Return
                 End If
 
-                Dim service As New RapportService(dal)
-                Animer(lblKpiCAJour, service.CAJournalier(Date.Now))
-                Animer(lblKpiCAMois, service.CAMensuel(Date.Now))
-                Animer(lblKpiValeurStock, service.ValeurStock())
-                Animer(lblKpiStockCritique, service.StockCritique(If(param Is Nothing, 0D, param.SeuilStockCritique)))
-                Animer(lblKpiClients, service.ClientsFideles())
-                Animer(lblKpiFacturesAttente, service.FacturesEnAttente())
+                If Not String.IsNullOrWhiteSpace(snapshot.NomMagasin) Then
+                    lblEntreprise.Text = snapshot.NomMagasin.ToUpper()
+                End If
 
-                UpdateChart(chartVentesMois, service.VentesParMois(), "Mois", "CA")
-                UpdateChart(chartRevenus, service.RevenusParProduit(), "Libelle", "Montant")
-                UpdateChart(chartComparaison, service.ComparatifMois(Date.Now), "Periode", "CA")
+                Animer(lblKpiCAJour, snapshot.KpiCAJour)
+                Animer(lblKpiCAMois, snapshot.KpiCAMois)
+                Animer(lblKpiValeurStock, snapshot.KpiValeurStock)
+                Animer(lblKpiStockCritique, snapshot.KpiStockCritique)
+                Animer(lblKpiClients, snapshot.KpiClients)
+                Animer(lblKpiFacturesAttente, snapshot.KpiFacturesAttente)
 
-                Dim taux As Decimal = service.TauxVenteStock()
-                chartTaux.Series(0).Points.Clear()
-                chartTaux.Series(0).Points.AddXY("Vendu", taux * 100D)
-                chartTaux.Series(0).Points.AddXY("Stock", 100D - (taux * 100D))
+                UpdateChart(chartVentesMois, snapshot.VentesMois, "Mois", "CA")
+                UpdateChart(chartRevenus, snapshot.RevenusParProduit, "Libelle", "Montant")
+                UpdateChart(chartComparaison, snapshot.ComparatifMois, "Periode", "CA")
 
-                gridAlertes.DataSource = service.AlertesDetail(If(param Is Nothing, 0D, param.SeuilStockCritique), If(param Is Nothing, 0, param.AlerteExpirationJours))
+                If chartTaux IsNot Nothing AndAlso chartTaux.Series IsNot Nothing AndAlso chartTaux.Series.Count > 0 Then
+                    Dim taux As Decimal = snapshot.TauxVenteStock
+                    chartTaux.Series(0).Points.Clear()
+                    chartTaux.Series(0).Points.AddXY("Vendu", taux * 100D)
+                    chartTaux.Series(0).Points.AddXY("Stock", 100D - (taux * 100D))
+                End If
 
-                Dim activites As DataTable = service.ActivitesRecentes()
+                gridAlertes.DataSource = snapshot.Alertes
+
                 listActivites.Items.Clear()
-                For Each row As DataRow In activites.Rows
-                    Dim item As New ListViewItem(Convert.ToString(row("TypeAct")))
-                    item.SubItems.Add(Convert.ToString(row("Info")))
-                    item.SubItems.Add(Convert.ToDateTime(row("DateAct")).ToString("dd/MM HH:mm"))
-                    listActivites.Items.Add(item)
-                Next
+                If snapshot.Activites IsNot Nothing Then
+                    For Each row As DataRow In snapshot.Activites.Rows
+                        If row Is Nothing Then Continue For
+                        Dim item As New ListViewItem(Convert.ToString(row("TypeAct")))
+                        item.SubItems.Add(Convert.ToString(row("Info")))
+                        item.SubItems.Add(Convert.ToDateTime(row("DateAct")).ToString("dd/MM HH:mm"))
+                        listActivites.Items.Add(item)
+                    Next
+                End If
 
-                Dim notificationService As New NotificationService(dal)
-                notificationService.SynchroniserAlertesMetier(If(param Is Nothing, 0D, param.SeuilStockCritique), If(param Is Nothing, 30, param.AlerteExpirationJours), SessionUtilisateur.UtilisateurId)
-                Dim notifications As DataTable = notificationService.ListerNonLues()
-                btnNotif.Text = "Notifications (" & notifications.Rows.Count.ToString() & ")"
-                'btnNotif.Text = "Notifications (" & notifications.Rows.Count.ToString() & ")"
-                'btnNotif.BackColor = If(notifications.Rows.Count > 0, Color.FromArgb(220, 70, 70), Color.FromArgb(20, 30, 45))
-            Catch
+                btnNotif.Text = "Notifications (" & snapshot.NotificationsCount.ToString() & ")"
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("FormulaireDashboard", "Charger", "Erreur lors du chargement du dashboard.", ex)
+            Finally
+                _chargementEnCours = False
             End Try
         End Sub
 
+        Private Function ChargerSnapshot() As DashboardSnapshot
+            Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+            Dim dal As New DAL(cs)
+            Dim paramService As New ParametreService(New ParametreRepository(dal))
+            Dim param As ParametreDTO = paramService.Charger()
+            Dim service As New RapportService(dal)
+            Dim notificationService As New NotificationService(dal)
+
+            Dim seuil As Decimal = If(param Is Nothing, 0D, param.SeuilStockCritique)
+            Dim jours As Integer = If(param Is Nothing, 30, param.AlerteExpirationJours)
+
+            notificationService.SynchroniserAlertesMetier(seuil, jours, SessionUtilisateur.UtilisateurId)
+
+            Return New DashboardSnapshot With {
+                .NomMagasin = If(param Is Nothing, String.Empty, param.NomMagasin),
+                .SeuilStockCritique = seuil,
+                .AlerteExpirationJours = jours,
+                .KpiCAJour = service.CAJournalier(Date.Now),
+                .KpiCAMois = service.CAMensuel(Date.Now),
+                .KpiValeurStock = service.ValeurStock(),
+                .KpiStockCritique = service.StockCritique(seuil),
+                .KpiClients = service.ClientsFideles(),
+                .KpiFacturesAttente = service.FacturesEnAttente(),
+                .VentesMois = service.VentesParMois(),
+                .RevenusParProduit = service.RevenusParProduit(),
+                .ComparatifMois = service.ComparatifMois(Date.Now),
+                .TauxVenteStock = service.TauxVenteStock(),
+                .Alertes = service.AlertesDetail(seuil, jours),
+                .Activites = service.ActivitesRecentes(),
+                .NotificationsCount = notificationService.ListerNonLues().Rows.Count
+            }
+        End Function
+
         Private Sub UpdateChart(chart As Chart, dt As DataTable, xCol As String, yCol As String)
-            chart.Series(0).Points.Clear()
-            For Each row As DataRow In dt.Rows
-                chart.Series(0).Points.AddXY(Convert.ToString(row(xCol)), Convert.ToDecimal(row(yCol)))
-            Next
+            Try
+                If chart Is Nothing OrElse chart.Series Is Nothing OrElse chart.Series.Count = 0 Then
+                    Return
+                End If
+                If String.IsNullOrWhiteSpace(xCol) OrElse String.IsNullOrWhiteSpace(yCol) Then
+                    Return
+                End If
+                If dt Is Nothing OrElse dt.Rows.Count = 0 Then
+                    chart.Series(0).Points.Clear()
+                    Return
+                End If
+                If Not dt.Columns.Contains(xCol) OrElse Not dt.Columns.Contains(yCol) Then
+                    chart.Series(0).Points.Clear()
+                    Return
+                End If
+
+                chart.Series(0).Points.Clear()
+                For Each row As DataRow In dt.Rows
+                    If row Is Nothing OrElse row.IsNull(xCol) OrElse row.IsNull(yCol) Then
+                        Continue For
+                    End If
+                    chart.Series(0).Points.AddXY(Convert.ToString(row(xCol)), Convert.ToDecimal(row(yCol)))
+                Next
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("FormulaireDashboard", "UpdateChart", "Erreur lors de la mise à jour d'un graphique.", ex)
+            End Try
         End Sub
 
         'Private Sub AfficherNotifications(sender As Object, e As EventArgs)
