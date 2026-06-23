@@ -3,6 +3,7 @@ Option Explicit On
 
 Imports System
 Imports System.Configuration
+Imports System.Collections.Generic
 Imports System.Data
 Imports System.Drawing
 Imports System.Drawing.Drawing2D
@@ -304,7 +305,7 @@ Namespace DevCommerc8ak
             _chargementUtilisateursEnCours = True
             Try
                 Dim service As UtilisateurService = ObtenirService()
-                Dim utilisateurs = Await Task.Run(Function() service.Lister())
+                Dim utilisateurs As List(Of UtilisateurDTO) = Await Task.Run(Function() service.Lister())
                 If IsDisposed OrElse grid Is Nothing Then
                     Return
                 End If
