@@ -506,9 +506,9 @@ Namespace DevCommerc8ak
             tpBanque.Controls.Add(mainLayoutBanque)
 
             AddHandler cmbFiltreBanque.SelectedIndexChanged, AddressOf ActualiserFiltreBanqueUI
-            AddHandler cmbAnneeBanque.SelectedIndexChanged, AddressOf ChargerBanque
-            AddHandler cmbMoisBanque.SelectedIndexChanged, AddressOf ChargerBanque
-            AddHandler dtpJourBanque.ValueChanged, AddressOf ChargerBanque
+            AddHandler cmbAnneeBanque.SelectedIndexChanged, AddressOf ActualiserFiltreBanqueUI
+            AddHandler cmbMoisBanque.SelectedIndexChanged, AddressOf ActualiserFiltreBanqueUI
+            AddHandler dtpJourBanque.ValueChanged, AddressOf ActualiserFiltreBanqueUI
             ActualiserFiltreBanqueUI(Nothing, EventArgs.Empty)
         End Sub
 

@@ -179,6 +179,8 @@ Namespace DevCommerc8ak
         Private _accueilAdminCharge As Boolean
         Private _dernierMessageBackup As String = String.Empty
         Private _moduleInitialCharge As Boolean
+        Private _isCheckingSession As Boolean
+        Private _isCheckingStatus As Boolean
 
         ' Boutons de navigation
         Private ReadOnly btnFact As Button
@@ -611,24 +613,36 @@ Namespace DevCommerc8ak
         '    End Try
         'End Sub
 
-        Private Sub PingSession(sender As Object, e As EventArgs)
+        Private Async Sub PingSession(sender As Object, e As EventArgs)
+            If _isCheckingSession Then Return
+            _isCheckingSession = True
             Try
-                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
-                Dim dal As New DAL(cs)
-                Dim repo As New SessionRepository(dal)
-                repo.Ping(SessionUtilisateur.SessionId)
+                Dim result As Tuple(Of DataTable, Integer) = Await Task.Run(Function()
+                                                                                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                                                                                Dim dal As New DAL(cs)
+                                                                                Dim repo As New SessionRepository(dal)
+                                                                                repo.Ping(SessionUtilisateur.SessionId)
 
-                Dim paramService As New ParametreService(New ParametreRepository(dal))
-                Dim p As ParametreDTO = paramService.Charger()
-                Dim seuil As Decimal = If(p Is Nothing, 0D, p.SeuilStockCritique)
-                Dim jours As Integer = If(p Is Nothing, 30, p.AlerteExpirationJours)
+                                                                                Dim paramService As New ParametreService(New ParametreRepository(dal))
+                                                                                Dim p As ParametreDTO = paramService.Charger()
+                                                                                Dim seuil As Decimal = If(p Is Nothing, 0D, p.SeuilStockCritique)
+                                                                                Dim jours As Integer = If(p Is Nothing, 30, p.AlerteExpirationJours)
 
-                Dim notificationService As New NotificationService(dal)
-                notificationService.SynchroniserAlertesMetier(seuil, jours, SessionUtilisateur.UtilisateurId)
+                                                                                Dim notificationService As New NotificationService(dal)
+                                                                                notificationService.SynchroniserAlertesMetier(seuil, jours, SessionUtilisateur.UtilisateurId)
 
-                Dim dt As DataTable = notificationService.ListerNonLues()
-                If dt.Rows.Count > 0 Then
-                    Dim derniereId As Integer = Convert.ToInt32(dt.Rows(0)("NotificationId"))
+                                                                                Dim dt As DataTable = notificationService.ListerNonLues()
+                                                                                Dim derniereId As Integer = 0
+                                                                                If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
+                                                                                    derniereId = Convert.ToInt32(dt.Rows(0)("NotificationId"))
+                                                                                End If
+
+                                                                                Return Tuple.Create(dt, derniereId)
+                                                                            End Function)
+
+                Dim dt As DataTable = If(result Is Nothing, Nothing, result.Item1)
+                If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
+                    Dim derniereId As Integer = If(result Is Nothing, 0, result.Item2)
                     If derniereId > _dernierPopupNotificationId Then
                         Dim messages As New List(Of String)()
                         For Each row As DataRow In dt.Rows
@@ -645,30 +659,48 @@ Namespace DevCommerc8ak
             Catch ex As Exception
                 Dim log As New ProductionLogService()
                 log.Warn("MainForm", "PingSession", "Erreur lors du ping de session : " & ex.Message)
+            Finally
+                _isCheckingSession = False
             End Try
         End Sub
 
-        Private Sub ActualiserEtatPlateformeTick(sender As Object, e As EventArgs)
-            ActualiserEtatPlateforme()
+        Private Async Sub ActualiserEtatPlateformeTick(sender As Object, e As EventArgs)
+            Await ActualiserEtatPlateformeAsync()
         End Sub
 
-        Private Sub ActualiserEtatPlateforme()
+        Private Async Function ActualiserEtatPlateformeAsync() As Task
+            If _isCheckingStatus Then Return
+            _isCheckingStatus = True
             Try
-                Dim settings As SqlConnectionSettings = SqlConfigurationService.LoadSettings()
-                Dim serveurConnecte As Boolean = TesterHoteServeur(If(settings Is Nothing, String.Empty, settings.Server))
-                Dim erreurSql As String = Nothing
-                Dim sqlConnecte As Boolean = SqlConfigurationService.HasValidConnection(erreurSql)
+                Dim etat As Tuple(Of Boolean, Boolean) = Await Task.Run(Function()
+                                                                            Dim settings As SqlConnectionSettings = SqlConfigurationService.LoadSettings()
+                                                                            Dim serveurConnecte As Boolean = TesterHoteServeur(If(settings Is Nothing, String.Empty, settings.Server))
+                                                                            Dim erreurSql As String = Nothing
+                                                                            Dim sqlConnecte As Boolean = SqlConfigurationService.HasValidConnection(erreurSql)
+                                                                            Return Tuple.Create(serveurConnecte, sqlConnecte)
+                                                                        End Function)
 
-                MettreAJourStatusServeur(serveurConnecte)
-                MettreAJourStatusSql(sqlConnecte)
+                If etat Is Nothing Then
+                    MettreAJourStatusServeur(False)
+                    MettreAJourStatusSql(False)
+                Else
+                    MettreAJourStatusServeur(etat.Item1)
+                    MettreAJourStatusSql(etat.Item2)
+                End If
                 MettreAJourStatusSauvegarde()
             Catch ex As Exception
                 Dim log As New ProductionLogService()
-                log.Error("MainForm", "ActualiserEtatPlateforme", "Erreur lors de la mise à jour des statuts.", ex)
+                log.Error("MainForm", "ActualiserEtatPlateformeAsync", "Erreur lors de la mise à jour des statuts.", ex)
                 MettreAJourStatusServeur(False)
                 MettreAJourStatusSql(False)
                 MettreAJourStatusSauvegarde()
+            Finally
+                _isCheckingStatus = False
             End Try
+        End Function
+
+        Private Sub ActualiserEtatPlateforme()
+            Dim t As Task = ActualiserEtatPlateformeAsync()
         End Sub
 
         Private Function TesterHoteServeur(serveur As String) As Boolean

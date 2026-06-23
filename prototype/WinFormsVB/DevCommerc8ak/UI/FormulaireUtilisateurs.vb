@@ -60,6 +60,8 @@ Namespace DevCommerc8ak
         Private ReadOnly cardForm As Panel
         Private ReadOnly flowButtons As FlowLayoutPanel
         Private ReadOnly splitGrids As TableLayoutPanel
+        Private _chargementUtilisateursEnCours As Boolean
+        Private _chargementConnectesEnCours As Boolean
 
         Public Sub New()
             ' Configuration de base du formulaire
@@ -292,24 +294,45 @@ Namespace DevCommerc8ak
             Return New UtilisateurService(utilisateurRepo, roleRepo, sessionRepo)
         End Function
 
-        Private Sub Charger(sender As Object, e As EventArgs)
+        Private Async Sub Charger(sender As Object, e As EventArgs)
+            If _chargementUtilisateursEnCours Then
+                Return
+            End If
+
+            _chargementUtilisateursEnCours = True
             Try
                 Dim service As UtilisateurService = ObtenirService()
-                grid.DataSource = service.Lister()
+                Dim dt As DataTable = Await Task.Run(Function() service.Lister())
+                If IsDisposed OrElse grid Is Nothing Then
+                    Return
+                End If
+                grid.DataSource = dt
                 ConfigurerGrilleUtilisateurs()
                 ChargerSelectionUtilisateur(Nothing, EventArgs.Empty)
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement utilisateurs: " & ex.Message)
+            Finally
+                _chargementUtilisateursEnCours = False
             End Try
         End Sub
 
-        Private Sub ChargerConnectes(sender As Object, e As EventArgs)
+        Private Async Sub ChargerConnectes(sender As Object, e As EventArgs)
+            If _chargementConnectesEnCours Then
+                Return
+            End If
+
+            _chargementConnectesEnCours = True
             Try
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
                 Dim repo As New SessionRepository(dal)
-                gridConnectes.DataSource = repo.ListerConnectes()
+                Dim dt As DataTable = Await Task.Run(Function() repo.ListerConnectes())
+                If Not IsDisposed AndAlso gridConnectes IsNot Nothing Then
+                    gridConnectes.DataSource = dt
+                End If
             Catch
+            Finally
+                _chargementConnectesEnCours = False
             End Try
         End Sub
 
