@@ -29,6 +29,17 @@ Namespace DevCommerc8ak
             Return nom.Trim()
         End Function
 
+        Private Function ObtenirIdUtilisateurModification() As Integer
+            Try
+                If SessionUtilisateur.UtilisateurId > 0 Then
+                    Return SessionUtilisateur.UtilisateurId
+                End If
+            Catch
+            End Try
+
+            Return 1
+        End Function
+
         Private Sub AssurerColonnes()
             ' Schéma géré par le script SQL de déploiement.
         End Sub
@@ -245,11 +256,11 @@ Namespace DevCommerc8ak
                 Dim sqlHist As String = "INSERT INTO HistoriquePrixProduits (" &
                                         "ProduitId, AncienPrixAchat, NouveauPrixAchat, AncienPrixDetail, NouveauPrixDetail, AncienPrixDemi, NouveauPrixDemi, " &
                                         "AncienPrixQuart, NouveauPrixQuart, AncienPrixDouzaine, NouveauPrixDouzaine, AncienPrixGros, NouveauPrixGros, " &
-                                        "AncienPrixSpecial, NouveauPrixSpecial, ModifiedPar, ModifieLe, IdStock) " &
+                                        "AncienPrixSpecial, NouveauPrixSpecial, ModifiePar, ModifieLe, IdStock) " &
                                         "VALUES (" &
                                         "@ProduitId, @AncienPrixAchat, @NouveauPrixAchat, @AncienPrixDetail, @NouveauPrixDetail, @AncienPrixDemi, @NouveauPrixDemi, " &
                                         "@AncienPrixQuart, @NouveauPrixQuart, @AncienPrixDouzaine, @NouveauPrixDouzaine, @AncienPrixGros, @NouveauPrixGros, " &
-                                        "@AncienPrixSpecial, @NouveauPrixSpecial, @ModifiedPar, GETDATE(), @IdStock)"
+                                        "@AncienPrixSpecial, @NouveauPrixSpecial, @ModifiePar, GETDATE(), @IdStock)"
                 Dim pHist As New List(Of SqlParameter) From {
                     New SqlParameter("@ProduitId", produit.ProduitId),
                     New SqlParameter("@AncienPrixAchat", ancienPrixAchat),
@@ -266,7 +277,7 @@ Namespace DevCommerc8ak
                     New SqlParameter("@NouveauPrixGros", produit.PrixGros),
                     New SqlParameter("@AncienPrixSpecial", ancienPrixSpecial),
                     New SqlParameter("@NouveauPrixSpecial", produit.PrixSpecial),
-                    New SqlParameter("@ModifiedPar", modifierPar),
+                    New SqlParameter("@ModifiePar", ObtenirIdUtilisateurModification()),
                     New SqlParameter("@IdStock", DBNull.Value)
                 }
                 _dal.ExecuterNonRequete(sqlHist, CommandType.Text, pHist)
@@ -287,35 +298,35 @@ Namespace DevCommerc8ak
             AssurerColonnes()
             Dim sql As String = "" &
                 "WITH Hist AS (" &
-                "SELECT h.HistoriquePrixId, h.ProduitId, p.Libelle, h.ModifieLe, h.ModifiedPar, " &
+                "SELECT h.HistoriquePrixId, h.ProduitId, p.Libelle, h.ModifieLe, h.ModifiePar, " &
                 "'Achat' AS TypePrix, h.AncienPrixAchat AS AncienPrix, h.NouveauPrixAchat AS NouveauPrix " &
                 "FROM HistoriquePrixProduits h JOIN Produits p ON p.ProduitId=h.ProduitId " &
                 "UNION ALL " &
-                "SELECT h.HistoriquePrixId, h.ProduitId, p.Libelle, h.ModifieLe, h.ModifiedPar, " &
+                "SELECT h.HistoriquePrixId, h.ProduitId, p.Libelle, h.ModifieLe, h.ModifiePar, " &
                 "'Detail' AS TypePrix, h.AncienPrixDetail, h.NouveauPrixDetail " &
                 "FROM HistoriquePrixProduits h JOIN Produits p ON p.ProduitId=h.ProduitId " &
                 "UNION ALL " &
-                "SELECT h.HistoriquePrixId, h.ProduitId, p.Libelle, h.ModifieLe, h.ModifiedPar, " &
+                "SELECT h.HistoriquePrixId, h.ProduitId, p.Libelle, h.ModifieLe, h.ModifiePar, " &
                 "'Demi' AS TypePrix, h.AncienPrixDemi, h.NouveauPrixDemi " &
                 "FROM HistoriquePrixProduits h JOIN Produits p ON p.ProduitId=h.ProduitId " &
                 "UNION ALL " &
-                "SELECT h.HistoriquePrixId, h.ProduitId, p.Libelle, h.ModifieLe, h.ModifiedPar, " &
+                "SELECT h.HistoriquePrixId, h.ProduitId, p.Libelle, h.ModifieLe, h.ModifiePar, " &
                 "'Quart' AS TypePrix, h.AncienPrixQuart, h.NouveauPrixQuart " &
                 "FROM HistoriquePrixProduits h JOIN Produits p ON p.ProduitId=h.ProduitId " &
                 "UNION ALL " &
-                "SELECT h.HistoriquePrixId, h.ProduitId, p.Libelle, h.ModifieLe, h.ModifiedPar, " &
+                "SELECT h.HistoriquePrixId, h.ProduitId, p.Libelle, h.ModifieLe, h.ModifiePar, " &
                 "'Douzaine' AS TypePrix, h.AncienPrixDouzaine, h.NouveauPrixDouzaine " &
                 "FROM HistoriquePrixProduits h JOIN Produits p ON p.ProduitId=h.ProduitId " &
                 "UNION ALL " &
-                "SELECT h.HistoriquePrixId, h.ProduitId, p.Libelle, h.ModifieLe, h.ModifiedPar, " &
+                "SELECT h.HistoriquePrixId, h.ProduitId, p.Libelle, h.ModifieLe, h.ModifiePar, " &
                 "'Gros' AS TypePrix, h.AncienPrixGros, h.NouveauPrixGros " &
                 "FROM HistoriquePrixProduits h JOIN Produits p ON p.ProduitId=h.ProduitId " &
                 "UNION ALL " &
-                "SELECT h.HistoriquePrixId, h.ProduitId, p.Libelle, h.ModifieLe, h.ModifiedPar, " &
+                "SELECT h.HistoriquePrixId, h.ProduitId, p.Libelle, h.ModifieLe, h.ModifiePar, " &
                 "'Special' AS TypePrix, h.AncienPrixSpecial, h.NouveauPrixSpecial " &
                 "FROM HistoriquePrixProduits h JOIN Produits p ON p.ProduitId=h.ProduitId " &
                 ") " &
-                "SELECT ProduitId, Libelle AS Produit, AncienPrix, NouveauPrix, TypePrix, ModifieLe, ISNULL(ModifiedPar,'') AS Utilisateur " &
+                "SELECT ProduitId, Libelle AS Produit, AncienPrix, NouveauPrix, TypePrix, ModifieLe, ISNULL(CONVERT(NVARCHAR(20), ModifiePar),'') AS Utilisateur " &
                 "FROM Hist " &
                 "WHERE AncienPrix <> NouveauPrix " &
                 "AND (@ProduitId IS NULL OR ProduitId=@ProduitId) " &
