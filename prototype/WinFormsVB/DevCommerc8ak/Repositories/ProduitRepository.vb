@@ -15,6 +15,20 @@ Namespace DevCommerc8ak
             AssurerColonnes()
         End Sub
 
+        Private Function ObtenirNomUtilisateurModification() As String
+            Dim nom As String = Nothing
+            Try
+                nom = SessionUtilisateur.NomUtilisateur
+            Catch
+            End Try
+
+            If String.IsNullOrWhiteSpace(nom) Then
+                Return "SYSTEM"
+            End If
+
+            Return nom.Trim()
+        End Function
+
         Private Sub AssurerColonnes()
             ' Schéma géré par le script SQL de déploiement.
         End Sub
@@ -47,7 +61,7 @@ Namespace DevCommerc8ak
                 New SqlParameter("@VenteDemi", produit.VenteDemi),
                 New SqlParameter("@VenteDouzaine", produit.VenteDouzaine),
                 New SqlParameter("@VenteGros", produit.VenteGros),
-                New SqlParameter("@ModifierPar", SessionUtilisateur.NomUtilisateur)
+                New SqlParameter("@ModifierPar", ObtenirNomUtilisateurModification())
             }
 
             Dim id As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
@@ -206,7 +220,7 @@ Namespace DevCommerc8ak
                 New SqlParameter("@VenteDouzaine", produit.VenteDouzaine),
                 New SqlParameter("@VenteGros", produit.VenteGros),
                 New SqlParameter("@ProduitId", produit.ProduitId),
-                New SqlParameter("@ModifierPar", SessionUtilisateur.NomUtilisateur)
+                New SqlParameter("@ModifierPar", ObtenirNomUtilisateurModification())
             }
 
             Dim rows As Integer = _dal.ExecuterNonRequete(sql, CommandType.Text, p)
@@ -243,7 +257,7 @@ Namespace DevCommerc8ak
                     New SqlParameter("@NouveauPrixGros", produit.PrixGros),
                     New SqlParameter("@AncienPrixSpecial", ancienPrixSpecial),
                     New SqlParameter("@NouveauPrixSpecial", produit.PrixSpecial),
-                    New SqlParameter("@ModifiePar", SessionUtilisateur.NomUtilisateur),
+                    New SqlParameter("@ModifiePar", ObtenirNomUtilisateurModification()),
                     New SqlParameter("@IdStock", DBNull.Value)
                 }
                 _dal.ExecuterNonRequete(sqlHist, CommandType.Text, pHist)
