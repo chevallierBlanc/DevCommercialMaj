@@ -178,6 +178,7 @@ Namespace DevCommerc8ak
         Private _dernierAlerte As Date = Date.MinValue
         Private _accueilAdminCharge As Boolean
         Private _dernierMessageBackup As String = String.Empty
+        Private _moduleInitialCharge As Boolean
 
         ' Boutons de navigation
         Private ReadOnly btnFact As Button
@@ -411,12 +412,18 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub MainForm_Shown(sender As Object, e As EventArgs)
-            If _accueilAdminCharge Then
+            If _moduleInitialCharge Then
                 Return
             End If
 
-            If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) Then
-                _accueilAdminCharge = True
+            _moduleInitialCharge = True
+
+            If String.Equals(SessionUtilisateur.Role, "FACTURIER", StringComparison.OrdinalIgnoreCase) Then
+                LoadForm(New FacturationForm())
+            ElseIf String.Equals(SessionUtilisateur.Role, "CAISSIERE", StringComparison.OrdinalIgnoreCase) OrElse
+                   String.Equals(SessionUtilisateur.Role, "CAISSIER", StringComparison.OrdinalIgnoreCase) Then
+                LoadForm(New CaisseForm())
+            ElseIf String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) Then
                 Me.BeginInvoke(New MethodInvoker(Sub()
                                                      Try
                                                          If panelContent Is Nothing OrElse panelContent.ClientSize.Width <= 0 OrElse panelContent.ClientSize.Height <= 0 Then
@@ -536,6 +543,13 @@ Namespace DevCommerc8ak
         Private Sub LoadForm(f As Form)
             If f Is Nothing Then Return
             If panelContent Is Nothing Then Return
+            If panelContent.Controls.Count = 1 Then
+                Dim currentForm As Form = TryCast(panelContent.Controls(0), Form)
+                If currentForm IsNot Nothing AndAlso currentForm.GetType() = f.GetType() Then
+                    f.Dispose()
+                    Return
+                End If
+            End If
             If panelContent.ClientSize.Width <= 0 OrElse panelContent.ClientSize.Height <= 0 Then
                 If Me.IsHandleCreated Then
                     Me.BeginInvoke(New MethodInvoker(Sub()

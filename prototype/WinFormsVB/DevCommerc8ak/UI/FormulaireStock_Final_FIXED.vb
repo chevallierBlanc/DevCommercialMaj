@@ -1549,12 +1549,6 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                If String.IsNullOrWhiteSpace(txtCoefficientInput.Text) OrElse _coefficientCalcule <= 0D Then
-                    MessageBox.Show("Le coefficient gros doit être renseigné avant l'enregistrement.")
-                    txtCoefficientInput.Focus()
-                    Return
-                End If
-
                 Dim produitId As Integer
                 If chkProduitExistant.Checked Then
                     If cmbProduitExistant.SelectedValue Is Nothing OrElse IsDBNull(cmbProduitExistant.SelectedValue) Then

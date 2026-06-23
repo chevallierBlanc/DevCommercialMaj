@@ -219,9 +219,16 @@ Namespace DevCommerc8ak
             txtReference = New TextBox() With {.Dock = DockStyle.Top, .Height = 30, .BorderStyle = BorderStyle.FixedSingle}
             pnlRef.Controls.AddRange({txtReference, lblRefTitre})
 
-            Dim pnlActions As New FlowLayoutPanel() With {.Dock = DockStyle.Bottom, .Height = 220, .FlowDirection = FlowDirection.TopDown, .WrapContents = False, .Padding = New Padding(0, 0, 0, 0)}
+            Dim pnlActions As New TableLayoutPanel() With {.Dock = DockStyle.Bottom, .Height = 260, .ColumnCount = 1, .RowCount = 7, .Padding = New Padding(0), .Margin = New Padding(0)}
+            pnlActions.RowStyles.Add(New RowStyle(SizeType.Absolute, 55))
+            pnlActions.RowStyles.Add(New RowStyle(SizeType.Absolute, 8))
+            pnlActions.RowStyles.Add(New RowStyle(SizeType.Absolute, 45))
+            pnlActions.RowStyles.Add(New RowStyle(SizeType.Absolute, 8))
+            pnlActions.RowStyles.Add(New RowStyle(SizeType.Absolute, 45))
+            pnlActions.RowStyles.Add(New RowStyle(SizeType.Absolute, 8))
+            pnlActions.RowStyles.Add(New RowStyle(SizeType.Absolute, 45))
             btnEncaisser = New Button() With {
-                .Text = "VALIDER L'ENCAISSEMENT", .Dock = DockStyle.Top, .Height = 55,
+                .Text = "VALIDER L'ENCAISSEMENT", .Dock = DockStyle.Fill,
                 .FlatStyle = FlatStyle.Flat, .BackColor = ColorAccent, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand
             }
             btnEncaisser.FlatAppearance.BorderSize = 0
@@ -229,7 +236,7 @@ Namespace DevCommerc8ak
             Dim btnSep1 As New Panel() With {.Dock = DockStyle.Top, .Height = 10}
 
             btnImprimer = New Button() With {
-                .Text = "IMPRIMER TICKET", .Dock = DockStyle.Top, .Height = 45,
+                .Text = "IMPRIMER TICKET", .Dock = DockStyle.Fill,
                 .FlatStyle = FlatStyle.Flat, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand
             }
             btnImprimer.FlatAppearance.BorderSize = 0
@@ -237,25 +244,27 @@ Namespace DevCommerc8ak
             Dim btnSep2 As New Panel() With {.Dock = DockStyle.Top, .Height = 10}
 
             btnAnnuler = New Button() With {
-                .Text = "EFFACER SÉLECTION", .Dock = DockStyle.Top, .Height = 45,
+                .Text = "EFFACER SÉLECTION", .Dock = DockStyle.Fill,
                 .FlatStyle = FlatStyle.Flat, .BackColor = ColorDanger, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand
             }
             btnAnnuler.FlatAppearance.BorderSize = 0
 
             btnAnnulerFacture = New Button() With {
-                .Text = "ANNULER FACTURE BROUILLON", .Dock = DockStyle.Top, .Height = 45,
+                .Text = "ANNULER FACTURE BROUILLON", .Dock = DockStyle.Fill,
                 .FlatStyle = FlatStyle.Flat, .BackColor = ColorDanger, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand
             }
             btnAnnulerFacture.FlatAppearance.BorderSize = 0
 
-            pnlActions.Controls.Add(btnEncaisser)
-            pnlActions.Controls.Add(btnSep1)
-            pnlActions.Controls.Add(btnImprimer)
-            pnlActions.Controls.Add(btnSep2)
-            pnlActions.Controls.Add(btnAnnulerFacture)
-            pnlActions.Controls.Add(btnAnnuler)
+            pnlActions.Controls.Add(btnEncaisser, 0, 0)
+            pnlActions.Controls.Add(btnSep1, 0, 1)
+            pnlActions.Controls.Add(btnImprimer, 0, 2)
+            pnlActions.Controls.Add(btnSep2, 0, 3)
+            pnlActions.Controls.Add(btnAnnulerFacture, 0, 4)
+            pnlActions.Controls.Add(New Panel() With {.Dock = DockStyle.Fill}, 0, 5)
+            pnlActions.Controls.Add(btnAnnuler, 0, 6)
 
             pnlDroite.Controls.AddRange({pnlActions, pnlRef, pnlMode, lblMonnaie, pnlRecu, lblTotal, lblTotalTitre})
+            pnlActions.BringToFront()
 
             ' Assemblage final
             pnlMain.Controls.Add(pnlCentre)

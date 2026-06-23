@@ -84,6 +84,14 @@ Namespace DevCommerc8ak
         Private lblSoldeBanqueFC As Label
         Private lblSoldeBanqueUSD As Label
         Private gridHistoriqueBanque As DataGridView
+        Private cmbFiltreBanque As ComboBox
+        Private cmbAnneeBanque As ComboBox
+        Private cmbMoisBanque As ComboBox
+        Private dtpJourBanque As DateTimePicker
+        Private lblBanqueFiltre As Label
+        Private lblBanqueAnnee As Label
+        Private lblBanqueMois As Label
+        Private lblBanqueJour As Label
 
         ' Onglet Dashboard
         Private chartDepensesCat As Chart
@@ -434,9 +442,38 @@ Namespace DevCommerc8ak
 
         Private Sub InitOngletBanque()
             tpBanque.BackColor = ColorBg
-            Dim mainLayoutBanque As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 2, .Padding = New Padding(24), .BackColor = ColorBg}
+            Dim mainLayoutBanque As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 3, .Padding = New Padding(24), .BackColor = ColorBg}
+            mainLayoutBanque.RowStyles.Add(New RowStyle(SizeType.Absolute, 55))
             mainLayoutBanque.RowStyles.Add(New RowStyle(SizeType.Absolute, 155))
             mainLayoutBanque.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+
+            Dim pnlFiltresBanque As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.LeftToRight, .WrapContents = False, .AutoSize = False, .Padding = New Padding(0), .Margin = New Padding(0)}
+            lblBanqueFiltre = CreateLabel("Filtre :", New Padding(0, 8, 5, 0))
+            pnlFiltresBanque.Controls.Add(lblBanqueFiltre)
+            cmbFiltreBanque = New ComboBox() With {.Width = 120, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
+            cmbFiltreBanque.Items.AddRange(New Object() {"Toutes", "Par année", "Par mois", "Par jour"})
+            cmbFiltreBanque.SelectedIndex = 0
+            pnlFiltresBanque.Controls.Add(cmbFiltreBanque)
+            lblBanqueAnnee = CreateLabel("Année :", New Padding(12, 8, 5, 0))
+            pnlFiltresBanque.Controls.Add(lblBanqueAnnee)
+            cmbAnneeBanque = New ComboBox() With {.Width = 90, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
+            For i As Integer = DateTime.Now.Year To DateTime.Now.Year - 5 Step -1
+                cmbAnneeBanque.Items.Add(i)
+            Next
+            cmbAnneeBanque.SelectedIndex = 0
+            pnlFiltresBanque.Controls.Add(cmbAnneeBanque)
+            lblBanqueMois = CreateLabel("Mois :", New Padding(12, 8, 5, 0))
+            pnlFiltresBanque.Controls.Add(lblBanqueMois)
+            cmbMoisBanque = New ComboBox() With {.Width = 130, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
+            cmbMoisBanque.Items.AddRange(New Object() {"Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"})
+            cmbMoisBanque.SelectedIndex = DateTime.Now.Month - 1
+            pnlFiltresBanque.Controls.Add(cmbMoisBanque)
+            lblBanqueJour = CreateLabel("Jour :", New Padding(12, 8, 5, 0))
+            pnlFiltresBanque.Controls.Add(lblBanqueJour)
+            dtpJourBanque = New DateTimePicker() With {.Width = 120, .Format = DateTimePickerFormat.Short, .Font = FontControl}
+            pnlFiltresBanque.Controls.Add(dtpJourBanque)
+
+            mainLayoutBanque.Controls.Add(pnlFiltresBanque, 0, 0)
 
             Dim pnlSoldes As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.LeftToRight, .WrapContents = False, .AutoSize = False, .Padding = New Padding(0)}
             lblSoldeBanqueFC = CreerKpiCard(pnlSoldes, "Solde Banque (FC)", ColorPrimary)
@@ -464,9 +501,15 @@ Namespace DevCommerc8ak
 
             pnlHist.Controls.Add(layoutHistBanque)
 
-            mainLayoutBanque.Controls.Add(pnlSoldes, 0, 0)
-            mainLayoutBanque.Controls.Add(pnlHist, 0, 1)
+            mainLayoutBanque.Controls.Add(pnlSoldes, 0, 1)
+            mainLayoutBanque.Controls.Add(pnlHist, 0, 2)
             tpBanque.Controls.Add(mainLayoutBanque)
+
+            AddHandler cmbFiltreBanque.SelectedIndexChanged, AddressOf ActualiserFiltreBanqueUI
+            AddHandler cmbAnneeBanque.SelectedIndexChanged, AddressOf ChargerBanque
+            AddHandler cmbMoisBanque.SelectedIndexChanged, AddressOf ChargerBanque
+            AddHandler dtpJourBanque.ValueChanged, AddressOf ChargerBanque
+            ActualiserFiltreBanqueUI(Nothing, EventArgs.Empty)
         End Sub
 
         Private Sub InitOngletDashboard()
@@ -609,25 +652,22 @@ Namespace DevCommerc8ak
 
         Private Sub ChargerBanque()
             Try
-                'Dim banque As BanqueDTO = _banqueService.ObtenirSoldeBanque()
-                lblSoldeBanqueFC.Text = FormatMontant(_banqueService.GetSolde("FC"), "FC")
-                lblSoldeBanqueUSD.Text = FormaterSoldeUsd(_banqueService.GetSolde("USD"))
-                'lblSoldeBanqueFC.Text = FormatMontant(banque.SoldeFC)
-                'lblSoldeBanqueUSD.Text = FormatMontant(banque.SoldeUSD, "USD")
-
-                gridHistoriqueBanque.DataSource = _banqueService.GetHistorique()
+                Dim historiqueAll As DataTable = _banqueService.GetHistorique()
+                Dim historiqueFiltre As DataTable = FiltrerHistoriqueBanque(historiqueAll)
+                gridHistoriqueBanque.DataSource = historiqueFiltre
                 ConfigurerGrilleBanque()
+                If EstFiltreBanqueToutes() OrElse historiqueFiltre Is Nothing Then
+                    lblSoldeBanqueFC.Text = FormatMontant(_banqueService.GetSolde("FC"), "FC")
+                    lblSoldeBanqueUSD.Text = FormaterSoldeUsd(_banqueService.GetSolde("USD"))
+                Else
+                    lblSoldeBanqueFC.Text = FormatMontant(CalculerSoldeBanqueFiltre(historiqueFiltre, "FC"), "FC")
+                    lblSoldeBanqueUSD.Text = FormaterSoldeUsd(CalculerSoldeBanqueFiltre(historiqueFiltre, "USD"))
+                End If
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement banque: " & ex.Message)
             End Try
         End Sub
-        Private Sub ChargerGraphiques()
-            chartDepensesCat.Series(0).Points.Clear()
-            Dim dtStats As DataTable = _depenseService.GetStatsParCategorie()
-            For Each row As DataRow In dtStats.Rows
-                chartDepensesCat.Series(0).Points.AddXY(row("Categorie"), row("Total"))
-            Next
-        End Sub
+
         Private Sub ChargerDashboard()
             Try
                 Dim dateJour As DateTime = DateTime.Now
@@ -650,17 +690,30 @@ Namespace DevCommerc8ak
             chartDepensesCat.Series(0).Points.Clear()
             chartDepensesCat.Series(0).IsVisibleInLegend = True
             chartDepensesCat.Series(0).IsValueShownAsLabel = True
+            chartDepensesCat.Series(0).SmartLabelStyle.Enabled = True
+            chartDepensesCat.Series(0).SmartLabelStyle.AllowOutsidePlotArea = LabelOutsidePlotAreaStyle.Yes
+            chartDepensesCat.Series(0).SmartLabelStyle.CalloutLineColor = ColorTextSecondary
             chartDepensesCat.Series(0).LabelForeColor = ColorTextPrimary
             chartDepensesCat.Series(0)("PieLabelStyle") = "Outside"
+            chartDepensesCat.Series(0).Label = "#VALX : #VALY{N0} FC"
+            If chartDepensesCat.ChartAreas.Count > 0 Then
+                chartDepensesCat.ChartAreas(0).Area3DStyle.Enable3D = False
+            End If
 
-            Dim dtStats As DataTable = _depenseService.GetStatsParCategorie()
+            Dim dtStats As DataTable = _depenseService.GetHistorique()
             For Each row As DataRow In dtStats.Rows
-                Dim categorie As String = Convert.ToString(row("Categorie"))
-                Dim total As Decimal = If(IsDBNull(row("Total")), 0D, Convert.ToDecimal(row("Total")))
-                Dim indexPoint As Integer = chartDepensesCat.Series(0).Points.AddXY(categorie, total)
+                Dim categorie As String = If(dtStats.Columns.Contains("NomCategorie"), Convert.ToString(row("NomCategorie")), Convert.ToString(row("Categorie")))
+                Dim description As String = If(dtStats.Columns.Contains("Description"), Convert.ToString(row("Description")), "")
+                Dim libelle As String = categorie
+                If Not String.IsNullOrWhiteSpace(description) Then
+                    libelle &= " - " & description
+                End If
+                Dim total As Decimal = If(IsDBNull(row("Montant")), 0D, Convert.ToDecimal(row("Montant")))
+                Dim indexPoint As Integer = chartDepensesCat.Series(0).Points.AddXY(libelle, total)
                 Dim point As DataPoint = chartDepensesCat.Series(0).Points(indexPoint)
-                point.Label = categorie & " : " & total.ToString("N0") & " FC"
-                point.LegendText = categorie
+                point.Label = libelle & Environment.NewLine & total.ToString("N0") & " FC"
+                point.LegendText = libelle
+                point.ToolTip = libelle & " : " & total.ToString("N0") & " FC"
             Next
         End Sub
 
@@ -716,6 +769,107 @@ Namespace DevCommerc8ak
 
                 Dim dateOperation As DateTime = Convert.ToDateTime(row(colonneDate))
                 If dateOperation.Date <> jour.Date Then
+                    Continue For
+                End If
+
+                Dim montant As Decimal = If(IsDBNull(row("Montant")), 0D, Convert.ToDecimal(row("Montant")))
+                Dim typeOperation As String = Convert.ToString(row(colonneType)).Trim().ToLowerInvariant()
+                If typeOperation.Contains("retrait") Then
+                    total -= montant
+                Else
+                    total += montant
+                End If
+            Next
+
+            Return total
+        End Function
+
+        Private Sub ActualiserFiltreBanqueUI(sender As Object, e As EventArgs)
+            If cmbFiltreBanque Is Nothing Then
+                Return
+            End If
+
+            Dim filtre As String = Convert.ToString(cmbFiltreBanque.SelectedItem)
+            Dim visibleAnnee As Boolean = String.Equals(filtre, "Par année", StringComparison.OrdinalIgnoreCase) OrElse
+                                          String.Equals(filtre, "Par mois", StringComparison.OrdinalIgnoreCase) OrElse
+                                          String.Equals(filtre, "Par jour", StringComparison.OrdinalIgnoreCase)
+            Dim visibleMois As Boolean = String.Equals(filtre, "Par mois", StringComparison.OrdinalIgnoreCase)
+            Dim visibleJour As Boolean = String.Equals(filtre, "Par jour", StringComparison.OrdinalIgnoreCase)
+
+            If lblBanqueFiltre IsNot Nothing Then lblBanqueFiltre.Visible = True
+            If cmbAnneeBanque IsNot Nothing Then cmbAnneeBanque.Visible = visibleAnnee
+            If lblBanqueAnnee IsNot Nothing Then lblBanqueAnnee.Visible = visibleAnnee
+            If cmbMoisBanque IsNot Nothing Then cmbMoisBanque.Visible = visibleMois
+            If lblBanqueMois IsNot Nothing Then lblBanqueMois.Visible = visibleMois
+            If dtpJourBanque IsNot Nothing Then dtpJourBanque.Visible = visibleJour
+            If lblBanqueJour IsNot Nothing Then lblBanqueJour.Visible = visibleJour
+
+            ChargerBanque()
+        End Sub
+
+        Private Function EstFiltreBanqueToutes() As Boolean
+            If cmbFiltreBanque Is Nothing Then
+                Return True
+            End If
+            Return String.Equals(Convert.ToString(cmbFiltreBanque.SelectedItem), "Toutes", StringComparison.OrdinalIgnoreCase)
+        End Function
+
+        Private Function FiltrerHistoriqueBanque(historique As DataTable) As DataTable
+            If historique Is Nothing Then
+                Return Nothing
+            End If
+
+            If EstFiltreBanqueToutes() Then
+                Return historique
+            End If
+
+            Dim filtre As String = Convert.ToString(cmbFiltreBanque.SelectedItem)
+            Dim colonneDate As String = If(historique.Columns.Contains("DateOperation"), "DateOperation", If(historique.Columns.Contains("DateTransaction"), "DateTransaction", ""))
+            If colonneDate = "" Then
+                Return historique
+            End If
+
+            Dim annee As Integer = If(cmbAnneeBanque Is Nothing OrElse cmbAnneeBanque.SelectedItem Is Nothing, DateTime.Now.Year, Convert.ToInt32(cmbAnneeBanque.SelectedItem))
+            Dim resultat As DataTable = historique.Clone()
+
+            For Each row As DataRow In historique.Rows
+                If IsDBNull(row(colonneDate)) Then
+                    Continue For
+                End If
+
+                Dim dateOperation As DateTime = Convert.ToDateTime(row(colonneDate))
+                Dim doitInclure As Boolean = False
+
+                If String.Equals(filtre, "Par année", StringComparison.OrdinalIgnoreCase) Then
+                    doitInclure = (dateOperation.Year = annee)
+                ElseIf String.Equals(filtre, "Par mois", StringComparison.OrdinalIgnoreCase) Then
+                    Dim mois As Integer = If(cmbMoisBanque Is Nothing OrElse cmbMoisBanque.SelectedIndex < 0, DateTime.Now.Month, cmbMoisBanque.SelectedIndex + 1)
+                    doitInclure = (dateOperation.Year = annee AndAlso dateOperation.Month = mois)
+                ElseIf String.Equals(filtre, "Par jour", StringComparison.OrdinalIgnoreCase) Then
+                    doitInclure = (dateOperation.Date = dtpJourBanque.Value.Date)
+                End If
+
+                If doitInclure Then
+                    resultat.ImportRow(row)
+                End If
+            Next
+
+            Return resultat
+        End Function
+
+        Private Function CalculerSoldeBanqueFiltre(historique As DataTable, devise As String) As Decimal
+            If historique Is Nothing OrElse historique.Rows.Count = 0 Then
+                Return 0D
+            End If
+
+            Dim colonneType As String = If(historique.Columns.Contains("TypeOperation"), "TypeOperation", If(historique.Columns.Contains("TypeTransaction"), "TypeTransaction", ""))
+            If colonneType = "" OrElse Not historique.Columns.Contains("Montant") OrElse Not historique.Columns.Contains("Devise") Then
+                Return 0D
+            End If
+
+            Dim total As Decimal = 0D
+            For Each row As DataRow In historique.Rows
+                If IsDBNull(row("Devise")) OrElse Not String.Equals(Convert.ToString(row("Devise")), devise, StringComparison.OrdinalIgnoreCase) Then
                     Continue For
                 End If
 
