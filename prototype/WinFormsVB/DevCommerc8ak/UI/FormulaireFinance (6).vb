@@ -109,6 +109,7 @@ Namespace DevCommerc8ak
         Private _impressionIndex As Integer
         Private _impressionTotalFC As Decimal
         Private _impressionTotalUSD As Decimal
+        Private _banqueUsdIndisponibleLoggee As Boolean
 
         ' Filtres Impression
         Private cmbAnneeRapport As ComboBox
@@ -656,12 +657,30 @@ Namespace DevCommerc8ak
                 Dim historiqueFiltre As DataTable = FiltrerHistoriqueBanque(historiqueAll)
                 gridHistoriqueBanque.DataSource = historiqueFiltre
                 ConfigurerGrilleBanque()
+
+                Dim soldeUsdDisponible As Boolean = BanqueUsdDisponible(historiqueFiltre)
                 If EstFiltreBanqueToutes() OrElse historiqueFiltre Is Nothing Then
                     lblSoldeBanqueFC.Text = FormatMontant(_banqueService.GetSolde("FC"), "FC")
-                    lblSoldeBanqueUSD.Text = FormaterSoldeUsd(_banqueService.GetSolde("USD"))
+                    If soldeUsdDisponible Then
+                        lblSoldeBanqueUSD.Text = FormaterSoldeUsd(_banqueService.GetSolde("USD"))
+                    Else
+                        lblSoldeBanqueUSD.Text = "Non disponible"
+                    End If
                 Else
                     lblSoldeBanqueFC.Text = FormatMontant(CalculerSoldeBanqueFiltre(historiqueFiltre, "FC"), "FC")
-                    lblSoldeBanqueUSD.Text = FormaterSoldeUsd(CalculerSoldeBanqueFiltre(historiqueFiltre, "USD"))
+                    If soldeUsdDisponible Then
+                        lblSoldeBanqueUSD.Text = FormaterSoldeUsd(CalculerSoldeBanqueFiltre(historiqueFiltre, "USD"))
+                    Else
+                        lblSoldeBanqueUSD.Text = "Non disponible"
+                    End If
+                End If
+
+                If Not soldeUsdDisponible Then
+                    If Not _banqueUsdIndisponibleLoggee Then
+                        Dim log As New ProductionLogService()
+                        log.Warn("FormulaireFinance", "ChargerBanque", "Solde Banque USD indisponible: aucune colonne de montant original USD n'est disponible dans l'historique Banque. Affichage neutralisé.")
+                        _banqueUsdIndisponibleLoggee = True
+                    End If
                 End If
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement banque: " & ex.Message)
@@ -863,7 +882,22 @@ Namespace DevCommerc8ak
             End If
 
             Dim colonneType As String = If(historique.Columns.Contains("TypeOperation"), "TypeOperation", If(historique.Columns.Contains("TypeTransaction"), "TypeTransaction", ""))
-            If colonneType = "" OrElse Not historique.Columns.Contains("Montant") OrElse Not historique.Columns.Contains("Devise") Then
+            If colonneType = "" OrElse Not historique.Columns.Contains("Devise") Then
+                Return 0D
+            End If
+
+            Dim colonneMontant As String = "Montant"
+            If String.Equals(devise, "USD", StringComparison.OrdinalIgnoreCase) Then
+                If historique.Columns.Contains("MontantUSD") Then
+                    colonneMontant = "MontantUSD"
+                ElseIf historique.Columns.Contains("MontantOriginalUSD") Then
+                    colonneMontant = "MontantOriginalUSD"
+                ElseIf historique.Columns.Contains("MontantOriginal") AndAlso historique.Columns.Contains("DeviseOriginale") Then
+                    colonneMontant = "MontantOriginal"
+                Else
+                    Return 0D
+                End If
+            ElseIf Not historique.Columns.Contains("Montant") Then
                 Return 0D
             End If
 
@@ -873,7 +907,7 @@ Namespace DevCommerc8ak
                     Continue For
                 End If
 
-                Dim montant As Decimal = If(IsDBNull(row("Montant")), 0D, Convert.ToDecimal(row("Montant")))
+                Dim montant As Decimal = If(IsDBNull(row(colonneMontant)), 0D, Convert.ToDecimal(row(colonneMontant)))
                 Dim typeOperation As String = Convert.ToString(row(colonneType)).Trim().ToLowerInvariant()
                 If typeOperation.Contains("retrait") Then
                     total -= montant
@@ -883,6 +917,20 @@ Namespace DevCommerc8ak
             Next
 
             Return total
+        End Function
+
+        Private Function BanqueUsdDisponible(historique As DataTable) As Boolean
+            If historique Is Nothing OrElse historique.Rows.Count = 0 Then
+                Return False
+            End If
+
+            If historique.Columns.Contains("MontantUSD") OrElse
+               historique.Columns.Contains("MontantOriginalUSD") OrElse
+               (historique.Columns.Contains("MontantOriginal") AndAlso historique.Columns.Contains("DeviseOriginale")) Then
+                Return True
+            End If
+
+            Return False
         End Function
 
         Private Sub ChargerCategoriesDepense()

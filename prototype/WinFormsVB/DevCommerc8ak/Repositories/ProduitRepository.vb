@@ -35,6 +35,11 @@ Namespace DevCommerc8ak
 
         ' Cree un produit et retourne son identifiant.
         Public Function Ajouter(produit As Produit) As Integer
+            Dim modifierPar As String = ObtenirNomUtilisateurModification()
+            If String.IsNullOrWhiteSpace(modifierPar) Then
+                modifierPar = "SYSTEM"
+            End If
+
             Dim sql As String = "INSERT INTO Produits (CodeBarres, Libelle, PrixDetail, PrixAchat, PrixDemi, PrixQuart, PrixDouzaine, PrixGros, PrixSpecial, CoefficientGros, SeuilCritique, DateExpiration, CategorieId, UnitePrincipale, UniteSecondaire, ConversionUnite, EstActif, VenteDetail, VenteDemi, VenteDouzaine, VenteGros, ModifierPar) " &
                                 "VALUES (@CodeBarres, @Libelle, @PrixDetail, @PrixAchat, @PrixDemi, @PrixQuart, @PrixDouzaine, @PrixGros, @PrixSpecial, @CoefficientGros, @SeuilCritique, @DateExpiration, @CategorieId, @UnitePrincipale, @UniteSecondaire, @ConversionUnite, @EstActif, @VenteDetail, @VenteDemi, @VenteDouzaine, @VenteGros, @ModifierPar); " &
                                 "SELECT CAST(SCOPE_IDENTITY() AS INT);"
@@ -61,7 +66,7 @@ Namespace DevCommerc8ak
                 New SqlParameter("@VenteDemi", produit.VenteDemi),
                 New SqlParameter("@VenteDouzaine", produit.VenteDouzaine),
                 New SqlParameter("@VenteGros", produit.VenteGros),
-                New SqlParameter("@ModifierPar", ObtenirNomUtilisateurModification())
+                New SqlParameter("@ModifierPar", modifierPar)
             }
 
             Dim id As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
@@ -180,6 +185,10 @@ Namespace DevCommerc8ak
             Dim ancienPrixDouzaine As Decimal = 0D
             Dim ancienPrixGros As Decimal = 0D
             Dim ancienPrixSpecial As Decimal = 0D
+            Dim modifierPar As String = ObtenirNomUtilisateurModification()
+            If String.IsNullOrWhiteSpace(modifierPar) Then
+                modifierPar = "SYSTEM"
+            End If
             Dim sqlOld As String = "SELECT PrixAchat, PrixDetail, PrixDemi, PrixQuart, PrixDouzaine, PrixGros, PrixSpecial FROM Produits WHERE ProduitId=@ProduitId"
             Dim pOld As New List(Of SqlParameter) From {New SqlParameter("@ProduitId", produit.ProduitId)}
             Dim dtOld As DataTable = _dal.ExecuterTable(sqlOld, CommandType.Text, pOld)
@@ -220,7 +229,7 @@ Namespace DevCommerc8ak
                 New SqlParameter("@VenteDouzaine", produit.VenteDouzaine),
                 New SqlParameter("@VenteGros", produit.VenteGros),
                 New SqlParameter("@ProduitId", produit.ProduitId),
-                New SqlParameter("@ModifierPar", ObtenirNomUtilisateurModification())
+                New SqlParameter("@ModifierPar", modifierPar)
             }
 
             Dim rows As Integer = _dal.ExecuterNonRequete(sql, CommandType.Text, p)
@@ -257,7 +266,7 @@ Namespace DevCommerc8ak
                     New SqlParameter("@NouveauPrixGros", produit.PrixGros),
                     New SqlParameter("@AncienPrixSpecial", ancienPrixSpecial),
                     New SqlParameter("@NouveauPrixSpecial", produit.PrixSpecial),
-                    New SqlParameter("@ModifiePar", ObtenirNomUtilisateurModification()),
+                    New SqlParameter("@ModifiePar", modifierPar),
                     New SqlParameter("@IdStock", DBNull.Value)
                 }
                 _dal.ExecuterNonRequete(sqlHist, CommandType.Text, pHist)
