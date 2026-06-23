@@ -3,8 +3,10 @@ Option Explicit On
 
 Imports System
 Imports System.Configuration
+Imports System.Data
 Imports System.Drawing
 Imports System.Drawing.Drawing2D
+Imports System.Threading.Tasks
 Imports System.Windows.Forms
 
 Namespace DevCommerc8ak
@@ -302,11 +304,11 @@ Namespace DevCommerc8ak
             _chargementUtilisateursEnCours = True
             Try
                 Dim service As UtilisateurService = ObtenirService()
-                Dim dt As DataTable = Await Task.Run(Function() service.Lister())
+                Dim utilisateurs = Await Task.Run(Function() service.Lister())
                 If IsDisposed OrElse grid Is Nothing Then
                     Return
                 End If
-                grid.DataSource = dt
+                grid.DataSource = utilisateurs
                 ConfigurerGrilleUtilisateurs()
                 ChargerSelectionUtilisateur(Nothing, EventArgs.Empty)
             Catch ex As Exception
@@ -409,9 +411,11 @@ Namespace DevCommerc8ak
 
                 _utilisateurSelectionneId = Convert.ToInt32(grid.CurrentRow.Cells("UtilisateurId").Value)
                 txtNom.Text = Convert.ToString(grid.CurrentRow.Cells("NomUtilisateur").Value)
-                chkActif.Checked = If(grid.CurrentRow.Cells("EstActif").Value Is Nothing OrElse IsDBNull(grid.CurrentRow.Cells("EstActif").Value), False, Convert.ToBoolean(grid.CurrentRow.Cells("EstActif").Value))
+                Dim valeurActif As Object = grid.CurrentRow.Cells("EstActif").Value
+                chkActif.Checked = If(valeurActif Is Nothing OrElse Convert.IsDBNull(valeurActif), False, Convert.ToBoolean(valeurActif))
 
-                Dim role As String = If(grid.CurrentRow.Cells("Role").Value Is Nothing OrElse IsDBNull(grid.CurrentRow.Cells("Role").Value), "", Convert.ToString(grid.CurrentRow.Cells("Role").Value))
+                Dim valeurRole As Object = grid.CurrentRow.Cells("Role").Value
+                Dim role As String = If(valeurRole Is Nothing OrElse Convert.IsDBNull(valeurRole), "", Convert.ToString(valeurRole))
                 If cmbRole.Items.Contains(role) Then
                     cmbRole.SelectedItem = role
                 Else

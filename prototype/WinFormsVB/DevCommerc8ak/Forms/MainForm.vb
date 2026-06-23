@@ -631,21 +631,21 @@ Namespace DevCommerc8ak
                                                                                 Dim notificationService As New NotificationService(dal)
                                                                                 notificationService.SynchroniserAlertesMetier(seuil, jours, SessionUtilisateur.UtilisateurId)
 
-                                                                                Dim dt As DataTable = notificationService.ListerNonLues()
+                                                                                Dim dtNotifications As DataTable = notificationService.ListerNonLues()
                                                                                 Dim derniereId As Integer = 0
-                                                                                If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
-                                                                                    derniereId = Convert.ToInt32(dt.Rows(0)("NotificationId"))
+                                                                                If dtNotifications IsNot Nothing AndAlso dtNotifications.Rows.Count > 0 Then
+                                                                                    derniereId = Convert.ToInt32(dtNotifications.Rows(0)("NotificationId"))
                                                                                 End If
 
-                                                                                Return Tuple.Create(dt, derniereId)
+                                                                                Return Tuple.Create(dtNotifications, derniereId)
                                                                             End Function)
 
-                Dim dt As DataTable = If(result Is Nothing, Nothing, result.Item1)
-                If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
+                Dim dtResultat As DataTable = If(result Is Nothing, Nothing, result.Item1)
+                If dtResultat IsNot Nothing AndAlso dtResultat.Rows.Count > 0 Then
                     Dim derniereId As Integer = If(result Is Nothing, 0, result.Item2)
                     If derniereId > _dernierPopupNotificationId Then
                         Dim messages As New List(Of String)()
-                        For Each row As DataRow In dt.Rows
+                        For Each row As DataRow In dtResultat.Rows
                             messages.Add(Convert.ToString(row("Message")))
                             If messages.Count >= 3 Then
                                 Exit For
@@ -917,7 +917,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub AfficherStockAdmin(sender As Object, e As EventArgs)
-            LoadForm(New FormulaireStock_Final_FIXED())
+            LoadForm(New FormulaireStock())
         End Sub
 
         Protected Overrides Sub OnFormClosing(e As FormClosingEventArgs)
