@@ -260,7 +260,7 @@ Namespace DevCommerc8ak
                                         "VALUES (" &
                                         "@ProduitId, @AncienPrixAchat, @NouveauPrixAchat, @AncienPrixDetail, @NouveauPrixDetail, @AncienPrixDemi, @NouveauPrixDemi, " &
                                         "@AncienPrixQuart, @NouveauPrixQuart, @AncienPrixDouzaine, @NouveauPrixDouzaine, @AncienPrixGros, @NouveauPrixGros, " &
-                                        "@AncienPrixSpecial, @NouveauPrixSpecial, @ModifiePar, GETDATE(), @IdStock)"
+                                        "@AncienPrixSpecial, @NouveauPrixSpecial, 1, GETDATE(), @IdStock)"
                 Dim pHist As New List(Of SqlParameter) From {
                     New SqlParameter("@ProduitId", produit.ProduitId),
                     New SqlParameter("@AncienPrixAchat", ancienPrixAchat),
@@ -277,7 +277,6 @@ Namespace DevCommerc8ak
                     New SqlParameter("@NouveauPrixGros", produit.PrixGros),
                     New SqlParameter("@AncienPrixSpecial", ancienPrixSpecial),
                     New SqlParameter("@NouveauPrixSpecial", produit.PrixSpecial),
-                    New SqlParameter("@ModifiePar", SqlDbType.Int) With {.Value = If(ObtenirIdUtilisateurModification() > 0, ObtenirIdUtilisateurModification(), 1)},
                     New SqlParameter("@IdStock", DBNull.Value)
                 }
                 _dal.ExecuterNonRequete(sqlHist, CommandType.Text, pHist)
