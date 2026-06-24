@@ -277,7 +277,7 @@ Namespace DevCommerc8ak
                     New SqlParameter("@NouveauPrixGros", produit.PrixGros),
                     New SqlParameter("@AncienPrixSpecial", ancienPrixSpecial),
                     New SqlParameter("@NouveauPrixSpecial", produit.PrixSpecial),
-                    New SqlParameter("@ModifiePar", ObtenirIdUtilisateurModification()),
+                    New SqlParameter("@ModifiePar", SqlDbType.Int) With {.Value = If(ObtenirIdUtilisateurModification() > 0, ObtenirIdUtilisateurModification(), 1)},
                     New SqlParameter("@IdStock", DBNull.Value)
                 }
                 _dal.ExecuterNonRequete(sqlHist, CommandType.Text, pHist)
