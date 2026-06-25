@@ -41,6 +41,7 @@ Namespace DevCommerc8ak
         Private ReadOnly btnExportPdf As Button
         Private ReadOnly grid As DataGridView
         Private ReadOnly timer As Timer
+        Private _isRefreshingFromEvent As Boolean
 
         Public Sub New()
             Me.Text = "Rapports"
@@ -219,9 +220,29 @@ Namespace DevCommerc8ak
 
             timer = New Timer() With {.Interval = 600000}
             AddHandler timer.Tick, AddressOf Charger
+            AddHandler AppEvents.DataChanged, AddressOf RafraichirDepuisEvenement
             timer.Start()
 
             Charger(Nothing, EventArgs.Empty) ' Charger les données au démarrage
+        End Sub
+
+        Private Sub RafraichirDepuisEvenement(sender As Object, e As EventArgs)
+            If IsDisposed Then Return
+            If InvokeRequired Then
+                BeginInvoke(New MethodInvoker(Sub() RafraichirDepuisEvenement(Nothing, EventArgs.Empty)))
+                Return
+            End If
+            If _isRefreshingFromEvent Then Return
+
+            _isRefreshingFromEvent = True
+            Try
+                Charger(Nothing, EventArgs.Empty)
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("FormulaireRapports", "RafraichirDepuisEvenement", "Erreur lors du rafraichissement automatique des rapports.", ex)
+            Finally
+                _isRefreshingFromEvent = False
+            End Try
         End Sub
 
         Private Sub Charger(sender As Object, e As EventArgs)
@@ -398,6 +419,11 @@ Namespace DevCommerc8ak
                     grid.Columns("CA").AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
                 End If
             End If
+        End Sub
+
+        Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+            RemoveHandler AppEvents.DataChanged, AddressOf RafraichirDepuisEvenement
+            MyBase.OnFormClosed(e)
         End Sub
 
     End Class

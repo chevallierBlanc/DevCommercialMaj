@@ -20,6 +20,12 @@ Namespace DevCommerc8ak
                 _syncService.EssayerSynchroniserDepense(depense)
             Catch
             End Try
+            If id > 0 Then
+                AppEvents.OnDepenseAjoutee()
+                AppEvents.OnCaisseModifiee()
+                AppEvents.OnAnalyseVenteModifiee()
+                AppEvents.OnDataChanged()
+            End If
             Return id
         End Function
     End Class

@@ -115,6 +115,7 @@ Namespace DevCommerc8ak
         Private _produitsView As DataView
         Private _produitId As Integer
         Private _pageCourante As Integer
+        Private _isRefreshingFromEvent As Boolean
 
         Public Sub New()
             ' Configuration de base
@@ -338,6 +339,8 @@ Namespace DevCommerc8ak
             ConfigurerGrilleProduits()
             ConfigurerGrilleHistorique()
             ChargerDonnees(Nothing, EventArgs.Empty)
+            AddHandler AppEvents.ProduitModifie, AddressOf RafraichirDepuisEvenement
+            AddHandler AppEvents.StockModifie, AddressOf RafraichirDepuisEvenement
         End Sub
 
         ' --- Helpers de Design ---
@@ -814,6 +817,50 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
+        Private Sub RafraichirDepuisEvenement(sender As Object, e As EventArgs)
+            If IsDisposed Then Return
+            If InvokeRequired Then
+                BeginInvoke(New MethodInvoker(Sub() RafraichirDepuisEvenement(Nothing, EventArgs.Empty)))
+                Return
+            End If
+            If _isRefreshingFromEvent Then Return
+
+            _isRefreshingFromEvent = True
+            Try
+                Dim produitIdSelectionne As Integer = _produitId
+                Dim ongletSelectionne As Integer = tabs.SelectedIndex
+                Dim pageSelectionnee As Integer = _pageCourante
+
+                ChargerDonnees(Nothing, EventArgs.Empty)
+                tabs.SelectedIndex = Math.Max(0, Math.Min(ongletSelectionne, tabs.TabPages.Count - 1))
+
+                If Not String.IsNullOrWhiteSpace(txtRecherche.Text) Then
+                    Filtrer(Nothing, EventArgs.Empty)
+                End If
+
+                If pageSelectionnee > 1 Then
+                    _pageCourante = pageSelectionnee
+                    MettreAJourPagination()
+                End If
+
+                If produitIdSelectionne > 0 Then
+                    For Each row As DataGridViewRow In grid.Rows
+                        If row Is Nothing OrElse row.IsNewRow Then Continue For
+                        If Convert.ToInt32(row.Cells("ProduitId").Value) = produitIdSelectionne Then
+                            row.Selected = True
+                            grid.CurrentCell = row.Cells(2)
+                            Exit For
+                        End If
+                    Next
+                End If
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("FormulaireProduits", "RafraichirDepuisEvenement", "Erreur lors du rafraichissement automatique du catalogue produits.", ex)
+            Finally
+                _isRefreshingFromEvent = False
+            End Try
+        End Sub
+
         Private Sub ChargerDashboard(sender As Object, e As EventArgs)
             'Try
             '    Dim annee As Integer = Convert.ToInt32(cmbAnneeDashboard.SelectedItem)
@@ -1191,5 +1238,11 @@ Namespace DevCommerc8ak
                 ProduitId = id : Libelle = libel
             End Sub
         End Class
+
+        Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+            RemoveHandler AppEvents.ProduitModifie, AddressOf RafraichirDepuisEvenement
+            RemoveHandler AppEvents.StockModifie, AddressOf RafraichirDepuisEvenement
+            MyBase.OnFormClosed(e)
+        End Sub
     End Class
 End Namespace

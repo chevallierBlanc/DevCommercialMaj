@@ -27,6 +27,7 @@ Namespace DevCommerc8ak
         Private _caisseService As CaisseService
         Private _banqueService As BanqueService
         Private _catService As CategorieDepenseService
+        Private _isRefreshingFromEvent As Boolean
 
         ' --- Constantes de Design ---
         Private ReadOnly ColorBg As Color = Color.FromArgb(248, 249, 250) ' Gris très clair pour le fond
@@ -248,6 +249,9 @@ Namespace DevCommerc8ak
             ClotureAutomatique()
             ChargerDonnees()
             SetSelectedTab(0) ' Sélectionne l'onglet Dépenses par défaut
+            AddHandler AppEvents.PaiementValide, AddressOf RafraichirDepuisEvenement
+            AddHandler AppEvents.DepenseAjoutee, AddressOf RafraichirDepuisEvenement
+            AddHandler AppEvents.CaisseModifiee, AddressOf RafraichirDepuisEvenement
         End Sub
 
         Private Sub InitialiserServices()
@@ -571,6 +575,29 @@ Namespace DevCommerc8ak
             RemoveHandler btn.Paint, AddressOf TabButton_Paint ' Supprimer l'ancien handler
             AddHandler btn.Paint, AddressOf TabButton_Paint ' Ajouter le nouveau handler
             btn.Invalidate()
+        End Sub
+
+        Private Sub RafraichirDepuisEvenement(sender As Object, e As EventArgs)
+            If IsDisposed Then Return
+            If InvokeRequired Then
+                BeginInvoke(New MethodInvoker(Sub() RafraichirDepuisEvenement(Nothing, EventArgs.Empty)))
+                Return
+            End If
+            If _isRefreshingFromEvent Then Return
+
+            _isRefreshingFromEvent = True
+            Try
+                Dim ongletSelectionne As Integer = If(tabControlFinance Is Nothing, 0, tabControlFinance.SelectedIndex)
+                ChargerDonnees()
+                If tabControlFinance IsNot Nothing AndAlso tabControlFinance.TabPages.Count > 0 Then
+                    tabControlFinance.SelectedIndex = Math.Max(0, Math.Min(ongletSelectionne, tabControlFinance.TabPages.Count - 1))
+                End If
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("FormulaireFinance", "RafraichirDepuisEvenement", "Erreur lors du rafraichissement automatique des donnees finance.", ex)
+            Finally
+                _isRefreshingFromEvent = False
+            End Try
         End Sub
 
         Private Sub TabButton_Paint(sender As Object, e As PaintEventArgs)
@@ -1451,6 +1478,13 @@ Namespace DevCommerc8ak
             End If
             Return valeurAffichee.ToString("N0") & " USD"
         End Function
+
+        Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+            RemoveHandler AppEvents.PaiementValide, AddressOf RafraichirDepuisEvenement
+            RemoveHandler AppEvents.DepenseAjoutee, AddressOf RafraichirDepuisEvenement
+            RemoveHandler AppEvents.CaisseModifiee, AddressOf RafraichirDepuisEvenement
+            MyBase.OnFormClosed(e)
+        End Sub
 
     End Class
 

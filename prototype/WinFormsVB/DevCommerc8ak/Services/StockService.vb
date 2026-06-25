@@ -97,6 +97,9 @@ Namespace DevCommerc8ak
                             Next
                         Catch
                         End Try
+                        AppEvents.OnStockModifie()
+                        AppEvents.OnAnalyseVenteModifiee()
+                        AppEvents.OnDataChanged()
                         Return numeroSortie
                     Catch
                         tx.Rollback()
@@ -155,6 +158,9 @@ Namespace DevCommerc8ak
                             syncService.EssayerSynchroniserSortieParNumero(numeroSortie)
                         Catch
                         End Try
+                        AppEvents.OnCaisseModifiee()
+                        AppEvents.OnAnalyseVenteModifiee()
+                        AppEvents.OnDataChanged()
                         Return nouveauReste
                     Catch
                         tx.Rollback()
@@ -254,6 +260,9 @@ Namespace DevCommerc8ak
                         _mvtRepo.Ajouter(mouvement, cn, tx)
 
                         tx.Commit()
+                        AppEvents.OnStockModifie()
+                        AppEvents.OnAnalyseVenteModifiee()
+                        AppEvents.OnDataChanged()
                         Return ecart
                     Catch
                         tx.Rollback()
@@ -383,6 +392,9 @@ Namespace DevCommerc8ak
                         End Using
 
                         tx.Commit()
+                        AppEvents.OnStockModifie()
+                        AppEvents.OnAnalyseVenteModifiee()
+                        AppEvents.OnDataChanged()
                         Return mouvementsCree
                     Catch
                         tx.Rollback()
@@ -479,6 +491,9 @@ Namespace DevCommerc8ak
                         End Using
 
                         tx.Commit()
+                        AppEvents.OnStockModifie()
+                        AppEvents.OnAnalyseVenteModifiee()
+                        AppEvents.OnDataChanged()
                     Catch
                         tx.Rollback()
                         Throw
@@ -566,6 +581,9 @@ Namespace DevCommerc8ak
                         }
                         Dim resultat As Integer = _mvtRepo.Ajouter(mouvement, cn, tx)
                         tx.Commit()
+                        AppEvents.OnStockModifie()
+                        AppEvents.OnAnalyseVenteModifiee()
+                        AppEvents.OnDataChanged()
                         Return resultat
                     Catch
                         tx.Rollback()

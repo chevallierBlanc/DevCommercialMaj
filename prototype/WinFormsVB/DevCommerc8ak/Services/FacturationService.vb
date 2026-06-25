@@ -27,7 +27,12 @@ Namespace DevCommerc8ak
                 .Statut = "EN_ATTENTE",
                 .CreePar = creePar
             }
-            Return repo.Ajouter(f)
+            Dim factureId As Integer = repo.Ajouter(f)
+            If factureId > 0 Then
+                AppEvents.OnVenteCreee()
+                AppEvents.OnDataChanged()
+            End If
+            Return factureId
         End Function
 
         ' Ajoute une ligne a une facture.
@@ -59,7 +64,14 @@ Namespace DevCommerc8ak
                 New SqlParameter("@PayePar", payePar)
             }
 
-            Return _dal.ExecuterNonRequete("sp_valider_paiement", CommandType.StoredProcedure, p)
+            Dim resultat As Integer = _dal.ExecuterNonRequete("sp_valider_paiement", CommandType.StoredProcedure, p)
+            If resultat > 0 Then
+                AppEvents.OnPaiementValide()
+                AppEvents.OnCaisseModifiee()
+                AppEvents.OnAnalyseVenteModifiee()
+                AppEvents.OnDataChanged()
+            End If
+            Return resultat
         End Function
 
         ' Encaissement avec transaction: paiement + stock + statut facture.
@@ -150,6 +162,12 @@ Namespace DevCommerc8ak
                         End Using
 
                         tx.Commit()
+                        AppEvents.OnVenteValidee()
+                        AppEvents.OnPaiementValide()
+                        AppEvents.OnStockModifie()
+                        AppEvents.OnCaisseModifiee()
+                        AppEvents.OnAnalyseVenteModifiee()
+                        AppEvents.OnDataChanged()
                     Catch
                         tx.Rollback()
                         Throw

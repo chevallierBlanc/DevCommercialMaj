@@ -75,6 +75,7 @@ Namespace DevCommerc8ak
         Private dtDetailVentesAImprimer As DataTable
         Private _impressionIndexDetailVentes As Integer
         Private _titreDetailVentes As String = String.Empty
+        Private _isRefreshingFromEvent As Boolean
 
         Private lblValeurStockEntree As Label
         Private lblCoutMarchandisesVendues As Label
@@ -486,6 +487,7 @@ Namespace DevCommerc8ak
 
             InitialiserFiltres()
             SetSelectedTab(0) ' Sélectionne l'onglet Synthèse par défaut
+            AddHandler AppEvents.AnalyseVenteModifiee, AddressOf RafraichirDepuisEvenement
         End Sub
 
         Private Sub Tabs_GotFocus(sender As Object, e As EventArgs)
@@ -598,6 +600,25 @@ Namespace DevCommerc8ak
             _courantMargeBeneficiairePourcentage = 0D
 
             timerAnimation.Start()
+        End Sub
+
+        Private Sub RafraichirDepuisEvenement(sender As Object, e As EventArgs)
+            If IsDisposed Then Return
+            If InvokeRequired Then
+                BeginInvoke(New MethodInvoker(Sub() RafraichirDepuisEvenement(Nothing, EventArgs.Empty)))
+                Return
+            End If
+            If _isRefreshingFromEvent Then Return
+
+            _isRefreshingFromEvent = True
+            Try
+                ChargerDonnees(Nothing, EventArgs.Empty)
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("FormulaireAnalyseVente", "RafraichirDepuisEvenement", "Erreur lors du rafraichissement automatique de l'analyse vente.", ex)
+            Finally
+                _isRefreshingFromEvent = False
+            End Try
         End Sub
 
         Private Sub RendreCarteCliquable(card As Control)
@@ -1120,5 +1141,10 @@ Namespace DevCommerc8ak
                 Return Libelle
             End Function
         End Class
+
+        Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+            RemoveHandler AppEvents.AnalyseVenteModifiee, AddressOf RafraichirDepuisEvenement
+            MyBase.OnFormClosed(e)
+        End Sub
     End Class
 End Namespace

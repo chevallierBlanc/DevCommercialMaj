@@ -67,6 +67,7 @@ Namespace DevCommerc8ak
         Private _parametres As ParametreDTO
         Private _typesVenteCourants As List(Of TypeVenteDTO) 'nouveau
         Private _factureEnEditionId As Integer?
+        Private _isRefreshingFromEvent As Boolean
 
         Private Class PanierLigne
             Public Property ProduitId As Integer
@@ -339,6 +340,8 @@ Namespace DevCommerc8ak
             GenererNouveauNumeroFacture()
             ConfigurerGrilleChargerProduit()
             MettreAJourBoutonsPanier()
+            AddHandler AppEvents.ProduitModifie, AddressOf RafraichirProduitsDepuisEvenement
+            AddHandler AppEvents.StockModifie, AddressOf RafraichirProduitsDepuisEvenement
         End Sub
 
         Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
@@ -475,6 +478,43 @@ Namespace DevCommerc8ak
         Private Sub RechargerProduits(sender As Object, e As EventArgs)
             ChargerProduits()
             FiltrerProduits(Nothing, EventArgs.Empty)
+        End Sub
+
+        Private Sub RafraichirProduitsDepuisEvenement(sender As Object, e As EventArgs)
+            If IsDisposed Then Return
+            If InvokeRequired Then
+                BeginInvoke(New MethodInvoker(Sub() RafraichirProduitsDepuisEvenement(Nothing, EventArgs.Empty)))
+                Return
+            End If
+            If _isRefreshingFromEvent Then Return
+
+            _isRefreshingFromEvent = True
+            Try
+                Dim produitIdSelectionne As Integer? = Nothing
+                If gridProduits.CurrentRow IsNot Nothing AndAlso gridProduits.CurrentRow.Cells("ProduitId").Value IsNot Nothing Then
+                    produitIdSelectionne = Convert.ToInt32(gridProduits.CurrentRow.Cells("ProduitId").Value)
+                End If
+
+                RechargerProduits(Nothing, EventArgs.Empty)
+
+                If produitIdSelectionne.HasValue Then
+                    For Each row As DataGridViewRow In gridProduits.Rows
+                        If row Is Nothing OrElse row.IsNewRow Then Continue For
+                        If Convert.ToInt32(row.Cells("ProduitId").Value) = produitIdSelectionne.Value Then
+                            row.Selected = True
+                            gridProduits.CurrentCell = row.Cells(1)
+                            Exit For
+                        End If
+                    Next
+                End If
+
+                ChargerUnites(Nothing, EventArgs.Empty)
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("FacturationForm", "RafraichirProduitsDepuisEvenement", "Erreur lors du rafraichissement automatique des produits.", ex)
+            Finally
+                _isRefreshingFromEvent = False
+            End Try
         End Sub
 
         Private Sub FiltrerProduits(sender As Object, e As EventArgs)
@@ -1098,6 +1138,12 @@ Namespace DevCommerc8ak
             If main IsNot Nothing Then
                 main.Close()
             End If
+        End Sub
+
+        Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+            RemoveHandler AppEvents.ProduitModifie, AddressOf RafraichirProduitsDepuisEvenement
+            RemoveHandler AppEvents.StockModifie, AddressOf RafraichirProduitsDepuisEvenement
+            MyBase.OnFormClosed(e)
         End Sub
     End Class
 End Namespace

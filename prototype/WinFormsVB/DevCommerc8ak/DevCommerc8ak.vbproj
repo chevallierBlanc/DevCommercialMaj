@@ -120,6 +120,7 @@
     <Compile Include="Services\PdfHelper.vb" />
     <Compile Include="Services\FormatageGlobal.vb" />
     <Compile Include="Services\ProductionLogService.vb" />
+    <Compile Include="Services\AppEvents.vb" />
     <Compile Include="Services\SyncLogService.vb" />
     <Compile Include="Services\RemoteApiSession.vb" />
     <Compile Include="Services\OfflineSyncService.vb" />

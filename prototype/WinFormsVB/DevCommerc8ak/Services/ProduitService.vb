@@ -18,7 +18,12 @@ Namespace DevCommerc8ak
 
         ' Cree un produit.
         Public Function Ajouter(produit As Produit) As Integer
-            Return _repo.Ajouter(produit)
+            Dim produitId As Integer = _repo.Ajouter(produit)
+            If produitId > 0 Then
+                AppEvents.OnProduitModifie()
+                AppEvents.OnDataChanged()
+            End If
+            Return produitId
         End Function
 
         ' Liste des produits.
@@ -28,12 +33,22 @@ Namespace DevCommerc8ak
 
         ' Met a jour un produit.
         Public Function MettreAJour(produit As Produit) As Integer
-            Return _repo.MettreAJour(produit)
+            Dim resultat As Integer = _repo.MettreAJour(produit)
+            If resultat > 0 Then
+                AppEvents.OnProduitModifie()
+                AppEvents.OnDataChanged()
+            End If
+            Return resultat
         End Function
 
         ' Supprime un produit.
         Public Function Supprimer(produitId As Integer) As Integer
-            Return _repo.Supprimer(produitId)
+            Dim resultat As Integer = _repo.Supprimer(produitId)
+            If resultat > 0 Then
+                AppEvents.OnProduitModifie()
+                AppEvents.OnDataChanged()
+            End If
+            Return resultat
         End Function
 
         Public Function ListerHistoriquePrixTable(produitId As Integer?, dateDebut As Date?, dateFin As Date?) As DataTable

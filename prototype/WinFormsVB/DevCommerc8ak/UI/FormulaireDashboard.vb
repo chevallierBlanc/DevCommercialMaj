@@ -562,6 +562,7 @@ Namespace DevCommerc8ak
 
             timerAnim = New Timer() With {.Interval = 30}
             AddHandler timerAnim.Tick, AddressOf AnimerKpi
+            AddHandler AppEvents.DataChanged, AddressOf RafraichirDepuisEvenement
 
             ' Initialisation
             ConfigurerAlertes()
@@ -736,6 +737,19 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
+        Private Sub RafraichirDepuisEvenement(sender As Object, e As EventArgs)
+            If IsDisposed Then
+                Return
+            End If
+
+            If InvokeRequired Then
+                BeginInvoke(New MethodInvoker(Sub() RafraichirDepuisEvenement(Nothing, EventArgs.Empty)))
+                Return
+            End If
+
+            Charger()
+        End Sub
+
         Private Function ChargerSnapshot() As DashboardSnapshot
             Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
             Dim dal As New DAL(cs)
@@ -768,6 +782,11 @@ Namespace DevCommerc8ak
                 .NotificationsCount = notificationService.ListerNonLues().Rows.Count
             }
         End Function
+
+        Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+            RemoveHandler AppEvents.DataChanged, AddressOf RafraichirDepuisEvenement
+            MyBase.OnFormClosed(e)
+        End Sub
 
         Private Sub UpdateChart(chart As Chart, dt As DataTable, xCol As String, yCol As String)
             Try

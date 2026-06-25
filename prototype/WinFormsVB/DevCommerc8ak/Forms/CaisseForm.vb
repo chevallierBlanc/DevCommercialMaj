@@ -51,6 +51,7 @@ Namespace DevCommerc8ak
         Private _param As ParametreDTO
         Private _totalCourant As Decimal
         Private _dernierTicket As TicketData
+        Private _isRefreshingFromEvent As Boolean
 
         Private Class TicketData
             Public Property Numero As String
@@ -291,6 +292,9 @@ Namespace DevCommerc8ak
             ConfigurerGrilleChargerLignes()
             ChargerParametres()
             ChargerFactures(Nothing, EventArgs.Empty)
+            AddHandler AppEvents.VenteCreee, AddressOf RafraichirFacturesDepuisEvenement
+            AddHandler AppEvents.VenteValidee, AddressOf RafraichirFacturesDepuisEvenement
+            AddHandler AppEvents.PaiementValide, AddressOf RafraichirFacturesDepuisEvenement
         End Sub
         Protected Overrides Sub OnKeyDown(e As KeyEventArgs)
             MyBase.OnKeyDown(e)
@@ -361,6 +365,43 @@ Namespace DevCommerc8ak
                 Next
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement factures: " & ex.Message)
+            End Try
+        End Sub
+
+        Private Sub RafraichirFacturesDepuisEvenement(sender As Object, e As EventArgs)
+            If IsDisposed Then Return
+            If InvokeRequired Then
+                BeginInvoke(New MethodInvoker(Sub() RafraichirFacturesDepuisEvenement(Nothing, EventArgs.Empty)))
+                Return
+            End If
+            If _isRefreshingFromEvent Then Return
+
+            _isRefreshingFromEvent = True
+            Try
+                Dim factureSelectionneeId As Integer? = Nothing
+                If gridFactures.CurrentRow IsNot Nothing AndAlso gridFactures.CurrentRow.Cells(0).Value IsNot Nothing Then
+                    factureSelectionneeId = Convert.ToInt32(gridFactures.CurrentRow.Cells(0).Value)
+                End If
+
+                ChargerFactures(Nothing, EventArgs.Empty)
+
+                If factureSelectionneeId.HasValue Then
+                    For Each row As DataGridViewRow In gridFactures.Rows
+                        If row Is Nothing OrElse row.IsNewRow Then Continue For
+                        If Convert.ToInt32(row.Cells(0).Value) = factureSelectionneeId.Value Then
+                            row.Selected = True
+                            gridFactures.CurrentCell = row.Cells(1)
+                            Exit For
+                        End If
+                    Next
+                End If
+
+                ChargerDetails(Nothing, EventArgs.Empty)
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("CaisseForm", "RafraichirFacturesDepuisEvenement", "Erreur lors du rafraichissement automatique des factures caisse.", ex)
+            Finally
+                _isRefreshingFromEvent = False
             End Try
         End Sub
 
@@ -646,6 +687,13 @@ Namespace DevCommerc8ak
                 log.Error("CaisseForm", "AnnulerFactureBrouillon", "Erreur lors de l'annulation de la facture brouillon.", ex)
                 MessageBox.Show("Erreur annulation facture: " & ex.Message)
             End Try
+        End Sub
+
+        Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+            RemoveHandler AppEvents.VenteCreee, AddressOf RafraichirFacturesDepuisEvenement
+            RemoveHandler AppEvents.VenteValidee, AddressOf RafraichirFacturesDepuisEvenement
+            RemoveHandler AppEvents.PaiementValide, AddressOf RafraichirFacturesDepuisEvenement
+            MyBase.OnFormClosed(e)
         End Sub
     End Class
 End Namespace

@@ -28,6 +28,7 @@ Namespace DevCommerc8ak
         Private ReadOnly FontTitle As New Font("Segoe UI Semibold", 18.0F)
         Private ReadOnly FontLabel As New Font("Segoe UI Semibold", 9.0F)
         Private ReadOnly FontControl As New Font("Segoe UI", 9.5F)
+        Private _isRefreshingFromEvent As Boolean
 
         ' --- COMPONENTS ---
         Private ReadOnly tabs As TabControl
@@ -707,6 +708,8 @@ Namespace DevCommerc8ak
             txtStockReel.ReadOnly = True
             txtObservationInventaire.ReadOnly = True
             btnValiderInventaire.Enabled = False
+            AddHandler AppEvents.StockModifie, AddressOf RafraichirDepuisEvenement
+            AddHandler AppEvents.ProduitModifie, AddressOf RafraichirDepuisEvenement
         End Sub
 
         ' --- DESIGN HELPERS ---
@@ -2126,6 +2129,32 @@ Namespace DevCommerc8ak
                 MessageBox.Show("Erreur inventaire: " & ex.Message)
             End Try
         End Sub
+
+        Private Sub RafraichirDepuisEvenement(sender As Object, e As EventArgs)
+            If IsDisposed Then Return
+            If InvokeRequired Then
+                BeginInvoke(New MethodInvoker(Sub() RafraichirDepuisEvenement(Nothing, EventArgs.Empty)))
+                Return
+            End If
+            If _isRefreshingFromEvent Then Return
+
+            _isRefreshingFromEvent = True
+            Try
+                ChargerProduits()
+                ChargerSortiesDuMois(Nothing, EventArgs.Empty)
+                ChargerDettes(Nothing, EventArgs.Empty)
+                ChargerDashboardSorties(Nothing, EventArgs.Empty)
+                ChargerAlertes(Nothing, EventArgs.Empty)
+                If cmbProduitInventaire.SelectedValue IsNot Nothing Then
+                    ChargerInventaire(Nothing, EventArgs.Empty)
+                End If
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("FormulaireStock", "RafraichirDepuisEvenement", "Erreur lors du rafraichissement automatique du stock.", ex)
+            Finally
+                _isRefreshingFromEvent = False
+            End Try
+        End Sub
         Private Sub EnregistrerPerte(sender As Object, e As EventArgs)
             Try
                 If cmbProduitPerte.SelectedValue Is Nothing Then
@@ -2345,6 +2374,12 @@ Namespace DevCommerc8ak
             Catch
                 ' N'interrompt pas l'ouverture de l'écran si la précharge échoue.
             End Try
+        End Sub
+
+        Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+            RemoveHandler AppEvents.StockModifie, AddressOf RafraichirDepuisEvenement
+            RemoveHandler AppEvents.ProduitModifie, AddressOf RafraichirDepuisEvenement
+            MyBase.OnFormClosed(e)
         End Sub
     End Class
 End Namespace
