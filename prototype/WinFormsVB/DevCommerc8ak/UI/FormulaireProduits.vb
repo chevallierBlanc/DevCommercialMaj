@@ -222,6 +222,7 @@ Namespace DevCommerc8ak
 
             ' 3. Grille
             grid = CreateStyledGrid()
+            grid.AutoGenerateColumns = False
 
             ' 4. Pagination
             Dim flowPager As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft}
@@ -252,6 +253,7 @@ Namespace DevCommerc8ak
             cardHistFiltres.Controls.AddRange({chkFiltreDate, dtpHistoriqueDu, dtpHistoriqueAu, btnImprimerHistorique})
 
             gridHistorique = CreateStyledGrid()
+            gridHistorique.AutoGenerateColumns = False
             mainTableHist.Controls.Add(cardHistFiltres, 0, 0)
             mainTableHist.Controls.Add(gridHistorique, 0, 1)
             tabHistorique.Controls.Add(mainTableHist)
@@ -334,6 +336,7 @@ Namespace DevCommerc8ak
             ' ThemeHelper.AppliquerTheme(Me)
             ConfigurerCharts()
             ConfigurerGrilleProduits()
+            ConfigurerGrilleHistorique()
             ChargerDonnees(Nothing, EventArgs.Empty)
         End Sub
 
@@ -380,6 +383,14 @@ Namespace DevCommerc8ak
             Dim lblValeur As New Label() With {.Top = 40, .Left = 10, .Font = New Font("Segoe UI", 14.0F, FontStyle.Bold), .ForeColor = ColorPrimary, .AutoSize = True}
             p.Controls.Add(lblTitre)
             p.Controls.Add(lblValeur)
+            If String.Equals(title, "Dormants", StringComparison.OrdinalIgnoreCase) Then
+                p.Cursor = Cursors.Hand
+                lblTitre.Cursor = Cursors.Hand
+                lblValeur.Cursor = Cursors.Hand
+                AddHandler p.Click, AddressOf OuvrirProduitsDormants
+                AddHandler lblTitre.Click, AddressOf OuvrirProduitsDormants
+                AddHandler lblValeur.Click, AddressOf OuvrirProduitsDormants
+            End If
             parent.Controls.Add(p, col, 0)
             Return lblValeur
         End Function
@@ -414,13 +425,42 @@ Namespace DevCommerc8ak
 
         Private Sub ConfigurerGrilleProduits()
             grid.Columns.Clear()
-            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "Libelle", .HeaderText = "Désignation", .FillWeight = 200})
+            grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+            grid.ScrollBars = ScrollBars.Both
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "ProduitId", .HeaderText = "ProduitId", .Visible = False})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "CategorieId", .HeaderText = "CategorieId", .Visible = False})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "Libelle", .HeaderText = "Désignation", .Width = 180})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "NomCategorie", .HeaderText = "Catégorie", .Width = 120})
             grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "CodeBarres", .HeaderText = "Code Barres", .Width = 120})
             grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "QuantiteStock", .HeaderText = "Stock", .Width = 80})
-            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixAchat", .HeaderText = "P. Achat", .Width = 100})
-            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixGros", .HeaderText = "P. Gros", .Width = 100})
-            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixDetail", .HeaderText = "P. Détail", .Width = 100})
-            grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "EstActif", .HeaderText = "Actif", .Width = 60})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "UnitePrincipale", .HeaderText = "Unité", .Width = 80})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "UniteSecondaire", .HeaderText = "Unité 2", .Width = 80})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixAchat", .HeaderText = "P. Achat", .Width = 90})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixGros", .HeaderText = "P. Gros", .Width = 90})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixDetail", .HeaderText = "P. Détail", .Width = 90})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixDemi", .HeaderText = "P. Demi", .Width = 85})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixQuart", .HeaderText = "P. Quart", .Width = 85})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixDouzaine", .HeaderText = "P. Douzaine", .Width = 100})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "MargePourcent", .HeaderText = "Marge %", .Width = 80})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "DateExpiration", .HeaderText = "Expiration", .Width = 95})
+            grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "VenteDetail", .HeaderText = "Détail", .Width = 60})
+            grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "VenteDemi", .HeaderText = "Demi", .Width = 55})
+            grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "VenteDouzaine", .HeaderText = "Douzaine", .Width = 70})
+            grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "VenteGros", .HeaderText = "Gros", .Width = 55})
+            grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "EstActif", .HeaderText = "Actif", .Width = 55})
+        End Sub
+
+        Private Sub ConfigurerGrilleHistorique()
+            gridHistorique.Columns.Clear()
+            gridHistorique.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+            gridHistorique.ScrollBars = ScrollBars.Both
+            gridHistorique.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "ProduitId", .HeaderText = "ProduitId", .Visible = False})
+            gridHistorique.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "Produit", .HeaderText = "Produit", .Width = 180})
+            gridHistorique.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "TypePrix", .HeaderText = "Type", .Width = 90})
+            gridHistorique.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "AncienPrix", .HeaderText = "Ancien Prix", .Width = 100})
+            gridHistorique.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "NouveauPrix", .HeaderText = "Nouveau Prix", .Width = 100})
+            gridHistorique.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "ModifieLe", .HeaderText = "Date", .Width = 120})
+            gridHistorique.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "Utilisateur", .HeaderText = "Utilisateur", .Width = 140})
         End Sub
 
         ' --- LOGIQUE MÉTIER (STRICTEMENT IDENTIQUE À L'ORIGINAL) ---
@@ -767,8 +807,10 @@ Namespace DevCommerc8ak
                 End If
                 Dim dDu As Date? = If(chkFiltreDate.Checked, dtpHistoriqueDu.Value.Date, CType(Nothing, Date?))
                 Dim dAu As Date? = If(chkFiltreDate.Checked, dtpHistoriqueAu.Value.Date, CType(Nothing, Date?))
-                gridHistorique.DataSource = service.ListerHistoriquePrixTable(pId, dDu, dAu)
+                _historiqueTable = service.ListerHistoriquePrixTable(pId, dDu, dAu)
+                gridHistorique.DataSource = _historiqueTable
             Catch
+                _historiqueTable = Nothing
             End Try
         End Sub
 
@@ -841,18 +883,21 @@ Namespace DevCommerc8ak
                 Return
             End If
             Dim dtPrint As DataTable = _produitsView.ToTable()
-            ImprimerTableau("Liste des produits", dtPrint, New String() {"Libelle", "CodeBarres", "QuantiteStock", "PrixAchat", "PrixGros", "PrixDetail", "PrixDemi", "PrixDouzaine", "PrixQuart", "MargePourcent"})
+            ImprimerTableau("Liste des produits", dtPrint, New String() {"Libelle", "NomCategorie", "CodeBarres", "QuantiteStock", "UnitePrincipale", "PrixAchat", "PrixGros", "PrixDetail", "MargePourcent", "DateExpiration", "VenteDetail", "VenteDemi", "VenteDouzaine", "VenteGros"}, New Integer() {180, 120, 100, 70, 100, 80, 80, 80, 70, 90, 60, 60, 70, 60}, "Catalogue actuel")
         End Sub
 
         Private Sub ImprimerHistoriquePrix(sender As Object, e As EventArgs)
             If _historiqueTable Is Nothing Then
-                Return
+                ChargerHistoriquePrix(Nothing, EventArgs.Empty)
+                If _historiqueTable Is Nothing Then
+                    MessageBox.Show("Aucun historique à imprimer.")
+                    Return
+                End If
             End If
-            ImprimerTableau("Historique des prix", _historiqueTable, New String() {"Produit", "TypePrix", "AncienPrix", "NouveauPrix", "ModifieLe", "Utilisateur"})
+            ImprimerTableau("Historique des prix", _historiqueTable, New String() {"Produit", "TypePrix", "AncienPrix", "NouveauPrix", "ModifieLe", "Utilisateur"}, New Integer() {180, 90, 90, 90, 120, 140}, ObtenirResumeHistoriquePrix())
         End Sub
 
-
-        Private Sub ImprimerTableau(titre As String, table As DataTable, colonnes As String())
+        Private Sub ImprimerTableau(titre As String, table As DataTable, colonnes As String(), Optional largeurs As Integer() = Nothing, Optional sousTitre As String = "")
             Try
                 Dim dal As New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)
                 Dim param As ParametreDTO = (New ParametreService(New ParametreRepository(dal))).Charger()
@@ -861,42 +906,92 @@ Namespace DevCommerc8ak
                     doc.PrinterSettings.PrinterName = param.ImprimanteA4
                 End If
                 doc.DefaultPageSettings.Color = If(param IsNot Nothing, param.ImpressionCouleur, True)
+                Dim largeurColonnes() As Integer = ConstruireLargeursColonnes(colonnes, largeurs, If(doc.DefaultPageSettings.Landscape, 1000, 760))
+                Dim largeurTotale As Integer = 0
+                For Each largeur As Integer In largeurColonnes
+                    largeurTotale += largeur
+                Next
+                If largeurTotale > 760 AndAlso Not doc.DefaultPageSettings.Landscape Then
+                    doc.DefaultPageSettings.Landscape = True
+                    largeurColonnes = ConstruireLargeursColonnes(colonnes, largeurs, 1000)
+                End If
+                doc.DefaultPageSettings.Margins = New Margins(25, 25, 25, 25)
+
+                Dim ligneCourante As Integer = 0
 
                 AddHandler doc.PrintPage,
                     Sub(s As Object, pe As PrintPageEventArgs)
-                        Dim y As Integer = 30
+                        Dim pinceauBleu As New SolidBrush(Color.FromArgb(17, 35, 74))
+                        Dim pinceauGris As New SolidBrush(Color.FromArgb(92, 104, 120))
+                        Dim fontTitre As New Font("Segoe UI", 16, FontStyle.Bold)
+                        Dim fontSousTitre As New Font("Segoe UI", 10, FontStyle.Regular)
+                        Dim fontBloc As New Font("Segoe UI", 9.5F, FontStyle.Regular)
+                        Dim fontBlocGras As New Font("Segoe UI", 10, FontStyle.Bold)
+                        Dim y As Integer = pe.MarginBounds.Top
+                        Dim x As Integer = pe.MarginBounds.Left
+
                         If param IsNot Nothing AndAlso param.LogoPath <> "" AndAlso File.Exists(param.LogoPath) Then
                             Using img As Image = Image.FromFile(param.LogoPath)
-                                pe.Graphics.DrawImage(img, 30, y, 60, 60)
+                                pe.Graphics.DrawImage(img, x, y, 60, 60)
                             End Using
+                            x += 74
                         End If
-                        pe.Graphics.DrawString(If(param IsNot Nothing, param.NomMagasin, "Paons Rehoboth"), New Font("Segoe UI", 15, FontStyle.Bold), Brushes.Black, 105, y)
+
+                        pe.Graphics.DrawString(If(param IsNot Nothing AndAlso param.NomMagasin <> "", param.NomMagasin, "Paons Rehoboth"), fontTitre, pinceauBleu, x, y)
                         y += 24
-                        pe.Graphics.DrawString(If(param IsNot Nothing, param.AdresseMagasin, ""), New Font("Segoe UI", 9), Brushes.Black, 105, y)
+                        pe.Graphics.DrawString(If(param IsNot Nothing, param.AdresseMagasin, ""), fontSousTitre, pinceauGris, x, y)
                         y += 18
-                        pe.Graphics.DrawString(If(param IsNot Nothing, param.TelephoneMagasin, ""), New Font("Segoe UI", 9), Brushes.Black, 105, y)
-                        y += 34
-                        pe.Graphics.DrawString(titre, New Font("Segoe UI", 12, FontStyle.Bold), Brushes.Black, 30, y)
+                        pe.Graphics.DrawString(If(param IsNot Nothing, param.TelephoneMagasin, ""), fontSousTitre, pinceauGris, x, y)
                         y += 28
 
-                        Dim x As Integer = 30
-                        For Each col As String In colonnes
-                            pe.Graphics.DrawString(col, New Font("Segoe UI", 9, FontStyle.Bold), Brushes.Black, x, y)
-                            x += 120
-                        Next
-                        y += 22
+                        pe.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(17, 35, 74)), pe.MarginBounds.Left, y, pe.MarginBounds.Width, 32)
+                        pe.Graphics.DrawString(titre, New Font("Segoe UI", 12, FontStyle.Bold), Brushes.White, pe.MarginBounds.Left + 12, y + 7)
+                        y += 42
 
-                        For Each row As DataRow In table.Rows
-                            x = 30
-                            For Each col As String In colonnes
-                                pe.Graphics.DrawString(Convert.ToString(row(col)), New Font("Segoe UI", 8.5F), Brushes.Black, x, y)
-                                x += 120
-                            Next
-                            y += 20
-                            If y > 1020 Then
-                                Exit For
-                            End If
+                        Dim boxHeight As Integer = 74
+                        Dim boxWidth As Integer = Math.Max(220, Math.Min(380, (pe.MarginBounds.Width - 10) \ 2))
+                        pe.Graphics.DrawRectangle(New Pen(Color.FromArgb(210, 219, 232)), pe.MarginBounds.Left, y, boxWidth, boxHeight)
+                        pe.Graphics.DrawRectangle(New Pen(Color.FromArgb(210, 219, 232)), pe.MarginBounds.Left + boxWidth + 10, y, boxWidth, boxHeight)
+                        pe.Graphics.DrawString("Informations du rapport", fontBlocGras, pinceauBleu, pe.MarginBounds.Left + 12, y + 8)
+                        pe.Graphics.DrawString("Titre : " & titre, fontBloc, Brushes.Black, pe.MarginBounds.Left + 12, y + 28)
+                        pe.Graphics.DrawString("Lignes : " & table.Rows.Count.ToString(), fontBloc, Brushes.Black, pe.MarginBounds.Left + 12, y + 48)
+                        pe.Graphics.DrawString("Période", fontBlocGras, pinceauBleu, pe.MarginBounds.Left + boxWidth + 22, y + 8)
+                        pe.Graphics.DrawString(If(String.IsNullOrWhiteSpace(sousTitre), "Toutes les dates", sousTitre), fontBloc, Brushes.Black, pe.MarginBounds.Left + boxWidth + 22, y + 28)
+                        pe.Graphics.DrawString("Date impression : " & Date.Now.ToString("dd/MM/yyyy HH:mm"), fontBloc, Brushes.Black, pe.MarginBounds.Left + boxWidth + 22, y + 48)
+                        y += boxHeight + 16
+
+                        Dim headerHeight As Integer = 26
+                        pe.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(229, 239, 252)), pe.MarginBounds.Left, y, pe.MarginBounds.Width, headerHeight)
+                        Dim colX As Integer = pe.MarginBounds.Left
+                        For i As Integer = 0 To colonnes.Length - 1
+                            pe.Graphics.DrawRectangle(New Pen(Color.FromArgb(210, 219, 232)), colX, y, largeurColonnes(i), headerHeight)
+                            pe.Graphics.DrawString(colonnes(i), fontBlocGras, pinceauBleu, New RectangleF(colX + 4, y + 4, largeurColonnes(i) - 8, headerHeight - 8), New StringFormat() With {.Alignment = StringAlignment.Near, .LineAlignment = StringAlignment.Center})
+                            colX += largeurColonnes(i)
                         Next
+                        y += headerHeight
+
+                        Dim rowHeight As Integer = 22
+                        While ligneCourante < table.Rows.Count
+                            If y + rowHeight > pe.MarginBounds.Bottom Then
+                                pe.HasMorePages = True
+                                Return
+                            End If
+
+                            Dim row As DataRow = table.Rows(ligneCourante)
+                            colX = pe.MarginBounds.Left
+                            For i As Integer = 0 To colonnes.Length - 1
+                                Dim colonne As String = colonnes(i)
+                                Dim rect As New Rectangle(colX, y, largeurColonnes(i), rowHeight)
+                                pe.Graphics.DrawRectangle(New Pen(Color.FromArgb(232, 236, 242)), rect)
+                                Dim text As String = FormaterValeurImpression(row(colonne), colonne)
+                                pe.Graphics.DrawString(text, fontBloc, Brushes.Black, New RectangleF(rect.X + 4, rect.Y + 3, rect.Width - 8, rect.Height - 6), FormatString(colonne))
+                                colX += largeurColonnes(i)
+                            Next
+                            y += rowHeight
+                            ligneCourante += 1
+                        End While
+
+                        pe.HasMorePages = False
                     End Sub
 
                 If param IsNot Nothing AndAlso param.ApercuAvantImpression Then
@@ -909,6 +1004,185 @@ Namespace DevCommerc8ak
                 MessageBox.Show("Erreur impression: " & ex.Message)
             End Try
         End Sub
+
+        Private Function ObtenirResumeHistoriquePrix() As String
+            Dim morceaux As New List(Of String)()
+            If cmbProduitHistorique.SelectedItem IsNot Nothing Then
+                Dim item As ComboProduitItem = DirectCast(cmbProduitHistorique.SelectedItem, ComboProduitItem)
+                If item IsNot Nothing AndAlso item.ProduitId > 0 Then
+                    morceaux.Add("Produit : " & item.Libelle)
+                Else
+                    morceaux.Add("Produit : Tous les produits")
+                End If
+            End If
+
+            If chkFiltreDate.Checked Then
+                morceaux.Add("Période : du " & dtpHistoriqueDu.Value.ToString("dd/MM/yyyy") & " au " & dtpHistoriqueAu.Value.ToString("dd/MM/yyyy"))
+            Else
+                morceaux.Add("Période : Toutes les dates")
+            End If
+
+            Return String.Join(" | ", morceaux)
+        End Function
+
+        Private Function ConstruireLargeursColonnes(colonnes As String(), largeurs As Integer(), largeurTotale As Integer) As Integer()
+            Dim resultat(colonnes.Length - 1) As Integer
+            If largeurs IsNot Nothing AndAlso largeurs.Length = colonnes.Length Then
+                Dim somme As Integer = 0
+                For Each largeur As Integer In largeurs
+                    somme += largeur
+                Next
+                If somme <= 0 Then
+                    Dim largeurMoyenne As Integer = Math.Max(1, largeurTotale \ Math.Max(1, colonnes.Length))
+                    For i As Integer = 0 To colonnes.Length - 1
+                        resultat(i) = largeurMoyenne
+                    Next
+                Else
+                    Dim cumul As Integer = 0
+                    For i As Integer = 0 To colonnes.Length - 1
+                        If i = colonnes.Length - 1 Then
+                            resultat(i) = Math.Max(40, largeurTotale - cumul)
+                        Else
+                            resultat(i) = Math.Max(40, CInt(Math.Round(largeurTotale * (largeurs(i) / CDbl(somme)))))
+                            cumul += resultat(i)
+                        End If
+                    Next
+                End If
+            Else
+                Dim largeurParDefaut As Integer = Math.Max(1, largeurTotale \ Math.Max(1, colonnes.Length))
+                For i As Integer = 0 To colonnes.Length - 1
+                    resultat(i) = largeurParDefaut
+                Next
+            End If
+
+            Return resultat
+        End Function
+
+        Private Function FormaterValeurImpression(valeur As Object, colonne As String) As String
+            If valeur Is Nothing OrElse Convert.IsDBNull(valeur) Then
+                Return ""
+            End If
+
+            Dim texteColonne As String = colonne.ToLowerInvariant()
+            If TypeOf valeur Is DateTime Then
+                Return Convert.ToDateTime(valeur).ToString("dd/MM/yyyy")
+            End If
+            If TypeOf valeur Is Boolean Then
+                Return If(Convert.ToBoolean(valeur), "Oui", "Non")
+            End If
+            If TypeOf valeur Is Decimal OrElse TypeOf valeur Is Double OrElse TypeOf valeur Is Single OrElse TypeOf valeur Is Integer OrElse TypeOf valeur Is Long Then
+                Dim dec As Decimal = Convert.ToDecimal(valeur)
+                If texteColonne.Contains("prix") OrElse texteColonne.Contains("montant") OrElse texteColonne.Contains("solde") OrElse texteColonne.Contains("recette") OrElse texteColonne.Contains("stock") OrElse texteColonne.Contains("marge") Then
+                    If Math.Abs(dec - Math.Truncate(dec)) < 0.0001D Then
+                        Return dec.ToString("N0")
+                    End If
+                    Return dec.ToString("N2")
+                End If
+                If Math.Abs(dec - Math.Truncate(dec)) < 0.0001D Then
+                    Return dec.ToString("N0")
+                End If
+                Return dec.ToString("N2")
+            End If
+            Return Convert.ToString(valeur)
+        End Function
+
+        Private Function FormatString(colonne As String) As StringFormat
+            Dim fmt As New StringFormat() With {
+                .Alignment = If(IsColonneNumerique(colonne), StringAlignment.Far, StringAlignment.Near),
+                .LineAlignment = StringAlignment.Center,
+                .Trimming = StringTrimming.EllipsisCharacter,
+                .FormatFlags = StringFormatFlags.NoWrap
+            }
+            Return fmt
+        End Function
+
+        Private Function IsColonneNumerique(colonne As String) As Boolean
+            Dim c As String = colonne.ToLowerInvariant()
+            Return c.Contains("prix") OrElse c.Contains("quantite") OrElse c.Contains("stock") OrElse c.Contains("marge") OrElse c.Contains("montant")
+        End Function
+
+        Private Sub OuvrirProduitsDormants(sender As Object, e As EventArgs)
+            Try
+                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                Dim repo As New ProduitRepository(New DAL(cs))
+                Dim dtDormants As DataTable = repo.ListerProduitsDormantsTable()
+                Using frm As New FormProduitsDormants(dtDormants)
+                    frm.ShowDialog(Me)
+                End Using
+            Catch ex As Exception
+                MessageBox.Show("Impossible d'ouvrir la liste des produits dormants : " & ex.Message)
+            End Try
+        End Sub
+
+        Private Class FormProduitsDormants
+            Inherits Form
+
+            Private ReadOnly _grid As DataGridView
+            Private ReadOnly _btnFermer As Button
+
+            Public Sub New(dt As DataTable)
+                Me.Text = "Produits dormants"
+                Me.StartPosition = FormStartPosition.CenterParent
+                Me.Size = New Size(980, 620)
+                Me.BackColor = Color.FromArgb(245, 247, 250)
+                Me.FormBorderStyle = FormBorderStyle.FixedDialog
+                Me.MaximizeBox = False
+                Me.MinimizeBox = False
+
+                Dim colorPrimaryLocal As Color = Color.FromArgb(52, 73, 94)
+                Dim colorAccentLocal As Color = Color.FromArgb(39, 174, 96)
+                Dim colorSelectedLocal As Color = Color.FromArgb(232, 234, 246)
+
+                Dim header As New Panel() With {.Dock = DockStyle.Top, .Height = 60, .BackColor = colorPrimaryLocal, .Padding = New Padding(15, 10, 15, 10)}
+                Dim lblTitre As New Label() With {.Text = "Produits dormants", .ForeColor = Color.White, .Font = New Font("Segoe UI", 15, FontStyle.Bold), .AutoSize = True, .Left = 15, .Top = 15}
+                _btnFermer = New Button() With {.Text = "Fermer", .Width = 90, .Height = 30, .BackColor = colorAccentLocal, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat, .Anchor = AnchorStyles.Top Or AnchorStyles.Right, .Left = 860, .Top = 15}
+                AddHandler _btnFermer.Click, AddressOf Fermer
+                header.Controls.Add(lblTitre)
+                header.Controls.Add(_btnFermer)
+
+                _grid = New DataGridView() With {
+                    .Dock = DockStyle.Fill,
+                    .BackgroundColor = Color.White,
+                    .BorderStyle = BorderStyle.None,
+                    .AllowUserToAddRows = False,
+                    .AllowUserToDeleteRows = False,
+                    .ReadOnly = True,
+                    .RowHeadersVisible = False,
+                    .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                    .AutoGenerateColumns = False,
+                    .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+                }
+                _grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245)
+                _grid.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
+                _grid.ColumnHeadersHeight = 38
+                _grid.DefaultCellStyle.Font = New Font("Segoe UI", 9.5F)
+                _grid.DefaultCellStyle.SelectionBackColor = colorSelectedLocal
+                _grid.DefaultCellStyle.SelectionForeColor = colorPrimaryLocal
+
+                _grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "ProduitId", .Visible = False})
+                _grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "Libelle", .HeaderText = "Libellé produit", .FillWeight = 180})
+                _grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "CodeBarres", .HeaderText = "Code-barres", .FillWeight = 120})
+                _grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "Categorie", .HeaderText = "Catégorie", .FillWeight = 120})
+                _grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "QuantiteStock", .HeaderText = "Stock", .FillWeight = 70})
+                _grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "DerniereVente", .HeaderText = "Dernière vente", .FillWeight = 120})
+
+                If dt IsNot Nothing Then
+                    _grid.DataSource = dt
+                End If
+
+                Dim layout As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 2}
+                layout.RowStyles.Add(New RowStyle(SizeType.Absolute, 60))
+                layout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+                layout.Controls.Add(header, 0, 0)
+                layout.Controls.Add(_grid, 0, 1)
+
+                Me.Controls.Add(layout)
+            End Sub
+
+            Private Sub Fermer(sender As Object, e As EventArgs)
+                Me.Close()
+            End Sub
+        End Class
         ' Classes internes pour les combos
         Private Class ComboProduitItem
             Public Property ProduitId As Integer

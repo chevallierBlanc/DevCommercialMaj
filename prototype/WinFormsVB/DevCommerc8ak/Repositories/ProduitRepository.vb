@@ -87,9 +87,10 @@ Namespace DevCommerc8ak
         ' Retourne la liste des produits.
         Public Function Lister() As List(Of ProduitDTO)
             Dim sql As String = "SELECT p.ProduitId, p.CodeBarres, p.Libelle, p.PrixDetail, p.PrixAchat, p.PrixDemi, p.PrixQuart, p.PrixDouzaine, p.PrixGros, p.PrixSpecial, p.CoefficientGros, " &
-                                "ISNULL(s.QuantiteStock,0) AS QuantiteStock, p.SeuilCritique, p.DateExpiration, p.CategorieId, p.EstActif, p.UnitePrincipale, p.UniteSecondaire, p.ConversionUnite, " &
+                                "ISNULL(s.QuantiteStock,0) AS QuantiteStock, p.SeuilCritique, p.DateExpiration, p.CategorieId, ISNULL(cat.NomCategorie, '') AS NomCategorie, p.EstActif, p.UnitePrincipale, p.UniteSecondaire, p.ConversionUnite, " &
                                 "p.VenteDetail, p.VenteDemi, p.VenteDouzaine, p.VenteGros " &
-                                "FROM Produits p LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId"
+                                "FROM Produits p LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId " &
+                                "LEFT JOIN CategoriesProduits cat ON cat.CategorieId = p.CategorieId"
             Dim dt As DataTable = _dal.ExecuterTable(sql, CommandType.Text, Nothing)
             Dim liste As New List(Of ProduitDTO)()
 
@@ -103,9 +104,10 @@ Namespace DevCommerc8ak
         ' Retourne la liste des produits sous forme de DataTable pour filtrage local.
         Public Function ListerTable() As DataTable
             Dim sql As String = "SELECT p.ProduitId, p.CodeBarres, p.Libelle, p.PrixDetail, p.PrixAchat, p.PrixDemi, p.PrixQuart, p.PrixDouzaine, p.PrixGros, p.PrixSpecial, p.CoefficientGros, " &
-                                " cast (ISNULL(s.QuantiteStock,0) as int) AS QuantiteStock, p.SeuilCritique, p.DateExpiration, p.CategorieId, p.EstActif, p.UnitePrincipale, p.UniteSecondaire, p.ConversionUnite, " &
+                                " cast (ISNULL(s.QuantiteStock,0) as int) AS QuantiteStock, p.SeuilCritique, p.DateExpiration, p.CategorieId, ISNULL(cat.NomCategorie, '') AS NomCategorie, p.EstActif, p.UnitePrincipale, p.UniteSecondaire, p.ConversionUnite, " &
                                 "p.VenteDetail, p.VenteDemi, p.VenteDouzaine, p.VenteGros " &
-                                "FROM Produits p LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId"
+                                "FROM Produits p LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId " &
+                                "LEFT JOIN CategoriesProduits cat ON cat.CategorieId = p.CategorieId"
             Return _dal.ExecuterTable(sql, CommandType.Text, Nothing)
         End Function
 
@@ -159,9 +161,10 @@ Namespace DevCommerc8ak
         ' Recherche par code-barres ou libelle.
         Public Function Rechercher(texte As String) As List(Of ProduitDTO)
             Dim sql As String = "SELECT p.ProduitId, p.CodeBarres, p.Libelle, p.PrixDetail, p.PrixAchat, p.PrixDemi, p.PrixQuart, p.PrixDouzaine, p.PrixGros, p.PrixSpecial, p.CoefficientGros, " &
-                                "ISNULL(s.QuantiteStock,0) AS QuantiteStock, p.SeuilCritique, p.DateExpiration, p.CategorieId, p.EstActif, p.UnitePrincipale, p.UniteSecondaire, p.ConversionUnite, " &
+                                "ISNULL(s.QuantiteStock,0) AS QuantiteStock, p.SeuilCritique, p.DateExpiration, p.CategorieId, ISNULL(cat.NomCategorie, '') AS NomCategorie, p.EstActif, p.UnitePrincipale, p.UniteSecondaire, p.ConversionUnite, " &
                                 "p.VenteDetail, p.VenteDemi, p.VenteDouzaine, p.VenteGros " &
                                 "FROM Produits p LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId " &
+                                "LEFT JOIN CategoriesProduits cat ON cat.CategorieId = p.CategorieId " &
                                 "WHERE p.CodeBarres LIKE @q OR p.Libelle LIKE @q"
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@q", "%" & texte & "%")}
             Dim dt As DataTable = _dal.ExecuterTable(sql, CommandType.Text, p)
@@ -175,9 +178,9 @@ Namespace DevCommerc8ak
         ' Retourne un produit par identifiant.
         Public Function ObtenirParId(produitId As Integer) As ProduitDTO
             Dim sql As String = "SELECT p.ProduitId, p.CodeBarres, p.Libelle, p.PrixDetail, p.PrixAchat, p.PrixDemi, p.PrixQuart, p.PrixDouzaine, p.PrixGros, p.PrixSpecial, p.CoefficientGros, " &
-                                "ISNULL(s.QuantiteStock,0) AS QuantiteStock, p.SeuilCritique, p.DateExpiration, p.CategorieId, p.EstActif, p.UnitePrincipale, p.UniteSecondaire, p.ConversionUnite, " &
+                                "ISNULL(s.QuantiteStock,0) AS QuantiteStock, p.SeuilCritique, p.DateExpiration, p.CategorieId, ISNULL(cat.NomCategorie, '') AS NomCategorie, p.EstActif, p.UnitePrincipale, p.UniteSecondaire, p.ConversionUnite, " &
                                 "p.VenteDetail, p.VenteDemi, p.VenteDouzaine, p.VenteGros " &
-                                "FROM Produits p LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId WHERE p.ProduitId = @ProduitId"
+                                "FROM Produits p LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId LEFT JOIN CategoriesProduits cat ON cat.CategorieId = p.CategorieId WHERE p.ProduitId = @ProduitId"
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@ProduitId", produitId)}
             Dim dt As DataTable = _dal.ExecuterTable(sql, CommandType.Text, p)
             If dt.Rows.Count = 0 Then
@@ -325,8 +328,10 @@ Namespace DevCommerc8ak
                 "'Special' AS TypePrix, h.AncienPrixSpecial, h.NouveauPrixSpecial " &
                 "FROM HistoriquePrixProduits h JOIN Produits p ON p.ProduitId=h.ProduitId " &
                 ") " &
-                "SELECT ProduitId, Libelle AS Produit, AncienPrix, NouveauPrix, TypePrix, ModifieLe, ISNULL(CONVERT(NVARCHAR(20), ModifiePar),'') AS Utilisateur " &
+                "SELECT ProduitId, Libelle AS Produit, AncienPrix, NouveauPrix, TypePrix, ModifieLe, " &
+                "ISNULL(NULLIF(LTRIM(RTRIM(u.NomUtilisateur)),''), 'Utilisateur inconnu') AS Utilisateur " &
                 "FROM Hist " &
+                "LEFT JOIN Utilisateurs u ON u.UtilisateurId = Hist.ModifiePar " &
                 "WHERE AncienPrix <> NouveauPrix " &
                 "AND (@ProduitId IS NULL OR ProduitId=@ProduitId) " &
                 "AND (@DateDebut IS NULL OR CAST(ModifieLe AS DATE) >= @DateDebut) " &
@@ -374,8 +379,34 @@ Namespace DevCommerc8ak
 
         Public Function RepartitionParCategorie() As DataTable
             Dim sql As String = "" &
-                "SELECT ISNULL(CAST(p.CategorieId AS NVARCHAR(20)),'Sans categorie') AS Categorie, COUNT(*) AS NombreProduits " &
-                "FROM Produits p GROUP BY ISNULL(CAST(p.CategorieId AS NVARCHAR(20)),'Sans categorie') ORDER BY COUNT(*) DESC"
+                "SELECT ISNULL(cat.NomCategorie, 'Sans categorie') AS Categorie, COUNT(*) AS NombreProduits " &
+                "FROM Produits p LEFT JOIN CategoriesProduits cat ON cat.CategorieId = p.CategorieId " &
+                "GROUP BY ISNULL(cat.NomCategorie, 'Sans categorie') ORDER BY COUNT(*) DESC"
+            Return _dal.ExecuterTable(sql, CommandType.Text, Nothing)
+        End Function
+
+        Public Function ListerProduitsDormantsTable() As DataTable
+            Dim sql As String = "" &
+                "SELECT p.ProduitId, p.Libelle, p.CodeBarres, ISNULL(cat.NomCategorie, 'Sans categorie') AS Categorie, " &
+                "       ISNULL(s.QuantiteStock, 0) AS QuantiteStock, ds.DerniereVente " &
+                "FROM Produits p " &
+                "LEFT JOIN CategoriesProduits cat ON cat.CategorieId = p.CategorieId " &
+                "LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId " &
+                "OUTER APPLY ( " &
+                "    SELECT MAX(f.CreeLe) AS DerniereVente " &
+                "    FROM LignesFactureVente l " &
+                "    INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
+                "    WHERE l.ProduitId = p.ProduitId AND f.Statut = 'PAYEE' " &
+                ") ds " &
+                "WHERE NOT EXISTS ( " &
+                "    SELECT 1 " &
+                "    FROM LignesFactureVente l2 " &
+                "    INNER JOIN FacturesVente f2 ON f2.FactureVenteId = l2.FactureVenteId " &
+                "    WHERE l2.ProduitId = p.ProduitId " &
+                "      AND f2.Statut = 'PAYEE' " &
+                "      AND f2.CreeLe >= DATEADD(DAY, -90, GETDATE()) " &
+                ") " &
+                "ORDER BY p.Libelle"
             Return _dal.ExecuterTable(sql, CommandType.Text, Nothing)
         End Function
 
