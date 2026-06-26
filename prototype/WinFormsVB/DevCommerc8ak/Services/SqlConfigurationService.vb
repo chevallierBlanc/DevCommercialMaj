@@ -46,6 +46,8 @@ Namespace DevCommerc8ak
                     File.Copy(sourceConfig, _localConfigPath, True)
                 End If
 
+                SanitizeConfigurationFile(_localConfigPath)
+
                 AppDomain.CurrentDomain.SetData("APP_CONFIG_FILE", _localConfigPath)
                 ConfigurationManager.RefreshSection("connectionStrings")
                 ConfigurationManager.RefreshSection("appSettings")
@@ -160,11 +162,43 @@ Namespace DevCommerc8ak
                 existing.ProviderName = "System.Data.SqlClient"
             End If
 
-            section.SectionInformation.ProtectSection("DataProtectionConfigurationProvider")
+            If section.SectionInformation.IsProtected Then
+                section.SectionInformation.UnprotectSection()
+            End If
             section.SectionInformation.ForceSave = True
             config.Save(ConfigurationSaveMode.Full)
             ConfigurationManager.RefreshSection("connectionStrings")
             _log.Info("SqlConfigurationService", "SaveSettings", "Configuration SQL enregistrée dans le fichier local.")
+        End Sub
+
+        Private Shared Sub SanitizeConfigurationFile(configPath As String)
+            If String.IsNullOrWhiteSpace(configPath) OrElse Not File.Exists(configPath) Then
+                Return
+            End If
+
+            Dim map As New ExeConfigurationFileMap() With {
+                .ExeConfigFilename = configPath
+            }
+            Dim config As Configuration = ConfigurationManager.OpenMappedExeConfiguration(map, ConfigurationUserLevel.None)
+            Dim modified As Boolean = False
+
+            Dim connectionSection As ConnectionStringsSection = config.ConnectionStrings
+            If connectionSection IsNot Nothing AndAlso connectionSection.SectionInformation.IsProtected Then
+                connectionSection.SectionInformation.UnprotectSection()
+                connectionSection.SectionInformation.ForceSave = True
+                modified = True
+            End If
+
+            Dim appSettingsSection As AppSettingsSection = TryCast(config.GetSection("appSettings"), AppSettingsSection)
+            If appSettingsSection IsNot Nothing AndAlso appSettingsSection.SectionInformation.IsProtected Then
+                appSettingsSection.SectionInformation.UnprotectSection()
+                appSettingsSection.SectionInformation.ForceSave = True
+                modified = True
+            End If
+
+            If modified Then
+                config.Save(ConfigurationSaveMode.Full)
+            End If
         End Sub
 
         Private Shared Function GetActiveConnectionString() As String

@@ -626,7 +626,7 @@ Namespace DevCommerc8ak
             txtLibelle.Text = Convert.ToString(row("Libelle"))
             txtCodeBarres.Text = Convert.ToString(row("CodeBarres"))
             txtCategorieId.Text = If(r.IsNull("CategorieId"), "", Convert.ToString(row("CategorieId")))
-            chkActif.Checked = Convert.ToBoolean(row("EstActif"))
+            chkActif.Checked = SafeBoolean(row("EstActif"))
             cmbUnitePrincipale.Text = If(r.IsNull("UnitePrincipale"), "", Convert.ToString(row("UnitePrincipale")))
             cmbUniteSecondaire.Text = If(r.IsNull("UniteSecondaire"), "", Convert.ToString(row("UniteSecondaire")))
             txtConversion.Text = LireDecimalRow(row, "ConversionUnite").ToString("N2")
@@ -646,10 +646,10 @@ Namespace DevCommerc8ak
             Else
                 dtpExpiration.Value = Convert.ToDateTime(row("DateExpiration"))
             End If
-            chkVenteUnite.Checked = Convert.ToBoolean(row("VenteDetail"))
-            chkVenteDemi.Checked = Convert.ToBoolean(row("VenteDemi"))
-            chkVenteDouzaine.Checked = Convert.ToBoolean(row("VenteDouzaine"))
-            chkVenteGros.Checked = Convert.ToBoolean(row("VenteGros"))
+            chkVenteUnite.Checked = SafeBoolean(row("VenteDetail"))
+            chkVenteDemi.Checked = SafeBoolean(row("VenteDemi"))
+            chkVenteDouzaine.Checked = SafeBoolean(row("VenteDouzaine"))
+            chkVenteGros.Checked = SafeBoolean(row("VenteGros"))
             chkVenteQuart.Checked = LireDecimal(txtPrixQuart.Text) > 0D
         End Sub
 
@@ -733,7 +733,56 @@ Namespace DevCommerc8ak
 
         Private Function LireDecimalRow(row As DataRowView, colonne As String) As Decimal
             If row Is Nothing OrElse row.Row.IsNull(colonne) Then Return 0D
-            Return Convert.ToDecimal(row(colonne))
+            Return SafeDecimal(row(colonne))
+        End Function
+
+        Private Function SafeDecimal(value As Object) As Decimal
+            If value Is Nothing OrElse value Is DBNull.Value Then
+                Return 0D
+            End If
+
+            Dim texte As String = Convert.ToString(value).Trim()
+            If texte = String.Empty Then
+                Return 0D
+            End If
+
+            Dim nombre As Decimal
+            If Decimal.TryParse(texte, nombre) Then
+                Return nombre
+            End If
+
+            If Decimal.TryParse(texte, Globalization.NumberStyles.Any, Globalization.CultureInfo.InvariantCulture, nombre) Then
+                Return nombre
+            End If
+
+            Return 0D
+        End Function
+
+        Private Function SafeBoolean(value As Object) As Boolean
+            If value Is Nothing OrElse value Is DBNull.Value Then
+                Return False
+            End If
+
+            If TypeOf value Is Boolean Then
+                Return CBool(value)
+            End If
+
+            Dim texte As String = Convert.ToString(value).Trim()
+            If texte = String.Empty Then
+                Return False
+            End If
+
+            Dim resultat As Boolean
+            If Boolean.TryParse(texte, resultat) Then
+                Return resultat
+            End If
+
+            Dim nombre As Integer
+            If Integer.TryParse(texte, nombre) Then
+                Return nombre <> 0
+            End If
+
+            Return False
         End Function
 
         Private Sub MajOptionsVente(sender As Object, e As EventArgs)

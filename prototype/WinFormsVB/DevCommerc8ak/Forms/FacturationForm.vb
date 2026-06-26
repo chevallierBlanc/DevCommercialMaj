@@ -529,18 +529,19 @@ Namespace DevCommerc8ak
 
         Private Sub ChargerUnites(sender As Object, e As EventArgs)
             If gridProduits.CurrentRow Is Nothing Then Return
-            Dim nbUnites As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(18).Value)
-            Dim prixAchat As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(4).Value)
-            Dim prixGros As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(8).Value)
-            Dim prixDemi As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(5).Value)
-            Dim prixDetail As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(3).Value)
-            Dim prixQuart As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(6).Value)
-            Dim prixDouzaine As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(7).Value)
-            Dim prixSpecial As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(9).Value)
-            Dim venteDetail As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells(19).Value)
-            Dim venteDemi As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells(20).Value)
-            Dim venteDouzaine As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells(21).Value)
-            Dim venteGros As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells(22).Value)
+            Dim row As DataGridViewRow = gridProduits.CurrentRow
+            Dim nbUnites As Decimal = SafeDecimal(row.Cells("ConversionUnite").Value)
+            Dim prixAchat As Decimal = SafeDecimal(row.Cells("PrixAchat").Value)
+            Dim prixGros As Decimal = SafeDecimal(row.Cells("PrixGros").Value)
+            Dim prixDemi As Decimal = SafeDecimal(row.Cells("PrixDemi").Value)
+            Dim prixDetail As Decimal = SafeDecimal(row.Cells("PrixDetail").Value)
+            Dim prixQuart As Decimal = SafeDecimal(row.Cells("PrixQuart").Value)
+            Dim prixDouzaine As Decimal = SafeDecimal(row.Cells("PrixDouzaine").Value)
+            Dim prixSpecial As Decimal = SafeDecimal(row.Cells("PrixSpecial").Value)
+            Dim venteDetail As Boolean = SafeBoolean(row.Cells("VenteDetail").Value)
+            Dim venteDemi As Boolean = SafeBoolean(row.Cells("VenteDemi").Value)
+            Dim venteDouzaine As Boolean = SafeBoolean(row.Cells("VenteDouzaine").Value)
+            Dim venteGros As Boolean = SafeBoolean(row.Cells("VenteGros").Value)
 
             _typesVenteCourants = _typeVenteService.ConstruireTypesVente(nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine)
             cmbUnite.DataSource = Nothing
@@ -552,6 +553,55 @@ Namespace DevCommerc8ak
             MettreAJourAffichageStockProduit()
             MiseAJourPrixUnitaire(Nothing, EventArgs.Empty)
         End Sub
+
+        Private Function SafeDecimal(value As Object) As Decimal
+            If value Is Nothing OrElse value Is DBNull.Value Then
+                Return 0D
+            End If
+
+            Dim texte As String = Convert.ToString(value).Trim()
+            If texte = String.Empty Then
+                Return 0D
+            End If
+
+            Dim nombre As Decimal
+            If Decimal.TryParse(texte, nombre) Then
+                Return nombre
+            End If
+
+            If Decimal.TryParse(texte, Globalization.NumberStyles.Any, Globalization.CultureInfo.InvariantCulture, nombre) Then
+                Return nombre
+            End If
+
+            Return 0D
+        End Function
+
+        Private Function SafeBoolean(value As Object) As Boolean
+            If value Is Nothing OrElse value Is DBNull.Value Then
+                Return False
+            End If
+
+            If TypeOf value Is Boolean Then
+                Return CBool(value)
+            End If
+
+            Dim texte As String = Convert.ToString(value).Trim()
+            If texte = String.Empty Then
+                Return False
+            End If
+
+            Dim resultat As Boolean
+            If Boolean.TryParse(texte, resultat) Then
+                Return resultat
+            End If
+
+            Dim nombre As Integer
+            If Integer.TryParse(texte, nombre) Then
+                Return nombre <> 0
+            End If
+
+            Return False
+        End Function
 
         Private Sub MiseAJourPrixUnitaire(sender As Object, e As EventArgs)
             If gridProduits.CurrentRow Is Nothing Then Return
