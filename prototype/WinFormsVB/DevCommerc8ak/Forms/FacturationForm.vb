@@ -973,6 +973,8 @@ Namespace DevCommerc8ak
                     service.AjouterLigne(factureId, l.ProduitId, l.QuantiteBase, l.QuantiteEquivalente, l.Unite, l.PrixUnitaire, 0D, l.Quantite)
                 Next
 
+                AppEvents.OnDataChanged()
+
                 MessageBox.Show(If(_factureEnEditionId.HasValue, "Facture brouillon mise a jour: ", "Facture en attente: ") & numeroFacture)
                 _panier.Clear()
                 _factureEnEditionId = Nothing

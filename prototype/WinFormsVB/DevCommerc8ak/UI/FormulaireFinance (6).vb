@@ -666,12 +666,13 @@ Namespace DevCommerc8ak
         Private Sub ChargerCaisse()
             Try
                 Dim dateJour As DateTime = DateTime.Now
+                Dim usdDisponible As Boolean = _caisseService.EstMontantUsdDisponible()
                 lblEncaisseFC.Text = FormatMontant(_caisseService.GetEncaisse(dateJour, "FC"), "FC")
-                lblEncaisseUSD.Text = FormaterSoldeUsd(_caisseService.GetEncaisse(dateJour, "USD"))
+                lblEncaisseUSD.Text = If(usdDisponible, FormaterSoldeUsd(_caisseService.GetEncaisse(dateJour, "USD")), "USD non disponible")
                 lblDepensesCaisseFC.Text = FormatMontant(_caisseService.GetDepensesCaisse(dateJour, "FC"), "FC")
                 lblDepensesCaisseUSD.Text = FormaterSoldeUsd(_caisseService.GetDepensesCaisse(dateJour, "USD"))
                 lblSoldeCaisseFC.Text = FormatMontant(_caisseService.GetSoldeCaisse(dateJour, "FC"), "FC")
-                lblSoldeCaisseUSD.Text = FormaterSoldeUsd(_caisseService.GetSoldeCaisse(dateJour, "USD"))
+                lblSoldeCaisseUSD.Text = If(usdDisponible, FormaterSoldeUsd(_caisseService.GetSoldeCaisse(dateJour, "USD")), "USD non disponible")
                 ' lblStatusCloture.Text = If(caisse.EstCloture, "Statut : Clôturé", "Statut : Ouvert")
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement caisse: " & ex.Message)
@@ -1469,14 +1470,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Function FormaterSoldeUsd(montant As Decimal) As String
-            Dim taux As Decimal = If(_parametres Is Nothing, 0D, _parametres.TauxUsd)
-            Dim valeurAffichee As Decimal = montant
-            If taux > 0D Then
-                valeurAffichee = Decimal.Round((montant / taux) * taux, 0, MidpointRounding.AwayFromZero)
-            Else
-                valeurAffichee = Decimal.Round(montant, 0, MidpointRounding.AwayFromZero)
-            End If
-            Return valeurAffichee.ToString("N0") & " USD"
+            Return Decimal.Round(montant, 2, MidpointRounding.AwayFromZero).ToString("N2") & " USD"
         End Function
 
         Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)

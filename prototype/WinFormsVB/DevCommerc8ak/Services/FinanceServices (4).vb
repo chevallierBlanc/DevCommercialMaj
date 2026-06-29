@@ -51,6 +51,11 @@ Namespace DevCommerc8ak.Services
             If depense.Source = "Banque" Then
                 _banqueService.Retrait(depense.Montant, depense.Devise, "Dépense: " & depense.Categorie & " - " & depense.Description)
             End If
+
+            AppEvents.OnDepenseAjoutee()
+            AppEvents.OnCaisseModifiee()
+            AppEvents.OnAnalyseVenteModifiee()
+            AppEvents.OnDataChanged()
         End Sub
 
         Public Function GetHistorique(Optional annee As Integer = 0, Optional mois As Integer = 0) As DataTable
@@ -112,6 +117,10 @@ Namespace DevCommerc8ak.Services
             Return _caisseRepo.GetEncaisse(dateJour, devise)
         End Function
 
+        Public Function EstMontantUsdDisponible() As Boolean
+            Return _caisseRepo.PeutCalculerMontantUsd()
+        End Function
+
         Public Function GetDepensesCaisse(dateJour As DateTime, devise As String) As Decimal
             Return _depenseRepo.GetSommeParDevise(dateJour, devise, "Caisse")
         End Function
@@ -129,6 +138,9 @@ Namespace DevCommerc8ak.Services
                     _caisseRepo.EnregistrerCloture(dateACloturer, soldeFC, soldeUSD)
                     dateACloturer = dateACloturer.AddDays(1)
                 End While
+
+                AppEvents.OnCaisseModifiee()
+                AppEvents.OnDataChanged()
             End If
         End Sub
     End Class

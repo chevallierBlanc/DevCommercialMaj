@@ -163,13 +163,35 @@ Namespace DevCommerc8ak.Finance
         End Sub
 
         Public Function GetEncaisse(dateJour As DateTime, devise As String) As Decimal
-            Dim sql As String = "SELECT ISNULL(CAST(SUM(ISNULL(Montant,0)) AS DECIMAL(18,0)),0) FROM Paiements WHERE CAST(PayeLe AS DATE) = @date AND Devise = @devise"
+            If String.Equals(devise, "USD", StringComparison.OrdinalIgnoreCase) Then
+                Dim tauxUsd As Decimal? = ObtenirTauxUsdActuel()
+                If Not tauxUsd.HasValue OrElse tauxUsd.Value <= 0D Then
+                    Return 0D
+                End If
+
+                Dim sqlUsd As String = "SELECT ISNULL(CAST(SUM(CASE " &
+                                       "WHEN UPPER(ISNULL(Devise, '')) = 'USD' THEN ISNULL(NULLIF(MontantRecu, 0), ISNULL(Montant, 0)) " &
+                                       "ELSE 0 END) AS DECIMAL(18,2)),0) " &
+                                       "FROM Paiements WHERE CAST(PayeLe AS DATE) = @date"
+                Dim paramsUsd As New List(Of SqlParameter) From {
+                    New SqlParameter("@date", dateJour.Date)
+                }
+                Dim totalFc As Object = _dal.ExecuterScalaire(sqlUsd, CommandType.Text, paramsUsd)
+                Dim montantFc As Decimal = If(totalFc Is DBNull.Value OrElse totalFc Is Nothing, 0D, Convert.ToDecimal(totalFc))
+                Return Decimal.Round(montantFc / tauxUsd.Value, 2, MidpointRounding.AwayFromZero)
+            End If
+
+            Dim sql As String = "SELECT ISNULL(CAST(SUM(ISNULL(Montant,0)) AS DECIMAL(18,0)),0) FROM Paiements WHERE CAST(PayeLe AS DATE) = @date"
             Dim params As New List(Of SqlParameter) From {
-                New SqlParameter("@date", dateJour.Date),
-                New SqlParameter("@devise", devise)
+                New SqlParameter("@date", dateJour.Date)
             }
             Dim result As Object = _dal.ExecuterScalaire(sql, CommandType.Text, params)
             Return If(result Is DBNull.Value OrElse result Is Nothing, 0D, Convert.ToDecimal(result))
+        End Function
+
+        Public Function PeutCalculerMontantUsd() As Boolean
+            Dim tauxUsd As Decimal? = ObtenirTauxUsdActuel()
+            Return tauxUsd.HasValue AndAlso tauxUsd.Value > 0D
         End Function
 
         Public Function GetDerniereCloture() As DateTime?
@@ -187,5 +209,14 @@ Namespace DevCommerc8ak.Finance
             }
             _dal.ExecuterNonRequete(sql, CommandType.Text, params)
         End Sub
+
+        Private Function ObtenirTauxUsdActuel() As Decimal?
+            Dim sql As String = "SELECT TOP 1 TauxUsd FROM Parametres WHERE TauxUsd IS NOT NULL AND TauxUsd > 0"
+            Dim result As Object = _dal.ExecuterScalaire(sql, CommandType.Text, Nothing)
+            If result Is Nothing OrElse result Is DBNull.Value Then
+                Return Nothing
+            End If
+            Return Convert.ToDecimal(result)
+        End Function
     End Class
 End Namespace

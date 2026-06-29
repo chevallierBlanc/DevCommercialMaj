@@ -47,6 +47,7 @@ Namespace DevCommerc8ak
         Private ReadOnly lblTotalFacture As Label
         Private ReadOnly lblTotalAttente As Label
         Private ReadOnly lblTotalPaye As Label
+        Private _isRefreshingFromEvent As Boolean
 
         Public Sub New()
             ' Configuration de la Form
@@ -152,6 +153,7 @@ Namespace DevCommerc8ak
             timer = New Timer() With {.Interval = 600000}
             AddHandler timer.Tick, AddressOf ChargerFactures
             timer.Start()
+            AddHandler AppEvents.DataChanged, AddressOf RafraichirDepuisEvenement
         End Sub
 
         ' --- Helpers de Design ---
@@ -350,6 +352,7 @@ Namespace DevCommerc8ak
                     Dim f As New FacturationForm()
                     f.ChargerFacturePourEdition(factureId, numero, client, tel)
                     f.ShowDialog()
+                    ChargerFactures(Nothing, EventArgs.Empty)
                 Case "ActionAnnuler"
                     If statutDb <> "EN_ATTENTE" Then
                         MessageBox.Show("Seules les factures brouillon peuvent être annulées depuis l'historique.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information)
@@ -358,11 +361,31 @@ Namespace DevCommerc8ak
                     If MessageBox.Show("Confirmer l'annulation de la facture ?", "Annuler", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
                         Dim repo As New FactureVenteRepository(ObtenirDAL())
                         repo.MettreAJourStatut(factureId, "ANNULEE")
+                        AppEvents.OnDataChanged()
                         ChargerFactures(Nothing, EventArgs.Empty)
                     End If
                 Case "ActionImprimer"
                     ImprimerFacture(factureId, numero, client, tel)
             End Select
+        End Sub
+
+        Private Sub RafraichirDepuisEvenement(sender As Object, e As EventArgs)
+            If IsDisposed Then Return
+            If InvokeRequired Then
+                BeginInvoke(New MethodInvoker(Sub() RafraichirDepuisEvenement(Nothing, EventArgs.Empty)))
+                Return
+            End If
+            If _isRefreshingFromEvent Then Return
+
+            _isRefreshingFromEvent = True
+            Try
+                ChargerFactures(Nothing, EventArgs.Empty)
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("FormulaireFactures", "RafraichirDepuisEvenement", "Erreur lors du rafraichissement automatique des factures.", ex)
+            Finally
+                _isRefreshingFromEvent = False
+            End Try
         End Sub
         Private Sub VoirFacture(factureId As Integer, numero As String, client As String, tel As String)
             Try
@@ -446,6 +469,11 @@ Namespace DevCommerc8ak
             Catch ex As Exception
                 MessageBox.Show("Erreur impression facture: " & ex.Message)
             End Try
+        End Sub
+
+        Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+            RemoveHandler AppEvents.DataChanged, AddressOf RafraichirDepuisEvenement
+            MyBase.OnFormClosed(e)
         End Sub
 
     End Class

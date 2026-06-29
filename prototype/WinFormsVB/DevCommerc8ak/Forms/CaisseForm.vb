@@ -295,6 +295,7 @@ Namespace DevCommerc8ak
             AddHandler AppEvents.VenteCreee, AddressOf RafraichirFacturesDepuisEvenement
             AddHandler AppEvents.VenteValidee, AddressOf RafraichirFacturesDepuisEvenement
             AddHandler AppEvents.PaiementValide, AddressOf RafraichirFacturesDepuisEvenement
+            AddHandler AppEvents.DataChanged, AddressOf RafraichirFacturesDepuisEvenement
         End Sub
         Protected Overrides Sub OnKeyDown(e As KeyEventArgs)
             MyBase.OnKeyDown(e)
@@ -396,7 +397,11 @@ Namespace DevCommerc8ak
                     Next
                 End If
 
-                ChargerDetails(Nothing, EventArgs.Empty)
+                If gridFactures.CurrentRow IsNot Nothing Then
+                    ChargerDetails(Nothing, EventArgs.Empty)
+                Else
+                    AnnulerSelection(Nothing, EventArgs.Empty)
+                End If
             Catch ex As Exception
                 Dim log As New ProductionLogService()
                 log.Error("CaisseForm", "RafraichirFacturesDepuisEvenement", "Erreur lors du rafraichissement automatique des factures caisse.", ex)
@@ -676,6 +681,7 @@ Namespace DevCommerc8ak
                 Dim dal As New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)
                 Dim repo As New FactureVenteRepository(dal)
                 repo.MettreAJourStatut(factureId, "ANNULEE")
+                AppEvents.OnDataChanged()
 
                 Dim log As New ProductionLogService()
                 log.Info("CaisseForm", "AnnulerFactureBrouillon", "Facture brouillon annulée: " & factureId.ToString())
@@ -693,6 +699,7 @@ Namespace DevCommerc8ak
             RemoveHandler AppEvents.VenteCreee, AddressOf RafraichirFacturesDepuisEvenement
             RemoveHandler AppEvents.VenteValidee, AddressOf RafraichirFacturesDepuisEvenement
             RemoveHandler AppEvents.PaiementValide, AddressOf RafraichirFacturesDepuisEvenement
+            RemoveHandler AppEvents.DataChanged, AddressOf RafraichirFacturesDepuisEvenement
             MyBase.OnFormClosed(e)
         End Sub
     End Class
