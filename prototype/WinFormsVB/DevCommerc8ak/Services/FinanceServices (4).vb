@@ -129,13 +129,16 @@ Namespace DevCommerc8ak.Services
             Dim derniereCloture As DateTime? = _caisseRepo.GetDerniereCloture()
             Dim aujourdhui As DateTime = DateTime.Now.Date
             If Not derniereCloture.HasValue OrElse derniereCloture.Value.Date < aujourdhui Then
+                Dim log As New ProductionLogService()
                 Dim dateACloturer As DateTime = If(derniereCloture.HasValue, derniereCloture.Value.AddDays(1), aujourdhui.AddDays(-1))
                 While dateACloturer < aujourdhui
                     Dim soldeFC As Decimal = GetSoldeCaisse(dateACloturer, "FC")
                     Dim soldeUSD As Decimal = GetSoldeCaisse(dateACloturer, "USD")
                     If soldeFC > 0 Then _banqueService.Depot(soldeFC, "FC", "Clôture automatique du " & dateACloturer.ToString("dd/MM/yyyy"))
-                    If soldeUSD > 0 Then _banqueService.Depot(soldeUSD, "USD", "Clôture automatique du " & dateACloturer.ToString("dd/MM/yyyy"))
-                    _caisseRepo.EnregistrerCloture(dateACloturer, soldeFC, soldeUSD)
+                    If soldeUSD > 0D Then
+                        log.Info("Finance", "ClotureAutomatique", "Montant USD affiché à titre informatif uniquement le " & dateACloturer.ToString("dd/MM/yyyy") & ". Aucun versement banque USD n'a été généré.")
+                    End If
+                    _caisseRepo.EnregistrerCloture(dateACloturer, soldeFC, 0D)
                     dateACloturer = dateACloturer.AddDays(1)
                 End While
 

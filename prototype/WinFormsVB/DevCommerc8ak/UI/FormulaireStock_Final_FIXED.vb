@@ -7,6 +7,7 @@ Imports System.Configuration
 Imports System.Data
 Imports System.Collections.Generic
 Imports System.Drawing
+Imports System.Globalization
 Imports System.Windows.Forms
 Imports System.Drawing.Drawing2D
 Imports System.Drawing.Printing
@@ -53,6 +54,7 @@ Namespace DevCommerc8ak
         Private ReadOnly txtCoefficientDetail As TextBox
         Private ReadOnly lblTypeCoefficient As Label
         Private ReadOnly lblMargeCalculee As Label
+        Private ReadOnly lblMargeDetailCalculee As Label
         Private ReadOnly txtPrixGros As TextBox
         Private ReadOnly txtPrixDemi As TextBox
         Private ReadOnly txtPrixQuart As TextBox
@@ -101,6 +103,10 @@ Namespace DevCommerc8ak
         Private ReadOnly btnEnregistrerSortie As Button
         Private ReadOnly cmbSortieManuelleMotif As ComboBox
         Private ReadOnly cmbSortieManuelleClient As ComboBox
+        Private ReadOnly lblSortieManuelleClient As Label
+        Private ReadOnly lblMagasinDestination As Label
+        Private ReadOnly cmbMagasinDestination As ComboBox
+        Private ReadOnly btnAjouterMagasin As Button
 
 
         ' --- NOUVEAU: Sortie Manuelle ---
@@ -173,11 +179,13 @@ Namespace DevCommerc8ak
 
         ' --- LOGIC VARIABLES ---
         Private _produitsTable As DataTable
+        Private _produitsVueEntree As DataView
         Private _coefficientCalcule As Decimal
         Private _coefficientDetailCalcule As Decimal
         Private _parametres As ParametreDTO
         Private ReadOnly _typeVenteService As TypeVenteService
         Private _typesVenteCourants As List(Of TypeVenteDTO) 'nouveau 
+        Private _filtrageProduitActif As Boolean
         Private ReadOnly _panier As List(Of PanierLigne)
 
         Private Class PanierLigne
@@ -257,7 +265,9 @@ Namespace DevCommerc8ak
             ' Card 1: Produit
             Dim cardProduit As Panel = CreateCard(600, 180, "INFORMATIONS PRODUIT")
             chkProduitExistant = New CheckBox() With {.Text = "Produit existant", .Left = 20, .Top = 45, .AutoSize = True, .Checked = True}
-            cmbProduitExistant = New ComboBox() With {.Left = 160, .Top = 42, .Width = 250, .DropDownStyle = ComboBoxStyle.DropDownList}
+            cmbProduitExistant = New ComboBox() With {.Left = 160, .Top = 42, .Width = 250, .DropDownStyle = ComboBoxStyle.DropDown}
+            cmbProduitExistant.AutoCompleteMode = AutoCompleteMode.SuggestAppend
+            cmbProduitExistant.AutoCompleteSource = AutoCompleteSource.ListItems
             txtNomProduit = New TextBox() With {.Left = 160, .Top = 75, .Width = 250}
             cmbCategorie = New ComboBox() With {.Left = 160, .Top = 105, .Width = 150}
             txtReference = New TextBox() With {.Left = 160, .Top = 135, .Width = 250, .ReadOnly = True}
@@ -298,11 +308,12 @@ Namespace DevCommerc8ak
             txtCoefficientDetail = New TextBox() With {.Left = 150, .Top = 135, .Width = 120}
             lblTypeCoefficient = New Label() With {.Left = 280, .Top = 78, .AutoSize = True}
             lblMargeCalculee = New Label() With {.Left = 150, .Top = 105, .AutoSize = True, .ForeColor = ColorAccent}
+            lblMargeDetailCalculee = New Label() With {.Left = 150, .Top = 165, .AutoSize = True, .ForeColor = ColorAccent}
             cardFinance.Controls.AddRange(New Control() {
                 New Label() With {.Text = "Prix Achat", .Left = 20, .Top = 48, .AutoSize = True},
                 New Label() With {.Text = "Coeff. Gros", .Left = 20, .Top = 78, .AutoSize = True},
                 New Label() With {.Text = "Coeff. Détail", .Left = 20, .Top = 138, .AutoSize = True},
-                txtPrixAchat, cmbDevise, txtTaux, txtCoefficientInput, txtCoefficientDetail, lblTypeCoefficient, lblMargeCalculee
+                txtPrixAchat, cmbDevise, txtTaux, txtCoefficientInput, txtCoefficientDetail, lblTypeCoefficient, lblMargeCalculee, lblMargeDetailCalculee
             })
             'layoutEntree.Controls.Add(cardFinance)
 
@@ -470,8 +481,11 @@ Namespace DevCommerc8ak
             Dim lblM As New Label() With {.Text = "Motif:", .Location = New Point(370, 20), .AutoSize = True}
             cmbMotif = New ComboBox() With {.Location = New Point(370, 40), .Width = 150, .DropDownStyle = ComboBoxStyle.DropDownList}
 
-            Dim lblC As New Label() With {.Text = "Client (Optionnel):", .Location = New Point(530, 20), .AutoSize = True}
+            lblSortieManuelleClient = New Label() With {.Text = "Client", .Location = New Point(530, 20), .AutoSize = True}
             cmbSortieManuelleClient = New ComboBox() With {.Location = New Point(530, 40), .Width = 200, .DropDownStyle = ComboBoxStyle.DropDownList}
+            lblMagasinDestination = New Label() With {.Text = "Magasin destination:", .Location = New Point(530, 75), .AutoSize = True, .Visible = False}
+            cmbMagasinDestination = New ComboBox() With {.Location = New Point(530, 95), .Width = 200, .DropDownStyle = ComboBoxStyle.DropDownList, .Visible = False}
+            btnAjouterMagasin = New Button() With {.Text = "+", .Location = New Point(735, 94), .Width = 34, .Height = 28, .Visible = False, .BackColor = ColorAccent, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             lblQte = New Label() With {.Text = "Qte deja Acheter", .Left = 780, .Top = 30, .AutoSize = True}
             lblMont = New Label() With {.Text = "Montant Global", .Left = 920, .Top = 30, .AutoSize = True}
             lblMoyenne = New Label() With {.Text = "Moyenne Achat", .Left = 780, .Top = 48, .AutoSize = True}
@@ -502,7 +516,7 @@ Namespace DevCommerc8ak
                 .TextAlign = ContentAlignment.MiddleRight}
             btnValider = New Button() With {.Text = "VALIDER LA SORTIE", .Location = New Point(20, 200), .Width = 250, .Height = 45, .BackColor = ColorSuccess, .ForeColor = Color.White, .Font = FontBold}
 
-            pnlSaisie.Controls.AddRange({lblP, cmbProduitSortie, lblQ, txtQuantiteSortie, lblM, cmbMotif, lblC, cmbSortieManuelleClient, lblQte, lblMont, lblMoyenne, lblQteAchter, lblSMontantAchat, lblSMoyenneAchat, lblTypeVente, cmbTypeVente, lblPrixProd, btnAjouter, btnVider, lblSousTotal, lblTotal, btnValider, lblStock, lblEquivalent, lblTotalReel})
+            pnlSaisie.Controls.AddRange({lblP, cmbProduitSortie, lblQ, txtQuantiteSortie, lblM, cmbMotif, lblSortieManuelleClient, cmbSortieManuelleClient, lblMagasinDestination, cmbMagasinDestination, btnAjouterMagasin, lblQte, lblMont, lblMoyenne, lblQteAchter, lblSMontantAchat, lblSMoyenneAchat, lblTypeVente, cmbTypeVente, lblPrixProd, btnAjouter, btnVider, lblSousTotal, lblTotal, btnValider, lblStock, lblEquivalent, lblTotalReel})
 
 
             ' Grille du Panier
@@ -656,6 +670,8 @@ Namespace DevCommerc8ak
             AddHandler Me.Load, AddressOf FormulaireStock_Load
             AddHandler chkProduitExistant.CheckedChanged, AddressOf BasculerProduitExistant
             AddHandler cmbProduitExistant.SelectedIndexChanged, AddressOf ChargerProduitSelection
+            AddHandler cmbProduitExistant.TextUpdate, AddressOf FiltrerProduitsExistants
+            AddHandler cmbProduitExistant.SelectionChangeCommitted, AddressOf SelectionnerProduitExistant
             AddHandler txtNomProduit.TextChanged, AddressOf GenererReferenceAutomatique
             AddHandler cmbCategorie.SelectedIndexChanged, AddressOf GenererReferenceAutomatique
             AddHandler txtNbUniteParBase.TextChanged, AddressOf RecalculerStock
@@ -684,6 +700,9 @@ Namespace DevCommerc8ak
             AddHandler cmbProduitSortie.SelectedIndexChanged, AddressOf ChargerUnites
             AddHandler txtQuantiteSortie.TextChanged, AddressOf MiseAJourIndicateursQuantite
             AddHandler cmbSortieManuelleClient.SelectedIndexChanged, AddressOf ChargerInfoAchatClientSelection
+            AddHandler cmbMotif.SelectedIndexChanged, AddressOf MettreAJourVisibiliteSortieManuelle
+            AddHandler cmbSortieManuelleMotif.SelectedIndexChanged, AddressOf MettreAJourVisibiliteSortieManuelle
+            AddHandler btnAjouterMagasin.Click, AddressOf AjouterMagasinDestination
 
             AddHandler cmbProduitInventaire.SelectedIndexChanged, AddressOf ChargerInventaire
             AddHandler txtStockReel.TextChanged, AddressOf RecalculerEcart
@@ -776,6 +795,7 @@ Namespace DevCommerc8ak
                 ChargerProduits()
                 ChargerParametres()
                 ChargerMotifsSortie()
+                ChargerMagasins()
                 ChargerClientsActifs()
                 ' ChargerSortiesMois(Nothing, EventArgs.Empty)
                 ChargerSortiesDuMois(Nothing, EventArgs.Empty)
@@ -783,6 +803,7 @@ Namespace DevCommerc8ak
                 ChargerDashboardSorties(Nothing, EventArgs.Empty)
                 ChargerAlertes(Nothing, EventArgs.Empty)
                 BasculerProduitExistant(Nothing, EventArgs.Empty)
+                MettreAJourVisibiliteSortieManuelle(Nothing, EventArgs.Empty)
                 RafraichirTypesVente()
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement: " & ex.Message)
@@ -840,6 +861,7 @@ Namespace DevCommerc8ak
                 cmbSortieManuelleClient.ValueMember = "ClientId"
 
                 cmbSortieManuelleClient.SelectedIndex = 0
+                ChargerInfoAchatClientSelection(Nothing, EventArgs.Empty)
 
 
             Catch ex As Exception
@@ -851,6 +873,7 @@ Namespace DevCommerc8ak
             Try
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
+                AssurerMotifTransfertMarchandises(dal)
                 Dim dt As DataTable = dal.ExecuterTable("SELECT MotifId, Libelle FROM MotifSortie WHERE EstActif = 1 ORDER BY Libelle", CommandType.Text, Nothing)
                 For Each cmb As ComboBox In New ComboBox() {cmbMotif, cmbSortieManuelleMotif}
                     cmb.DataSource = Nothing
@@ -858,12 +881,72 @@ Namespace DevCommerc8ak
                     cmb.ValueMember = "MotifId"
                     cmb.DataSource = dt.Copy()
                 Next
+                MettreAJourVisibiliteSortieManuelle(Nothing, EventArgs.Empty)
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement motifs: " & ex.Message)
             End Try
         End Sub
 
+        Private Sub AssurerMotifTransfertMarchandises(dal As DAL)
+            Dim sql As String =
+                "IF NOT EXISTS (SELECT 1 FROM MotifSortie WHERE Libelle = @Libelle) " &
+                "BEGIN " &
+                "INSERT INTO MotifSortie (Libelle, EstActif) VALUES (@Libelle, 1) " &
+                "END"
+            Dim params As New List(Of System.Data.SqlClient.SqlParameter) From {
+                New System.Data.SqlClient.SqlParameter("@Libelle", "Transfert marchandises")
+            }
+            dal.ExecuterNonRequete(sql, CommandType.Text, params)
+        End Sub
+
+        Private Sub AssurerTableMagasins()
+            Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+            Dim dal As New DAL(cs)
+            Dim sql As String =
+                "IF OBJECT_ID('dbo.Magasins', 'U') IS NULL " &
+                "BEGIN " &
+                "CREATE TABLE dbo.Magasins (" &
+                "MagasinId INT IDENTITY(1,1) PRIMARY KEY, " &
+                "NomMagasin NVARCHAR(100) NOT NULL, " &
+                "Adresse NVARCHAR(200) NULL, " &
+                "EstActif BIT NOT NULL CONSTRAINT DF_Magasins_EstActif DEFAULT(1), " &
+                "CreeLe DATETIME NOT NULL CONSTRAINT DF_Magasins_CreeLe DEFAULT(GETDATE())) " &
+                "END"
+            dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+        End Sub
+
+        Private Sub ChargerMagasins()
+            Try
+                AssurerTableMagasins()
+                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                Dim dal As New DAL(cs)
+                Dim dt As DataTable = dal.ExecuterTable("SELECT MagasinId, NomMagasin FROM Magasins WHERE EstActif = 1 ORDER BY NomMagasin", CommandType.Text, Nothing)
+                Dim ligneVide As DataRow = dt.NewRow()
+                ligneVide("MagasinId") = DBNull.Value
+                ligneVide("NomMagasin") = ""
+                dt.Rows.InsertAt(ligneVide, 0)
+
+                cmbMagasinDestination.DataSource = dt
+                cmbMagasinDestination.DisplayMember = "NomMagasin"
+                cmbMagasinDestination.ValueMember = "MagasinId"
+                cmbMagasinDestination.SelectedIndex = 0
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("Stock", "ChargerMagasins", "Impossible de charger les magasins de destination.", ex)
+            End Try
+        End Sub
+
         Private Sub ChargerInfoAchatClientSelection(sender As Object, e As EventArgs)
+            If Not lblSortieManuelleClient.Visible OrElse Not cmbSortieManuelleClient.Visible Then
+                lblQteAchter.Visible = False
+                lblSMontantAchat.Visible = False
+                lblSMoyenneAchat.Visible = False
+                lblQte.Visible = False
+                lblMont.Visible = False
+                lblMoyenne.Visible = False
+                Return
+            End If
+
             If String.IsNullOrWhiteSpace(cmbSortieManuelleClient.Text) Or cmbSortieManuelleClient.SelectedIndex = 0 Then
                 lblQteAchter.Visible = False
                 lblSMontantAchat.Visible = False
@@ -891,13 +974,117 @@ Namespace DevCommerc8ak
 
         End Sub
 
+        Private Sub MettreAJourVisibiliteSortieManuelle(sender As Object, e As EventArgs)
+            Dim motif As String = String.Empty
+            Dim motifView As DataRowView = TryCast(cmbMotif.SelectedItem, DataRowView)
+            If motifView IsNot Nothing Then
+                motif = Convert.ToString(motifView("Libelle"))
+            ElseIf cmbMotif IsNot Nothing Then
+                motif = cmbMotif.Text
+            End If
+
+            Dim clientObligatoire As Boolean = String.Equals(motif, "Dette Client", StringComparison.OrdinalIgnoreCase)
+            Dim transfert As Boolean = String.Equals(motif, "Transfert marchandises", StringComparison.OrdinalIgnoreCase)
+
+            lblSortieManuelleClient.Visible = clientObligatoire
+            cmbSortieManuelleClient.Visible = clientObligatoire
+            If Not clientObligatoire Then
+                cmbSortieManuelleClient.SelectedIndex = If(cmbSortieManuelleClient.Items.Count > 0, 0, -1)
+            End If
+
+            lblMagasinDestination.Visible = transfert
+            cmbMagasinDestination.Visible = transfert
+            btnAjouterMagasin.Visible = transfert
+            If Not transfert AndAlso cmbMagasinDestination IsNot Nothing Then
+                cmbMagasinDestination.SelectedIndex = If(cmbMagasinDestination.Items.Count > 0, 0, -1)
+            End If
+
+            ChargerInfoAchatClientSelection(Nothing, EventArgs.Empty)
+        End Sub
+
+        Private Sub AjouterMagasinDestination(sender As Object, e As EventArgs)
+            Using formulaire As New FormulaireMagasinRapide()
+                If formulaire.ShowDialog(Me) <> DialogResult.OK Then
+                    Return
+                End If
+
+                Dim nomMagasin As String = formulaire.NomMagasin
+                If String.IsNullOrWhiteSpace(nomMagasin) Then
+                    Return
+                End If
+
+                Try
+                    AssurerTableMagasins()
+                    Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                    Dim dal As New DAL(cs)
+                    Dim sql As String =
+                        "IF NOT EXISTS (SELECT 1 FROM Magasins WHERE NomMagasin = @NomMagasin) " &
+                        "BEGIN " &
+                        "INSERT INTO Magasins (NomMagasin, Adresse, EstActif) VALUES (@NomMagasin, @Adresse, 1) " &
+                        "END"
+                    Dim params As New List(Of System.Data.SqlClient.SqlParameter) From {
+                        New System.Data.SqlClient.SqlParameter("@NomMagasin", nomMagasin.Trim()),
+                        New System.Data.SqlClient.SqlParameter("@Adresse", If(String.IsNullOrWhiteSpace(formulaire.AdresseMagasin), CType(DBNull.Value, Object), formulaire.AdresseMagasin.Trim()))
+                    }
+                    dal.ExecuterNonRequete(sql, CommandType.Text, params)
+                    ChargerMagasins()
+                    cmbMagasinDestination.Text = nomMagasin.Trim()
+                Catch ex As Exception
+                    Dim log As New ProductionLogService()
+                    log.Error("Stock", "AjouterMagasinDestination", "Impossible d'ajouter le magasin de destination.", ex)
+                    MessageBox.Show("Impossible d'ajouter le magasin de destination : " & ex.Message)
+                End Try
+            End Using
+        End Sub
+
+        Private Sub FiltrerProduitsExistants(sender As Object, e As EventArgs)
+            If _produitsTable Is Nothing OrElse _filtrageProduitActif Then
+                Return
+            End If
+
+            Try
+                _filtrageProduitActif = True
+                If _produitsVueEntree Is Nothing Then
+                    _produitsVueEntree = New DataView(_produitsTable)
+                End If
+
+                Dim recherche As String = cmbProduitExistant.Text.Trim().Replace("'", "''")
+                If String.IsNullOrWhiteSpace(recherche) Then
+                    _produitsVueEntree.RowFilter = String.Empty
+                Else
+                    _produitsVueEntree.RowFilter = "Libelle LIKE '%" & recherche & "%' OR Convert(ProduitId, 'System.String') LIKE '%" & recherche & "%'"
+                End If
+
+                cmbProduitExistant.DataSource = _produitsVueEntree
+                cmbProduitExistant.DisplayMember = "Libelle"
+                cmbProduitExistant.ValueMember = "ProduitId"
+                cmbProduitExistant.SelectionStart = cmbProduitExistant.Text.Length
+                cmbProduitExistant.DroppedDown = True
+                Cursor.Current = Cursors.Default
+            Finally
+                _filtrageProduitActif = False
+            End Try
+        End Sub
+
+        Private Sub SelectionnerProduitExistant(sender As Object, e As EventArgs)
+            If _produitsTable Is Nothing Then
+                Return
+            End If
+
+            If _produitsVueEntree IsNot Nothing AndAlso String.IsNullOrWhiteSpace(cmbProduitExistant.Text) Then
+                _produitsVueEntree.RowFilter = String.Empty
+            End If
+            ChargerProduitSelection(sender, e)
+        End Sub
+
         Private Sub ChargerProduits()
             Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
             Dim dal As New DAL(cs)
             Dim repo As New ProduitRepository(dal)
             _produitsTable = repo.ListerTable()
+            _produitsVueEntree = New DataView(_produitsTable)
 
-            cmbProduitExistant.DataSource = _produitsTable
+            cmbProduitExistant.DataSource = _produitsVueEntree
             cmbProduitExistant.DisplayMember = "Libelle"
             cmbProduitExistant.ValueMember = "ProduitId"
 
@@ -990,6 +1177,9 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub ChargerProduitSelection(sender As Object, e As EventArgs)
+            If _filtrageProduitActif Then
+                Return
+            End If
             If cmbProduitExistant.SelectedValue Is Nothing Then Return
             Dim row As DataRowView = TryCast(cmbProduitExistant.SelectedItem, DataRowView)
             If row Is Nothing Then Return
@@ -1338,53 +1528,35 @@ Namespace DevCommerc8ak
                 _coefficientCalcule = 0D
                 lblTypeCoefficient.Text = ""
                 lblMargeCalculee.Text = ""
+                RecalculerPrixAuto(Nothing, EventArgs.Empty)
                 Exit Sub
             End If
 
-            Dim input As String = txtCoefficientInput.Text.Replace("%", "").Replace(".", ",").Trim()
-            Dim valeur As Decimal
-            If Decimal.TryParse(input, valeur) Then
-                Dim coefficient As Decimal
-                Dim marge As Decimal
-
-                If txtCoefficientInput.Text.Contains("%") OrElse valeur >= 10 Then
-                    marge = valeur
-                    coefficient = 1 + (marge / 100)
-                    lblTypeCoefficient.Text = "Marge " & marge & "(%)"
-                Else
-                    coefficient = valeur
-                    marge = (coefficient - 1) * 100
-                    lblTypeCoefficient.Text = "Coefficient " & coefficient
-                End If
-                lblMargeCalculee.Text = $" {Math.Round(marge, 2)} %"
-                _coefficientCalcule = coefficient
-                RecalculerPrixAuto(Nothing, EventArgs.Empty)
+            Dim coefficient As Decimal
+            Dim marge As Decimal
+            If Not TenterLireCoefficient(txtCoefficientInput.Text, coefficient, marge) Then
+                Exit Sub
             End If
+
+            _coefficientCalcule = coefficient
+            lblTypeCoefficient.Text = "Coefficient " & coefficient.ToString("N2")
+            lblMargeCalculee.Text = Math.Round(marge, 2).ToString("N2") & " %"
+            RecalculerPrixAuto(Nothing, EventArgs.Empty)
         End Sub
 
         Private Sub CoefficientDetailChange(sender As Object, e As EventArgs)
             If String.IsNullOrWhiteSpace(txtCoefficientDetail.Text) Then
                 _coefficientDetailCalcule = 0D
+                lblMargeDetailCalculee.Text = ""
                 RecalculerPrixAuto(Nothing, EventArgs.Empty)
                 Return
             End If
 
-            Dim valeur As Decimal
+            Dim coefficient As Decimal
             Dim marge As Decimal
-            If Decimal.TryParse(txtCoefficientDetail.Text.Replace("%", "").Replace(".", ",").Trim(), valeur) Then
-                If txtCoefficientDetail.Text.Contains("%") OrElse valeur > 1D Then
-                    _coefficientDetailCalcule = 1D + (valeur / 100D)
-                Else
-                    _coefficientDetailCalcule = valeur
-                End If
-
-                If txtCoefficientDetail.Text.Contains("%") OrElse valeur >= 10 Then
-                    marge = valeur
-                    _coefficientDetailCalcule = 1 + (marge / 100)
-                Else
-                    _coefficientDetailCalcule = valeur
-                    marge = (_coefficientDetailCalcule - 1) * 100
-                End If
+            If TenterLireCoefficient(txtCoefficientDetail.Text, coefficient, marge) Then
+                _coefficientDetailCalcule = coefficient
+                lblMargeDetailCalculee.Text = Math.Round(marge, 2).ToString("N2") & " %"
                 RecalculerPrixAuto(Nothing, EventArgs.Empty)
             End If
         End Sub
@@ -1393,12 +1565,16 @@ Namespace DevCommerc8ak
             Dim prixAchatVal As Decimal = LireDecimal(txtPrixAchat.Text)
             Dim nbUnites As Decimal = LireDecimal(txtNbUniteParBase.Text)
             Dim coefficientGros As Decimal = If(_coefficientCalcule > 0D, _coefficientCalcule, 0D)
-            Dim coefficientDetail As Decimal = If(_coefficientDetailCalcule > 0D, _coefficientDetailCalcule, coefficientGros)
+            Dim coefficientDetail As Decimal = If(_coefficientDetailCalcule > 0D, _coefficientDetailCalcule, 0D)
 
-            If prixAchatVal <= 0D OrElse nbUnites <= 0D OrElse coefficientGros <= 0D Then Return
+            If prixAchatVal <= 0D OrElse nbUnites <= 0D Then Return
 
-            Dim prixGros As Decimal = prixAchatVal * coefficientGros
-            Dim prixDemi As Decimal = prixGros * 0.5D
+            Dim prixGros As Decimal = 0D
+            Dim prixDemi As Decimal = 0D
+            If coefficientGros > 0D Then
+                prixGros = prixAchatVal * coefficientGros
+                prixDemi = prixGros * 0.5D
+            End If
             Dim prixPiece As Decimal = 0D
             If coefficientDetail > 0D Then
                 prixPiece = (prixAchatVal * coefficientDetail) / nbUnites
@@ -1406,8 +1582,8 @@ Namespace DevCommerc8ak
             Dim prixQuart As Decimal = prixPiece * Math.Max(1D, Decimal.Floor(nbUnites / 4D))
             Dim prixDouzaine As Decimal = prixPiece * 12D
 
-            txtPrixGros.Text = If(chkGros.Checked, prixGros.ToString("N0"), "-")
-            txtPrixDemi.Text = If(chkDemi.Checked, prixDemi.ToString("N0"), "-")
+            txtPrixGros.Text = If(chkGros.Checked AndAlso coefficientGros > 0D, prixGros.ToString("N0"), "-")
+            txtPrixDemi.Text = If(chkDemi.Checked AndAlso coefficientGros > 0D, prixDemi.ToString("N0"), "-")
             txtPrixQuart.Text = If(chkQuart.Checked, prixQuart.ToString("N0"), "-")
             txtPrixPiece.Text = If(chkPiece.Checked, prixPiece.ToString("N0"), "-")
             txtPrixDouzaine.Text = If(chkDouzaine.Checked, prixDouzaine.ToString("N0"), "-")
@@ -1670,6 +1846,7 @@ Namespace DevCommerc8ak
                 Dim statutPaiement As String = "PAYE"
                 Dim montantPaye As Decimal = CalculerTotalPanier()
                 Dim resteAPayer As Decimal = 0D
+                Dim observationSortie As String = txtDescriptionSortie.Text.Trim()
 
                 If String.Equals(motifLibelle, "Dette Client", StringComparison.OrdinalIgnoreCase) Then
                     If clientValue Is Nothing OrElse IsDBNull(clientValue) Then
@@ -1682,6 +1859,20 @@ Namespace DevCommerc8ak
                     resteAPayer = CalculerTotalPanier()
                 ElseIf clientValue IsNot Nothing AndAlso Not IsDBNull(clientValue) AndAlso Not TypeOf clientValue Is DataRowView Then
                     clientId = Convert.ToInt32(clientValue)
+                End If
+
+                If String.Equals(motifLibelle, "Transfert marchandises", StringComparison.OrdinalIgnoreCase) Then
+                    If cmbMagasinDestination.SelectedValue Is Nothing OrElse IsDBNull(cmbMagasinDestination.SelectedValue) OrElse String.IsNullOrWhiteSpace(cmbMagasinDestination.Text) Then
+                        MessageBox.Show("Sélectionnez le magasin de destination pour le transfert.")
+                        cmbMagasinDestination.Focus()
+                        Return
+                    End If
+
+                    If String.IsNullOrWhiteSpace(observationSortie) Then
+                        observationSortie = "Magasin destination: " & cmbMagasinDestination.Text.Trim()
+                    Else
+                        observationSortie &= " | Magasin destination: " & cmbMagasinDestination.Text.Trim()
+                    End If
                 End If
 
                 Dim lignes As New List(Of StockSortie)()
@@ -1701,14 +1892,14 @@ Namespace DevCommerc8ak
                         .StatutPaiement = statutPaiement,
                         .MontantPaye = montantPaye,
                         .ResteAPayer = resteAPayer,
-                        .Observation = txtDescriptionSortie.Text.Trim(),
+                        .Observation = observationSortie,
                         .ClientId = clientId,
                         .MotifId = motifId
                     })
                 Next
 
                 Dim service As StockService = ObtenirStockService()
-                Dim numeroSortie As String = service.EnregistrerSortiesManuelles(lignes, motifId, clientId, statutPaiement, montantPaye, resteAPayer, txtDescriptionSortie.Text.Trim(), SessionUtilisateur.UtilisateurId)
+                Dim numeroSortie As String = service.EnregistrerSortiesManuelles(lignes, motifId, clientId, statutPaiement, montantPaye, resteAPayer, observationSortie, SessionUtilisateur.UtilisateurId)
 
                 _panier.Clear()
                 RafraichirPanier()
@@ -2302,9 +2493,40 @@ Namespace DevCommerc8ak
             Return New StockService(dal)
         End Function
 
+        Private Function TenterLireCoefficient(saisie As String, ByRef coefficient As Decimal, ByRef marge As Decimal) As Boolean
+            coefficient = 0D
+            marge = 0D
+
+            Dim texte As String = If(saisie, String.Empty).Trim().Replace("%", String.Empty)
+            If texte = String.Empty Then
+                Return False
+            End If
+
+            Dim valeur As Decimal
+            If Not Decimal.TryParse(texte.Replace(".", ","), NumberStyles.Number, CultureInfo.CurrentCulture, valeur) AndAlso
+               Not Decimal.TryParse(texte.Replace(",", "."), NumberStyles.Number, CultureInfo.InvariantCulture, valeur) Then
+                Return False
+            End If
+
+            If saisie.Contains("%") OrElse valeur >= 10D Then
+                marge = valeur
+                coefficient = 1D + (marge / 100D)
+            Else
+                coefficient = valeur
+                marge = (coefficient - 1D) * 100D
+            End If
+
+            Return coefficient > 0D
+        End Function
+
         Private Function LireDecimal(texte As String) As Decimal
             Dim v As Decimal
-            If Decimal.TryParse(If(texte.Trim() = "", "0", texte.Trim()), v) Then Return v
+            Dim valeur As String = If(texte, String.Empty).Trim()
+            If valeur = String.Empty Then
+                Return 0D
+            End If
+            If Decimal.TryParse(valeur, NumberStyles.Number, CultureInfo.CurrentCulture, v) Then Return v
+            If Decimal.TryParse(valeur.Replace(",", "."), NumberStyles.Number, CultureInfo.InvariantCulture, v) Then Return v
             Return 0D
         End Function
 
@@ -2339,6 +2561,63 @@ Namespace DevCommerc8ak
         Private Function GenererReferenceUnique(libelle As String, categorieId As String) As String
             Return GenererReference(libelle, categorieId) & "-" & Date.Now.ToString("HHmmss")
         End Function
+
+        Private Class FormulaireMagasinRapide
+            Inherits Form
+
+            Private ReadOnly txtNom As TextBox
+            Private ReadOnly txtAdresse As TextBox
+
+            Public ReadOnly Property NomMagasin As String
+                Get
+                    Return txtNom.Text.Trim()
+                End Get
+            End Property
+
+            Public ReadOnly Property AdresseMagasin As String
+                Get
+                    Return txtAdresse.Text.Trim()
+                End Get
+            End Property
+
+            Public Sub New()
+                Text = "Ajouter un magasin"
+                FormBorderStyle = FormBorderStyle.FixedDialog
+                StartPosition = FormStartPosition.CenterParent
+                MinimizeBox = False
+                MaximizeBox = False
+                Width = 420
+                Height = 220
+                BackColor = Color.White
+
+                Dim lblNom As New Label() With {.Text = "Nom magasin", .Left = 20, .Top = 20, .AutoSize = True}
+                txtNom = New TextBox() With {.Left = 20, .Top = 42, .Width = 360}
+                Dim lblAdresse As New Label() With {.Text = "Adresse", .Left = 20, .Top = 78, .AutoSize = True}
+                txtAdresse = New TextBox() With {.Left = 20, .Top = 100, .Width = 360}
+                Dim btnAnnuler As New Button() With {.Text = "Annuler", .Left = 210, .Top = 140, .Width = 80}
+                Dim btnEnregistrer As New Button() With {.Text = "Enregistrer", .Left = 300, .Top = 140, .Width = 80}
+
+                AddHandler btnEnregistrer.Click,
+                    Sub(sender As Object, e As EventArgs)
+                        If String.IsNullOrWhiteSpace(txtNom.Text) Then
+                            MessageBox.Show("Le nom du magasin est obligatoire.")
+                            txtNom.Focus()
+                            Return
+                        End If
+
+                        DialogResult = DialogResult.OK
+                        Close()
+                    End Sub
+                AddHandler btnAnnuler.Click,
+                    Sub(sender As Object, e As EventArgs)
+                        DialogResult = DialogResult.Cancel
+                        Close()
+                    End Sub
+
+                Controls.AddRange(New Control() {lblNom, txtNom, lblAdresse, txtAdresse, btnAnnuler, btnEnregistrer})
+            End Sub
+        End Class
+
         ' Précharge l'onglet d'entrée stock à partir d'un bon d'approvisionnement.
         Public Sub PrechargerDepuisBonApprovisionnement(bonId As Integer)
             Try
