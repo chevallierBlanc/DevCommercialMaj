@@ -179,13 +179,13 @@ Namespace DevCommerc8ak
 
         ' --- LOGIC VARIABLES ---
         Private _produitsTable As DataTable
-        Private _produitsVueEntree As DataView
+        Private _produitsAutoCompleteSource As AutoCompleteStringCollection
         Private _coefficientCalcule As Decimal
         Private _coefficientDetailCalcule As Decimal
         Private _parametres As ParametreDTO
         Private ReadOnly _typeVenteService As TypeVenteService
         Private _typesVenteCourants As List(Of TypeVenteDTO) 'nouveau 
-        Private _filtrageProduitActif As Boolean
+        Private _isFilteringProduits As Boolean
         Private ReadOnly _panier As List(Of PanierLigne)
 
         Private Class PanierLigne
@@ -267,7 +267,7 @@ Namespace DevCommerc8ak
             chkProduitExistant = New CheckBox() With {.Text = "Produit existant", .Left = 20, .Top = 45, .AutoSize = True, .Checked = True}
             cmbProduitExistant = New ComboBox() With {.Left = 160, .Top = 42, .Width = 250, .DropDownStyle = ComboBoxStyle.DropDown}
             cmbProduitExistant.AutoCompleteMode = AutoCompleteMode.SuggestAppend
-            cmbProduitExistant.AutoCompleteSource = AutoCompleteSource.ListItems
+            cmbProduitExistant.AutoCompleteSource = AutoCompleteSource.CustomSource
             txtNomProduit = New TextBox() With {.Left = 160, .Top = 75, .Width = 250}
             cmbCategorie = New ComboBox() With {.Left = 160, .Top = 105, .Width = 150}
             txtReference = New TextBox() With {.Left = 160, .Top = 135, .Width = 250, .ReadOnly = True}
@@ -672,6 +672,7 @@ Namespace DevCommerc8ak
             AddHandler cmbProduitExistant.SelectedIndexChanged, AddressOf ChargerProduitSelection
             AddHandler cmbProduitExistant.TextUpdate, AddressOf FiltrerProduitsExistants
             AddHandler cmbProduitExistant.SelectionChangeCommitted, AddressOf SelectionnerProduitExistant
+            AddHandler cmbProduitExistant.Leave, AddressOf SelectionnerProduitExistant
             AddHandler txtNomProduit.TextChanged, AddressOf GenererReferenceAutomatique
             AddHandler cmbCategorie.SelectedIndexChanged, AddressOf GenererReferenceAutomatique
             AddHandler txtNbUniteParBase.TextChanged, AddressOf RecalculerStock
@@ -1038,32 +1039,15 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub FiltrerProduitsExistants(sender As Object, e As EventArgs)
-            If _produitsTable Is Nothing OrElse _filtrageProduitActif Then
+            If _produitsTable Is Nothing OrElse _isFilteringProduits Then
                 Return
             End If
 
-            Try
-                _filtrageProduitActif = True
-                If _produitsVueEntree Is Nothing Then
-                    _produitsVueEntree = New DataView(_produitsTable)
-                End If
-
-                Dim recherche As String = cmbProduitExistant.Text.Trim().Replace("'", "''")
-                If String.IsNullOrWhiteSpace(recherche) Then
-                    _produitsVueEntree.RowFilter = String.Empty
-                Else
-                    _produitsVueEntree.RowFilter = "Libelle LIKE '%" & recherche & "%' OR Convert(ProduitId, 'System.String') LIKE '%" & recherche & "%'"
-                End If
-
-                cmbProduitExistant.DataSource = _produitsVueEntree
-                cmbProduitExistant.DisplayMember = "Libelle"
-                cmbProduitExistant.ValueMember = "ProduitId"
-                cmbProduitExistant.SelectionStart = cmbProduitExistant.Text.Length
-                cmbProduitExistant.DroppedDown = True
-                Cursor.Current = Cursors.Default
-            Finally
-                _filtrageProduitActif = False
-            End Try
+            _isFilteringProduits = True
+            BeginInvoke(New MethodInvoker(
+                Sub()
+                    _isFilteringProduits = False
+                End Sub))
         End Sub
 
         Private Sub SelectionnerProduitExistant(sender As Object, e As EventArgs)
@@ -1071,10 +1055,25 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            If _produitsVueEntree IsNot Nothing AndAlso String.IsNullOrWhiteSpace(cmbProduitExistant.Text) Then
-                _produitsVueEntree.RowFilter = String.Empty
+            If _isFilteringProduits Then
+                Return
             End If
-            ChargerProduitSelection(sender, e)
+
+            Dim texte As String = cmbProduitExistant.Text.Trim()
+            If texte = String.Empty Then
+                Return
+            End If
+
+            For Each row As DataRow In _produitsTable.Rows
+                If String.Equals(Convert.ToString(row("Libelle")).Trim(), texte, StringComparison.CurrentCultureIgnoreCase) Then
+                    Dim produitId As Integer = Convert.ToInt32(row("ProduitId"))
+                    Dim valeurSelectionnee As Integer = If(cmbProduitExistant.SelectedValue Is Nothing OrElse IsDBNull(cmbProduitExistant.SelectedValue), 0, Convert.ToInt32(cmbProduitExistant.SelectedValue))
+                    If valeurSelectionnee <> produitId Then
+                        cmbProduitExistant.SelectedValue = produitId
+                    End If
+                    Exit For
+                End If
+            Next
         End Sub
 
         Private Sub ChargerProduits()
@@ -1082,9 +1081,16 @@ Namespace DevCommerc8ak
             Dim dal As New DAL(cs)
             Dim repo As New ProduitRepository(dal)
             _produitsTable = repo.ListerTable()
-            _produitsVueEntree = New DataView(_produitsTable)
+            _produitsAutoCompleteSource = New AutoCompleteStringCollection()
+            For Each row As DataRow In _produitsTable.Rows
+                Dim libelle As String = Convert.ToString(row("Libelle")).Trim()
+                If libelle <> String.Empty Then
+                    _produitsAutoCompleteSource.Add(libelle)
+                End If
+            Next
 
-            cmbProduitExistant.DataSource = _produitsVueEntree
+            cmbProduitExistant.AutoCompleteCustomSource = _produitsAutoCompleteSource
+            cmbProduitExistant.DataSource = _produitsTable
             cmbProduitExistant.DisplayMember = "Libelle"
             cmbProduitExistant.ValueMember = "ProduitId"
 
@@ -1177,7 +1183,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub ChargerProduitSelection(sender As Object, e As EventArgs)
-            If _filtrageProduitActif Then
+            If _isFilteringProduits Then
                 Return
             End If
             If cmbProduitExistant.SelectedValue Is Nothing Then Return
@@ -2497,7 +2503,8 @@ Namespace DevCommerc8ak
             coefficient = 0D
             marge = 0D
 
-            Dim texte As String = If(saisie, String.Empty).Trim().Replace("%", String.Empty)
+            Dim saisieNormalisee As String = If(saisie, String.Empty).Trim()
+            Dim texte As String = saisieNormalisee.Replace("%", String.Empty)
             If texte = String.Empty Then
                 Return False
             End If
@@ -2508,7 +2515,10 @@ Namespace DevCommerc8ak
                 Return False
             End If
 
-            If saisie.Contains("%") OrElse valeur >= 10D Then
+            Dim aSeparateurDecimal As Boolean = saisieNormalisee.Contains(".") OrElse saisieNormalisee.Contains(",")
+            Dim traiterCommeCoefficientDirect As Boolean = aSeparateurDecimal AndAlso valeur >= 1.01D AndAlso valeur <= 9.99D
+
+            If Not traiterCommeCoefficientDirect Then
                 marge = valeur
                 coefficient = 1D + (marge / 100D)
             Else
