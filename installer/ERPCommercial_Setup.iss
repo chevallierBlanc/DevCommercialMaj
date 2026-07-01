@@ -26,6 +26,8 @@ Name: "{app}\Reports"; Flags: uninsneveruninstall; Permissions: users-modify
 Source: "..\prototype\WinFormsVB\DevCommerc8ak\bin\Release\DevCommerc8ak.exe"; DestDir: "{app}"; DestName: "ERPCommercial.exe"; Flags: ignoreversion
 Source: "..\prototype\WinFormsVB\DevCommerc8ak\bin\Release\DevCommerc8ak.exe.config"; DestDir: "{app}"; DestName: "ERPCommercial.exe.config"; Flags: onlyifdoesntexist
 Source: "..\prototype\WinFormsVB\DevCommerc8ak\bin\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "DevCommerc8ak.exe;DevCommerc8ak.exe.config"
+Source: "..\prototype\WinFormsVB\DevCommerc8ak\Resources\images\logo.bmp"; DestDir: "{app}\Resources\images"; Flags: ignoreversion
+Source: "..\prototype\WinFormsVB\DevCommerc8ak\Resources\images\logo.bmp"; DestDir: "{app}\Config"; DestName: "logo.bmp"; Flags: ignoreversion onlyifdoesntexist
 Source: "..\README_PRODUCTION.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\GUIDE_INSTALLATION_INNOSETUP.md"; DestDir: "{app}\Docs"; Flags: ignoreversion
 

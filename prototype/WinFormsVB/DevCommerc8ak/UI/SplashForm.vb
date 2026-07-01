@@ -12,17 +12,17 @@ Namespace DevCommerc8ak
     Public Class SplashForm
         Inherits Form
 
-        ' --- Palette de Couleurs Identité Visuelle ---
-        Private ReadOnly ColorBg As Color = Color.FromArgb(28, 35, 49) ' Bleu Nuit Profond (Identité MainForm)
+        ' --- Palette de Couleurs IdentitÃ© Visuelle ---
+        Private ReadOnly ColorBg As Color = Color.FromArgb(28, 35, 49) ' Bleu Nuit Profond (IdentitÃ© MainForm)
         Private ReadOnly ColorAccent As Color = Color.FromArgb(59, 130, 246) ' Bleu Moderne
         Private ReadOnly ColorWhite As Color = Color.White
         Private ReadOnly ColorTextSecondary As Color = Color.FromArgb(145, 158, 171)
 
-        ' --- Composants (Noms conservés) ---
+        ' --- Composants (Noms conservÃ©s) ---
         Private ReadOnly picLogo As PictureBox
         Private ReadOnly lblTitre As Label
 
-        ' --- Nouveaux éléments visuels pour l'optimisation UX ---
+        ' --- Nouveaux Ã©lÃ©ments visuels pour l'optimisation UX ---
         Private ReadOnly pnlProgressBg As Panel
         Private ReadOnly pnlProgressBar As Panel
         Private ReadOnly lblStatus As Label
@@ -59,7 +59,7 @@ Namespace DevCommerc8ak
 
             ' --- Sous-titre / Status ---
             lblStatus = New Label() With {
-                .Text = "Initialisation du système...",
+                .Text = "Initialisation du systÃ¨me...",
                 .Font = New Font("Segoe UI", 9),
                 .ForeColor = ColorTextSecondary,
                 .AutoSize = False,
@@ -99,7 +99,7 @@ Namespace DevCommerc8ak
             ' Assemblage
             Me.Controls.AddRange({picLogo, lblTitre, lblStatus, pnlProgressBg, lblVersion})
 
-            ' Chargement et Thème
+            ' Chargement et ThÃ¨me
             ChargerLogo()
             ThemeHelper.AppliquerTheme(Me)
 
@@ -118,8 +118,8 @@ Namespace DevCommerc8ak
 
                 ' Simulation de changement de statut
                 If _progressWidth = 100 Then lblStatus.Text = "Chargement des modules..."
-                If _progressWidth = 200 Then lblStatus.Text = "Connexion à la base de données..."
-                If _progressWidth = 300 Then lblStatus.Text = "Préparation de l'interface..."
+                If _progressWidth = 200 Then lblStatus.Text = "Connexion Ã  la base de donnÃ©es..."
+                If _progressWidth = 300 Then lblStatus.Text = "PrÃ©paration de l'interface..."
             Else
                 timerAnim.Stop()
                 ' Ici, le formulaire se fermerait normalement pour ouvrir le Login
@@ -132,17 +132,9 @@ Namespace DevCommerc8ak
                 Dim dal As New DAL(cs)
                 Dim paramService As New ParametreService(New ParametreRepository(dal))
                 Dim p As ParametreDTO = paramService.Charger()
-
-                Dim pathLogo As String = ""
-                If p IsNot Nothing Then pathLogo = p.LogoPath
+                Dim pathLogo As String = LogoPathHelper.GetLogoPath(p)
                 If Not String.IsNullOrEmpty(pathLogo) AndAlso File.Exists(pathLogo) Then
                     picLogo.Image = Image.FromFile(pathLogo)
-                Else
-                    Dim baseDir As String = AppDomain.CurrentDomain.BaseDirectory
-                    Dim defaultLogo As String = Path.Combine(baseDir, "Resources", "images", "logo.png")
-                    If File.Exists(defaultLogo) Then
-                        picLogo.Image = Image.FromFile(defaultLogo)
-                    End If
                 End If
             Catch
                 ' Fallback silencieux

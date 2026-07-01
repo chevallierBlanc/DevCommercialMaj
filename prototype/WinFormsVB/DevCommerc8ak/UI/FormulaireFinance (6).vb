@@ -9,6 +9,7 @@ Imports System.Drawing
 Imports System.Drawing.Drawing2D
 Imports System.Drawing.Printing
 Imports System.IO
+Imports System.Threading.Tasks
 Imports System.Windows.Forms
 Imports System.Windows.Forms.DataVisualization.Charting
 Imports DevCommerc8ak.DevCommerc8ak.DTO
@@ -97,6 +98,13 @@ Namespace DevCommerc8ak
         ' Onglet Dashboard
         Private chartDepensesCat As Chart
         Private chartEvolutionFinance As Chart
+        Private gridLegendeDepenses As DataGridView
+        Private cmbFiltreDashboardDepenses As ComboBox
+        Private cmbAnneeDashboardDepenses As ComboBox
+        Private cmbMoisDashboardDepenses As ComboBox
+        Private lblDashboardFiltre As Label
+        Private lblDashboardAnnee As Label
+        Private lblDashboardMois As Label
         Private lblTotalEncaisse As Label
         Private lblTotalDepenses As Label
         Private lblSoldeGlobalBanque As Label
@@ -111,6 +119,15 @@ Namespace DevCommerc8ak
         Private _impressionTotalFC As Decimal
         Private _impressionTotalUSD As Decimal
         Private _banqueUsdIndisponibleLoggee As Boolean
+        Private _isLoadingRepartitionDepenses As Boolean
+        Private _repartitionDepensesRefreshDemandee As Boolean
+
+        Private Class RepartitionDepenseItem
+            Public Property Categorie As String
+            Public Property Montant As Decimal
+            Public Property Devise As String
+            Public Property Pourcentage As Decimal
+        End Class
 
         ' Filtres Impression
         Private cmbAnneeRapport As ComboBox
@@ -528,7 +545,68 @@ Namespace DevCommerc8ak
             chartDepensesCat = CreerChart("Dépenses par Catégorie", SeriesChartType.Pie)
             chartEvolutionFinance = CreerChart("Évolution Caisse vs Banque", SeriesChartType.Line)
 
-            mainLayoutDashboard.Controls.Add(WrapInCard(chartDepensesCat, "Répartition des Dépenses"), 0, 0)
+            Dim cardRepartition As Panel = CreerCarte()
+            cardRepartition.Padding = New Padding(15)
+            Dim layoutRepartition As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 3}
+            layoutRepartition.RowStyles.Add(New RowStyle(SizeType.Absolute, 30))
+            layoutRepartition.RowStyles.Add(New RowStyle(SizeType.Absolute, 40))
+            layoutRepartition.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+
+            Dim lblTitreRepartition As New Label() With {
+                .Text = "Répartition des Dépenses",
+                .Dock = DockStyle.Fill,
+                .Font = FontLabel,
+                .ForeColor = ColorTextPrimary,
+                .TextAlign = ContentAlignment.MiddleLeft
+            }
+
+            Dim pnlFiltresDashboard As New FlowLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .FlowDirection = FlowDirection.LeftToRight,
+                .WrapContents = False,
+                .AutoScroll = False,
+                .Padding = New Padding(0)
+            }
+            lblDashboardFiltre = CreateLabel("Filtre :", New Padding(0, 8, 5, 0))
+            cmbFiltreDashboardDepenses = New ComboBox() With {.Width = 130, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
+            cmbFiltreDashboardDepenses.Items.AddRange(New Object() {"Toutes périodes", "Année", "Mois"})
+            cmbFiltreDashboardDepenses.SelectedIndex = 0
+            lblDashboardAnnee = CreateLabel("Année :", New Padding(12, 8, 5, 0))
+            cmbAnneeDashboardDepenses = New ComboBox() With {.Width = 90, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
+            For i As Integer = DateTime.Now.Year To DateTime.Now.Year - 5 Step -1
+                cmbAnneeDashboardDepenses.Items.Add(i)
+            Next
+            If cmbAnneeDashboardDepenses.Items.Count > 0 Then
+                cmbAnneeDashboardDepenses.SelectedIndex = 0
+            End If
+            lblDashboardMois = CreateLabel("Mois :", New Padding(12, 8, 5, 0))
+            cmbMoisDashboardDepenses = New ComboBox() With {.Width = 130, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl}
+            cmbMoisDashboardDepenses.Items.AddRange(New Object() {"Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"})
+            cmbMoisDashboardDepenses.SelectedIndex = Math.Max(0, DateTime.Now.Month - 1)
+            pnlFiltresDashboard.Controls.AddRange(New Control() {lblDashboardFiltre, cmbFiltreDashboardDepenses, lblDashboardAnnee, cmbAnneeDashboardDepenses, lblDashboardMois, cmbMoisDashboardDepenses})
+
+            Dim splitRepartition As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 1}
+            splitRepartition.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 55))
+            splitRepartition.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 45))
+            splitRepartition.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+
+            gridLegendeDepenses = CreerGrilleLegendeDepenses()
+            Dim pnlLegende As New Panel() With {.Dock = DockStyle.Fill, .Padding = New Padding(10, 0, 0, 0), .BackColor = Color.Transparent}
+            Dim layoutLegende As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 2}
+            layoutLegende.RowStyles.Add(New RowStyle(SizeType.Absolute, 24))
+            layoutLegende.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+            layoutLegende.Controls.Add(New Label() With {.Text = "Légende détaillée", .Dock = DockStyle.Fill, .Font = FontLabel, .ForeColor = ColorTextSecondary, .TextAlign = ContentAlignment.MiddleLeft}, 0, 0)
+            layoutLegende.Controls.Add(gridLegendeDepenses, 0, 1)
+            pnlLegende.Controls.Add(layoutLegende)
+
+            splitRepartition.Controls.Add(chartDepensesCat, 0, 0)
+            splitRepartition.Controls.Add(pnlLegende, 1, 0)
+            layoutRepartition.Controls.Add(lblTitreRepartition, 0, 0)
+            layoutRepartition.Controls.Add(pnlFiltresDashboard, 0, 1)
+            layoutRepartition.Controls.Add(splitRepartition, 0, 2)
+            cardRepartition.Controls.Add(layoutRepartition)
+
+            mainLayoutDashboard.Controls.Add(cardRepartition, 0, 0)
             mainLayoutDashboard.Controls.Add(WrapInCard(chartEvolutionFinance, "Évolution des Flux"), 1, 0)
 
             Dim pnlKpi As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.LeftToRight, .WrapContents = True, .Margin = New Padding(0, 16, 0, 0)}
@@ -540,6 +618,10 @@ Namespace DevCommerc8ak
             mainLayoutDashboard.SetColumnSpan(pnlKpi, 2)
 
             tpDashboard.Controls.Add(mainLayoutDashboard)
+            AddHandler cmbFiltreDashboardDepenses.SelectedIndexChanged, AddressOf ActualiserFiltreDashboardDepenses
+            AddHandler cmbAnneeDashboardDepenses.SelectedIndexChanged, AddressOf ActualiserFiltreDashboardDepenses
+            AddHandler cmbMoisDashboardDepenses.SelectedIndexChanged, AddressOf ActualiserFiltreDashboardDepenses
+            ActualiserFiltreDashboardDepenses(Nothing, EventArgs.Empty)
         End Sub
 
         Private Sub Tabs_GotFocus(sender As Object, e As EventArgs)
@@ -733,35 +815,34 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
-        Private Sub ChargerRepartitionDepenses()
-            chartDepensesCat.Series(0).Points.Clear()
-            chartDepensesCat.Series(0).IsVisibleInLegend = True
-            chartDepensesCat.Series(0).IsValueShownAsLabel = True
-            chartDepensesCat.Series(0).SmartLabelStyle.Enabled = True
-            chartDepensesCat.Series(0).SmartLabelStyle.AllowOutsidePlotArea = LabelOutsidePlotAreaStyle.Yes
-            chartDepensesCat.Series(0).SmartLabelStyle.CalloutLineColor = ColorTextSecondary
-            chartDepensesCat.Series(0).LabelForeColor = ColorTextPrimary
-            chartDepensesCat.Series(0)("PieLabelStyle") = "Outside"
-            chartDepensesCat.Series(0).Label = "#VALX : #VALY{N0} FC"
-            If chartDepensesCat.ChartAreas.Count > 0 Then
-                chartDepensesCat.ChartAreas(0).Area3DStyle.Enable3D = False
+        Private Async Sub ChargerRepartitionDepenses()
+            If chartDepensesCat Is Nothing OrElse gridLegendeDepenses Is Nothing Then
+                Return
             End If
 
-            Dim dtStats As DataTable = _depenseService.GetHistorique()
-            For Each row As DataRow In dtStats.Rows
-                Dim categorie As String = If(dtStats.Columns.Contains("NomCategorie"), Convert.ToString(row("NomCategorie")), Convert.ToString(row("Categorie")))
-                Dim description As String = If(dtStats.Columns.Contains("Description"), Convert.ToString(row("Description")), "")
-                Dim libelle As String = categorie
-                If Not String.IsNullOrWhiteSpace(description) Then
-                    libelle &= " - " & description
+            If _isLoadingRepartitionDepenses Then
+                _repartitionDepensesRefreshDemandee = True
+                Return
+            End If
+
+            _isLoadingRepartitionDepenses = True
+            _repartitionDepensesRefreshDemandee = False
+
+            Try
+                Dim filtre As String = If(cmbFiltreDashboardDepenses Is Nothing OrElse cmbFiltreDashboardDepenses.SelectedItem Is Nothing, "Toutes périodes", Convert.ToString(cmbFiltreDashboardDepenses.SelectedItem))
+                Dim annee As Integer = If(cmbAnneeDashboardDepenses Is Nothing OrElse cmbAnneeDashboardDepenses.SelectedItem Is Nothing, DateTime.Now.Year, Convert.ToInt32(cmbAnneeDashboardDepenses.SelectedItem))
+                Dim mois As Integer = If(cmbMoisDashboardDepenses Is Nothing OrElse cmbMoisDashboardDepenses.SelectedIndex < 0, DateTime.Now.Month, cmbMoisDashboardDepenses.SelectedIndex + 1)
+                Dim items As List(Of RepartitionDepenseItem) = Await Task.Run(Function() ConstruireRepartitionDepenses(filtre, annee, mois))
+                AfficherRepartitionDepenses(items)
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("FormulaireFinance", "ChargerRepartitionDepenses", "Erreur lors du chargement de la répartition des dépenses.", ex)
+            Finally
+                _isLoadingRepartitionDepenses = False
+                If _repartitionDepensesRefreshDemandee Then
+                    ChargerRepartitionDepenses()
                 End If
-                Dim total As Decimal = If(IsDBNull(row("Montant")), 0D, Convert.ToDecimal(row("Montant")))
-                Dim indexPoint As Integer = chartDepensesCat.Series(0).Points.AddXY(libelle, total)
-                Dim point As DataPoint = chartDepensesCat.Series(0).Points(indexPoint)
-                point.Label = libelle & Environment.NewLine & total.ToString("N0") & " FC"
-                point.LegendText = libelle
-                point.ToolTip = libelle & " : " & total.ToString("N0") & " FC"
-            Next
+            End Try
         End Sub
 
         Private Sub ChargerEvolutionFlux()
@@ -852,6 +933,24 @@ Namespace DevCommerc8ak
             If lblBanqueJour IsNot Nothing Then lblBanqueJour.Visible = visibleJour
 
             ChargerBanque()
+        End Sub
+
+        Private Sub ActualiserFiltreDashboardDepenses(sender As Object, e As EventArgs)
+            If cmbFiltreDashboardDepenses Is Nothing Then
+                Return
+            End If
+
+            Dim filtre As String = Convert.ToString(cmbFiltreDashboardDepenses.SelectedItem)
+            Dim visibleAnnee As Boolean = String.Equals(filtre, "Année", StringComparison.OrdinalIgnoreCase) OrElse
+                                          String.Equals(filtre, "Mois", StringComparison.OrdinalIgnoreCase)
+            Dim visibleMois As Boolean = String.Equals(filtre, "Mois", StringComparison.OrdinalIgnoreCase)
+
+            If lblDashboardAnnee IsNot Nothing Then lblDashboardAnnee.Visible = visibleAnnee
+            If cmbAnneeDashboardDepenses IsNot Nothing Then cmbAnneeDashboardDepenses.Visible = visibleAnnee
+            If lblDashboardMois IsNot Nothing Then lblDashboardMois.Visible = visibleMois
+            If cmbMoisDashboardDepenses IsNot Nothing Then cmbMoisDashboardDepenses.Visible = visibleMois
+
+            ChargerRepartitionDepenses()
         End Sub
 
         Private Function EstFiltreBanqueToutes() As Boolean
@@ -1274,6 +1373,22 @@ Namespace DevCommerc8ak
             Return chart
         End Function
 
+        Private Function CreerGrilleLegendeDepenses() As DataGridView
+            Dim dgv As DataGridView = CreerGrille()
+            dgv.AutoGenerateColumns = False
+            dgv.AllowUserToResizeRows = False
+            dgv.ScrollBars = ScrollBars.Both
+            dgv.RowTemplate.Height = 28
+            dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+            dgv.Columns.Clear()
+            dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "Couleur", .HeaderText = "", .Width = 35, .ReadOnly = True})
+            dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "Categorie", .HeaderText = "Catégorie", .Width = 190, .ReadOnly = True})
+            dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "Montant", .HeaderText = "Montant", .Width = 110, .ReadOnly = True})
+            dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "Devise", .HeaderText = "Devise", .Width = 70, .ReadOnly = True})
+            dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "Pourcentage", .HeaderText = "%", .Width = 70, .ReadOnly = True})
+            Return dgv
+        End Function
+
         Private Function WrapInCard(control As Control, title As String) As Panel
             Dim cardPanel As Panel = CreerCarte()
             cardPanel.Padding = New Padding(15)
@@ -1302,6 +1417,118 @@ Namespace DevCommerc8ak
 
         Private Function FormatMontant(montant As Decimal, Optional devise As String = "FC") As String
             Return montant.ToString("N0") & " " & devise
+        End Function
+
+        Private Function ConstruireRepartitionDepenses(filtre As String, annee As Integer, mois As Integer) As List(Of RepartitionDepenseItem)
+            Dim historique As DataTable = ObtenirHistoriqueDashboardDepenses(filtre, annee, mois)
+            Dim items As New Dictionary(Of String, RepartitionDepenseItem)(StringComparer.OrdinalIgnoreCase)
+
+            If historique Is Nothing Then
+                Return New List(Of RepartitionDepenseItem)()
+            End If
+
+            For Each row As DataRow In historique.Rows
+                Dim categorie As String = If(historique.Columns.Contains("NomCategorie"), Convert.ToString(row("NomCategorie")), Convert.ToString(row("Categorie"))).Trim()
+                If String.IsNullOrWhiteSpace(categorie) Then
+                    categorie = "Sans catégorie"
+                End If
+
+                Dim devise As String = If(historique.Columns.Contains("Devise"), Convert.ToString(row("Devise")), "FC").Trim().ToUpperInvariant()
+                If devise = String.Empty Then
+                    devise = "FC"
+                End If
+
+                Dim montant As Decimal = If(historique.Columns.Contains("Montant") AndAlso Not IsDBNull(row("Montant")), Convert.ToDecimal(row("Montant")), 0D)
+                Dim cle As String = categorie & "|" & devise
+
+                If Not items.ContainsKey(cle) Then
+                    items.Add(cle, New RepartitionDepenseItem With {
+                        .Categorie = categorie,
+                        .Devise = devise,
+                        .Montant = 0D
+                    })
+                End If
+
+                items(cle).Montant += montant
+            Next
+
+            Dim resultat As New List(Of RepartitionDepenseItem)(items.Values)
+            resultat.Sort(Function(a, b) b.Montant.CompareTo(a.Montant))
+
+            Dim total As Decimal = 0D
+            For Each item As RepartitionDepenseItem In resultat
+                total += item.Montant
+            Next
+
+            For Each item As RepartitionDepenseItem In resultat
+                item.Pourcentage = If(total <= 0D, 0D, Decimal.Round((item.Montant / total) * 100D, 2, MidpointRounding.AwayFromZero))
+            Next
+
+            Return resultat
+        End Function
+
+        Private Function ObtenirHistoriqueDashboardDepenses(filtre As String, annee As Integer, mois As Integer) As DataTable
+            If String.IsNullOrWhiteSpace(filtre) Then
+                Return _depenseService.GetHistorique()
+            End If
+
+            If String.Equals(filtre, "Toutes périodes", StringComparison.OrdinalIgnoreCase) Then
+                Return _depenseService.GetHistorique()
+            End If
+
+            If String.Equals(filtre, "Année", StringComparison.OrdinalIgnoreCase) Then
+                Return _depenseService.GetHistorique(annee, 0)
+            End If
+
+            Return _depenseService.GetHistorique(annee, mois)
+        End Function
+
+        Private Sub AfficherRepartitionDepenses(items As List(Of RepartitionDepenseItem))
+            chartDepensesCat.Series(0).Points.Clear()
+            chartDepensesCat.Series(0).IsVisibleInLegend = False
+            chartDepensesCat.Series(0).IsValueShownAsLabel = True
+            chartDepensesCat.Series(0).SmartLabelStyle.Enabled = True
+            chartDepensesCat.Series(0).SmartLabelStyle.AllowOutsidePlotArea = LabelOutsidePlotAreaStyle.Yes
+            chartDepensesCat.Series(0).SmartLabelStyle.CalloutLineColor = ColorTextSecondary
+            chartDepensesCat.Series(0).LabelForeColor = ColorTextPrimary
+            chartDepensesCat.Series(0)("PieLabelStyle") = "Outside"
+            If chartDepensesCat.ChartAreas.Count > 0 Then
+                chartDepensesCat.ChartAreas(0).Area3DStyle.Enable3D = False
+            End If
+
+            gridLegendeDepenses.Rows.Clear()
+
+            For i As Integer = 0 To items.Count - 1
+                Dim item As RepartitionDepenseItem = items(i)
+                Dim couleur As Color = ObtenirCouleurDepense(i)
+                Dim indexPoint As Integer = chartDepensesCat.Series(0).Points.AddXY(item.Categorie, item.Montant)
+                Dim point As DataPoint = chartDepensesCat.Series(0).Points(indexPoint)
+                point.Color = couleur
+                point.LegendText = item.Categorie
+                point.Label = item.Categorie & Environment.NewLine & item.Montant.ToString("N0") & " " & item.Devise
+                point.ToolTip = item.Categorie & " : " & item.Montant.ToString("N0") & " " & item.Devise & " (" & item.Pourcentage.ToString("N2") & "%)"
+
+                Dim rowIndex As Integer = gridLegendeDepenses.Rows.Add("", item.Categorie, item.Montant.ToString("N0"), item.Devise, item.Pourcentage.ToString("N2") & "%")
+                gridLegendeDepenses.Rows(rowIndex).Cells("Couleur").Style.BackColor = couleur
+                gridLegendeDepenses.Rows(rowIndex).Cells("Couleur").Style.SelectionBackColor = couleur
+                gridLegendeDepenses.Rows(rowIndex).Cells("Couleur").Style.SelectionForeColor = couleur
+            Next
+        End Sub
+
+        Private Function ObtenirCouleurDepense(index As Integer) As Color
+            Dim palette As Color() = {
+                Color.FromArgb(63, 81, 181),
+                Color.FromArgb(0, 150, 136),
+                Color.FromArgb(255, 152, 0),
+                Color.FromArgb(244, 67, 54),
+                Color.FromArgb(103, 58, 183),
+                Color.FromArgb(41, 128, 185),
+                Color.FromArgb(39, 174, 96),
+                Color.FromArgb(121, 85, 72),
+                Color.FromArgb(96, 125, 139),
+                Color.FromArgb(255, 87, 34)
+            }
+            Return palette(index Mod palette.Length)
         End Function
 
         'Private Sub PreparerImpression(sender As Object, e As EventArgs)
@@ -1369,8 +1596,9 @@ Namespace DevCommerc8ak
             Dim fontBlocGras As New Font("Segoe UI", 10, FontStyle.Bold)
             Dim pageWidth As Integer = 760
 
-            If param IsNot Nothing AndAlso param.LogoPath <> "" AndAlso File.Exists(param.LogoPath) Then
-                Using logo As Image = Image.FromFile(param.LogoPath)
+            Dim logoPath As String = LogoPathHelper.GetLogoPath(param)
+            If logoPath <> "" AndAlso File.Exists(logoPath) Then
+                Using logo As Image = Image.FromFile(logoPath)
                     e.Graphics.DrawImage(logo, x, y, 70, 70)
                 End Using
                 x += 84
@@ -1464,6 +1692,9 @@ Namespace DevCommerc8ak
                 Dim dal As New DAL(connectionString)
                 Dim paramService As New ParametreService(New ParametreRepository(dal))
                 _parametres = paramService.Charger()
+                If _parametres IsNot Nothing Then
+                    _parametres.LogoPath = LogoPathHelper.GetLogoPath(_parametres)
+                End If
             Catch
                 _parametres = Nothing
             End Try

@@ -131,6 +131,7 @@
     <Compile Include="Services\TypeVenteService.vb" />
     <Compile Include="Services\NotificationService.vb" />
     <Compile Include="Services\IconsHelper.vb" />
+    <Compile Include="Services\LogoPathHelper.vb" />
     <Compile Include="UI\FormulaireAnalyseVente .vb">
       <SubType>Form</SubType>
     </Compile>
@@ -231,6 +232,9 @@
   <ItemGroup>
     <None Include="My Project\App.config" />
     <None Include="My Project\Settings.settings" />
+    <Content Include="Resources\images\logo.bmp">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
 </Project>

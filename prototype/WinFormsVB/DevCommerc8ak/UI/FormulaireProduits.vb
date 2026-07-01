@@ -1026,8 +1026,9 @@ Namespace DevCommerc8ak
                         Dim y As Integer = pe.MarginBounds.Top
                         Dim x As Integer = pe.MarginBounds.Left
 
-                        If param IsNot Nothing AndAlso param.LogoPath <> "" AndAlso File.Exists(param.LogoPath) Then
-                            Using img As Image = Image.FromFile(param.LogoPath)
+                        Dim logoPath As String = LogoPathHelper.GetLogoPath(param)
+                        If logoPath <> "" AndAlso File.Exists(logoPath) Then
+                            Using img As Image = Image.FromFile(logoPath)
                                 pe.Graphics.DrawImage(img, x, y, 60, 60)
                             End Using
                             x += 74

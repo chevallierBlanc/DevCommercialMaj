@@ -714,8 +714,9 @@ Namespace DevCommerc8ak
                         Dim fontBloc As New Font("Segoe UI", 9.5F, FontStyle.Regular)
                         Dim fontBlocGras As New Font("Segoe UI", 10, FontStyle.Bold)
 
-                        If param IsNot Nothing AndAlso param.LogoPath <> "" AndAlso File.Exists(param.LogoPath) Then
-                            Using logo As Image = Image.FromFile(param.LogoPath)
+                        Dim logoPath As String = LogoPathHelper.GetLogoPath(param)
+                        If logoPath <> "" AndAlso File.Exists(logoPath) Then
+                            Using logo As Image = Image.FromFile(logoPath)
                                 pe.Graphics.DrawImage(logo, x, y, 70, 70)
                             End Using
                             x += 84

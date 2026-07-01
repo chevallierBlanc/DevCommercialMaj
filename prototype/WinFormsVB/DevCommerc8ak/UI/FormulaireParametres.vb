@@ -5,6 +5,7 @@ Imports System
 Imports System.Configuration
 Imports System.Drawing
 Imports System.Drawing.Drawing2D
+Imports System.IO
 Imports System.Windows.Forms
 Imports System.Collections.Generic
 
@@ -283,7 +284,7 @@ Namespace DevCommerc8ak
                     txtAdresseMagasin.Text = p.AdresseMagasin
                     txtTelephoneMagasin.Text = p.TelephoneMagasin
                     chkModeSombre.Checked = p.ModeSombre
-                    txtLogoPath.Text = p.LogoPath
+                    txtLogoPath.Text = LogoPathHelper.GetLogoPath(p)
                     chkApercu.Checked = p.ApercuAvantImpression
                     chkCouleur.Checked = p.ImpressionCouleur
                 End If
@@ -309,6 +310,13 @@ Namespace DevCommerc8ak
                 If Not Integer.TryParse(If(txtBackupInterval.Text.Trim() = "", "240", txtBackupInterval.Text.Trim()), intervalleBackup) Then
                     intervalleBackup = 240
                 End If
+                Dim logoPathStable As String = LogoPathHelper.GetInstalledDefaultLogoPath()
+                If Not String.IsNullOrWhiteSpace(txtLogoPath.Text.Trim()) Then
+                    logoPathStable = If(File.Exists(txtLogoPath.Text.Trim()),
+                                        LogoPathHelper.PreparerLogoSelectionne(txtLogoPath.Text.Trim()),
+                                        LogoPathHelper.GetInstalledDefaultLogoPath())
+                End If
+
                 Dim p As New ParametreDTO With {
                     .RemiseMaxPourcent = Decimal.Parse(If(txtRemiseMax.Text.Trim() = "", "0", txtRemiseMax.Text.Trim())),
                     .SeuilStockCritique = Decimal.Parse(If(txtSeuilStock.Text.Trim() = "", "0", txtSeuilStock.Text.Trim())),
@@ -324,11 +332,12 @@ Namespace DevCommerc8ak
                     .AdresseMagasin = txtAdresseMagasin.Text.Trim(),
                     .TelephoneMagasin = txtTelephoneMagasin.Text.Trim(),
                     .ModeSombre = chkModeSombre.Checked,
-                    .LogoPath = txtLogoPath.Text.Trim(),
+                    .LogoPath = logoPathStable,
                     .ApercuAvantImpression = chkApercu.Checked,
                     .ImpressionCouleur = chkCouleur.Checked
                 }
                 service.Enregistrer(p)
+                txtLogoPath.Text = logoPathStable
 
                 Dim backupSettings As New BackupSettings With {
                     .Enabled = chkBackupAuto.Checked,
@@ -344,9 +353,9 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub ChoisirLogo(sender As Object, e As EventArgs)
-            Dim ofd As New OpenFileDialog() With {.Filter = "Images|*.png;*.jpg;*.jpeg;*.ico"}
+            Dim ofd As New OpenFileDialog() With {.Filter = "Images|*.png;*.jpg;*.jpeg;*.ico;*.bmp"}
             If ofd.ShowDialog() = DialogResult.OK Then
-                txtLogoPath.Text = ofd.FileName
+                txtLogoPath.Text = LogoPathHelper.PreparerLogoSelectionne(ofd.FileName)
             End If
         End Sub
 
