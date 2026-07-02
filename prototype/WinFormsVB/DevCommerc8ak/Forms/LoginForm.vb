@@ -238,7 +238,6 @@ Namespace DevCommerc8ak
             'ChargerModeSombre()
             'ThemeHelper.AppliquerTheme(Me)
             'IconsHelper.AppliquerIconeFormulaire(Me)
-            InitialiserCompteAdminSiNecessaire()
         End Sub
 
         Private Sub LoginForm_KeyDown(sender As Object, e As KeyEventArgs)
@@ -281,9 +280,8 @@ Namespace DevCommerc8ak
             Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
             OfflineSyncScheduler.Start(cs)
 
-            Dim main As New MainForm()
-            main.Show()
-            Me.Hide()
+            Me.DialogResult = DialogResult.OK
+            Me.Close()
         End Sub
 
         Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
@@ -332,6 +330,7 @@ Namespace DevCommerc8ak
                     "")
                 If String.IsNullOrWhiteSpace(motDePasse) Then
                     MessageBox.Show("La création du compte administrateur est obligatoire au premier démarrage.")
+                    Me.DialogResult = DialogResult.Cancel
                     Me.Close()
                     Return
                 End If
@@ -342,6 +341,7 @@ Namespace DevCommerc8ak
                     "")
                 If motDePasse <> confirmation Then
                     MessageBox.Show("La confirmation ne correspond pas. Le compte administrateur n'a pas été créé.")
+                    Me.DialogResult = DialogResult.Cancel
                     Me.Close()
                     Return
                 End If
@@ -352,6 +352,7 @@ Namespace DevCommerc8ak
                 Dim log As New ProductionLogService()
                 log.Error("LoginForm", "InitialiserCompteAdminSiNecessaire", "Erreur lors de l'initialisation du compte administrateur.", ex)
                 MessageBox.Show("Impossible d'initialiser le compte administrateur initial : " & ex.Message)
+                Me.DialogResult = DialogResult.Cancel
                 Me.Close()
             End Try
         End Sub

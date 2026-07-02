@@ -844,23 +844,6 @@ Namespace DevCommerc8ak
             Catch
             End Try
             ApplicationLifecycle.RequestReturnToLogin()
-
-            Dim login As LoginForm = Nothing
-            For Each frm As Form In Application.OpenForms
-                If TypeOf frm Is LoginForm Then
-                    login = DirectCast(frm, LoginForm)
-                    Exit For
-                End If
-            Next
-
-            If login Is Nothing Then
-                login = New LoginForm()
-            End If
-
-            login.Show()
-            login.WindowState = FormWindowState.Normal
-            login.Activate()
-            login.BringToFront()
             Me.Close()
         End Sub
 
@@ -967,7 +950,7 @@ Namespace DevCommerc8ak
 
         Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
             Try
-                If ApplicationLifecycle.ConsumeReturnToLoginRequested() Then
+                If ApplicationLifecycle.IsReturnToLoginRequested() Then
                     ApplicationLifecycle.StopBackgroundServices()
                 Else
                     ApplicationLifecycle.RequestShutdown()
