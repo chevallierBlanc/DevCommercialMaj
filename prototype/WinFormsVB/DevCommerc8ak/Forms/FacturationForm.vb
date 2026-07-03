@@ -88,9 +88,12 @@ Namespace DevCommerc8ak
             Me.Height = 820
             Me.Font = FontMain
             Me.StartPosition = FormStartPosition.CenterScreen
-            Me.FormBorderStyle = FormBorderStyle.FixedDialog
-            Me.MaximizeBox = False
+            Me.FormBorderStyle = FormBorderStyle.Sizable
+            Me.MaximizeBox = True
             Me.KeyPreview = True
+            Me.AutoScaleMode = AutoScaleMode.Dpi
+            Me.AutoScroll = True
+            Me.MinimumSize = New Size(1080, 700)
 
             _panier = New List(Of PanierLigne)()
             _typeVenteService = New TypeVenteService()
@@ -116,14 +119,16 @@ Namespace DevCommerc8ak
                 .Font = FontBold,
                 .AutoSize = True,
                 .Left = 950,
-                .Top = 25
+                .Top = 25,
+                .Anchor = AnchorStyles.Top Or AnchorStyles.Right
             }
             txtNumeroFacture = New TextBox() With {
                 .Left = 1060, .Top = 22, .Width = 180,
                 .Enabled = False, .BackColor = ColorWhite,
                 .BorderStyle = BorderStyle.FixedSingle,
                 .Font = New Font("Segoe UI", 11, FontStyle.Bold),
-                .TextAlign = HorizontalAlignment.Center
+                .TextAlign = HorizontalAlignment.Center,
+                .Anchor = AnchorStyles.Top Or AnchorStyles.Right
             }
             pnlHeader.Controls.Add(lblAppTitle)
             pnlHeader.Controls.Add(lblNumFactLabel)
@@ -132,13 +137,15 @@ Namespace DevCommerc8ak
             ' --- Main Container ---
             Dim pnlMain As New Panel() With {
                 .Dock = DockStyle.Fill,
-                .Padding = New Padding(20)
+                .Padding = New Padding(20),
+                .AutoScroll = True
             }
 
             ' --- Left Side (Client & Produits) ---
             Dim pnlLeft As New Panel() With {
                 .Width = 550,
-                .Dock = DockStyle.Left
+                .Dock = DockStyle.Left,
+                .MinimumSize = New Size(520, 0)
             }
 
             ' GroupBox Client
@@ -228,7 +235,9 @@ Namespace DevCommerc8ak
             ' --- Right Side (Panier & Actions) ---
             Dim pnlRight As New Panel() With {
                 .Dock = DockStyle.Fill,
-                .Padding = New Padding(20, 0, 0, 0)
+                .Padding = New Padding(20, 0, 0, 0),
+                .MinimumSize = New Size(420, 0),
+                .AutoScroll = True
             }
 
             Dim grpPanier As New GroupBox() With {
@@ -265,22 +274,39 @@ Namespace DevCommerc8ak
 
             txtRemise = New TextBox() With {.Left = 120, .Top = 12, .Width = 60, .BorderStyle = BorderStyle.FixedSingle, .TextAlign = HorizontalAlignment.Center, .Visible = False}
 
+            Dim totalsLayout As New TableLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .ColumnCount = 2,
+                .RowCount = 1
+            }
+            totalsLayout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 45.0F))
+            totalsLayout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 55.0F))
+
             lblSousTotal = New Label() With {
-                .Text = "SOUS-TOTAL : 0.00", .Left = 200, .Top = 15, .Width = 200,
-                .Font = New Font("Segoe UI", 11, FontStyle.Bold), .ForeColor = ColorSecondary
+                .Text = "SOUS-TOTAL : 0.00",
+                .Dock = DockStyle.Fill,
+                .Font = New Font("Segoe UI", 11, FontStyle.Bold),
+                .ForeColor = ColorSecondary,
+                .TextAlign = ContentAlignment.MiddleLeft
             }
 
             lblTotal = New Label() With {
-                .Text = "TOTAL À PAYER : 0.00", .Left = 400, .Top = 10, .Width = 250,
-                .Font = New Font("Segoe UI", 14, FontStyle.Bold), .ForeColor = ColorPrimary,
+                .Text = "TOTAL À PAYER : 0.00",
+                .Dock = DockStyle.Fill,
+                .Font = New Font("Segoe UI", 14, FontStyle.Bold),
+                .ForeColor = ColorPrimary,
                 .TextAlign = ContentAlignment.MiddleRight
             }
-            pnlTotals.Controls.AddRange({lblSousTotal, lblTotal})
+            totalsLayout.Controls.Add(lblSousTotal, 0, 0)
+            totalsLayout.Controls.Add(lblTotal, 1, 0)
+            pnlTotals.Controls.Add(totalsLayout)
 
             ' Actions Panel
             Dim pnlActions As New FlowLayoutPanel() With {
                 .Dock = DockStyle.Fill,
-                .Padding = New Padding(0, 20, 0, 0)
+                .Padding = New Padding(0, 20, 0, 0),
+                .WrapContents = True,
+                .AutoScroll = True
             }
 
             btnValider = New Button() With {.Text = "VALIDER LA VENTE", .Width = 210, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorAccent, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
@@ -315,6 +341,7 @@ Namespace DevCommerc8ak
 
             Me.Controls.Add(pnlMain)
             Me.Controls.Add(pnlHeader)
+            Me.ResizeRedraw = True
 
             ' --- Handlers ---
 

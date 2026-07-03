@@ -208,11 +208,14 @@ Namespace DevCommerc8ak
             Me.StartPosition = FormStartPosition.CenterScreen
             Me.BackColor = ColorBackground
             Me.Font = FontControl
+            Me.AutoScaleMode = AutoScaleMode.Dpi
+            Me.AutoScroll = True
+            Me.MinimumSize = New Size(1080, 720)
             _typeVenteService = New TypeVenteService()
             _typesVenteCourants = New List(Of TypeVenteDTO)()
             _panier = New List(Of PanierLigne)()
             ' Main Layout
-            Dim mainLayout As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 2}
+            Dim mainLayout As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 2, .AutoScroll = True}
             mainLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 60))
             mainLayout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
 

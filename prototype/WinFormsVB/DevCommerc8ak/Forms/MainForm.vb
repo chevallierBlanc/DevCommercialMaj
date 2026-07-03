@@ -181,6 +181,7 @@ Namespace DevCommerc8ak
         Private _moduleInitialCharge As Boolean
         Private _isCheckingSession As Boolean
         Private _isCheckingStatus As Boolean
+        Private _childFormLoaded As Form
 
         ' Boutons de navigation
         Private ReadOnly btnFact As Button
@@ -218,7 +219,7 @@ Namespace DevCommerc8ak
             ' --- Sidebar (Navigation Latérale) ---
             panelSidebar = New Panel() With {
                 .Dock = DockStyle.Left,
-                .Width = 240,
+                .Width = 220,
                 .BackColor = ColorSidebar
             }
 
@@ -298,7 +299,8 @@ Namespace DevCommerc8ak
             panelContent = New Panel() With {
                 .Dock = DockStyle.Fill,
                 .BackColor = ColorBg,
-                .Padding = New Padding(10)
+                .Padding = New Padding(8),
+                .AutoScroll = True
             }
 
             ' Gestion des droits d'accès
@@ -405,6 +407,7 @@ Namespace DevCommerc8ak
             _etatTimer.Start()
 
             AddHandler Me.Shown, AddressOf MainForm_Shown
+            AddHandler panelContent.Resize, AddressOf PanelContent_Resize
 
             If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled Then
                 _backupTimer = New Timer() With {.Interval = 21600000}
@@ -460,6 +463,7 @@ Namespace DevCommerc8ak
             btn.Width = panel.Width - 10
             btn.Height = 46
             btn.Location = New Point(5, y)
+            btn.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
             btn.BackColor = Color.FromArgb(44, 62, 80)
             btn.ForeColor = Color.White
             btn.Font = New Font("Arial", 11, FontStyle.Regular)
@@ -574,10 +578,32 @@ Namespace DevCommerc8ak
             End While
             f.TopLevel = False
             f.FormBorderStyle = FormBorderStyle.None
-            f.Dock = DockStyle.Fill
+            f.AutoScroll = True
+            f.AutoScaleMode = AutoScaleMode.Dpi
+            f.Location = Point.Empty
+            f.Anchor = AnchorStyles.Top Or AnchorStyles.Left
             panelContent.Controls.Add(f)
+            _childFormLoaded = f
+            AjusterFormulaireCharge()
             f.Show()
             panelContent.ResumeLayout(True)
+        End Sub
+
+        Private Sub PanelContent_Resize(sender As Object, e As EventArgs)
+            AjusterFormulaireCharge()
+        End Sub
+
+        Private Sub AjusterFormulaireCharge()
+            If panelContent Is Nothing OrElse _childFormLoaded Is Nothing OrElse _childFormLoaded.IsDisposed Then
+                Return
+            End If
+
+            Dim largeurDisponible As Integer = Math.Max(0, panelContent.ClientSize.Width - panelContent.Padding.Horizontal)
+            Dim hauteurDisponible As Integer = Math.Max(0, panelContent.ClientSize.Height - panelContent.Padding.Vertical)
+            Dim largeurCible As Integer = Math.Max(largeurDisponible, If(_childFormLoaded.MinimumSize.Width > 0, _childFormLoaded.MinimumSize.Width, 0))
+            Dim hauteurCible As Integer = Math.Max(hauteurDisponible, If(_childFormLoaded.MinimumSize.Height > 0, _childFormLoaded.MinimumSize.Height, 0))
+
+            _childFormLoaded.Size = New Size(largeurCible, hauteurCible)
         End Sub
         ''' <summary>
         ''' Sélectionner un bouton et mettre à jour l'affichage

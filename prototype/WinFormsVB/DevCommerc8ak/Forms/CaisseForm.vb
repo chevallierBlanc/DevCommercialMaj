@@ -73,9 +73,12 @@ Namespace DevCommerc8ak
             Me.Height = 800
             Me.Font = FontMain
             Me.StartPosition = FormStartPosition.CenterScreen
-            Me.FormBorderStyle = FormBorderStyle.FixedDialog
-            Me.MaximizeBox = False
+            Me.FormBorderStyle = FormBorderStyle.Sizable
+            Me.MaximizeBox = True
             Me.KeyPreview = True
+            Me.AutoScaleMode = AutoScaleMode.Dpi
+            Me.AutoScroll = True
+            Me.MinimumSize = New Size(1040, 700)
 
             ' --- Header Panel ---
             Dim pnlHeader As New Panel() With {
@@ -96,7 +99,8 @@ Namespace DevCommerc8ak
             ' --- Main Container ---
             Dim pnlMain As New Panel() With {
                 .Dock = DockStyle.Fill,
-                .Padding = New Padding(15)
+                .Padding = New Padding(15),
+                .AutoScroll = True
             }
 
             ' --- Colonne Gauche (Liste des Factures) ---
@@ -140,7 +144,8 @@ Namespace DevCommerc8ak
             ' --- Colonne Centre (Détails Facture) ---
             Dim pnlCentre As New Panel() With {
                 .Dock = DockStyle.Fill,
-                .Padding = New Padding(15, 0, 15, 0)
+                .Padding = New Padding(15, 0, 15, 0),
+                .AutoScroll = True
             }
 
             Dim grpDetails As New GroupBox() With {
@@ -177,7 +182,9 @@ Namespace DevCommerc8ak
                 .Width = 360,
                 .Dock = DockStyle.Right,
                 .BackColor = ColorWhite,
-                .Padding = New Padding(15)
+                .Padding = New Padding(15),
+                .MinimumSize = New Size(320, 0),
+                .AutoScroll = True
             }
             pnlDroite.BorderStyle = BorderStyle.FixedSingle
 

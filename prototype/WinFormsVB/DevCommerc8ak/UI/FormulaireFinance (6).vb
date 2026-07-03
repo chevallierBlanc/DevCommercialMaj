@@ -142,6 +142,9 @@ Namespace DevCommerc8ak
             Me.WindowState = FormWindowState.Maximized
             Me.BackColor = ColorBg
             Me.DoubleBuffered = True
+            Me.AutoScaleMode = AutoScaleMode.Dpi
+            Me.AutoScroll = True
+            Me.MinimumSize = New Size(1080, 720)
 
             ' --- Header ---
             Dim pnlHeader As New Panel() With {
@@ -170,10 +173,10 @@ Namespace DevCommerc8ak
             tabControlFinance.SizeMode = TabSizeMode.Fixed
             AddHandler tabControlFinance.GotFocus, AddressOf Tabs_GotFocus ' Empêche le focus sur les onglets
 
-            tpDepenses = New TabPage("Dépenses") With {.BackColor = ColorBg, .Padding = New Padding(0)}
-            tpCaisse = New TabPage("Caisse Journalière") With {.BackColor = ColorBg, .Padding = New Padding(0)}
-            tpBanque = New TabPage("Banque") With {.BackColor = ColorBg, .Padding = New Padding(0)}
-            tpDashboard = New TabPage("Dashboard Financier") With {.BackColor = ColorBg, .Padding = New Padding(0)}
+            tpDepenses = New TabPage("Dépenses") With {.BackColor = ColorBg, .Padding = New Padding(0), .AutoScroll = True}
+            tpCaisse = New TabPage("Caisse Journalière") With {.BackColor = ColorBg, .Padding = New Padding(0), .AutoScroll = True}
+            tpBanque = New TabPage("Banque") With {.BackColor = ColorBg, .Padding = New Padding(0), .AutoScroll = True}
+            tpDashboard = New TabPage("Dashboard Financier") With {.BackColor = ColorBg, .Padding = New Padding(0), .AutoScroll = True}
 
             tabControlFinance.TabPages.AddRange(New TabPage() {tpDepenses, tpCaisse, tpBanque, tpDashboard})
 
@@ -182,6 +185,7 @@ Namespace DevCommerc8ak
                 .Dock = DockStyle.Top,
                 .Height = 50,
                 .FlowDirection = FlowDirection.LeftToRight,
+                .WrapContents = True,
                 .Padding = New Padding(24, 0, 0, 0),
                 .Margin = New Padding(0, 0, 0, 0),
                 .BackColor = ColorBg

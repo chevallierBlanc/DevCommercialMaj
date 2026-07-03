@@ -125,6 +125,9 @@ Namespace DevCommerc8ak
             Me.StartPosition = FormStartPosition.CenterScreen
             Me.BackColor = ColorBackground
             Me.DoubleBuffered = True
+            Me.AutoScaleMode = AutoScaleMode.Dpi
+            Me.AutoScroll = True
+            Me.MinimumSize = New Size(1080, 720)
             _pageCourante = 1
 
             ' --- Header / Hero Section ---
@@ -136,9 +139,9 @@ Namespace DevCommerc8ak
 
             ' --- TabControl ---
             tabs = New TabControl() With {.Dock = DockStyle.Fill, .Padding = New Point(15, 8)}
-            tabProduits = New TabPage("Gestion Produits") With {.BackColor = ColorBackground}
-            tabHistorique = New TabPage("Historique des Prix") With {.BackColor = ColorBackground}
-            tabDashboard = New TabPage("Analyses & Dashboard") With {.BackColor = ColorBackground}
+            tabProduits = New TabPage("Gestion Produits") With {.BackColor = ColorBackground, .AutoScroll = True}
+            tabHistorique = New TabPage("Historique des Prix") With {.BackColor = ColorBackground, .AutoScroll = True}
+            tabDashboard = New TabPage("Analyses & Dashboard") With {.BackColor = ColorBackground, .AutoScroll = True}
             tabs.TabPages.AddRange({tabProduits, tabHistorique, tabDashboard})
 
             ' --- TAB PRODUITS : STRUCTURE ---
@@ -149,7 +152,7 @@ Namespace DevCommerc8ak
             mainTableProduits.RowStyles.Add(New RowStyle(SizeType.Absolute, 40))  ' Pagination
 
             ' 1. Barre de Recherche et Actions
-            Dim flowHeader As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.LeftToRight, .Padding = New Padding(0, 10, 0, 0)}
+            Dim flowHeader As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.LeftToRight, .Padding = New Padding(0, 10, 0, 0), .WrapContents = True, .AutoScroll = True}
             txtRecherche = New TextBox() With {.Width = 250, .Font = FontControl, .BorderStyle = BorderStyle.FixedSingle, .Margin = New Padding(0, 5, 20, 0)}
             btnNouveau = CreateStyledButton("Nouveau", ColorPrimary)
             btnEnregistrer = CreateStyledButton("Enregistrer", Color.ForestGreen)
