@@ -1242,6 +1242,97 @@ Namespace DevCommerc8ak
             Dim repo As New ProduitRepository(dal)
             Return New ProduitService(repo)
         End Function
+
+        Private Function ObtenirProduitCourantDepuisListe(produitId As Integer) As DataRow
+            If _produitsTable Is Nothing Then
+                Return Nothing
+            End If
+
+            For Each row As DataRow In _produitsTable.Rows
+                If row IsNot Nothing AndAlso Not row.IsNull("ProduitId") AndAlso Convert.ToInt32(row("ProduitId")) = produitId Then
+                    Return row
+                End If
+            Next
+
+            Return Nothing
+        End Function
+
+        Private Function LireTexteCellule(row As DataRow, colonne As String) As String
+            If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains(colonne) OrElse row.IsNull(colonne) Then
+                Return String.Empty
+            End If
+
+            Return Convert.ToString(row(colonne)).Trim()
+        End Function
+
+        Private Function LireBooleenCellule(row As DataRow, colonne As String) As Boolean
+            If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains(colonne) OrElse row.IsNull(colonne) Then
+                Return False
+            End If
+
+            Return Convert.ToBoolean(row(colonne))
+        End Function
+
+        Private Function LireDateCellule(row As DataRow, colonne As String) As Date?
+            If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains(colonne) OrElse row.IsNull(colonne) Then
+                Return Nothing
+            End If
+
+            Return Convert.ToDateTime(row(colonne))
+        End Function
+
+        Private Function ConstruireProduitMisAJourDepuisEntree(produitId As Integer) As Produit
+            Dim row As DataRow = ObtenirProduitCourantDepuisListe(produitId)
+            If row Is Nothing Then
+                Return Nothing
+            End If
+
+            Dim prixGrosSaisi As Boolean = Not String.IsNullOrWhiteSpace(txtPrixGros.Text) AndAlso txtPrixGros.Text.Trim() <> "-"
+            Dim prixDemiSaisi As Boolean = Not String.IsNullOrWhiteSpace(txtPrixDemi.Text) AndAlso txtPrixDemi.Text.Trim() <> "-"
+            Dim prixQuartSaisi As Boolean = Not String.IsNullOrWhiteSpace(txtPrixQuart.Text) AndAlso txtPrixQuart.Text.Trim() <> "-"
+            Dim prixDetailSaisi As Boolean = Not String.IsNullOrWhiteSpace(txtPrixPiece.Text) AndAlso txtPrixPiece.Text.Trim() <> "-"
+            Dim prixDouzaineSaisi As Boolean = Not String.IsNullOrWhiteSpace(txtPrixDouzaine.Text) AndAlso txtPrixDouzaine.Text.Trim() <> "-"
+            Dim coefficientGrosSaisi As Boolean = Not String.IsNullOrWhiteSpace(txtCoefficientInput.Text)
+            Dim conversionSaisie As Boolean = Not String.IsNullOrWhiteSpace(txtNbUniteParBase.Text)
+
+            Dim produit As New Produit With {
+                .ProduitId = produitId,
+                .CodeBarres = LireTexteCellule(row, "CodeBarres"),
+                .Libelle = LireTexteCellule(row, "Libelle"),
+                .PrixAchat = LireDecimal(txtPrixAchat.Text),
+                .PrixGros = If(chkGros.Checked, If(prixGrosSaisi, LireDecimal(txtPrixGros.Text), LireDecimalTable(row, "PrixGros")), 0D),
+                .PrixDemi = If(chkDemi.Checked, If(prixDemiSaisi, LireDecimal(txtPrixDemi.Text), LireDecimalTable(row, "PrixDemi")), 0D),
+                .PrixQuart = If(chkQuart.Checked, If(prixQuartSaisi, LireDecimal(txtPrixQuart.Text), LireDecimalTable(row, "PrixQuart")), 0D),
+                .PrixDetail = If(chkPiece.Checked, If(prixDetailSaisi, LireDecimal(txtPrixPiece.Text), LireDecimalTable(row, "PrixDetail")), 0D),
+                .PrixDouzaine = If(chkDouzaine.Checked, If(prixDouzaineSaisi, LireDecimal(txtPrixDouzaine.Text), LireDecimalTable(row, "PrixDouzaine")), 0D),
+                .PrixSpecial = LireDecimalTable(row, "PrixSpecial"),
+                .CoefficientGros = If(coefficientGrosSaisi AndAlso _coefficientCalcule > 0D, _coefficientCalcule, LireDecimalTable(row, "CoefficientGros")),
+                .QuantiteStock = LireDecimalTable(row, "QuantiteStock"),
+                .SeuilCritique = LireDecimalTable(row, "SeuilCritique"),
+                .DateExpiration = LireDateCellule(row, "DateExpiration"),
+                .CategorieId = If(row.Table.Columns.Contains("CategorieId") AndAlso Not row.IsNull("CategorieId"), Convert.ToInt32(row("CategorieId")), CType(Nothing, Integer?)),
+                .UnitePrincipale = If(String.IsNullOrWhiteSpace(cmbUniteBase.Text), LireTexteCellule(row, "UnitePrincipale"), cmbUniteBase.Text.Trim()),
+                .UniteSecondaire = LireTexteCellule(row, "UniteSecondaire"),
+                .ConversionUnite = If(conversionSaisie AndAlso LireDecimal(txtNbUniteParBase.Text) > 0D, LireDecimal(txtNbUniteParBase.Text), LireDecimalTable(row, "ConversionUnite")),
+                .EstActif = If(row.Table.Columns.Contains("EstActif") AndAlso Not row.IsNull("EstActif"), Convert.ToBoolean(row("EstActif")), True),
+                .VenteDetail = chkPiece.Checked,
+                .VenteDemi = chkDemi.Checked,
+                .VenteDouzaine = chkDouzaine.Checked,
+                .VenteGros = chkGros.Checked
+            }
+
+            Return produit
+        End Function
+
+        Private Sub MettreAJourProduitExistantDepuisEntree(produitId As Integer)
+            Dim produit As Produit = ConstruireProduitMisAJourDepuisEntree(produitId)
+            If produit Is Nothing Then
+                Return
+            End If
+
+            Dim serviceProduit As ProduitService = ObtenirService()
+            serviceProduit.MettreAJour(produit)
+        End Sub
         '""""################################################################
         '"""########### Sortie manuel ################################"#####"
         Private Sub AjouterAuPanier(sender As Object, e As EventArgs) '"""#### Nouvelle logique tres bon
@@ -1799,6 +1890,13 @@ Namespace DevCommerc8ak
                 End If
                 Dim service As StockService = ObtenirStockService()
                 service.EnregistrerEntree(produitId, qte, cmbUniteBase.Text, txtReference.Text.Trim(), txtObservationEntree.Text.Trim(), SessionUtilisateur.UtilisateurId, prixAchatVal)
+                If chkProduitExistant.Checked Then
+                    MettreAJourProduitExistantDepuisEntree(produitId)
+                End If
+                ChargerProduits()
+                chkProduitExistant.Checked = True
+                cmbProduitExistant.SelectedValue = produitId
+                ChargerProduitSelection(Nothing, EventArgs.Empty)
 
                 MessageBox.Show("Entrée stock enregistrée.")
                 AfficherStockActuel()

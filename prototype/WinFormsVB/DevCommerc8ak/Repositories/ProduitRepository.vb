@@ -218,7 +218,7 @@ Namespace DevCommerc8ak
 
             Dim sql As String = "UPDATE Produits SET CodeBarres=@CodeBarres, Libelle=@Libelle, PrixDetail=@PrixDetail, PrixAchat=@PrixAchat, PrixDemi=@PrixDemi, PrixQuart=@PrixQuart, PrixDouzaine=@PrixDouzaine, PrixGros=@PrixGros, PrixSpecial=@PrixSpecial, CoefficientGros=@CoefficientGros, " &
                                 "SeuilCritique=@SeuilCritique, DateExpiration=@DateExpiration, CategorieId=@CategorieId, UnitePrincipale=@UnitePrincipale, UniteSecondaire=@UniteSecondaire, ConversionUnite=@ConversionUnite, EstActif=@EstActif, " &
-                                "VenteDetail=@VenteDetail, VenteDemi=@VenteDemi, VenteDouzaine=@VenteDouzaine, VenteGros=@VenteGros, ModifierPar=@ModifierPar " &
+                                "VenteDetail=@VenteDetail, VenteDemi=@VenteDemi, VenteDouzaine=@VenteDouzaine, VenteGros=@VenteGros, ModifierPar=@ModifierPar, ModifieLe=GETDATE() " &
                                 "WHERE ProduitId=@ProduitId"
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@CodeBarres", If(String.IsNullOrWhiteSpace(produit.CodeBarres), CType(DBNull.Value, Object), produit.CodeBarres.Trim())),
