@@ -60,6 +60,7 @@ Namespace DevCommerc8ak
         Private ReadOnly txtPrixQuart As TextBox
         Private ReadOnly txtPrixPiece As TextBox
         Private ReadOnly txtPrixDouzaine As TextBox
+        Private ReadOnly btnTypesPersonnalisesEntree As Button
         Private ReadOnly chkGros As CheckBox
         Private ReadOnly chkDemi As CheckBox
         Private ReadOnly chkQuart As CheckBox
@@ -327,6 +328,8 @@ Namespace DevCommerc8ak
             txtPrixQuart = New TextBox() With {.Left = 150, .Top = 105, .Width = 120, .ReadOnly = True}
             txtPrixPiece = New TextBox() With {.Left = 150, .Top = 135, .Width = 120, .ReadOnly = True}
             txtPrixDouzaine = New TextBox() With {.Left = 150, .Top = 165, .Width = 120, .ReadOnly = True, .Visible = True}
+            btnTypesPersonnalisesEntree = New Button() With {.Text = "Créer type personnalisé", .Left = 300, .Top = 42, .Width = 210, .Height = 32, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .FlatStyle = FlatStyle.Flat}
+            btnTypesPersonnalisesEntree.FlatAppearance.BorderSize = 0
             chkGros = New CheckBox() With {.Text = "Gros", .Left = 20, .Top = 45, .AutoSize = True, .Checked = True}
             chkDemi = New CheckBox() With {.Text = "Demi", .Left = 20, .Top = 75, .AutoSize = True}
             chkQuart = New CheckBox() With {.Text = "Quart", .Left = 20, .Top = 105, .AutoSize = True}
@@ -334,7 +337,7 @@ Namespace DevCommerc8ak
             chkDouzaine = New CheckBox() With {.Text = "Douzaine", .Left = 20, .Top = 165, .AutoSize = True, .Visible = True}
             cardPrix.Controls.AddRange(New Control() {
                 chkGros, chkDemi, chkQuart, chkPiece, chkDouzaine,
-                txtPrixGros, txtPrixDemi, txtPrixQuart, txtPrixPiece, txtPrixDouzaine
+                txtPrixGros, txtPrixDemi, txtPrixQuart, txtPrixPiece, txtPrixDouzaine, btnTypesPersonnalisesEntree
             })
             ' layoutEntree.Controls.Add(cardPrix)
 
@@ -688,6 +691,7 @@ Namespace DevCommerc8ak
             AddHandler chkQuart.CheckedChanged, AddressOf RecalculerPrixAuto
             AddHandler chkPiece.CheckedChanged, AddressOf RecalculerPrixAuto
             AddHandler chkDouzaine.CheckedChanged, AddressOf RecalculerPrixAuto
+            AddHandler btnTypesPersonnalisesEntree.Click, AddressOf OuvrirTypesPersonnalisesEntree
             AddHandler btnEnregistrerEntree.Click, AddressOf EnregistrerEntree
             AddHandler btnRafraichirSortie.Click, AddressOf ChargerSortiesDuMois
             AddHandler txtRechercheSortie.TextChanged, AddressOf ChargerSortiesDuMois
@@ -1221,6 +1225,7 @@ Namespace DevCommerc8ak
             AfficherStockActuel()
             RecalculerStock(Nothing, EventArgs.Empty)
             RecalculerPrixAuto(Nothing, EventArgs.Empty)
+            RafraichirTypesVente()
         End Sub
 
         Private Sub AfficherStockActuel()
@@ -1242,6 +1247,28 @@ Namespace DevCommerc8ak
             Dim repo As New ProduitRepository(dal)
             Return New ProduitService(repo)
         End Function
+
+        Private Function ObtenirProduitEntreeSelectionneId() As Integer
+            If chkProduitExistant.Checked AndAlso cmbProduitExistant.SelectedValue IsNot Nothing AndAlso Not TypeOf cmbProduitExistant.SelectedValue Is DataRowView AndAlso Not IsDBNull(cmbProduitExistant.SelectedValue) Then
+                Return Convert.ToInt32(cmbProduitExistant.SelectedValue)
+            End If
+
+            Return 0
+        End Function
+
+        Private Sub OuvrirTypesPersonnalisesEntree(sender As Object, e As EventArgs)
+            Dim produitId As Integer = ObtenirProduitEntreeSelectionneId()
+            If produitId <= 0 Then
+                MessageBox.Show("Sélectionnez d'abord un produit existant pour gérer ses types personnalisés.")
+                Return
+            End If
+
+            Using frm As New FormulaireTypesVenteProduit(produitId, LireDecimal(txtPrixAchat.Text), LireDecimal(txtNbUniteParBase.Text))
+                frm.ShowDialog(Me)
+            End Using
+
+            RafraichirTypesVente()
+        End Sub
 
         Private Function ObtenirProduitCourantDepuisListe(produitId As Integer) As DataRow
             If _produitsTable Is Nothing Then
@@ -1439,6 +1466,7 @@ Namespace DevCommerc8ak
         End Sub
         Private Sub ChargerUnites(sender As Object, e As EventArgs)
             If cmbProduitSortie.SelectedValue IsNot Nothing AndAlso Not TypeOf cmbProduitSortie.SelectedValue Is DataRowView Then
+                Dim produitId As Integer = Convert.ToInt32(cmbProduitSortie.SelectedValue)
                 Dim row As DataRowView = TryCast(cmbProduitSortie.SelectedItem, DataRowView)
                 If row Is Nothing Then Return
                 Dim r As DataRow = row.Row
@@ -1456,7 +1484,7 @@ Namespace DevCommerc8ak
                 Dim venteDouzaine As Boolean = If(IsDBNull(row("VenteDouzaine")), False, Convert.ToDecimal(row("VenteDouzaine")) = 1)
                 Dim venteGros As Boolean = If(IsDBNull(row("VenteGros")), False, Convert.ToDecimal(row("VenteGros")) = 1)
 
-                _typesVenteCourants = _typeVenteService.ConstruireTypesVente(nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine)
+                _typesVenteCourants = _typeVenteService.ConstruireTypesVentePourProduit(produitId, nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine)
                 cmbTypeVente.DataSource = Nothing
                 cmbTypeVente.DisplayMember = "NomAffichage"
                 cmbTypeVente.ValueMember = "Nom"
@@ -1743,7 +1771,8 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub RafraichirTypesVente()
-            Dim liste As List(Of TypeVenteDTO) = _typeVenteService.ConstruireTypesVente(
+            Dim liste As List(Of TypeVenteDTO) = _typeVenteService.ConstruireTypesVentePourProduit(
+                ObtenirProduitEntreeSelectionneId(),
                 LireDecimal(txtNbUniteParBase.Text),
                 LireDecimal(txtPrixAchat.Text),
                 LireDecimal(txtPrixGros.Text.Replace("-", "0")),
@@ -1758,6 +1787,24 @@ Namespace DevCommerc8ak
                 chkDouzaine.Checked)
             gridTypesVente.DataSource = Nothing
             gridTypesVente.DataSource = liste
+            ConfigurerGrilleTypesVenteAffichage(gridTypesVente)
+        End Sub
+
+        Private Sub ConfigurerGrilleTypesVenteAffichage(grille As DataGridView)
+            If grille Is Nothing Then
+                Return
+            End If
+
+            If grille.Columns.Contains("TypeVenteProduitId") Then grille.Columns("TypeVenteProduitId").Visible = False
+            If grille.Columns.Contains("Coefficient") Then grille.Columns("Coefficient").Visible = False
+            If grille.Columns.Contains("EstPersonnalise") Then grille.Columns("EstPersonnalise").Visible = False
+            If grille.Columns.Contains("ModePrix") Then grille.Columns("ModePrix").Visible = False
+            If grille.Columns.Contains("Nom") Then grille.Columns("Nom").HeaderText = "Nom"
+            If grille.Columns.Contains("QuantiteEquivalent") Then grille.Columns("QuantiteEquivalent").HeaderText = "Qté équiv."
+            If grille.Columns.Contains("TypePrixAffichage") Then grille.Columns("TypePrixAffichage").HeaderText = "Coefficient / mode"
+            If grille.Columns.Contains("PrixVente") Then grille.Columns("PrixVente").HeaderText = "Prix vente"
+            If grille.Columns.Contains("Actif") Then grille.Columns("Actif").HeaderText = "Actif"
+            If grille.Columns.Contains("NomAffichage") Then grille.Columns("NomAffichage").HeaderText = "Nom affiché"
         End Sub
 
         'Private Sub EnregistrerEntree(sender As Object, e As EventArgs)

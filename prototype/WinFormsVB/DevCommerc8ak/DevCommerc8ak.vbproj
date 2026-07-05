@@ -79,10 +79,12 @@
     <Compile Include="DTOs\ParametreDTO.vb" />
     <Compile Include="DTOs\BonApprovisionnementDTO.vb" />
     <Compile Include="DTOs\TypeVenteDTO.vb" />
+    <Compile Include="DTOs\TypeVenteProduitDTO.vb" />
     <Compile Include="DTOs\NotificationDTO.vb" />
     <Compile Include="Repositories\ClientRepository.vb" />
     <Compile Include="Repositories\FinanceRepositories %284%29.vb" />
     <Compile Include="Repositories\ProduitRepository.vb" />
+    <Compile Include="Repositories\TypeVenteProduitRepository.vb" />
     <Compile Include="Repositories\FournisseurRepository.vb" />
     <Compile Include="Repositories\FactureVenteRepository.vb" />
     <Compile Include="Repositories\LigneFactureVenteRepository.vb" />
@@ -129,6 +131,7 @@
     <Compile Include="Services\DepenseService.vb" />
     <Compile Include="Services\VenteService.vb" />
     <Compile Include="Services\TypeVenteService.vb" />
+    <Compile Include="Services\TypeVenteProduitService.vb" />
     <Compile Include="Services\NotificationService.vb" />
     <Compile Include="Services\IconsHelper.vb" />
     <Compile Include="Services\LogoPathHelper.vb" />
@@ -199,6 +202,9 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FormConfigurationSQL.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireTypesVenteProduit.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\NotificationPopupB.vb">

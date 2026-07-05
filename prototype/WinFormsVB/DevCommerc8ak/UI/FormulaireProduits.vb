@@ -52,6 +52,7 @@ Namespace DevCommerc8ak
         Private ReadOnly btnActualiser As Button
         Private ReadOnly btnImprimerProduits As Button
         Private ReadOnly btnImprimerHistorique As Button
+        Private ReadOnly btnTypesPersonnalises As Button
 
         Private ReadOnly txtLibelle As TextBox
         Private ReadOnly txtCodeBarres As TextBox
@@ -91,6 +92,7 @@ Namespace DevCommerc8ak
         Private ReadOnly lblHeroTitre As Label
         Private ReadOnly lblHeroSousTitre As Label
         Private ReadOnly grid As DataGridView
+        Private ReadOnly gridTypesPersonnalises As DataGridView
         Private ReadOnly gridHistorique As DataGridView
         Private ReadOnly gridProduitVedette As DataGridView
         Private ReadOnly lblPagination As Label
@@ -145,9 +147,10 @@ Namespace DevCommerc8ak
             tabs.TabPages.AddRange({tabProduits, tabHistorique, tabDashboard})
 
             ' --- TAB PRODUITS : STRUCTURE ---
-            Dim mainTableProduits As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 4, .Padding = New Padding(10)}
+            Dim mainTableProduits As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 5, .Padding = New Padding(10)}
             mainTableProduits.RowStyles.Add(New RowStyle(SizeType.Absolute, 60))  ' Barre Recherche/Actions
             mainTableProduits.RowStyles.Add(New RowStyle(SizeType.Absolute, 260)) ' Cartes Edition
+            mainTableProduits.RowStyles.Add(New RowStyle(SizeType.Absolute, 130)) ' Types personnalisés
             mainTableProduits.RowStyles.Add(New RowStyle(SizeType.Percent, 100))  ' Grille
             mainTableProduits.RowStyles.Add(New RowStyle(SizeType.Absolute, 40))  ' Pagination
 
@@ -159,10 +162,11 @@ Namespace DevCommerc8ak
             btnSupprimer = CreateStyledButton("Supprimer", Color.Crimson)
             btnActualiser = CreateStyledButton("Actualiser", Color.Gray)
             btnImprimerProduits = CreateStyledButton("Imprimer Liste", Color.SlateGray)
+            btnTypesPersonnalises = CreateStyledButton("Types personnalisés", ColorSecondary, 160, 35)
 
             flowHeader.Controls.Add(New Label() With {.Text = "Recherche :", .Font = FontLabel, .ForeColor = ColorTextSecondary, .Margin = New Padding(0, 10, 5, 0), .AutoSize = True})
             flowHeader.Controls.Add(txtRecherche)
-            flowHeader.Controls.AddRange({btnNouveau, btnEnregistrer, btnSupprimer, btnActualiser, btnImprimerProduits})
+            flowHeader.Controls.AddRange({btnNouveau, btnEnregistrer, btnSupprimer, btnActualiser, btnImprimerProduits, btnTypesPersonnalises})
 
             ' 2. Cartes d'Édition (Layout Flexible)
             Dim tableEdition As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 4, .RowCount = 1}
@@ -225,10 +229,17 @@ Namespace DevCommerc8ak
             tableEdition.Controls.Add(cardStock, 3, 0)
 
             ' 3. Grille
+            Dim cardTypesPersonnalises As Panel = CreateCard("Types de vente personnalisés")
+            gridTypesPersonnalises = CreateStyledGrid()
+            gridTypesPersonnalises.AutoGenerateColumns = False
+            gridTypesPersonnalises.Dock = DockStyle.Fill
+            cardTypesPersonnalises.Controls.Add(gridTypesPersonnalises)
+
+            ' 4. Grille
             grid = CreateStyledGrid()
             grid.AutoGenerateColumns = False
 
-            ' 4. Pagination
+            ' 5. Pagination
             Dim flowPager As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft}
             btnPageSuivante = CreateStyledButton(">", Color.LightGray, 40, 30)
             lblPagination = New Label() With {.Text = "Page 1/1", .Font = FontLabel, .Margin = New Padding(10, 8, 10, 0), .AutoSize = True}
@@ -237,8 +248,9 @@ Namespace DevCommerc8ak
 
             mainTableProduits.Controls.Add(flowHeader, 0, 0)
             mainTableProduits.Controls.Add(tableEdition, 0, 1)
-            mainTableProduits.Controls.Add(grid, 0, 2)
-            mainTableProduits.Controls.Add(flowPager, 0, 3)
+            mainTableProduits.Controls.Add(cardTypesPersonnalises, 0, 2)
+            mainTableProduits.Controls.Add(grid, 0, 3)
+            mainTableProduits.Controls.Add(flowPager, 0, 4)
             tabProduits.Controls.Add(mainTableProduits)
 
             ' --- TAB HISTORIQUE : STRUCTURE ---
@@ -317,6 +329,7 @@ Namespace DevCommerc8ak
             AddHandler btnActualiser.Click, AddressOf ChargerDonnees
             AddHandler btnImprimerProduits.Click, AddressOf ImprimerListeProduits
             AddHandler btnImprimerHistorique.Click, AddressOf ImprimerHistoriquePrix
+            AddHandler btnTypesPersonnalises.Click, AddressOf OuvrirTypesPersonnalises
             AddHandler txtRecherche.TextChanged, AddressOf Filtrer
             AddHandler grid.SelectionChanged, AddressOf ChargerSelection
             AddHandler btnPagePrecedente.Click, AddressOf PagePrecedente
@@ -340,6 +353,7 @@ Namespace DevCommerc8ak
             ' ThemeHelper.AppliquerTheme(Me)
             ConfigurerCharts()
             ConfigurerGrilleProduits()
+            ConfigurerGrilleTypesPersonnalises()
             ConfigurerGrilleHistorique()
             ChargerDonnees(Nothing, EventArgs.Empty)
             AddHandler AppEvents.ProduitModifie, AddressOf RafraichirDepuisEvenement
@@ -469,6 +483,19 @@ Namespace DevCommerc8ak
             gridHistorique.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "Utilisateur", .HeaderText = "Utilisateur", .Width = 140})
         End Sub
 
+        Private Sub ConfigurerGrilleTypesPersonnalises()
+            gridTypesPersonnalises.Columns.Clear()
+            gridTypesPersonnalises.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+            gridTypesPersonnalises.ScrollBars = ScrollBars.Both
+            gridTypesPersonnalises.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "TypeVenteProduitId", .HeaderText = "Id", .Visible = False})
+            gridTypesPersonnalises.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "Nom", .HeaderText = "Nom", .Width = 180})
+            gridTypesPersonnalises.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "QuantiteEquivalent", .HeaderText = "Qté équiv.", .Width = 90})
+            gridTypesPersonnalises.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "ModePrixAffichage", .HeaderText = "Mode prix", .Width = 120})
+            gridTypesPersonnalises.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixVente", .HeaderText = "Prix vente", .Width = 100})
+            gridTypesPersonnalises.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "Actif", .HeaderText = "Actif", .Width = 60})
+            gridTypesPersonnalises.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "NomAffichage", .HeaderText = "Nom affiché", .AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill})
+        End Sub
+
         ' --- LOGIQUE MÉTIER (STRICTEMENT IDENTIQUE À L'ORIGINAL) ---
 
         Private Function ObtenirService() As ProduitService
@@ -519,6 +546,7 @@ Namespace DevCommerc8ak
                 ChargerDashboard(Nothing, EventArgs.Empty)
                 MettreAJourPagination()
                 RemplirComboAnnees()
+                ChargerTypesPersonnalisesProduit()
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement produits: " & ex.Message)
             End Try
@@ -617,7 +645,32 @@ Namespace DevCommerc8ak
             chkVenteDemi.Checked = False
             chkVenteQuart.Checked = False
             chkVenteDouzaine.Checked = False
+            gridTypesPersonnalises.DataSource = Nothing
             MessageBox.Show("L'ajout direct n'est pas autorisé ici. Sélectionnez un produit existant pour le modifier.")
+        End Sub
+
+        Private Sub ChargerTypesPersonnalisesProduit()
+            If _produitId <= 0 Then
+                gridTypesPersonnalises.DataSource = Nothing
+                Return
+            End If
+
+            Dim service As New TypeVenteProduitService()
+            gridTypesPersonnalises.DataSource = Nothing
+            gridTypesPersonnalises.DataSource = service.ListerParProduit(_produitId, False)
+        End Sub
+
+        Private Sub OuvrirTypesPersonnalises(sender As Object, e As EventArgs)
+            If _produitId <= 0 Then
+                MessageBox.Show("Sélectionnez d'abord un produit pour gérer ses types personnalisés.")
+                Return
+            End If
+
+            Using frm As New FormulaireTypesVenteProduit(_produitId, LireDecimal(txtPrixAchat.Text), LireDecimal(txtConversion.Text))
+                frm.ShowDialog(Me)
+            End Using
+
+            ChargerTypesPersonnalisesProduit()
         End Sub
 
         Private Sub ChargerSelection(sender As Object, e As EventArgs)
@@ -654,6 +707,7 @@ Namespace DevCommerc8ak
             chkVenteDouzaine.Checked = SafeBoolean(row("VenteDouzaine"))
             chkVenteGros.Checked = SafeBoolean(row("VenteGros"))
             chkVenteQuart.Checked = LireDecimal(txtPrixQuart.Text) > 0D
+            ChargerTypesPersonnalisesProduit()
         End Sub
 
         Private Sub EnregistrerProduit(sender As Object, e As EventArgs)

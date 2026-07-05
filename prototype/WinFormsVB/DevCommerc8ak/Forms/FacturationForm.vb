@@ -557,6 +557,7 @@ Namespace DevCommerc8ak
         Private Sub ChargerUnites(sender As Object, e As EventArgs)
             If gridProduits.CurrentRow Is Nothing Then Return
             Dim row As DataGridViewRow = gridProduits.CurrentRow
+            Dim produitId As Integer = Convert.ToInt32(row.Cells("ProduitId").Value)
             Dim nbUnites As Decimal = SafeDecimal(row.Cells("ConversionUnite").Value)
             Dim prixAchat As Decimal = SafeDecimal(row.Cells("PrixAchat").Value)
             Dim prixGros As Decimal = SafeDecimal(row.Cells("PrixGros").Value)
@@ -570,7 +571,7 @@ Namespace DevCommerc8ak
             Dim venteDouzaine As Boolean = SafeBoolean(row.Cells("VenteDouzaine").Value)
             Dim venteGros As Boolean = SafeBoolean(row.Cells("VenteGros").Value)
 
-            _typesVenteCourants = _typeVenteService.ConstruireTypesVente(nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine)
+            _typesVenteCourants = _typeVenteService.ConstruireTypesVentePourProduit(produitId, nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine)
             cmbUnite.DataSource = Nothing
             cmbUnite.DisplayMember = "NomAffichage"
             cmbUnite.ValueMember = "Nom"
