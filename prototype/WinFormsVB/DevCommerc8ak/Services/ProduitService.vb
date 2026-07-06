@@ -6,6 +6,7 @@ Imports System.Data
 Imports System.Drawing
 Imports System.Collections.Generic
 Imports System.Data.SqlClient
+Imports System.Diagnostics
 
 
 Namespace DevCommerc8ak
@@ -33,6 +34,23 @@ Namespace DevCommerc8ak
 
         ' Met a jour un produit.
         Public Function MettreAJour(produit As Produit) As Integer
+            Debug.WriteLine(String.Format(Globalization.CultureInfo.InvariantCulture, "[ProduitService] MettreAJour ProduitId={0}, PrixAchat={1}, PrixGros={2}, PrixDemi={3}, PrixDetail={4}, PrixQuart={5}, PrixDouzaine={6}, PrixSpecial={7}, CoefficientGros={8}, UnitePrincipale={9}, UniteSecondaire={10}, ConversionUnite={11}, VenteGros={12}, VenteDemi={13}, VenteDetail={14}, VenteDouzaine={15}",
+                                         produit.ProduitId,
+                                         produit.PrixAchat,
+                                         produit.PrixGros,
+                                         produit.PrixDemi,
+                                         produit.PrixDetail,
+                                         produit.PrixQuart,
+                                         produit.PrixDouzaine,
+                                         produit.PrixSpecial,
+                                         produit.CoefficientGros,
+                                         If(produit.UnitePrincipale, String.Empty),
+                                         If(produit.UniteSecondaire, String.Empty),
+                                         produit.ConversionUnite,
+                                         produit.VenteGros,
+                                         produit.VenteDemi,
+                                         produit.VenteDetail,
+                                         produit.VenteDouzaine))
             Dim resultat As Integer = _repo.MettreAJour(produit)
             If resultat > 0 Then
                 AppEvents.OnProduitModifie()

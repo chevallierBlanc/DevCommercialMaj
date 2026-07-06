@@ -5,6 +5,7 @@ Imports System
 Imports System.Data
 Imports System.Data.SqlClient
 Imports System.Collections.Generic
+Imports System.Diagnostics
 
 Namespace DevCommerc8ak
     Public Class ProduitRepository
@@ -246,7 +247,25 @@ Namespace DevCommerc8ak
                 New SqlParameter("@ModifierPar", modifierPar)
             }
 
+            Debug.WriteLine(String.Format(Globalization.CultureInfo.InvariantCulture, "[ProduitRepository] UPDATE Produits ProduitId={0}, PrixAchat={1}, PrixGros={2}, PrixDemi={3}, PrixDetail={4}, PrixQuart={5}, PrixDouzaine={6}, PrixSpecial={7}, CoefficientGros={8}, UnitePrincipale={9}, UniteSecondaire={10}, ConversionUnite={11}, VenteGros={12}, VenteDemi={13}, VenteDetail={14}, VenteDouzaine={15}",
+                                         produit.ProduitId,
+                                         produit.PrixAchat,
+                                         produit.PrixGros,
+                                         produit.PrixDemi,
+                                         produit.PrixDetail,
+                                         produit.PrixQuart,
+                                         produit.PrixDouzaine,
+                                         produit.PrixSpecial,
+                                         produit.CoefficientGros,
+                                         If(produit.UnitePrincipale, String.Empty),
+                                         If(produit.UniteSecondaire, String.Empty),
+                                         produit.ConversionUnite,
+                                         produit.VenteGros,
+                                         produit.VenteDemi,
+                                         produit.VenteDetail,
+                                         produit.VenteDouzaine))
             Dim rows As Integer = _dal.ExecuterNonRequete(sql, CommandType.Text, p)
+            Debug.WriteLine(String.Format(Globalization.CultureInfo.InvariantCulture, "[ProduitRepository] UPDATE Produits rows affected={0} pour ProduitId={1}", rows, produit.ProduitId))
 
             If ancienPrixAchat <> produit.PrixAchat OrElse
                ancienPrixDetail <> produit.PrixDetail OrElse

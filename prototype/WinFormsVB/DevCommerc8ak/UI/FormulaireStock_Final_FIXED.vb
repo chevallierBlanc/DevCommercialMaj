@@ -2,6 +2,7 @@ Option Strict On
 Option Explicit On
 
 Imports System
+Imports System.Diagnostics
 Imports Microsoft.VisualBasic
 Imports System.Configuration
 Imports System.Data
@@ -1348,15 +1349,36 @@ Namespace DevCommerc8ak
                 .VenteGros = chkGros.Checked
             }
 
+            Debug.WriteLine(String.Format(
+                Globalization.CultureInfo.InvariantCulture,
+                "[StockEntree] Produit capture avant update ProduitId={0}, PrixAchat={1}, PrixGros={2}, PrixDemi={3}, PrixDetail={4}, PrixQuart={5}, PrixDouzaine={6}, PrixSpecial={7}, CoefficientGros={8}, UnitePrincipale={9}, UniteSecondaire={10}, ConversionUnite={11}, VenteGros={12}, VenteDemi={13}, VenteDetail={14}, VenteDouzaine={15}",
+                produit.ProduitId,
+                produit.PrixAchat,
+                produit.PrixGros,
+                produit.PrixDemi,
+                produit.PrixDetail,
+                produit.PrixQuart,
+                produit.PrixDouzaine,
+                produit.PrixSpecial,
+                produit.CoefficientGros,
+                If(produit.UnitePrincipale, String.Empty),
+                If(produit.UniteSecondaire, String.Empty),
+                produit.ConversionUnite,
+                produit.VenteGros,
+                produit.VenteDemi,
+                produit.VenteDetail,
+                produit.VenteDouzaine))
+
             Return produit
         End Function
 
-        Private Sub MettreAJourProduitExistantDepuisEntree(produitId As Integer)
-            Dim produit As Produit = ConstruireProduitMisAJourDepuisEntree(produitId)
+        Private Sub MettreAJourProduitExistantDepuisEntree(produitId As Integer, Optional produitCapture As Produit = Nothing)
+            Dim produit As Produit = If(produitCapture, ConstruireProduitMisAJourDepuisEntree(produitId))
             If produit Is Nothing Then
                 Return
             End If
 
+            Debug.WriteLine(String.Format(Globalization.CultureInfo.InvariantCulture, "[StockEntree] Appel ProduitService.MettreAJour pour ProduitId={0}", produit.ProduitId))
             Dim serviceProduit As ProduitService = ObtenirService()
             serviceProduit.MettreAJour(produit)
         End Sub
@@ -1876,6 +1898,7 @@ Namespace DevCommerc8ak
                 End If
 
                 Dim produitId As Integer
+                Dim produitCapture As Produit = Nothing
                 If chkProduitExistant.Checked Then
                     If cmbProduitExistant.SelectedValue Is Nothing OrElse IsDBNull(cmbProduitExistant.SelectedValue) Then
                         MessageBox.Show("Selectionnez un produit.")
@@ -1883,6 +1906,7 @@ Namespace DevCommerc8ak
                         Return
                     End If
                     produitId = Convert.ToInt32(cmbProduitExistant.SelectedValue)
+                    produitCapture = ConstruireProduitMisAJourDepuisEntree(produitId)
                 Else
                     Dim nom As String = txtNomProduit.Text.Trim()
                     If nom = "" Then
@@ -1938,7 +1962,7 @@ Namespace DevCommerc8ak
                 Dim service As StockService = ObtenirStockService()
                 service.EnregistrerEntree(produitId, qte, cmbUniteBase.Text, txtReference.Text.Trim(), txtObservationEntree.Text.Trim(), SessionUtilisateur.UtilisateurId, prixAchatVal)
                 If chkProduitExistant.Checked Then
-                    MettreAJourProduitExistantDepuisEntree(produitId)
+                    MettreAJourProduitExistantDepuisEntree(produitId, produitCapture)
                 End If
                 ChargerProduits()
                 chkProduitExistant.Checked = True
