@@ -4,6 +4,7 @@ Option Explicit On
 Imports System
 Imports System.Collections.Generic
 Imports System.Drawing
+Imports System.Linq
 Imports System.Windows.Forms
 
 Namespace DevCommerc8ak
@@ -14,6 +15,8 @@ Namespace DevCommerc8ak
         Private ReadOnly _prixAchat As Decimal
         Private ReadOnly _conversionUnite As Decimal
         Private ReadOnly _service As TypeVenteProduitService
+        Private ReadOnly _modeDirectBDD As Boolean
+        Private ReadOnly _typesTemporaires As List(Of TypeVenteProduitDTO)
 
         Private ReadOnly grid As DataGridView
         Private ReadOnly txtNom As TextBox
@@ -28,12 +31,26 @@ Namespace DevCommerc8ak
         Private ReadOnly lblAide As Label
 
         Private _typeSelectionneId As Integer
+        Private _typeResultat As TypeVenteProduitDTO
 
-        Public Sub New(produitId As Integer, prixAchat As Decimal, conversionUnite As Decimal)
+        Public ReadOnly Property TypeVenteResultat As TypeVenteProduitDTO
+            Get
+                Return _typeResultat
+            End Get
+        End Property
+
+        Public Sub New(produitId As Integer,
+                       prixAchat As Decimal,
+                       conversionUnite As Decimal,
+                       Optional modeDirectBDD As Boolean = True,
+                       Optional typesTemporaires As List(Of TypeVenteProduitDTO) = Nothing,
+                       Optional typeInitial As TypeVenteProduitDTO = Nothing)
             _produitId = produitId
             _prixAchat = prixAchat
             _conversionUnite = If(conversionUnite > 0D, conversionUnite, 1D)
             _service = New TypeVenteProduitService()
+            _modeDirectBDD = modeDirectBDD
+            _typesTemporaires = If(typesTemporaires, New List(Of TypeVenteProduitDTO)())
 
             Me.Text = "Types de vente personnalisés"
             Me.StartPosition = FormStartPosition.CenterParent
@@ -102,17 +119,27 @@ Namespace DevCommerc8ak
             AddHandler cmbModePrix.SelectedIndexChanged, AddressOf RecalculerPrixDepuisCoefficient
 
             ChargerListe()
-            NouveauType(Nothing, EventArgs.Empty)
+            If typeInitial IsNot Nothing Then
+                ChargerType(typeInitial)
+            Else
+                NouveauType(Nothing, EventArgs.Empty)
+            End If
         End Sub
 
         Private Sub ChargerListe()
-            Dim liste As List(Of TypeVenteProduitDTO) = _service.ListerParProduit(_produitId, False)
+            Dim liste As List(Of TypeVenteProduitDTO)
+            If _modeDirectBDD Then
+                liste = _service.ListerParProduit(_produitId, False)
+            Else
+                liste = _typesTemporaires.OrderByDescending(Function(x) x.Actif).ThenBy(Function(x) x.Nom).ToList()
+            End If
             grid.DataSource = Nothing
             grid.DataSource = liste
         End Sub
 
         Private Sub NouveauType(sender As Object, e As EventArgs)
             _typeSelectionneId = 0
+            _typeResultat = Nothing
             txtNom.Clear()
             txtQuantiteEquivalent.Clear()
             cmbModePrix.SelectedItem = "FIXE"
@@ -120,16 +147,12 @@ Namespace DevCommerc8ak
             txtCoefficient.Enabled = False
             txtPrixVente.Clear()
             chkActif.Checked = True
+            btnEnregistrer.Text = "Enregistrer"
             btnChangerEtat.Text = "Désactiver"
             lblAide.Text = "Mode COEFFICIENT : le prix final est calculé sur le coût équivalent de la quantité."
         End Sub
 
-        Private Sub ChargerSelection(sender As Object, e As EventArgs)
-            If grid.CurrentRow Is Nothing Then
-                Return
-            End If
-
-            Dim item As TypeVenteProduitDTO = TryCast(grid.CurrentRow.DataBoundItem, TypeVenteProduitDTO)
+        Private Sub ChargerType(item As TypeVenteProduitDTO)
             If item Is Nothing Then
                 Return
             End If
@@ -142,8 +165,22 @@ Namespace DevCommerc8ak
             txtCoefficient.Text = If(item.Coefficient.HasValue, item.Coefficient.Value.ToString("N4"), String.Empty)
             txtPrixVente.Text = item.PrixVente.ToString("N2")
             chkActif.Checked = item.Actif
+            btnEnregistrer.Text = If(_typeSelectionneId <> 0, "Modifier", "Enregistrer")
             btnChangerEtat.Text = If(item.Actif, "Désactiver", "Activer")
             lblAide.Text = item.ModePrixAffichage
+        End Sub
+
+        Private Sub ChargerSelection(sender As Object, e As EventArgs)
+            If grid.CurrentRow Is Nothing Then
+                Return
+            End If
+
+            Dim item As TypeVenteProduitDTO = TryCast(grid.CurrentRow.DataBoundItem, TypeVenteProduitDTO)
+            If item Is Nothing Then
+                Return
+            End If
+
+            ChargerType(item)
         End Sub
 
         Private Function LireDecimal(texte As String) As Decimal
@@ -245,13 +282,19 @@ Namespace DevCommerc8ak
         Private Sub EnregistrerType(sender As Object, e As EventArgs)
             Try
                 Dim dto As TypeVenteProduitDTO = ConstruireDto()
-                If dto.TypeVenteProduitId > 0 Then
-                    _service.MettreAJour(dto)
+                If _modeDirectBDD Then
+                    If dto.TypeVenteProduitId > 0 Then
+                        _service.MettreAJour(dto)
+                    Else
+                        _typeSelectionneId = _service.Ajouter(dto)
+                    End If
+                    ChargerListe()
+                    SelectionnerType(_typeSelectionneId)
                 Else
-                    _typeSelectionneId = _service.Ajouter(dto)
+                    _typeResultat = dto
+                    DialogResult = DialogResult.OK
+                    Close()
                 End If
-                ChargerListe()
-                SelectionnerType(_typeSelectionneId)
             Catch ex As Exception
                 Dim message As String = ex.Message
                 If message.IndexOf("UX_TypesVenteProduit_ProduitNomActif", StringComparison.OrdinalIgnoreCase) >= 0 Then
@@ -262,11 +305,18 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub ChangerEtatType(sender As Object, e As EventArgs)
+            Dim nouvelEtat As Boolean = Not chkActif.Checked
+            chkActif.Checked = nouvelEtat
+            btnChangerEtat.Text = If(nouvelEtat, "Désactiver", "Activer")
+
+            If Not _modeDirectBDD Then
+                Return
+            End If
+
             If _typeSelectionneId <= 0 Then
                 Return
             End If
 
-            Dim nouvelEtat As Boolean = Not chkActif.Checked
             _service.ChangerEtat(_typeSelectionneId, nouvelEtat)
             ChargerListe()
             SelectionnerType(_typeSelectionneId)

@@ -127,13 +127,23 @@ Namespace DevCommerc8ak
                                                         venteGros As Boolean,
                                                         venteDemi As Boolean,
                                                         venteDetail As Boolean,
-                                                        venteDouzaine As Boolean) As List(Of TypeVenteDTO)
+                                                        venteDouzaine As Boolean,
+                                                        Optional typesPersonnalisesOverrides As IEnumerable(Of TypeVenteProduitDTO) = Nothing) As List(Of TypeVenteDTO)
             Dim liste As List(Of TypeVenteDTO) = ConstruireTypesVente(nbUniteParBase, prixAchat, prixGros, prixDemi, prixPiece, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine)
             If produitId <= 0 Then
                 Return liste
             End If
 
-            Dim typesPersonnalises As List(Of TypeVenteProduitDTO) = _typeVenteProduitService.ListerParProduit(produitId, True)
+            Dim typesPersonnalises As List(Of TypeVenteProduitDTO)
+            If typesPersonnalisesOverrides Is Nothing Then
+                typesPersonnalises = _typeVenteProduitService.ListerParProduit(produitId, True)
+            Else
+                typesPersonnalises = typesPersonnalisesOverrides.
+                    Where(Function(x) x IsNot Nothing AndAlso x.Actif).
+                    Select(Function(x) x).
+                    ToList()
+            End If
+
             For Each item As TypeVenteProduitDTO In typesPersonnalises
                 If liste.Any(Function(x) String.Equals(x.Nom, item.Nom, StringComparison.OrdinalIgnoreCase)) Then
                     Continue For

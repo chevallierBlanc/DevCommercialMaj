@@ -9,6 +9,7 @@ Imports System.Data
 Imports System.Collections.Generic
 Imports System.Drawing
 Imports System.Globalization
+Imports System.Linq
 Imports System.Windows.Forms
 Imports System.Drawing.Drawing2D
 Imports System.Drawing.Printing
@@ -62,6 +63,7 @@ Namespace DevCommerc8ak
         Private ReadOnly txtPrixPiece As TextBox
         Private ReadOnly txtPrixDouzaine As TextBox
         Private ReadOnly btnTypesPersonnalisesEntree As Button
+        Private ReadOnly pnlTypesPersonnalisesEntree As FlowLayoutPanel
         Private ReadOnly chkGros As CheckBox
         Private ReadOnly chkDemi As CheckBox
         Private ReadOnly chkQuart As CheckBox
@@ -189,6 +191,8 @@ Namespace DevCommerc8ak
         Private _typesVenteCourants As List(Of TypeVenteDTO) 'nouveau 
         Private _isFilteringProduits As Boolean
         Private ReadOnly _panier As List(Of PanierLigne)
+        Private ReadOnly _typesPersonnalisesTemporairesParProduit As Dictionary(Of Integer, List(Of TypeVenteProduitDTO))
+        Private _prochainTypeTemporaireId As Integer
 
         Private Class PanierLigne
             Public Property ProduitId As Integer
@@ -216,6 +220,8 @@ Namespace DevCommerc8ak
             _typeVenteService = New TypeVenteService()
             _typesVenteCourants = New List(Of TypeVenteDTO)()
             _panier = New List(Of PanierLigne)()
+            _typesPersonnalisesTemporairesParProduit = New Dictionary(Of Integer, List(Of TypeVenteProduitDTO))()
+            _prochainTypeTemporaireId = -1
             ' Main Layout
             Dim mainLayout As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 2, .AutoScroll = True}
             mainLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 60))
@@ -331,6 +337,18 @@ Namespace DevCommerc8ak
             txtPrixDouzaine = New TextBox() With {.Left = 150, .Top = 165, .Width = 120, .ReadOnly = True, .Visible = True}
             btnTypesPersonnalisesEntree = New Button() With {.Text = "Créer type personnalisé", .Left = 300, .Top = 42, .Width = 210, .Height = 32, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .FlatStyle = FlatStyle.Flat}
             btnTypesPersonnalisesEntree.FlatAppearance.BorderSize = 0
+            Dim lblTypesPersonnalisesEntree As New Label() With {.Text = "Types personnalisés", .Left = 300, .Top = 82, .AutoSize = True}
+            pnlTypesPersonnalisesEntree = New FlowLayoutPanel() With {
+                .Left = 300,
+                .Top = 105,
+                .Width = 260,
+                .Height = 145,
+                .AutoScroll = True,
+                .FlowDirection = FlowDirection.TopDown,
+                .WrapContents = False,
+                .BorderStyle = BorderStyle.FixedSingle,
+                .BackColor = Color.White
+            }
             chkGros = New CheckBox() With {.Text = "Gros", .Left = 20, .Top = 45, .AutoSize = True, .Checked = True}
             chkDemi = New CheckBox() With {.Text = "Demi", .Left = 20, .Top = 75, .AutoSize = True}
             chkQuart = New CheckBox() With {.Text = "Quart", .Left = 20, .Top = 105, .AutoSize = True}
@@ -338,7 +356,7 @@ Namespace DevCommerc8ak
             chkDouzaine = New CheckBox() With {.Text = "Douzaine", .Left = 20, .Top = 165, .AutoSize = True, .Visible = True}
             cardPrix.Controls.AddRange(New Control() {
                 chkGros, chkDemi, chkQuart, chkPiece, chkDouzaine,
-                txtPrixGros, txtPrixDemi, txtPrixQuart, txtPrixPiece, txtPrixDouzaine, btnTypesPersonnalisesEntree
+                txtPrixGros, txtPrixDemi, txtPrixQuart, txtPrixPiece, txtPrixDouzaine, btnTypesPersonnalisesEntree, lblTypesPersonnalisesEntree, pnlTypesPersonnalisesEntree
             })
             ' layoutEntree.Controls.Add(cardPrix)
 
@@ -814,6 +832,7 @@ Namespace DevCommerc8ak
                 BasculerProduitExistant(Nothing, EventArgs.Empty)
                 MettreAJourVisibiliteSortieManuelle(Nothing, EventArgs.Empty)
                 RafraichirTypesVente()
+                RafraichirResumeTypesPersonnalisesEntree()
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement: " & ex.Message)
             End Try
@@ -1178,6 +1197,7 @@ Namespace DevCommerc8ak
                 chkPiece.Checked = True
             End If
             RafraichirTypesVente()
+            RafraichirResumeTypesPersonnalisesEntree()
         End Sub
 
         Private Sub GenererReferenceAutomatique(sender As Object, e As EventArgs)
@@ -1227,6 +1247,7 @@ Namespace DevCommerc8ak
             RecalculerStock(Nothing, EventArgs.Empty)
             RecalculerPrixAuto(Nothing, EventArgs.Empty)
             RafraichirTypesVente()
+            RafraichirResumeTypesPersonnalisesEntree()
         End Sub
 
         Private Sub AfficherStockActuel()
@@ -1264,11 +1285,220 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            Using frm As New FormulaireTypesVenteProduit(produitId, LireDecimal(txtPrixAchat.Text), LireDecimal(txtNbUniteParBase.Text))
-                frm.ShowDialog(Me)
+            Dim typesCourants As List(Of TypeVenteProduitDTO) = ConstruireTypesPersonnalisesFusionnesPourProduit(produitId)
+            Using frm As New FormulaireTypesVenteProduit(produitId, LireDecimal(txtPrixAchat.Text), LireDecimal(txtNbUniteParBase.Text), False, typesCourants)
+                If frm.ShowDialog(Me) = DialogResult.OK AndAlso frm.TypeVenteResultat IsNot Nothing Then
+                    Dim typeResultat As TypeVenteProduitDTO = ClonerTypePersonnalise(frm.TypeVenteResultat)
+                    If typeResultat.TypeVenteProduitId = 0 Then
+                        typeResultat.TypeVenteProduitId = GenererTypeTemporaireId()
+                    End If
+
+                    AjouterOuRemplacerTypePersonnaliseTemporaire(produitId, typeResultat)
+                End If
             End Using
 
             RafraichirTypesVente()
+            RafraichirResumeTypesPersonnalisesEntree()
+        End Sub
+
+        Private Function GenererTypeTemporaireId() As Integer
+            Dim id As Integer = _prochainTypeTemporaireId
+            _prochainTypeTemporaireId -= 1
+            Return id
+        End Function
+
+        Private Function ClonerTypePersonnalise(source As TypeVenteProduitDTO) As TypeVenteProduitDTO
+            If source Is Nothing Then
+                Return Nothing
+            End If
+
+            Return New TypeVenteProduitDTO With {
+                .TypeVenteProduitId = source.TypeVenteProduitId,
+                .ProduitId = source.ProduitId,
+                .Nom = source.Nom,
+                .QuantiteEquivalent = source.QuantiteEquivalent,
+                .ModePrix = source.ModePrix,
+                .Coefficient = source.Coefficient,
+                .PrixVente = source.PrixVente,
+                .Actif = source.Actif,
+                .CreeLe = source.CreeLe,
+                .ModifieLe = source.ModifieLe,
+                .ModifiePar = source.ModifiePar
+            }
+        End Function
+
+        Private Function ObtenirTypesPersonnalisesTemporaires(produitId As Integer) As List(Of TypeVenteProduitDTO)
+            Dim liste As List(Of TypeVenteProduitDTO) = Nothing
+            If Not _typesPersonnalisesTemporairesParProduit.TryGetValue(produitId, liste) Then
+                liste = New List(Of TypeVenteProduitDTO)()
+                _typesPersonnalisesTemporairesParProduit(produitId) = liste
+            End If
+
+            Return liste
+        End Function
+
+        Private Sub AjouterOuRemplacerTypePersonnaliseTemporaire(produitId As Integer, dto As TypeVenteProduitDTO)
+            If dto Is Nothing Then
+                Return
+            End If
+
+            Dim temporaires As List(Of TypeVenteProduitDTO) = ObtenirTypesPersonnalisesTemporaires(produitId)
+            Dim index As Integer = temporaires.FindIndex(Function(x) x.TypeVenteProduitId = dto.TypeVenteProduitId)
+            If index >= 0 Then
+                temporaires(index) = ClonerTypePersonnalise(dto)
+            Else
+                temporaires.Add(ClonerTypePersonnalise(dto))
+            End If
+        End Sub
+
+        Private Function ConstruireTypesPersonnalisesFusionnesPourProduit(produitId As Integer) As List(Of TypeVenteProduitDTO)
+            Dim service As New TypeVenteProduitService()
+            Dim resultat As List(Of TypeVenteProduitDTO) = service.ListerParProduit(produitId, False).Select(Function(x) ClonerTypePersonnalise(x)).ToList()
+
+            Dim temporaires As List(Of TypeVenteProduitDTO) = Nothing
+            If _typesPersonnalisesTemporairesParProduit.TryGetValue(produitId, temporaires) Then
+                For Each item As TypeVenteProduitDTO In temporaires
+                    Dim index As Integer = resultat.FindIndex(Function(x) x.TypeVenteProduitId = item.TypeVenteProduitId)
+                    If index >= 0 Then
+                        resultat(index) = ClonerTypePersonnalise(item)
+                    Else
+                        resultat.Add(ClonerTypePersonnalise(item))
+                    End If
+                Next
+            End If
+
+            Return resultat.OrderByDescending(Function(x) x.Actif).ThenBy(Function(x) x.Nom).ToList()
+        End Function
+
+        Private Function ConstruireTypesPersonnalisesActifsPourProduit(produitId As Integer) As List(Of TypeVenteProduitDTO)
+            Return ConstruireTypesPersonnalisesFusionnesPourProduit(produitId).Where(Function(x) x.Actif).ToList()
+        End Function
+
+        Private Function TrouverTypePersonnalisePourProduit(produitId As Integer, typeVenteProduitId As Integer) As TypeVenteProduitDTO
+            Return ConstruireTypesPersonnalisesFusionnesPourProduit(produitId).FirstOrDefault(Function(x) x.TypeVenteProduitId = typeVenteProduitId)
+        End Function
+
+        Private Sub ModifierTypePersonnaliseTemporaire(sender As Object, e As EventArgs)
+            Dim bouton As Button = TryCast(sender, Button)
+            If bouton Is Nothing OrElse bouton.Tag Is Nothing Then
+                Return
+            End If
+
+            Dim produitId As Integer = ObtenirProduitEntreeSelectionneId()
+            If produitId <= 0 Then
+                Return
+            End If
+
+            Dim typeId As Integer = Convert.ToInt32(bouton.Tag)
+            Dim typeCourant As TypeVenteProduitDTO = TrouverTypePersonnalisePourProduit(produitId, typeId)
+            If typeCourant Is Nothing Then
+                Return
+            End If
+
+            Dim typesCourants As List(Of TypeVenteProduitDTO) = ConstruireTypesPersonnalisesFusionnesPourProduit(produitId)
+            Using frm As New FormulaireTypesVenteProduit(produitId, LireDecimal(txtPrixAchat.Text), LireDecimal(txtNbUniteParBase.Text), False, typesCourants, typeCourant)
+                If frm.ShowDialog(Me) = DialogResult.OK AndAlso frm.TypeVenteResultat IsNot Nothing Then
+                    AjouterOuRemplacerTypePersonnaliseTemporaire(produitId, frm.TypeVenteResultat)
+                End If
+            End Using
+
+            RafraichirTypesVente()
+            RafraichirResumeTypesPersonnalisesEntree()
+        End Sub
+
+        Private Sub BasculerTypePersonnaliseTemporaire(sender As Object, e As EventArgs)
+            Dim bouton As Button = TryCast(sender, Button)
+            If bouton Is Nothing OrElse bouton.Tag Is Nothing Then
+                Return
+            End If
+
+            Dim produitId As Integer = ObtenirProduitEntreeSelectionneId()
+            If produitId <= 0 Then
+                Return
+            End If
+
+            Dim typeId As Integer = Convert.ToInt32(bouton.Tag)
+            Dim typeCourant As TypeVenteProduitDTO = TrouverTypePersonnalisePourProduit(produitId, typeId)
+            If typeCourant Is Nothing Then
+                Return
+            End If
+
+            Dim copie As TypeVenteProduitDTO = ClonerTypePersonnalise(typeCourant)
+            copie.Actif = Not copie.Actif
+            AjouterOuRemplacerTypePersonnaliseTemporaire(produitId, copie)
+            RafraichirTypesVente()
+            RafraichirResumeTypesPersonnalisesEntree()
+        End Sub
+
+        Private Sub RafraichirResumeTypesPersonnalisesEntree()
+            pnlTypesPersonnalisesEntree.Controls.Clear()
+
+            Dim produitId As Integer = ObtenirProduitEntreeSelectionneId()
+            If produitId <= 0 Then
+                Dim lblVide As New Label() With {.Text = "Sélectionnez un produit existant.", .AutoSize = True, .ForeColor = Color.Gray, .Margin = New Padding(6)}
+                pnlTypesPersonnalisesEntree.Controls.Add(lblVide)
+                Return
+            End If
+
+            Dim types As List(Of TypeVenteProduitDTO) = ConstruireTypesPersonnalisesFusionnesPourProduit(produitId)
+            If types.Count = 0 Then
+                Dim lblVide As New Label() With {.Text = "Aucun type personnalisé.", .AutoSize = True, .ForeColor = Color.Gray, .Margin = New Padding(6)}
+                pnlTypesPersonnalisesEntree.Controls.Add(lblVide)
+                Return
+            End If
+
+            For Each item As TypeVenteProduitDTO In types
+                Dim ligne As New Panel() With {.Width = Math.Max(220, pnlTypesPersonnalisesEntree.ClientSize.Width - 24), .Height = 30, .Margin = New Padding(4), .BackColor = Color.FromArgb(248, 249, 250)}
+                Dim lbl As New Label() With {
+                    .Left = 6,
+                    .Top = 7,
+                    .Width = Math.Max(90, ligne.Width - 112),
+                    .AutoEllipsis = True,
+                    .Text = item.NomAffichage & " — " & item.PrixVente.ToString("N0") & " FC" & If(item.Actif, String.Empty, " (Inactif)")
+                }
+                Dim btnModifier As New Button() With {
+                    .Text = "Modif.",
+                    .Width = 48,
+                    .Height = 22,
+                    .Left = ligne.Width - 100,
+                    .Top = 4,
+                    .Tag = item.TypeVenteProduitId
+                }
+                Dim btnToggle As New Button() With {
+                    .Text = If(item.Actif, "Off", "On"),
+                    .Width = 42,
+                    .Height = 22,
+                    .Left = ligne.Width - 48,
+                    .Top = 4,
+                    .Tag = item.TypeVenteProduitId
+                }
+                AddHandler btnModifier.Click, AddressOf ModifierTypePersonnaliseTemporaire
+                AddHandler btnToggle.Click, AddressOf BasculerTypePersonnaliseTemporaire
+                ligne.Controls.Add(lbl)
+                ligne.Controls.Add(btnModifier)
+                ligne.Controls.Add(btnToggle)
+                pnlTypesPersonnalisesEntree.Controls.Add(ligne)
+            Next
+        End Sub
+
+        Private Sub EnregistrerTypesPersonnalisesTemporaires(produitId As Integer)
+            Dim temporaires As List(Of TypeVenteProduitDTO) = Nothing
+            If produitId <= 0 OrElse Not _typesPersonnalisesTemporairesParProduit.TryGetValue(produitId, temporaires) OrElse temporaires.Count = 0 Then
+                Return
+            End If
+
+            Dim service As New TypeVenteProduitService()
+            For Each item As TypeVenteProduitDTO In temporaires
+                Dim copie As TypeVenteProduitDTO = ClonerTypePersonnalise(item)
+                copie.ProduitId = produitId
+                If copie.TypeVenteProduitId > 0 Then
+                    service.MettreAJour(copie)
+                Else
+                    service.Ajouter(copie)
+                End If
+            Next
+
+            _typesPersonnalisesTemporairesParProduit.Remove(produitId)
         End Sub
 
         Private Function ObtenirProduitCourantDepuisListe(produitId As Integer) As DataRow
@@ -1793,8 +2023,10 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub RafraichirTypesVente()
+            Dim produitId As Integer = ObtenirProduitEntreeSelectionneId()
+            Dim typesPersonnalisesActifs As List(Of TypeVenteProduitDTO) = If(produitId > 0, ConstruireTypesPersonnalisesActifsPourProduit(produitId), New List(Of TypeVenteProduitDTO)())
             Dim liste As List(Of TypeVenteDTO) = _typeVenteService.ConstruireTypesVentePourProduit(
-                ObtenirProduitEntreeSelectionneId(),
+                produitId,
                 LireDecimal(txtNbUniteParBase.Text),
                 LireDecimal(txtPrixAchat.Text),
                 LireDecimal(txtPrixGros.Text.Replace("-", "0")),
@@ -1806,7 +2038,8 @@ Namespace DevCommerc8ak
                 chkGros.Checked,
                 chkDemi.Checked,
                 chkPiece.Checked,
-                chkDouzaine.Checked)
+                chkDouzaine.Checked,
+                typesPersonnalisesActifs)
             gridTypesVente.DataSource = Nothing
             gridTypesVente.DataSource = liste
             ConfigurerGrilleTypesVenteAffichage(gridTypesVente)
@@ -1963,6 +2196,7 @@ Namespace DevCommerc8ak
                 service.EnregistrerEntree(produitId, qte, cmbUniteBase.Text, txtReference.Text.Trim(), txtObservationEntree.Text.Trim(), SessionUtilisateur.UtilisateurId, prixAchatVal)
                 If chkProduitExistant.Checked Then
                     MettreAJourProduitExistantDepuisEntree(produitId, produitCapture)
+                    EnregistrerTypesPersonnalisesTemporaires(produitId)
                 End If
                 ChargerProduits()
                 chkProduitExistant.Checked = True
@@ -2517,6 +2751,7 @@ Namespace DevCommerc8ak
                 If cmbProduitInventaire.SelectedValue IsNot Nothing Then
                     ChargerInventaire(Nothing, EventArgs.Empty)
                 End If
+                RafraichirResumeTypesPersonnalisesEntree()
             Catch ex As Exception
                 Dim log As New ProductionLogService()
                 log.Error("FormulaireStock", "RafraichirDepuisEvenement", "Erreur lors du rafraichissement automatique du stock.", ex)
