@@ -567,18 +567,14 @@ Namespace DevCommerc8ak
                     Return False
                 End If
 
-                Dim doc As New Printing.PrintDocument()
-                doc.PrinterSettings.PrinterName = _param.ImprimanteTicket
-                doc.PrinterSettings.Copies = CShort(Math.Max(1, copies))
-                ConfigurerTicket80Mm(doc)
-
-                doc.DefaultPageSettings.Color = If(_param IsNot Nothing, _param.ImpressionCouleur, True)
-                AddHandler doc.PrintPage, Sub(s, eV) ImprimerPageTicket(eV, ticket)
+                Dim totalCopies As Integer = Math.Max(1, copies)
+                Dim doc As Printing.PrintDocument = CreerDocumentTicket(ticket, totalCopies)
 
                 If afficherApercu AndAlso _param IsNot Nothing AndAlso _param.ApercuAvantImpression Then
                     Dim preview As New PrintPreviewDialog()
                     preview.Document = doc
-                    preview.ShowDialog()
+                    ConfigurerApercuImpression(preview, ticket, totalCopies)
+                    preview.ShowDialog(Me)
                 Else
                     doc.Print()
                 End If
@@ -589,6 +585,49 @@ Namespace DevCommerc8ak
                 Return False
             End Try
         End Function
+
+        Private Function CreerDocumentTicket(ticket As TicketData, copies As Integer) As Printing.PrintDocument
+            Dim doc As New Printing.PrintDocument()
+            doc.PrinterSettings.PrinterName = _param.ImprimanteTicket
+            doc.PrinterSettings.Copies = 1S
+            ConfigurerTicket80Mm(doc)
+            doc.DefaultPageSettings.Color = If(_param IsNot Nothing, _param.ImpressionCouleur, True)
+
+            Dim totalCopies As Integer = Math.Max(1, copies)
+            Dim copieCourante As Integer = 1
+            AddHandler doc.PrintPage,
+                Sub(s, eV)
+                    ImprimerPageTicket(eV, ticket, copieCourante, totalCopies)
+                    copieCourante += 1
+                    eV.HasMorePages = copieCourante <= totalCopies
+                End Sub
+
+            Return doc
+        End Function
+
+        Private Sub ConfigurerApercuImpression(preview As PrintPreviewDialog, ticket As TicketData, totalCopies As Integer)
+            If preview Is Nothing Then
+                Return
+            End If
+
+            preview.Width = 1000
+            preview.Height = 720
+            preview.KeyPreview = True
+            AddHandler preview.Shown,
+                Sub()
+                    preview.Select()
+                End Sub
+            AddHandler preview.KeyDown,
+                Sub(sender, eArgs)
+                    If eArgs.KeyCode = Keys.Enter Then
+                        eArgs.Handled = True
+                        eArgs.SuppressKeyPress = True
+                        Dim docImpression As Printing.PrintDocument = CreerDocumentTicket(ticket, totalCopies)
+                        docImpression.Print()
+                        preview.Close()
+                    End If
+                End Sub
+        End Sub
 
         Private Sub ConfigurerTicket80Mm(doc As Printing.PrintDocument)
             Try
@@ -603,56 +642,77 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
-        Private Sub ImprimerPageTicket(e As Printing.PrintPageEventArgs, ticket As TicketData)
-            Dim y As Integer = 10
+        Private Sub ImprimerPageTicket(e As Printing.PrintPageEventArgs, ticket As TicketData, copieCourante As Integer, totalCopies As Integer)
+            Dim margeGauche As Integer = 8
+            Dim margeDroite As Integer = Math.Max(margeGauche + 180, e.MarginBounds.Right - 8)
+            Dim largeurContenu As Integer = margeDroite - margeGauche
+            Dim y As Integer = 8
+            Dim fontTitre As New Font("Segoe UI", 10, FontStyle.Bold)
+            Dim fontSection As New Font("Segoe UI", 7, FontStyle.Bold)
+            Dim fontLigne As New Font("Segoe UI", 7)
+            Dim fontTotal As New Font("Segoe UI", 8, FontStyle.Bold)
             Dim titre As String = If(_param Is Nothing OrElse _param.NomMagasin = "", "MAGASIN", _param.NomMagasin)
-            e.Graphics.DrawString(titre, New Font("Segoe UI", 10, FontStyle.Bold), Brushes.Black, 10, y)
-            y += 14
+
+            e.Graphics.DrawString(titre, fontTitre, Brushes.Black, New RectangleF(margeGauche, y, largeurContenu, 16), New StringFormat With {.Alignment = StringAlignment.Center})
+            y += 16
             If _param IsNot Nothing Then
-                e.Graphics.DrawString(_param.AdresseMagasin, New Font("Segoe UI", 7), Brushes.Black, 10, y)
-                y += 12
-                e.Graphics.DrawString(_param.TelephoneMagasin, New Font("Segoe UI", 7), Brushes.Black, 10, y)
-                y += 12
+                If Not String.IsNullOrWhiteSpace(_param.AdresseMagasin) Then
+                    e.Graphics.DrawString(_param.AdresseMagasin, fontLigne, Brushes.Black, New RectangleF(margeGauche, y, largeurContenu, 12), New StringFormat With {.Alignment = StringAlignment.Center})
+                    y += 12
+                End If
+                If Not String.IsNullOrWhiteSpace(_param.TelephoneMagasin) Then
+                    e.Graphics.DrawString(_param.TelephoneMagasin, fontLigne, Brushes.Black, New RectangleF(margeGauche, y, largeurContenu, 12), New StringFormat With {.Alignment = StringAlignment.Center})
+                    y += 12
+                End If
             End If
 
-            e.Graphics.DrawString("------------------------", New Font("Segoe UI", 7), Brushes.Black, 10, y)
-            y += 12
-            e.Graphics.DrawString("Facture : " & ticket.Numero, New Font("Segoe UI", 7), Brushes.Black, 10, y)
-            y += 12
-            e.Graphics.DrawString("Date : " & ticket.DateFacture.ToString("dd/MM/yyyy"), New Font("Segoe UI", 7), Brushes.Black, 10, y)
-            y += 12
-            If ticket.Client <> "" Then
-                e.Graphics.DrawString("Client : " & ticket.Client, New Font("Segoe UI", 7), Brushes.Black, 10, y)
-                y += 12
+            y = DessinerSeparateurTicket(e.Graphics, fontLigne, margeGauche, y)
+            y = DessinerBlocTicket(e.Graphics, "Facture", ticket.Numero, fontLigne, margeGauche, margeDroite, y)
+            y = DessinerBlocTicket(e.Graphics, "Date", ticket.DateFacture.ToString("dd/MM/yyyy HH:mm"), fontLigne, margeGauche, margeDroite, y)
+            If Not String.IsNullOrWhiteSpace(ticket.Client) Then
+                y = DessinerBlocTicket(e.Graphics, "Client", ticket.Client, fontLigne, margeGauche, margeDroite, y)
             End If
+            y = DessinerBlocTicket(e.Graphics, "Exemplaire", copieCourante.ToString() & "/" & totalCopies.ToString(), fontLigne, margeGauche, margeDroite, y)
 
-            e.Graphics.DrawString("------------------------", New Font("Segoe UI", 7), Brushes.Black, 10, y)
+            y = DessinerSeparateurTicket(e.Graphics, fontLigne, margeGauche, y)
+            e.Graphics.DrawString("DÉSIGNATION", fontSection, Brushes.Black, margeGauche, y)
+            e.Graphics.DrawString("TOTAL", fontSection, Brushes.Black, margeDroite - 48, y)
             y += 12
+            y = DessinerSeparateurTicket(e.Graphics, fontLigne, margeGauche, y)
 
             If ticket.Lignes IsNot Nothing Then
                 For Each row As DataRow In ticket.Lignes.Rows
                     Dim libelle As String = Convert.ToString(row("Libelle"))
-                    Dim qte As String = Convert.ToDecimal(row("QuantiteSaisie")).ToString()
+                    Dim qte As Decimal = Convert.ToDecimal(row("QuantiteSaisie"))
                     Dim unite As String = Convert.ToString(row("TypeVente"))
-                    Dim prix As String = Convert.ToDecimal(row("PrixUnitaire")).ToString()
-                    Dim total As String = Convert.ToDecimal(row("MontantLigne")).ToString()
-                    Dim line As String = libelle & "  " & qte & unite & " x " & prix
-                    e.Graphics.DrawString(line, New Font("Segoe UI", 7), Brushes.Black, 10, y)
+                    Dim prix As Decimal = Convert.ToDecimal(row("PrixUnitaire"))
+                    Dim total As Decimal = Convert.ToDecimal(row("MontantLigne"))
+
+                    e.Graphics.DrawString(libelle, fontLigne, Brushes.Black, New RectangleF(margeGauche, y, largeurContenu, 12))
                     y += 12
-                    e.Graphics.DrawString("   = " & total, New Font("Segoe UI", 7), Brushes.Black, 10, y)
+                    e.Graphics.DrawString(qte.ToString("N0") & " " & unite & " x " & prix.ToString("N0"), fontLigne, Brushes.Black, margeGauche + 6, y)
+                    e.Graphics.DrawString(total.ToString("N0"), fontLigne, Brushes.Black, margeDroite - 48, y)
                     y += 12
                 Next
             End If
 
-            e.Graphics.DrawString("------------------------", New Font("Segoe UI", 7), Brushes.Black, 10, y)
-            y += 12
-            e.Graphics.DrawString("TOTAL : " & ticket.Total.ToString() & " FC", New Font("Segoe UI", 8, FontStyle.Bold), Brushes.Black, 10, y)
-            y += 12
-            e.Graphics.DrawString("Recu : " & ticket.MontantRecu.ToString() & " " & ticket.Devise, New Font("Segoe UI", 7), Brushes.Black, 10, y)
-            y += 12
-            e.Graphics.DrawString("Monnaie : " & ticket.Monnaie.ToString() & " FC", New Font("Segoe UI", 7), Brushes.Black, 10, y)
-            y += 12
-            e.Graphics.DrawString("Merci pour votre visite", New Font("Segoe UI", 7), Brushes.Black, 10, y)
+            y = DessinerSeparateurTicket(e.Graphics, fontLigne, margeGauche, y)
+            y = DessinerBlocTicket(e.Graphics, "TOTAL", ticket.Total.ToString("N0") & " FC", fontTotal, margeGauche, margeDroite, y)
+            y = DessinerBlocTicket(e.Graphics, "Reçu", ticket.MontantRecu.ToString("N0") & " " & ticket.Devise, fontLigne, margeGauche, margeDroite, y)
+            y = DessinerBlocTicket(e.Graphics, "Monnaie", ticket.Monnaie.ToString("N0") & " FC", fontLigne, margeGauche, margeDroite, y)
+            y = DessinerSeparateurTicket(e.Graphics, fontLigne, margeGauche, y)
+            e.Graphics.DrawString("Merci pour votre visite", fontSection, Brushes.Black, New RectangleF(margeGauche, y, largeurContenu, 12), New StringFormat With {.Alignment = StringAlignment.Center})
+        End Sub
+
+        Private Function DessinerSeparateurTicket(graphics As Graphics, font As Font, x As Integer, y As Integer) As Integer
+            graphics.DrawString(New String("-"c, 32), font, Brushes.Black, x, y)
+            Return y + 12
+        End Function
+
+        Private Function DessinerBlocTicket(graphics As Graphics, libelle As String, valeur As String, font As Font, xGauche As Integer, xDroite As Integer, y As Integer) As Integer
+            graphics.DrawString(libelle & " :", font, Brushes.Black, xGauche, y)
+            graphics.DrawString(valeur, font, Brushes.Black, New RectangleF(xGauche + 70, y, Math.Max(60, xDroite - (xGauche + 70)), 12), New StringFormat With {.Alignment = StringAlignment.Far})
+            Return y + 12
         End Sub
 
         Private Sub AnnulerSelection(sender As Object, e As EventArgs)

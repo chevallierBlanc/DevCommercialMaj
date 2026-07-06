@@ -61,6 +61,7 @@ Namespace DevCommerc8ak
 
         Private ReadOnly _panier As List(Of PanierLigne)
         Private ReadOnly _typeVenteService As TypeVenteService 'nouveau
+        Private ReadOnly _typeVenteProduitService As TypeVenteProduitService
         Private _remiseMax As Decimal
         Private _produitsTable As DataTable
         Private _produitsView As DataView
@@ -97,6 +98,7 @@ Namespace DevCommerc8ak
 
             _panier = New List(Of PanierLigne)()
             _typeVenteService = New TypeVenteService()
+            _typeVenteProduitService = New TypeVenteProduitService()
             _typesVenteCourants = New List(Of TypeVenteDTO)()
 
             ' --- Header Panel ---
@@ -570,8 +572,9 @@ Namespace DevCommerc8ak
             Dim venteDemi As Boolean = SafeBoolean(row.Cells("VenteDemi").Value)
             Dim venteDouzaine As Boolean = SafeBoolean(row.Cells("VenteDouzaine").Value)
             Dim venteGros As Boolean = SafeBoolean(row.Cells("VenteGros").Value)
+            Dim typesPersonnalisesActifs As List(Of TypeVenteProduitDTO) = _typeVenteProduitService.ListerParProduit(produitId, True)
 
-            _typesVenteCourants = _typeVenteService.ConstruireTypesVentePourProduit(produitId, nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine)
+            _typesVenteCourants = _typeVenteService.ConstruireTypesVentePourProduit(produitId, nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine, typesPersonnalisesActifs)
             cmbUnite.DataSource = Nothing
             cmbUnite.DisplayMember = "NomAffichage"
             cmbUnite.ValueMember = "Nom"

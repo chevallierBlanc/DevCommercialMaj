@@ -1501,6 +1501,51 @@ Namespace DevCommerc8ak
             _typesPersonnalisesTemporairesParProduit.Remove(produitId)
         End Sub
 
+        Private Sub NettoyerSaisieEntreeApresEnregistrement(produitId As Integer, produitExistant As Boolean)
+            txtQuantiteEntree.Clear()
+            txtObservationEntree.Clear()
+            txtCoefficientInput.Clear()
+            txtCoefficientDetail.Clear()
+            txtReference.Clear()
+            _coefficientCalcule = 0D
+            _coefficientDetailCalcule = 0D
+            lblMargeCalculee.Text = String.Empty
+            lblMargeDetailCalculee.Text = String.Empty
+            lblTypeCoefficient.Text = String.Empty
+
+            If produitId > 0 Then
+                _typesPersonnalisesTemporairesParProduit.Remove(produitId)
+            End If
+
+            If produitExistant AndAlso produitId > 0 Then
+                chkProduitExistant.Checked = True
+                cmbProduitExistant.SelectedValue = produitId
+                ChargerProduitSelection(Nothing, EventArgs.Empty)
+            Else
+                txtNomProduit.Clear()
+                cmbCategorie.Text = String.Empty
+                cmbUniteBase.SelectedIndex = -1
+                txtNbUniteParBase.Clear()
+                txtPrixAchat.Clear()
+                txtPrixGros.Clear()
+                txtPrixDemi.Clear()
+                txtPrixQuart.Clear()
+                txtPrixPiece.Clear()
+                txtPrixDouzaine.Clear()
+                chkGros.Checked = True
+                chkDemi.Checked = False
+                chkQuart.Checked = False
+                chkPiece.Checked = True
+                chkDouzaine.Checked = False
+                RafraichirTypesVente()
+            End If
+
+            RafraichirResumeTypesPersonnalisesEntree()
+            gridTypesVente.DataSource = Nothing
+            RafraichirTypesVente()
+            txtQuantiteEntree.Focus()
+        End Sub
+
         Private Function ObtenirProduitCourantDepuisListe(produitId As Integer) As DataRow
             If _produitsTable Is Nothing Then
                 Return Nothing
@@ -2131,6 +2176,7 @@ Namespace DevCommerc8ak
                 End If
 
                 Dim produitId As Integer
+                Dim etaitProduitExistant As Boolean = chkProduitExistant.Checked
                 Dim produitCapture As Produit = Nothing
                 If chkProduitExistant.Checked Then
                     If cmbProduitExistant.SelectedValue Is Nothing OrElse IsDBNull(cmbProduitExistant.SelectedValue) Then
@@ -2199,13 +2245,8 @@ Namespace DevCommerc8ak
                     EnregistrerTypesPersonnalisesTemporaires(produitId)
                 End If
                 ChargerProduits()
-                chkProduitExistant.Checked = True
-                cmbProduitExistant.SelectedValue = produitId
-                ChargerProduitSelection(Nothing, EventArgs.Empty)
-
                 MessageBox.Show("Entrée stock enregistrée.")
-                AfficherStockActuel()
-                RecalculerStock(Nothing, EventArgs.Empty)
+                NettoyerSaisieEntreeApresEnregistrement(produitId, etaitProduitExistant)
             Catch ex As Exception
                 MessageBox.Show("Erreur entrée stock: " & ex.Message)
             End Try
