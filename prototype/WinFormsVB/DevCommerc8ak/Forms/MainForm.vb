@@ -182,6 +182,7 @@ Namespace DevCommerc8ak
         Private _isCheckingSession As Boolean
         Private _isCheckingStatus As Boolean
         Private _childFormLoaded As Form
+        Private _permissionsDepuisBase As Dictionary(Of String, Boolean)
 
         ' Boutons de navigation
         Private ReadOnly btnFact As Button
@@ -352,10 +353,28 @@ Namespace DevCommerc8ak
                 y += 50
             End If
 
-            If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) Then
+            If VerifierPermission("ANALYSE_VENTES") Then
                 AjouterBoutonSidebar(flowPnlMenu, "Analyse ventes", y, AddressOf AfficherAnalyseVente)
                 y += 50
+            End If
+
+            If VerifierPermission("INVENTAIRE") Then
                 AjouterBoutonSidebar(flowPnlMenu, "Inventaire", y, AddressOf AfficherInventaire)
+                y += 50
+            End If
+
+            If VerifierPermission("SUPERADMIN_STOCK_INITIAL") Then
+                AjouterBoutonSidebar(flowPnlMenu, "Stock initial technique", y, AddressOf AfficherStockInitialTechnique)
+                y += 50
+            End If
+
+            If VerifierPermission("SUPERADMIN_ROLES") Then
+                AjouterBoutonSidebar(flowPnlMenu, "Rôles & privilèges", y, AddressOf AfficherRolesSuperAdmin)
+                y += 50
+            End If
+
+            If VerifierPermission("SUPERADMIN_AUDIT") Then
+                AjouterBoutonSidebar(flowPnlMenu, "Journal actions", y, AddressOf AfficherJournalSuperAdmin)
                 y += 50
             End If
 
@@ -409,7 +428,7 @@ Namespace DevCommerc8ak
             AddHandler Me.Shown, AddressOf MainForm_Shown
             AddHandler panelContent.Resize, AddressOf PanelContent_Resize
 
-            If String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled Then
+            If EstRoleAdminEtendu() AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled Then
                 _backupTimer = New Timer() With {.Interval = 21600000}
                 AddHandler _backupTimer.Tick, AddressOf SauvegardeAutomatiqueTick
                 _backupTimer.Start()
@@ -428,7 +447,7 @@ Namespace DevCommerc8ak
             ElseIf String.Equals(SessionUtilisateur.Role, "CAISSIERE", StringComparison.OrdinalIgnoreCase) OrElse
                    String.Equals(SessionUtilisateur.Role, "CAISSIER", StringComparison.OrdinalIgnoreCase) Then
                 LoadForm(New CaisseForm())
-            ElseIf String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) Then
+            ElseIf EstRoleAdminEtendu() Then
                 Me.BeginInvoke(New MethodInvoker(Sub()
                                                      Try
                                                          If panelContent Is Nothing OrElse panelContent.ClientSize.Width <= 0 OrElse panelContent.ClientSize.Height <= 0 Then
@@ -494,11 +513,24 @@ Namespace DevCommerc8ak
         ''' Vérifier les permissions de l'utilisateur
         ''' </summary>
         Private Function VerifierPermission(fonctionnalite As String) As Boolean
-            Select Case SessionUtilisateur.Role
+            Dim role As String = If(SessionUtilisateur.Role, String.Empty).Trim().ToUpperInvariant()
+            Dim codePermission As String = MapperCodePermission(fonctionnalite)
+            Dim permissionBase As Boolean?
+
+            If codePermission <> String.Empty Then
+                permissionBase = LirePermissionDepuisBase(role, codePermission)
+                If permissionBase.HasValue Then
+                    Return permissionBase.Value
+                End If
+            End If
+
+            Select Case role
                 Case "ADMIN"
                     Return True
+                Case "SUPERADMIN"
+                    Return True
 
-                Case "Pasteur"
+                Case "PASTEUR"
                     Return True
 
                 Case "FACTURIER"
@@ -521,9 +553,85 @@ Namespace DevCommerc8ak
                             Return False
                     End Select
 
+                Case "CAISSIER"
+                    Select Case fonctionnalite
+                        Case "Caisse"
+                            Return True
+                        Case "Finance"
+                            Return True
+                        Case Else
+                            Return False
+                    End Select
+
                 Case Else
                     Return False
             End Select
+        End Function
+
+        Private Function MapperCodePermission(fonctionnalite As String) As String
+            Select Case fonctionnalite.Trim().ToUpperInvariant()
+                Case "FACTURIER"
+                    Return "FACTURIER"
+                Case "HISTORIQUEFACTURES", "HISTORIQUE_FACTURES"
+                    Return "HISTORIQUE_FACTURES"
+                Case "CAISSE"
+                    Return "CAISSE"
+                Case "FINANCE"
+                    Return "FINANCE"
+                Case "ADMIN"
+                    Return "ADMINISTRATION"
+                Case "ANALYSE_VENTES"
+                    Return "ANALYSE_VENTES"
+                Case "INVENTAIRE"
+                    Return "INVENTAIRE"
+                Case "PARAMETRES"
+                    Return "PARAMETRES"
+                Case "SUPERADMIN_STOCK_INITIAL"
+                    Return "SUPERADMIN_STOCK_INITIAL"
+                Case "SUPERADMIN_ROLES"
+                    Return "SUPERADMIN_ROLES"
+                Case "SUPERADMIN_AUDIT"
+                    Return "SUPERADMIN_AUDIT"
+                Case Else
+                    Return String.Empty
+            End Select
+        End Function
+
+        Private Function LirePermissionDepuisBase(role As String, codePermission As String) As Boolean?
+            If role = String.Empty OrElse codePermission = String.Empty Then
+                Return Nothing
+            End If
+
+            If _permissionsDepuisBase Is Nothing Then
+                _permissionsDepuisBase = New Dictionary(Of String, Boolean)(StringComparer.OrdinalIgnoreCase)
+            End If
+
+            Dim cle As String = role & "|" & codePermission
+            If _permissionsDepuisBase.ContainsKey(cle) Then
+                Return _permissionsDepuisBase(cle)
+            End If
+
+            Try
+                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                Dim repo As New SuperAdminRepository(New DAL(cs))
+                repo.AssurerInfrastructure()
+                If Not repo.RoleUtilisePermissions(role) Then
+                    Return Nothing
+                End If
+
+                Dim autorise As Boolean = repo.RoleAutoriseInterface(role, codePermission)
+                _permissionsDepuisBase(cle) = autorise
+                Return autorise
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Warn("MainForm", "LirePermissionDepuisBase", "Permission base indisponible pour " & codePermission & " : " & ex.Message)
+                Return Nothing
+            End Try
+        End Function
+
+        Private Function EstRoleAdminEtendu() As Boolean
+            Return String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) OrElse
+                   String.Equals(SessionUtilisateur.Role, "SUPERADMIN", StringComparison.OrdinalIgnoreCase)
         End Function
         ' --- Helper pour créer les boutons du menu latéral ---
         Private Function CreerBoutonMenu(texte As String) As Button
@@ -897,6 +1005,18 @@ Namespace DevCommerc8ak
             LoadForm(New FrmInventaireIntelligent())
         End Sub
 
+        Private Sub AfficherStockInitialTechnique(sender As Object, e As EventArgs)
+            LoadForm(New FormulaireStockInitialTechnique())
+        End Sub
+
+        Private Sub AfficherRolesSuperAdmin(sender As Object, e As EventArgs)
+            LoadForm(New FormulaireSuperAdminRoles())
+        End Sub
+
+        Private Sub AfficherJournalSuperAdmin(sender As Object, e As EventArgs)
+            LoadForm(New FormulaireSuperAdminJournal())
+        End Sub
+
         Private Sub AfficherAPropos(sender As Object, e As EventArgs)
             Using frm As New FormAPropos()
                 frm.ShowDialog(Me)
@@ -944,7 +1064,7 @@ Namespace DevCommerc8ak
                     _etatTimer.Dispose()
                 End If
 
-                If Not ApplicationLifecycle.IsReturnToLoginRequested() AndAlso String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled AndAlso _backupSettings.BackupBeforeExit Then
+                If Not ApplicationLifecycle.IsReturnToLoginRequested() AndAlso EstRoleAdminEtendu() AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled AndAlso _backupSettings.BackupBeforeExit Then
                     Dim resultat As BackupResult = Nothing
                     Dim tacheBackup As Task(Of BackupResult) = Task.Run(Function() _backupService.ExecuterSauvegarde(_backupSettings.BackupFolder))
                     If tacheBackup.Wait(TimeSpan.FromSeconds(60)) Then

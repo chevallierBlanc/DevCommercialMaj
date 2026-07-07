@@ -52,6 +52,7 @@ Namespace DevCommerc8ak
         Private ReadOnly txtPrixAchat As TextBox
         Private ReadOnly cmbDevise As ComboBox
         Private ReadOnly txtTaux As TextBox
+        Private ReadOnly lblEquivalentCdf As Label
         Private ReadOnly txtCoefficientInput As TextBox
         Private ReadOnly txtCoefficientDetail As TextBox
         Private ReadOnly lblTypeCoefficient As Label
@@ -183,6 +184,7 @@ Namespace DevCommerc8ak
 
         ' --- LOGIC VARIABLES ---
         Private _produitsTable As DataTable
+        Private _categoriesTable As DataTable
         Private _produitsAutoCompleteSource As AutoCompleteStringCollection
         Private _coefficientCalcule As Decimal
         Private _coefficientDetailCalcule As Decimal
@@ -193,6 +195,8 @@ Namespace DevCommerc8ak
         Private ReadOnly _panier As List(Of PanierLigne)
         Private ReadOnly _typesPersonnalisesTemporairesParProduit As Dictionary(Of Integer, List(Of TypeVenteProduitDTO))
         Private _prochainTypeTemporaireId As Integer
+        Private ReadOnly _prixManuelOverrides As Dictionary(Of String, Boolean)
+        Private _isUpdatingPrixAutomatiques As Boolean
 
         Private Class PanierLigne
             Public Property ProduitId As Integer
@@ -222,6 +226,7 @@ Namespace DevCommerc8ak
             _panier = New List(Of PanierLigne)()
             _typesPersonnalisesTemporairesParProduit = New Dictionary(Of Integer, List(Of TypeVenteProduitDTO))()
             _prochainTypeTemporaireId = -1
+            _prixManuelOverrides = New Dictionary(Of String, Boolean)(StringComparer.OrdinalIgnoreCase)
             ' Main Layout
             Dim mainLayout As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 2, .AutoScroll = True}
             mainLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 60))
@@ -315,26 +320,27 @@ Namespace DevCommerc8ak
             cmbDevise.Items.AddRange(New Object() {"CDF", "USD"})
             cmbDevise.SelectedIndex = 0
             txtTaux = New TextBox() With {.Left = 360, .Top = 45, .Width = 80, .ReadOnly = True}
+            lblEquivalentCdf = New Label() With {.Left = 150, .Top = 105, .Width = 300, .AutoSize = False, .ForeColor = ColorSecondary}
             txtCoefficientInput = New TextBox() With {.Left = 150, .Top = 75, .Width = 120}
-            txtCoefficientDetail = New TextBox() With {.Left = 150, .Top = 135, .Width = 120}
+            txtCoefficientDetail = New TextBox() With {.Left = 150, .Top = 155, .Width = 120}
             lblTypeCoefficient = New Label() With {.Left = 280, .Top = 78, .AutoSize = True}
-            lblMargeCalculee = New Label() With {.Left = 150, .Top = 105, .AutoSize = True, .ForeColor = ColorAccent}
-            lblMargeDetailCalculee = New Label() With {.Left = 150, .Top = 165, .AutoSize = True, .ForeColor = ColorAccent}
+            lblMargeCalculee = New Label() With {.Left = 150, .Top = 125, .AutoSize = True, .ForeColor = ColorAccent}
+            lblMargeDetailCalculee = New Label() With {.Left = 150, .Top = 185, .AutoSize = True, .ForeColor = ColorAccent}
             cardFinance.Controls.AddRange(New Control() {
                 New Label() With {.Text = "Prix Achat", .Left = 20, .Top = 48, .AutoSize = True},
                 New Label() With {.Text = "Coeff. Gros", .Left = 20, .Top = 78, .AutoSize = True},
-                New Label() With {.Text = "Coeff. Détail", .Left = 20, .Top = 138, .AutoSize = True},
-                txtPrixAchat, cmbDevise, txtTaux, txtCoefficientInput, txtCoefficientDetail, lblTypeCoefficient, lblMargeCalculee, lblMargeDetailCalculee
+                New Label() With {.Text = "Coeff. Détail", .Left = 20, .Top = 158, .AutoSize = True},
+                txtPrixAchat, cmbDevise, txtTaux, lblEquivalentCdf, txtCoefficientInput, txtCoefficientDetail, lblTypeCoefficient, lblMargeCalculee, lblMargeDetailCalculee
             })
             'layoutEntree.Controls.Add(cardFinance)
 
             ' Card 4: Prix Vente
             Dim cardPrix As Panel = CreateCard(600, 350, "PRIX DE VENTE CALCULÉS")
-            txtPrixGros = New TextBox() With {.Left = 150, .Top = 45, .Width = 120, .ReadOnly = True}
-            txtPrixDemi = New TextBox() With {.Left = 150, .Top = 75, .Width = 120, .ReadOnly = True}
-            txtPrixQuart = New TextBox() With {.Left = 150, .Top = 105, .Width = 120, .ReadOnly = True}
-            txtPrixPiece = New TextBox() With {.Left = 150, .Top = 135, .Width = 120, .ReadOnly = True}
-            txtPrixDouzaine = New TextBox() With {.Left = 150, .Top = 165, .Width = 120, .ReadOnly = True, .Visible = True}
+            txtPrixGros = New TextBox() With {.Name = "txtPrixGros", .Left = 150, .Top = 45, .Width = 120}
+            txtPrixDemi = New TextBox() With {.Name = "txtPrixDemi", .Left = 150, .Top = 75, .Width = 120}
+            txtPrixQuart = New TextBox() With {.Name = "txtPrixQuart", .Left = 150, .Top = 105, .Width = 120}
+            txtPrixPiece = New TextBox() With {.Name = "txtPrixPiece", .Left = 150, .Top = 135, .Width = 120}
+            txtPrixDouzaine = New TextBox() With {.Name = "txtPrixDouzaine", .Left = 150, .Top = 165, .Width = 120, .Visible = True}
             btnTypesPersonnalisesEntree = New Button() With {.Text = "Créer type personnalisé", .Left = 300, .Top = 42, .Width = 210, .Height = 32, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .FlatStyle = FlatStyle.Flat}
             btnTypesPersonnalisesEntree.FlatAppearance.BorderSize = 0
             Dim lblTypesPersonnalisesEntree As New Label() With {.Text = "Types personnalisés", .Left = 300, .Top = 82, .AutoSize = True}
@@ -703,6 +709,7 @@ Namespace DevCommerc8ak
             AddHandler txtNbUniteParBase.TextChanged, AddressOf RecalculerStock
             AddHandler txtQuantiteEntree.TextChanged, AddressOf RecalculerStock
             AddHandler txtPrixAchat.TextChanged, AddressOf RecalculerPrixAuto
+            AddHandler cmbDevise.SelectedIndexChanged, AddressOf DeviseOuPrixAchatChange
             AddHandler txtCoefficientInput.TextChanged, AddressOf CoefficientInputChange
             AddHandler txtCoefficientDetail.TextChanged, AddressOf CoefficientDetailChange
             AddHandler chkGros.CheckedChanged, AddressOf RecalculerPrixAuto
@@ -710,6 +717,11 @@ Namespace DevCommerc8ak
             AddHandler chkQuart.CheckedChanged, AddressOf RecalculerPrixAuto
             AddHandler chkPiece.CheckedChanged, AddressOf RecalculerPrixAuto
             AddHandler chkDouzaine.CheckedChanged, AddressOf RecalculerPrixAuto
+            AddHandler txtPrixGros.TextChanged, AddressOf PrixVenteManuelChange
+            AddHandler txtPrixDemi.TextChanged, AddressOf PrixVenteManuelChange
+            AddHandler txtPrixQuart.TextChanged, AddressOf PrixVenteManuelChange
+            AddHandler txtPrixPiece.TextChanged, AddressOf PrixVenteManuelChange
+            AddHandler txtPrixDouzaine.TextChanged, AddressOf PrixVenteManuelChange
             AddHandler btnTypesPersonnalisesEntree.Click, AddressOf OuvrirTypesPersonnalisesEntree
             AddHandler btnEnregistrerEntree.Click, AddressOf EnregistrerEntree
             AddHandler btnRafraichirSortie.Click, AddressOf ChargerSortiesDuMois
@@ -818,7 +830,7 @@ Namespace DevCommerc8ak
 
         Private Sub FormulaireStock_Load(sender As Object, e As EventArgs)
             Try
-                'ChargerCategories()
+                ChargerCategories()
                 ChargerProduits()
                 ChargerParametres()
                 ChargerMotifsSortie()
@@ -835,6 +847,26 @@ Namespace DevCommerc8ak
                 RafraichirResumeTypesPersonnalisesEntree()
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement: " & ex.Message)
+            End Try
+        End Sub
+
+        Private Sub ChargerCategories()
+            Try
+                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                Dim dal As New DAL(cs)
+                _categoriesTable = dal.ExecuterTable(
+                    "SELECT CategorieId, ISNULL(NomCategorie, '') AS NomCategorie FROM CategoriesProduits ORDER BY NomCategorie",
+                    CommandType.Text,
+                    Nothing)
+                cmbCategorie.DataSource = Nothing
+                cmbCategorie.DisplayMember = "NomCategorie"
+                cmbCategorie.ValueMember = "CategorieId"
+                cmbCategorie.DataSource = _categoriesTable
+                cmbCategorie.SelectedIndex = -1
+            Catch
+                _categoriesTable = Nothing
+                cmbCategorie.DataSource = Nothing
+                cmbCategorie.Items.Clear()
             End Try
         End Sub
 
@@ -1133,16 +1165,6 @@ Namespace DevCommerc8ak
             cmbProduitPerte.DisplayMember = "Libelle"
             cmbProduitPerte.ValueMember = "ProduitId"
 
-            cmbCategorie.Items.Clear()
-            For Each row As DataRow In _produitsTable.Rows
-                If Not row.IsNull("CategorieId") Then
-                    Dim v As String = Convert.ToString(row("CategorieId"))
-                    If Not cmbCategorie.Items.Contains(v) Then
-                        cmbCategorie.Items.Add(v)
-                    End If
-                End If
-            Next
-
             If _produitsTable.Rows.Count > 0 Then
                 ChargerSortiesDuMois(Nothing, EventArgs.Empty)
                 ChargerRapportEntrees(Nothing, EventArgs.Empty)
@@ -1160,9 +1182,52 @@ Namespace DevCommerc8ak
                 If p IsNot Nothing Then
                     txtTaux.Text = p.TauxUsd.ToString()
                 End If
+                MettreAJourEquivalentPrixAchat()
             Catch
             End Try
         End Sub
+
+        Private Sub DeviseOuPrixAchatChange(sender As Object, e As EventArgs)
+            MettreAJourEquivalentPrixAchat()
+            RecalculerPrixAuto(sender, e)
+        End Sub
+
+        Private Sub MettreAJourEquivalentPrixAchat()
+            Dim prixSaisi As Decimal = LireDecimal(txtPrixAchat.Text)
+            Dim prixCdf As Decimal = CalculerPrixAchatEnCdf(prixSaisi)
+            If prixSaisi <= 0D Then
+                lblEquivalentCdf.Text = String.Empty
+                Return
+            End If
+
+            If String.Equals(Convert.ToString(cmbDevise.SelectedItem), "USD", StringComparison.OrdinalIgnoreCase) Then
+                lblEquivalentCdf.Text = "Équivalent CDF : " & prixCdf.ToString("N0") & " FC"
+            Else
+                lblEquivalentCdf.Text = "Montant CDF : " & prixCdf.ToString("N0") & " FC"
+            End If
+        End Sub
+
+        Private Function CalculerPrixAchatEnCdf(prixSaisi As Decimal) As Decimal
+            If prixSaisi <= 0D Then
+                Return 0D
+            End If
+
+            If String.Equals(Convert.ToString(cmbDevise.SelectedItem), "USD", StringComparison.OrdinalIgnoreCase) Then
+                Dim taux As Decimal = LireDecimal(txtTaux.Text)
+                If taux <= 0D AndAlso _parametres IsNot Nothing Then
+                    taux = _parametres.TauxUsd
+                End If
+                If taux > 0D Then
+                    Return Math.Round(prixSaisi * taux, 2)
+                End If
+            End If
+
+            Return prixSaisi
+        End Function
+
+        Private Function LirePrixAchatEntreeEnCdf() As Decimal
+            Return CalculerPrixAchatEnCdf(LireDecimal(txtPrixAchat.Text))
+        End Function
 
         Private Sub BasculerProduitExistant(sender As Object, e As EventArgs)
             Dim existant As Boolean = chkProduitExistant.Checked
@@ -1171,6 +1236,7 @@ Namespace DevCommerc8ak
             cmbCategorie.Enabled = Not existant
 
             If existant Then
+                ReinitialiserOverridesPrixVente()
                 ChargerProduitSelection(Nothing, EventArgs.Empty)
             Else
                 txtNomProduit.Text = ""
@@ -1190,6 +1256,9 @@ Namespace DevCommerc8ak
                 txtPrixPiece.Clear()
                 txtPrixQuart.Clear()
                 txtObservationEntree.Clear()
+                lblEquivalentCdf.Text = String.Empty
+                ReinitialiserOverridesPrixVente()
+                cmbDevise.SelectedItem = "CDF"
                 chkDemi.Checked = False
                 chkDouzaine.Checked = False
                 chkQuart.Checked = False
@@ -1219,12 +1288,17 @@ Namespace DevCommerc8ak
             If row Is Nothing Then Return
             Dim r As DataRow = row.Row
             txtNomProduit.Text = Convert.ToString(row("Libelle"))
-            cmbCategorie.Text = If(r.IsNull("CategorieId"), "", Convert.ToString(row("CategorieId")))
+            If Not r.IsNull("CategorieId") AndAlso cmbCategorie.DataSource IsNot Nothing Then
+                cmbCategorie.SelectedValue = Convert.ToInt32(row("CategorieId"))
+            Else
+                cmbCategorie.SelectedIndex = -1
+            End If
             txtReference.Text = GenererReference(Convert.ToString(row("Libelle")), cmbCategorie.Text)
 
             cmbUniteBase.Text = If(r.IsNull("UnitePrincipale"), "", Convert.ToString(row("UnitePrincipale")))
             txtNbUniteParBase.Text = If(r.IsNull("ConversionUnite"), "", Convert.ToDecimal(row("ConversionUnite")).ToString())
             txtPrixAchat.Text = If(r.IsNull("PrixAchat"), "", Convert.ToDecimal(row("PrixAchat")).ToString())
+            cmbDevise.SelectedItem = "CDF"
             txtCoefficientInput.Text = If(r.IsNull("CoefficientGros"), "", Convert.ToDecimal(row("CoefficientGros")).ToString("N4"))
 
             Dim prixAchatVal As Decimal = LireDecimal(txtPrixAchat.Text)
@@ -1244,6 +1318,8 @@ Namespace DevCommerc8ak
             chkDouzaine.Checked = Convert.ToBoolean(row("VenteDouzaine"))
 
             AfficherStockActuel()
+            ReinitialiserOverridesPrixVente()
+            MettreAJourEquivalentPrixAchat()
             RecalculerStock(Nothing, EventArgs.Empty)
             RecalculerPrixAuto(Nothing, EventArgs.Empty)
             RafraichirTypesVente()
@@ -1286,7 +1362,7 @@ Namespace DevCommerc8ak
             End If
 
             Dim typesCourants As List(Of TypeVenteProduitDTO) = ConstruireTypesPersonnalisesFusionnesPourProduit(produitId)
-            Using frm As New FormulaireTypesVenteProduit(produitId, LireDecimal(txtPrixAchat.Text), LireDecimal(txtNbUniteParBase.Text), False, typesCourants)
+            Using frm As New FormulaireTypesVenteProduit(produitId, LirePrixAchatEntreeEnCdf(), LireDecimal(txtNbUniteParBase.Text), False, typesCourants)
                 If frm.ShowDialog(Me) = DialogResult.OK AndAlso frm.TypeVenteResultat IsNot Nothing Then
                     Dim typeResultat As TypeVenteProduitDTO = ClonerTypePersonnalise(frm.TypeVenteResultat)
                     If typeResultat.TypeVenteProduitId = 0 Then
@@ -1396,7 +1472,7 @@ Namespace DevCommerc8ak
             End If
 
             Dim typesCourants As List(Of TypeVenteProduitDTO) = ConstruireTypesPersonnalisesFusionnesPourProduit(produitId)
-            Using frm As New FormulaireTypesVenteProduit(produitId, LireDecimal(txtPrixAchat.Text), LireDecimal(txtNbUniteParBase.Text), False, typesCourants, typeCourant)
+            Using frm As New FormulaireTypesVenteProduit(produitId, LirePrixAchatEntreeEnCdf(), LireDecimal(txtNbUniteParBase.Text), False, typesCourants, typeCourant)
                 If frm.ShowDialog(Me) = DialogResult.OK AndAlso frm.TypeVenteResultat IsNot Nothing Then
                     AjouterOuRemplacerTypePersonnaliseTemporaire(produitId, frm.TypeVenteResultat)
                 End If
@@ -1507,11 +1583,13 @@ Namespace DevCommerc8ak
             txtCoefficientInput.Clear()
             txtCoefficientDetail.Clear()
             txtReference.Clear()
+            lblEquivalentCdf.Text = String.Empty
             _coefficientCalcule = 0D
             _coefficientDetailCalcule = 0D
             lblMargeCalculee.Text = String.Empty
             lblMargeDetailCalculee.Text = String.Empty
             lblTypeCoefficient.Text = String.Empty
+            ReinitialiserOverridesPrixVente()
 
             If produitId > 0 Then
                 _typesPersonnalisesTemporairesParProduit.Remove(produitId)
@@ -1527,6 +1605,7 @@ Namespace DevCommerc8ak
                 cmbUniteBase.SelectedIndex = -1
                 txtNbUniteParBase.Clear()
                 txtPrixAchat.Clear()
+                cmbDevise.SelectedItem = "CDF"
                 txtPrixGros.Clear()
                 txtPrixDemi.Clear()
                 txtPrixQuart.Clear()
@@ -1558,6 +1637,14 @@ Namespace DevCommerc8ak
             Next
 
             Return Nothing
+        End Function
+
+        Private Function ObtenirCategorieSelectionneId() As Integer?
+            If cmbCategorie.SelectedValue Is Nothing OrElse IsDBNull(cmbCategorie.SelectedValue) Then
+                Return Nothing
+            End If
+
+            Return Convert.ToInt32(cmbCategorie.SelectedValue)
         End Function
 
         Private Function LireTexteCellule(row As DataRow, colonne As String) As String
@@ -1602,7 +1689,7 @@ Namespace DevCommerc8ak
                 .ProduitId = produitId,
                 .CodeBarres = LireTexteCellule(row, "CodeBarres"),
                 .Libelle = LireTexteCellule(row, "Libelle"),
-                .PrixAchat = LireDecimal(txtPrixAchat.Text),
+                .PrixAchat = LirePrixAchatEntreeEnCdf(),
                 .PrixGros = If(chkGros.Checked, If(prixGrosSaisi, LireDecimal(txtPrixGros.Text), LireDecimalTable(row, "PrixGros")), 0D),
                 .PrixDemi = If(chkDemi.Checked, If(prixDemiSaisi, LireDecimal(txtPrixDemi.Text), LireDecimalTable(row, "PrixDemi")), 0D),
                 .PrixQuart = If(chkQuart.Checked, If(prixQuartSaisi, LireDecimal(txtPrixQuart.Text), LireDecimalTable(row, "PrixQuart")), 0D),
@@ -1986,8 +2073,50 @@ Namespace DevCommerc8ak
             End If
         End Sub
 
+        Private Sub PrixVenteManuelChange(sender As Object, e As EventArgs)
+            If _isUpdatingPrixAutomatiques Then
+                Return
+            End If
+
+            Dim txt As TextBox = TryCast(sender, TextBox)
+            If txt Is Nothing Then
+                Return
+            End If
+
+            _prixManuelOverrides(txt.Name) = Not String.IsNullOrWhiteSpace(txt.Text) AndAlso txt.Text.Trim() <> "-"
+        End Sub
+
+        Private Sub ReinitialiserOverridesPrixVente()
+            _prixManuelOverrides.Clear()
+        End Sub
+
+        Private Function PrixVenteEnOverride(nomControle As String) As Boolean
+            Dim valeur As Boolean = False
+            If _prixManuelOverrides.TryGetValue(nomControle, valeur) Then
+                Return valeur
+            End If
+            Return False
+        End Function
+
+        Private Sub DefinirPrixCalcule(zone As TextBox, valeur As Decimal, actif As Boolean)
+            If zone Is Nothing Then
+                Return
+            End If
+            If PrixVenteEnOverride(zone.Name) Then
+                Return
+            End If
+
+            _isUpdatingPrixAutomatiques = True
+            Try
+                zone.Text = If(actif, valeur.ToString("N0"), "-")
+            Finally
+                _isUpdatingPrixAutomatiques = False
+            End Try
+        End Sub
+
         Private Sub RecalculerPrixAuto(sender As Object, e As EventArgs)
-            Dim prixAchatVal As Decimal = LireDecimal(txtPrixAchat.Text)
+            MettreAJourEquivalentPrixAchat()
+            Dim prixAchatVal As Decimal = LirePrixAchatEntreeEnCdf()
             Dim nbUnites As Decimal = LireDecimal(txtNbUniteParBase.Text)
             Dim coefficientGros As Decimal = If(_coefficientCalcule > 0D, _coefficientCalcule, 0D)
             Dim coefficientDetail As Decimal = If(_coefficientDetailCalcule > 0D, _coefficientDetailCalcule, 0D)
@@ -2007,11 +2136,11 @@ Namespace DevCommerc8ak
             Dim prixQuart As Decimal = prixPiece * Math.Max(1D, Decimal.Floor(nbUnites / 4D))
             Dim prixDouzaine As Decimal = prixPiece * 12D
 
-            txtPrixGros.Text = If(chkGros.Checked AndAlso coefficientGros > 0D, prixGros.ToString("N0"), "-")
-            txtPrixDemi.Text = If(chkDemi.Checked AndAlso coefficientGros > 0D, prixDemi.ToString("N0"), "-")
-            txtPrixQuart.Text = If(chkQuart.Checked, prixQuart.ToString("N0"), "-")
-            txtPrixPiece.Text = If(chkPiece.Checked, prixPiece.ToString("N0"), "-")
-            txtPrixDouzaine.Text = If(chkDouzaine.Checked, prixDouzaine.ToString("N0"), "-")
+            DefinirPrixCalcule(txtPrixGros, prixGros, chkGros.Checked AndAlso coefficientGros > 0D)
+            DefinirPrixCalcule(txtPrixDemi, prixDemi, chkDemi.Checked AndAlso coefficientGros > 0D)
+            DefinirPrixCalcule(txtPrixQuart, prixQuart, chkQuart.Checked)
+            DefinirPrixCalcule(txtPrixPiece, prixPiece, chkPiece.Checked)
+            DefinirPrixCalcule(txtPrixDouzaine, prixDouzaine, chkDouzaine.Checked)
         End Sub
         'Private Sub ChargerSortiesDuMois(sender As Object, e As EventArgs)
         '    Try
@@ -2168,7 +2297,7 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                Dim prixAchatVal As Decimal = LireDecimal(txtPrixAchat.Text)
+                Dim prixAchatVal As Decimal = LirePrixAchatEntreeEnCdf()
                 If prixAchatVal <= 0D Then
                     MessageBox.Show("Le prix d'achat doit être renseigné et supérieur à zéro.")
                     txtPrixAchat.Focus()
@@ -2200,7 +2329,7 @@ Namespace DevCommerc8ak
                         MessageBox.Show("Le nombre d'unités par base doit être supérieur à zéro.")
                         Return
                     End If
-                    Dim prixAchatVal1 As Decimal = LireDecimal(txtPrixAchat.Text)
+                    Dim prixAchatVal1 As Decimal = LirePrixAchatEntreeEnCdf()
                     Dim prixGrosVal As Decimal = LireDecimal(txtPrixGros.Text.Replace("-", "0"))
                     Dim prixDemiVal As Decimal = LireDecimal(txtPrixDemi.Text.Replace("-", "0"))
                     Dim prixQuartVal As Decimal = LireDecimal(txtPrixQuart.Text.Replace("-", "0"))
@@ -2220,7 +2349,7 @@ Namespace DevCommerc8ak
                         .CoefficientGros = _coefficientCalcule,
                         .SeuilCritique = 0D,
                         .DateExpiration = Nothing,
-                        .CategorieId = If(IsNumeric(cmbCategorie.Text.Trim()), Convert.ToInt32(cmbCategorie.Text.Trim()), CType(Nothing, Integer?)),
+                        .CategorieId = ObtenirCategorieSelectionneId(),
                         .UnitePrincipale = cmbUniteBase.Text,
                         .UniteSecondaire = "Piece",
                         .ConversionUnite = LireDecimal(txtNbUniteParBase.Text),

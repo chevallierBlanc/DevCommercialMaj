@@ -80,6 +80,7 @@
     <Compile Include="DTOs\BonApprovisionnementDTO.vb" />
     <Compile Include="DTOs\TypeVenteDTO.vb" />
     <Compile Include="DTOs\TypeVenteProduitDTO.vb" />
+    <Compile Include="DTOs\AuditLogEntryDTO.vb" />
     <Compile Include="DTOs\NotificationDTO.vb" />
     <Compile Include="Repositories\ClientRepository.vb" />
     <Compile Include="Repositories\FinanceRepositories %284%29.vb" />
@@ -102,6 +103,7 @@
     <Compile Include="Repositories\SessionRepository.vb" />
     <Compile Include="Repositories\DepenseRepository.vb" />
     <Compile Include="Repositories\InventaireIntelligentRepository.vb" />
+    <Compile Include="Repositories\SuperAdminRepository.vb" />
     <Compile Include="Repositories\StockSortieNonSynchroniseRepository.vb" />
     <Compile Include="Repositories\DepensesNonSynchroniseesRepository.vb" />
     <Compile Include="Services\ClientService.vb" />
@@ -135,6 +137,7 @@
     <Compile Include="Services\NotificationService.vb" />
     <Compile Include="Services\IconsHelper.vb" />
     <Compile Include="Services\LogoPathHelper.vb" />
+    <Compile Include="Services\SuperAdminService.vb" />
     <Compile Include="UI\FormulaireAnalyseVente .vb">
       <SubType>Form</SubType>
     </Compile>
@@ -205,6 +208,15 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FormulaireTypesVenteProduit.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireSuperAdminRoles.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireSuperAdminJournal.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireStockInitialTechnique.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\NotificationPopupB.vb">

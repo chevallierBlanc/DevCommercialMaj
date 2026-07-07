@@ -122,7 +122,7 @@ Namespace DevCommerc8ak
                 .FlatStyle = FlatStyle.Flat,
                 .Margin = New Padding(0, 0, 20, 0)
             }
-            cmbRole.Items.AddRange(New Object() {"ADMIN", "CAISSIERE", "FACTURIER"})
+            cmbRole.Items.AddRange(New Object() {"SUPERADMIN", "ADMIN", "CAISSIERE", "CAISSIER", "FACTURIER"})
 
             chkActif = New CheckBox() With {
                 .Text = "Compte Actif",
