@@ -42,7 +42,7 @@ Namespace DevCommerc8ak
             txtModule = CreerZone("Module")
             txtAction = CreerZone("Action")
             cmbType = New ComboBox() With {.Width = 120, .DropDownStyle = ComboBoxStyle.DropDownList}
-            cmbType.Items.AddRange(New Object() {"", "INFO", "WARN", "ERROR"})
+            cmbType.Items.AddRange(New Object() {"", "OK", "INFO", "WARN", "ERROR"})
             cmbType.SelectedIndex = 0
             dtpDebut = New DateTimePicker() With {.Width = 140, .Format = DateTimePickerFormat.Short}
             dtpFin = New DateTimePicker() With {.Width = 140, .Format = DateTimePickerFormat.Short}
@@ -92,11 +92,28 @@ Namespace DevCommerc8ak
             Try
                 Dim lignes As List(Of AuditLogEntryDTO) = _service.ListerActionsUtilisateur(dtpDebut.Value.Date, dtpFin.Value.Date, txtUtilisateur.Text, txtRole.Text, txtModule.Text, txtAction.Text, Convert.ToString(cmbType.SelectedItem))
                 grid.DataSource = lignes
+                ConfigurerColonnes()
             Catch ex As Exception
                 Dim log As New ProductionLogService()
                 log.Error("FormulaireSuperAdminJournal", "ChargerJournal", "Chargement du journal impossible.", ex)
                 MessageBox.Show("Impossible de charger le journal : " & ex.Message)
             End Try
+        End Sub
+
+        Private Sub ConfigurerColonnes()
+            If grid.Columns.Count = 0 Then
+                Return
+            End If
+
+            If grid.Columns.Contains("DateAction") Then grid.Columns("DateAction").HeaderText = "Date / Heure"
+            If grid.Columns.Contains("Utilisateur") Then grid.Columns("Utilisateur").HeaderText = "Utilisateur"
+            If grid.Columns.Contains("Role") Then grid.Columns("Role").HeaderText = "Rôle"
+            If grid.Columns.Contains("Module") Then grid.Columns("Module").HeaderText = "Module"
+            If grid.Columns.Contains("Action") Then grid.Columns("Action").HeaderText = "Action"
+            If grid.Columns.Contains("Description") Then grid.Columns("Description").HeaderText = "Description"
+            If grid.Columns.Contains("Machine") Then grid.Columns("Machine").HeaderText = "Machine / Poste"
+            If grid.Columns.Contains("Statut") Then grid.Columns("Statut").HeaderText = "Statut"
+            If grid.Columns.Contains("Niveau") Then grid.Columns("Niveau").Visible = False
         End Sub
 
         Private Sub ExporterCsv(sender As Object, e As EventArgs)

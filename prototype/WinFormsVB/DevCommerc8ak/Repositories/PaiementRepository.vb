@@ -5,6 +5,7 @@ Imports System
 Imports System.Data
 Imports System.Data.SqlClient
 Imports System.Collections.Generic
+Imports System.Globalization
 
 Namespace DevCommerc8ak
     Public Class PaiementRepository
@@ -50,16 +51,21 @@ Namespace DevCommerc8ak
             Dim liste As New List(Of PaiementDTO)()
 
             For Each row As DataRow In dt.Rows
-                liste.Add(New PaiementDTO With {
-                    .PaiementId = Convert.ToInt32(row("PaiementId")),
-                    .FactureVenteId = Convert.ToInt32(row("FactureVenteId")),
-                    .ModePaiement = Convert.ToString(row("ModePaiement")),
-                    .Montant = Convert.ToDecimal(row("Montant")),
-                    .MontantRecu = Convert.ToDecimal(row("MontantRecu")),
-                    .MonnaieRendue = Convert.ToDecimal(row("MonnaieRendue")),
-                    .Devise = If(row.IsNull("Devise"), Nothing, Convert.ToString(row("Devise"))),
-                    .PayeLe = Convert.ToDateTime(row("PayeLe"))
-                })
+                Try
+                    liste.Add(New PaiementDTO With {
+                        .PaiementId = SafeInteger(row("PaiementId")),
+                        .FactureVenteId = SafeInteger(row("FactureVenteId")),
+                        .ModePaiement = SafeString(row("ModePaiement")),
+                        .Montant = SafeDecimal(row("Montant")),
+                        .MontantRecu = SafeDecimal(row("MontantRecu")),
+                        .MonnaieRendue = SafeDecimal(row("MonnaieRendue")),
+                        .Devise = SafeNullableString(row("Devise")),
+                        .PayeLe = SafeDate(row("PayeLe"))
+                    })
+                Catch ex As Exception
+                    Dim log As New ProductionLogService()
+                    log.Warn("PaiementRepository", "ListerParFacture", "Ligne paiement ignorée car invalide : " & ex.Message)
+                End Try
             Next
 
             Return liste
@@ -70,6 +76,74 @@ Namespace DevCommerc8ak
             Dim sql As String = "DELETE FROM Paiements WHERE PaiementId = @PaiementId"
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@PaiementId", paiementId)}
             Return _dal.ExecuterNonRequete(sql, CommandType.Text, p)
+        End Function
+
+        Private Function SafeInteger(value As Object) As Integer
+            If value Is Nothing OrElse Convert.IsDBNull(value) Then
+                Return 0
+            End If
+
+            Dim resultat As Integer
+            If Integer.TryParse(Convert.ToString(value), resultat) Then
+                Return resultat
+            End If
+            Return 0
+        End Function
+
+        Private Function SafeDecimal(value As Object) As Decimal
+            If value Is Nothing OrElse Convert.IsDBNull(value) Then
+                Return 0D
+            End If
+
+            If TypeOf value Is Decimal Then
+                Return CType(value, Decimal)
+            End If
+
+            Dim texte As String = Convert.ToString(value).Trim()
+            If texte = String.Empty Then
+                Return 0D
+            End If
+
+            Dim invariant As String = texte.Replace(",", ".")
+            Dim resultat As Decimal
+            If Decimal.TryParse(invariant, NumberStyles.Any, CultureInfo.InvariantCulture, resultat) Then
+                Return resultat
+            End If
+            If Decimal.TryParse(texte, NumberStyles.Any, CultureInfo.CurrentCulture, resultat) Then
+                Return resultat
+            End If
+            Return 0D
+        End Function
+
+        Private Function SafeDate(value As Object) As Date
+            If value Is Nothing OrElse Convert.IsDBNull(value) Then
+                Return Date.MinValue
+            End If
+
+            If TypeOf value Is Date Then
+                Return CType(value, Date)
+            End If
+
+            Dim resultat As Date
+            If Date.TryParse(Convert.ToString(value), resultat) Then
+                Return resultat
+            End If
+            Return Date.MinValue
+        End Function
+
+        Private Function SafeString(value As Object) As String
+            If value Is Nothing OrElse Convert.IsDBNull(value) Then
+                Return String.Empty
+            End If
+            Return Convert.ToString(value)
+        End Function
+
+        Private Function SafeNullableString(value As Object) As String
+            Dim texte As String = SafeString(value)
+            If String.IsNullOrWhiteSpace(texte) Then
+                Return Nothing
+            End If
+            Return texte
         End Function
     End Class
 End Namespace

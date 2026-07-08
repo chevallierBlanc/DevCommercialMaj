@@ -1,6 +1,7 @@
 Imports System.Windows.Forms
 Imports System.Drawing
 Imports System.Drawing.Drawing2D
+Imports System.Configuration
 Imports Microsoft.VisualBasic
 
 Namespace DevCommerc8ak
@@ -104,8 +105,19 @@ Namespace DevCommerc8ak
             AddHandler btnUtilisateurs.Click, Sub() OuvrirFenetre(New FormulaireUtilisateurs())
             AddHandler btnFinance.Click, Sub() OuvrirFenetre(New FormulaireFinance())
 
-            ' Ajout à la grille
-            flowMain.Controls.AddRange({btnDashboard, btnProduits, btnClients, btnFournisseurs, btnFactures, btnPaiements, btnFinance, btnStock, btnVentes, btnAppro, btnRapports, btnUtilisateurs, btnParametres})
+            If VerifierPermission("ADMINISTRATION") Then flowMain.Controls.Add(btnDashboard)
+            If VerifierPermission("STOCK_INVENTAIRE") Then flowMain.Controls.Add(btnProduits)
+            If VerifierPermission("ADMINISTRATION") Then flowMain.Controls.Add(btnClients)
+            If VerifierPermission("ADMINISTRATION") Then flowMain.Controls.Add(btnFournisseurs)
+            If VerifierPermission("HISTORIQUE_FACTURES") Then flowMain.Controls.Add(btnFactures)
+            If VerifierPermission("CAISSE") Then flowMain.Controls.Add(btnPaiements)
+            If VerifierPermission("FINANCE") Then flowMain.Controls.Add(btnFinance)
+            If VerifierPermission("STOCK_INVENTAIRE") Then flowMain.Controls.Add(btnStock)
+            If VerifierPermission("ANALYSE_VENTES") Then flowMain.Controls.Add(btnVentes)
+            If VerifierPermission("STOCK_INVENTAIRE") Then flowMain.Controls.Add(btnAppro)
+            If VerifierPermission("ADMINISTRATION") Then flowMain.Controls.Add(btnRapports)
+            If VerifierPermission("ADMINISTRATION") Then flowMain.Controls.Add(btnUtilisateurs)
+            If VerifierPermission("PARAMETRES") Then flowMain.Controls.Add(btnParametres)
 
             ' Assemblage final
             Me.Controls.Add(flowMain)
@@ -176,5 +188,25 @@ Namespace DevCommerc8ak
             f.StartPosition = FormStartPosition.CenterParent
             f.ShowDialog(Me)
         End Sub
+
+        Private Function VerifierPermission(fonctionnalite As String) As Boolean
+            Dim role As String = If(SessionUtilisateur.Role, String.Empty).Trim().ToUpperInvariant()
+            If role = "SUPERADMIN" Then
+                Return True
+            End If
+
+            Dim codePermission As String = fonctionnalite.Trim().ToUpperInvariant()
+            Try
+                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                Dim repo As New SuperAdminRepository(New DAL(cs))
+                repo.AssurerInfrastructure()
+                If repo.RoleUtilisePermissions(role) Then
+                    Return repo.RoleAutoriseInterface(role, codePermission)
+                End If
+            Catch
+            End Try
+
+            Return role = "ADMIN"
+        End Function
     End Class
 End Namespace

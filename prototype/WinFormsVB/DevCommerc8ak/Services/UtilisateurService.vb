@@ -45,6 +45,7 @@ Namespace DevCommerc8ak
                 .EstActif = True
             }
             _utilisateurRepo.Ajouter(u, roleId)
+            AuditActionService.Enregistrer("Utilisateurs", "Création utilisateur", "Utilisateur " & nomUtilisateur.Trim() & " créé avec le rôle " & nomRole.Trim().ToUpperInvariant() & ".")
         End Sub
 
         ' Liste des utilisateurs.
@@ -68,6 +69,7 @@ Namespace DevCommerc8ak
             End If
 
             _utilisateurRepo.MettreAJour(utilisateurId, nomUtilisateur.Trim(), estActif, roleId, hash, sel)
+            AuditActionService.Enregistrer("Utilisateurs", "Modification utilisateur", "Utilisateur " & nomUtilisateur.Trim() & " mis à jour avec le rôle " & nomRole.Trim().ToUpperInvariant() & ".")
         End Sub
 
         ' Met a jour mot de passe.

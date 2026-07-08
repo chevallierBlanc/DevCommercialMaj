@@ -14,6 +14,7 @@ Namespace DevCommerc8ak
         Public Event CaisseModifiee As EventHandler
         Public Event AnalyseVenteModifiee As EventHandler
         Public Event DataChanged As EventHandler
+        Public Event RolePermissionsChanged As EventHandler
 
         Public Sub OnVenteCreee()
             RaiseEvent VenteCreee(Nothing, EventArgs.Empty)
@@ -49,6 +50,10 @@ Namespace DevCommerc8ak
 
         Public Sub OnDataChanged()
             RaiseEvent DataChanged(Nothing, EventArgs.Empty)
+        End Sub
+
+        Public Sub OnRolePermissionsChanged()
+            RaiseEvent RolePermissionsChanged(Nothing, EventArgs.Empty)
         End Sub
     End Module
 End Namespace

@@ -29,12 +29,20 @@ Namespace DevCommerc8ak
 
         ' Enregistre une entree de stock.
         Public Function EnregistrerEntree(produitId As Integer, quantiteSaisie As Decimal, unite As String, reference As String, observation As String, effectuePar As Integer, Optional prixAchatOverride As Decimal = 0D) As Integer
-            Return EnregistrerMouvement(produitId, "ENTREE", quantiteSaisie, unite, reference, observation, Nothing, effectuePar, prixAchatOverride)
+            Dim resultat As Integer = EnregistrerMouvement(produitId, "ENTREE", quantiteSaisie, unite, reference, observation, Nothing, effectuePar, prixAchatOverride)
+            If resultat > 0 Then
+                AuditActionService.Enregistrer("Stock", "Entrée stock", "Entrée stock enregistrée. ProduitId=" & produitId.ToString() & ", Référence=" & reference)
+            End If
+            Return resultat
         End Function
 
         ' Enregistre une sortie de stock.
         Public Function EnregistrerSortie(produitId As Integer, quantiteSaisie As Decimal, unite As String, reference As String, observation As String, effectuePar As Integer) As Integer
-            Return EnregistrerMouvement(produitId, "SORTIE", quantiteSaisie, unite, reference, observation, Nothing, effectuePar)
+            Dim resultat As Integer = EnregistrerMouvement(produitId, "SORTIE", quantiteSaisie, unite, reference, observation, Nothing, effectuePar)
+            If resultat > 0 Then
+                AuditActionService.Enregistrer("Stock", "Sortie stock", "Sortie stock enregistrée. ProduitId=" & produitId.ToString() & ", Référence=" & reference)
+            End If
+            Return resultat
         End Function
 
         Public Function EnregistrerSortiesManuelles(lignes As IEnumerable(Of StockSortie), motifId As Integer, clientId As Integer?, statutPaiement As String, montantPaye As Decimal, resteAPayer As Decimal, observation As String, effectuePar As Integer) As String
@@ -97,6 +105,7 @@ Namespace DevCommerc8ak
                             Next
                         Catch
                         End Try
+                        AuditActionService.Enregistrer("Stock", "Sortie manuelle", "Sortie manuelle " & numeroSortie & " enregistrée.")
                         AppEvents.OnStockModifie()
                         AppEvents.OnAnalyseVenteModifiee()
                         AppEvents.OnDataChanged()
@@ -158,6 +167,7 @@ Namespace DevCommerc8ak
                             syncService.EssayerSynchroniserSortieParNumero(numeroSortie)
                         Catch
                         End Try
+                        AuditActionService.Enregistrer("Stock", "Paiement dette", "Paiement enregistré pour la sortie " & numeroSortie & ".")
                         AppEvents.OnCaisseModifiee()
                         AppEvents.OnAnalyseVenteModifiee()
                         AppEvents.OnDataChanged()

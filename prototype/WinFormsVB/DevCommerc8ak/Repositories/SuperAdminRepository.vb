@@ -35,6 +35,19 @@ Namespace DevCommerc8ak
                 "RoleId INT NOT NULL, " &
                 "InterfaceId INT NOT NULL, " &
                 "PRIMARY KEY (RoleId, InterfaceId)); " &
+                "END " &
+                "IF OBJECT_ID('dbo.AuditActions', 'U') IS NULL " &
+                "BEGIN " &
+                "CREATE TABLE dbo.AuditActions (" &
+                "AuditActionId INT IDENTITY(1,1) PRIMARY KEY, " &
+                "Utilisateur NVARCHAR(80) NULL, " &
+                "[Role] NVARCHAR(50) NULL, " &
+                "Module NVARCHAR(80) NULL, " &
+                "[Action] NVARCHAR(100) NULL, " &
+                "[Description] NVARCHAR(255) NULL, " &
+                "Machine NVARCHAR(100) NULL, " &
+                "[Statut] NVARCHAR(30) NULL, " &
+                "CreeLe DATETIME2 NOT NULL CONSTRAINT DF_AuditActions_CreeLe DEFAULT(GETDATE())); " &
                 "END"
             _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
 
@@ -82,11 +95,19 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub AssurerPermissionsParDefaut()
-            AssurerRoleInterfaces("FACTURIER", New String() {"FACTURIER", "HISTORIQUE_FACTURES"})
-            AssurerRoleInterfaces("CAISSIER", New String() {"CAISSE", "FINANCE"})
-            AssurerRoleInterfaces("CAISSIERE", New String() {"CAISSE", "FINANCE"})
-            AssurerRoleInterfaces("ADMIN", New String() {"FACTURIER", "HISTORIQUE_FACTURES", "CAISSE", "FINANCE", "ADMINISTRATION", "STOCK_INVENTAIRE", "ANALYSE_VENTES", "INVENTAIRE", "PARAMETRES"})
-            AssurerRoleInterfaces("SUPERADMIN", New String() {"FACTURIER", "HISTORIQUE_FACTURES", "CAISSE", "FINANCE", "ADMINISTRATION", "STOCK_INVENTAIRE", "ANALYSE_VENTES", "INVENTAIRE", "PARAMETRES", "SUPERADMIN_TECH", "SUPERADMIN_STOCK_INITIAL", "SUPERADMIN_ROLES", "SUPERADMIN_AUDIT"})
+            AssurerRoleInterfacesSiVide("FACTURIER", New String() {"FACTURIER", "HISTORIQUE_FACTURES"})
+            AssurerRoleInterfacesSiVide("CAISSIER", New String() {"CAISSE", "FINANCE"})
+            AssurerRoleInterfacesSiVide("CAISSIERE", New String() {"CAISSE", "FINANCE"})
+            AssurerRoleInterfacesSiVide("ADMIN", New String() {"FACTURIER", "HISTORIQUE_FACTURES", "CAISSE", "FINANCE", "ADMINISTRATION", "STOCK_INVENTAIRE", "ANALYSE_VENTES", "INVENTAIRE", "PARAMETRES"})
+            AssurerRoleInterfacesSiVide("SUPERADMIN", New String() {"FACTURIER", "HISTORIQUE_FACTURES", "CAISSE", "FINANCE", "ADMINISTRATION", "STOCK_INVENTAIRE", "ANALYSE_VENTES", "INVENTAIRE", "PARAMETRES", "SUPERADMIN_TECH", "SUPERADMIN_STOCK_INITIAL", "SUPERADMIN_ROLES", "SUPERADMIN_AUDIT"})
+        End Sub
+
+        Private Sub AssurerRoleInterfacesSiVide(nomRole As String, codesInterfaces As IEnumerable(Of String))
+            If RoleUtilisePermissionsInterne(nomRole) Then
+                Return
+            End If
+
+            AssurerRoleInterfaces(nomRole, codesInterfaces)
         End Sub
 
         Private Sub AssurerRoleInterfaces(nomRole As String, codesInterfaces As IEnumerable(Of String))
@@ -134,6 +155,10 @@ Namespace DevCommerc8ak
 
         Public Function RoleUtilisePermissions(nomRole As String) As Boolean
             AssurerInfrastructure()
+            Return RoleUtilisePermissionsInterne(nomRole)
+        End Function
+
+        Private Function RoleUtilisePermissionsInterne(nomRole As String) As Boolean
             Dim sql As String =
                 "SELECT COUNT(*) FROM dbo.RoleInterfaces ri " &
                 "INNER JOIN dbo.Roles r ON r.RoleId = ri.RoleId " &
@@ -192,6 +217,63 @@ Namespace DevCommerc8ak
                 _dal.ExecuterNonRequete("INSERT INTO dbo.RoleInterfaces (RoleId, InterfaceId) VALUES (@RoleId, @InterfaceId)", CommandType.Text, pInsertRole)
             Next
         End Sub
+
+        Public Sub AjouterAuditAction(utilisateur As String, role As String, moduleName As String, actionName As String, description As String, machine As String, statut As String)
+            AssurerInfrastructure()
+            Dim sql As String =
+                "INSERT INTO dbo.AuditActions (Utilisateur, [Role], Module, [Action], [Description], Machine, [Statut]) " &
+                "VALUES (@Utilisateur, @Role, @Module, @Action, @Description, @Machine, @Statut)"
+            Dim p As New List(Of SqlParameter) From {
+                New SqlParameter("@Utilisateur", If(String.IsNullOrWhiteSpace(utilisateur), CType(DBNull.Value, Object), utilisateur.Trim())),
+                New SqlParameter("@Role", If(String.IsNullOrWhiteSpace(role), CType(DBNull.Value, Object), role.Trim())),
+                New SqlParameter("@Module", If(String.IsNullOrWhiteSpace(moduleName), CType(DBNull.Value, Object), moduleName.Trim())),
+                New SqlParameter("@Action", If(String.IsNullOrWhiteSpace(actionName), CType(DBNull.Value, Object), actionName.Trim())),
+                New SqlParameter("@Description", If(String.IsNullOrWhiteSpace(description), CType(DBNull.Value, Object), description.Trim())),
+                New SqlParameter("@Machine", If(String.IsNullOrWhiteSpace(machine), CType(DBNull.Value, Object), machine.Trim())),
+                New SqlParameter("@Statut", If(String.IsNullOrWhiteSpace(statut), CType(DBNull.Value, Object), statut.Trim()))
+            }
+            _dal.ExecuterNonRequete(sql, CommandType.Text, p)
+        End Sub
+
+        Public Function ListerAuditActions(dateDebut As Date?, dateFin As Date?, utilisateur As String, role As String, moduleName As String, actionName As String, statut As String) As DataTable
+            AssurerInfrastructure()
+            Dim sql As String =
+                "SELECT AuditActionId, Utilisateur, [Role], Module, [Action], [Description], Machine, [Statut], CreeLe " &
+                "FROM dbo.AuditActions WHERE 1=1 "
+            Dim p As New List(Of SqlParameter)()
+
+            If dateDebut.HasValue Then
+                sql &= "AND CAST(CreeLe AS DATE) >= @DateDebut "
+                p.Add(New SqlParameter("@DateDebut", dateDebut.Value.Date))
+            End If
+            If dateFin.HasValue Then
+                sql &= "AND CAST(CreeLe AS DATE) <= @DateFin "
+                p.Add(New SqlParameter("@DateFin", dateFin.Value.Date))
+            End If
+            If Not String.IsNullOrWhiteSpace(utilisateur) Then
+                sql &= "AND ISNULL(Utilisateur,'') LIKE @Utilisateur "
+                p.Add(New SqlParameter("@Utilisateur", "%" & utilisateur.Trim() & "%"))
+            End If
+            If Not String.IsNullOrWhiteSpace(role) Then
+                sql &= "AND ISNULL([Role],'') LIKE @Role "
+                p.Add(New SqlParameter("@Role", "%" & role.Trim() & "%"))
+            End If
+            If Not String.IsNullOrWhiteSpace(moduleName) Then
+                sql &= "AND ISNULL(Module,'') LIKE @Module "
+                p.Add(New SqlParameter("@Module", "%" & moduleName.Trim() & "%"))
+            End If
+            If Not String.IsNullOrWhiteSpace(actionName) Then
+                sql &= "AND ISNULL([Action],'') LIKE @Action "
+                p.Add(New SqlParameter("@Action", "%" & actionName.Trim() & "%"))
+            End If
+            If Not String.IsNullOrWhiteSpace(statut) Then
+                sql &= "AND ISNULL([Statut],'') LIKE @Statut "
+                p.Add(New SqlParameter("@Statut", "%" & statut.Trim() & "%"))
+            End If
+
+            sql &= "ORDER BY CreeLe DESC"
+            Return _dal.ExecuterTable(sql, CommandType.Text, p)
+        End Function
 
         Public Function ListerUtilisateursAvecRole() As DataTable
             Dim sql As String =

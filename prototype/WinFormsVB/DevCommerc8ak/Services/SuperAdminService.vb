@@ -39,6 +39,8 @@ Namespace DevCommerc8ak
 
         Public Sub EnregistrerRole(roleId As Integer?, nomRole As String, estActif As Boolean, interfaceIds As IEnumerable(Of Integer))
             ObtenirRepository().EnregistrerRole(roleId, nomRole, estActif, interfaceIds)
+            AuditActionService.Enregistrer("SuperAdmin", "Modification rôle", "Rôle " & nomRole.Trim().ToUpperInvariant() & " mis à jour.")
+            AppEvents.OnRolePermissionsChanged()
         End Sub
 
         Public Function RoleUtilisePermissions(nomRole As String) As Boolean
@@ -60,6 +62,28 @@ Namespace DevCommerc8ak
         End Function
 
         Public Function ListerActionsUtilisateur(dateDebut As Date?, dateFin As Date?, utilisateur As String, role As String, moduleName As String, actionName As String, typeAction As String) As List(Of AuditLogEntryDTO)
+            Try
+                Dim dtAudit As DataTable = ObtenirRepository().ListerAuditActions(dateDebut, dateFin, utilisateur, role, moduleName, actionName, typeAction)
+                If dtAudit IsNot Nothing AndAlso dtAudit.Rows.Count > 0 Then
+                    Dim audits As New List(Of AuditLogEntryDTO)()
+                    For Each row As DataRow In dtAudit.Rows
+                        audits.Add(New AuditLogEntryDTO With {
+                            .DateAction = If(row.IsNull("CreeLe"), Date.MinValue, Convert.ToDateTime(row("CreeLe"))),
+                            .Utilisateur = If(row.IsNull("Utilisateur"), "SYSTEM", Convert.ToString(row("Utilisateur"))),
+                            .Role = If(row.IsNull("Role"), "N/A", Convert.ToString(row("Role"))),
+                            .Module = If(row.IsNull("Module"), String.Empty, Convert.ToString(row("Module"))),
+                            .Action = If(row.IsNull("Action"), String.Empty, Convert.ToString(row("Action"))),
+                            .Description = If(row.IsNull("Description"), String.Empty, Convert.ToString(row("Description"))),
+                            .Machine = If(row.IsNull("Machine"), String.Empty, Convert.ToString(row("Machine"))),
+                            .Statut = If(row.IsNull("Statut"), String.Empty, Convert.ToString(row("Statut"))),
+                            .Niveau = If(row.IsNull("Statut"), String.Empty, Convert.ToString(row("Statut")))
+                        })
+                    Next
+                    Return audits
+                End If
+            Catch
+            End Try
+
             Dim entries As New List(Of AuditLogEntryDTO)()
             Dim dossier As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CommercialPro", "Logs")
             If Not Directory.Exists(dossier) Then

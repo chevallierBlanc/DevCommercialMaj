@@ -164,6 +164,7 @@ Namespace DevCommerc8ak
         Private ReadOnly panelSidebar As Panel
         Private ReadOnly panelContent As Panel
         Private ReadOnly panelHeader As Panel
+        Private ReadOnly _flowPnlMenu As Panel
         Private ReadOnly timer As Timer
         Private ReadOnly _backupService As BackupService
         Private ReadOnly _backupTimer As Timer
@@ -262,9 +263,9 @@ Namespace DevCommerc8ak
 
 
             ' Conteneur pour les boutons de menu
-            Dim flowPnlMenu As New Panel() With {
+            _flowPnlMenu = New Panel() With {
                 .Dock = DockStyle.Fill,
-            .AutoScroll = True,
+                .AutoScroll = True,
                 .Padding = New Padding(10, 0, 10, 0)
             }
 
@@ -320,71 +321,11 @@ Namespace DevCommerc8ak
             '    flowPnlMenu.Controls.Add(btnDeconnexion)
             '    LoadForm(New CaisseForm())
             'End If
-            panelSidebar.Controls.Add(flowPnlMenu)
+            panelSidebar.Controls.Add(_flowPnlMenu)
             panelSidebar.Controls.Add(pnlSep)
             panelSidebar.Controls.Add(pnlUser)
             panelSidebar.Controls.Add(pnlLogo)
-
-            Dim y As Integer = 50
-
-            ' Bouton Recettes
-            If VerifierPermission("Facturier") Then
-                AjouterBoutonSidebar(flowPnlMenu, "Facturier", y, AddressOf AfficherFacturier)
-                y += 50
-                AjouterBoutonSidebar(flowPnlMenu, "Historique factures", y, AddressOf AfficherHistoriqueFactures)
-                y += 50
-            End If
-
-            ' Bouton Recettes
-            If VerifierPermission("Caisse") Then
-                AjouterBoutonSidebar(flowPnlMenu, "Caisse", y, AddressOf AfficherCaisse)
-                y += 50
-                AjouterBoutonSidebar(flowPnlMenu, "Finance", y, AddressOf AfficherFinance)
-
-                y += 50
-            End If
-
-            ' Bouton Dépenses
-            If VerifierPermission("ADMIN") Then
-                AjouterBoutonSidebar(flowPnlMenu, "Administration", y, AddressOf Dashbord)
-
-                y += 50
-                AjouterBoutonSidebar(flowPnlMenu, "Stock / Inventaire", y, AddressOf AfficherStockAdmin)
-                y += 50
-            End If
-
-            If VerifierPermission("ANALYSE_VENTES") Then
-                AjouterBoutonSidebar(flowPnlMenu, "Analyse ventes", y, AddressOf AfficherAnalyseVente)
-                y += 50
-            End If
-
-            If VerifierPermission("INVENTAIRE") Then
-                AjouterBoutonSidebar(flowPnlMenu, "Inventaire", y, AddressOf AfficherInventaire)
-                y += 50
-            End If
-
-            If VerifierPermission("SUPERADMIN_STOCK_INITIAL") Then
-                AjouterBoutonSidebar(flowPnlMenu, "Stock initial technique", y, AddressOf AfficherStockInitialTechnique)
-                y += 50
-            End If
-
-            If VerifierPermission("SUPERADMIN_ROLES") Then
-                AjouterBoutonSidebar(flowPnlMenu, "Rôles & privilèges", y, AddressOf AfficherRolesSuperAdmin)
-                y += 50
-            End If
-
-            If VerifierPermission("SUPERADMIN_AUDIT") Then
-                AjouterBoutonSidebar(flowPnlMenu, "Journal actions", y, AddressOf AfficherJournalSuperAdmin)
-                y += 50
-            End If
-
-            AjouterBoutonSidebar(flowPnlMenu, "À propos", y, AddressOf AfficherAPropos)
-            y += 50
-
-            ' Bouton Accueil
-            btnDeconnexion.ForeColor = Color.FromArgb(231, 76, 60) ' Rouge pour déconnexion
-            AjouterBoutonSidebar(flowPnlMenu, "Déconnexion", y, AddressOf Deconnecter)
-            'y += 50
+            ConstruireMenuSidebar()
 
             ' Assemblage final
             Me.Controls.Add(panelContent)
@@ -427,6 +368,7 @@ Namespace DevCommerc8ak
 
             AddHandler Me.Shown, AddressOf MainForm_Shown
             AddHandler panelContent.Resize, AddressOf PanelContent_Resize
+            AddHandler AppEvents.RolePermissionsChanged, AddressOf RafraichirPermissionsDepuisEvenement
 
             If EstRoleAdminEtendu() AndAlso _backupSettings IsNot Nothing AndAlso _backupSettings.Enabled Then
                 _backupTimer = New Timer() With {.Interval = 21600000}
@@ -509,11 +451,80 @@ Namespace DevCommerc8ak
                                        End Sub
             panel.Controls.Add(btn)
         End Sub
+
+        Private Sub ConstruireMenuSidebar()
+            If _flowPnlMenu Is Nothing Then
+                Return
+            End If
+
+            _flowPnlMenu.Controls.Clear()
+            Dim y As Integer = 50
+
+            If VerifierPermission("FACTURIER") Then
+                AjouterBoutonSidebar(_flowPnlMenu, "Facturier", y, AddressOf AfficherFacturier)
+                y += 50
+            End If
+            If VerifierPermission("HISTORIQUE_FACTURES") Then
+                AjouterBoutonSidebar(_flowPnlMenu, "Historique factures", y, AddressOf AfficherHistoriqueFactures)
+                y += 50
+            End If
+
+            If VerifierPermission("CAISSE") Then
+                AjouterBoutonSidebar(_flowPnlMenu, "Caisse", y, AddressOf AfficherCaisse)
+                y += 50
+            End If
+            If VerifierPermission("FINANCE") Then
+                AjouterBoutonSidebar(_flowPnlMenu, "Finance", y, AddressOf AfficherFinance)
+                y += 50
+            End If
+
+            If VerifierPermission("ADMINISTRATION") Then
+                AjouterBoutonSidebar(_flowPnlMenu, "Administration", y, AddressOf Dashbord)
+                y += 50
+            End If
+            If VerifierPermission("STOCK_INVENTAIRE") Then
+                AjouterBoutonSidebar(_flowPnlMenu, "Stock / Inventaire", y, AddressOf AfficherStockAdmin)
+                y += 50
+            End If
+            If VerifierPermission("ANALYSE_VENTES") Then
+                AjouterBoutonSidebar(_flowPnlMenu, "Analyse ventes", y, AddressOf AfficherAnalyseVente)
+                y += 50
+            End If
+            If VerifierPermission("INVENTAIRE") Then
+                AjouterBoutonSidebar(_flowPnlMenu, "Inventaire", y, AddressOf AfficherInventaire)
+                y += 50
+            End If
+
+            If VerifierPermission("SUPERADMIN_TECH") Then
+                AjouterBoutonSidebar(_flowPnlMenu, "Interfaces techniques SuperAdmin", y, AddressOf AfficherRolesSuperAdmin)
+                y += 50
+            End If
+            If VerifierPermission("SUPERADMIN_STOCK_INITIAL") Then
+                AjouterBoutonSidebar(_flowPnlMenu, "Stock initial technique", y, AddressOf AfficherStockInitialTechnique)
+                y += 50
+            End If
+            If VerifierPermission("SUPERADMIN_ROLES") Then
+                AjouterBoutonSidebar(_flowPnlMenu, "Rôles & privilèges", y, AddressOf AfficherRolesSuperAdmin)
+                y += 50
+            End If
+            If VerifierPermission("SUPERADMIN_AUDIT") Then
+                AjouterBoutonSidebar(_flowPnlMenu, "Journal actions", y, AddressOf AfficherJournalSuperAdmin)
+                y += 50
+            End If
+
+            AjouterBoutonSidebar(_flowPnlMenu, "À propos", y, AddressOf AfficherAPropos)
+            y += 50
+            AjouterBoutonSidebar(_flowPnlMenu, "Déconnexion", y, AddressOf Deconnecter)
+        End Sub
         ''' <summary>
         ''' Vérifier les permissions de l'utilisateur
         ''' </summary>
         Private Function VerifierPermission(fonctionnalite As String) As Boolean
             Dim role As String = If(SessionUtilisateur.Role, String.Empty).Trim().ToUpperInvariant()
+            If role = "SUPERADMIN" Then
+                Return True
+            End If
+
             Dim codePermission As String = MapperCodePermission(fonctionnalite)
             Dim permissionBase As Boolean?
 
@@ -578,14 +589,18 @@ Namespace DevCommerc8ak
                     Return "CAISSE"
                 Case "FINANCE"
                     Return "FINANCE"
-                Case "ADMIN"
+                Case "ADMIN", "ADMINISTRATION"
                     Return "ADMINISTRATION"
+                Case "STOCK_INVENTAIRE"
+                    Return "STOCK_INVENTAIRE"
                 Case "ANALYSE_VENTES"
                     Return "ANALYSE_VENTES"
                 Case "INVENTAIRE"
                     Return "INVENTAIRE"
                 Case "PARAMETRES"
                     Return "PARAMETRES"
+                Case "SUPERADMIN_TECH"
+                    Return "SUPERADMIN_TECH"
                 Case "SUPERADMIN_STOCK_INITIAL"
                     Return "SUPERADMIN_STOCK_INITIAL"
                 Case "SUPERADMIN_ROLES"
@@ -633,6 +648,20 @@ Namespace DevCommerc8ak
             Return String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) OrElse
                    String.Equals(SessionUtilisateur.Role, "SUPERADMIN", StringComparison.OrdinalIgnoreCase)
         End Function
+
+        Private Sub RafraichirPermissionsDepuisEvenement(sender As Object, e As EventArgs)
+            If IsDisposed Then
+                Return
+            End If
+
+            If InvokeRequired Then
+                BeginInvoke(New MethodInvoker(Sub() RafraichirPermissionsDepuisEvenement(Nothing, EventArgs.Empty)))
+                Return
+            End If
+
+            _permissionsDepuisBase = Nothing
+            ConstruireMenuSidebar()
+        End Sub
         ' --- Helper pour créer les boutons du menu latéral ---
         Private Function CreerBoutonMenu(texte As String) As Button
             Dim btn As New Button() With {

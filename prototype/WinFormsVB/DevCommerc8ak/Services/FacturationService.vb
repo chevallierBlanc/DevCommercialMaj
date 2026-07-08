@@ -29,6 +29,7 @@ Namespace DevCommerc8ak
             }
             Dim factureId As Integer = repo.Ajouter(f)
             If factureId > 0 Then
+                AuditActionService.Enregistrer("Facturation", "Création facture", "Facture " & numeroFacture & " créée en attente.")
                 AppEvents.OnVenteCreee()
                 AppEvents.OnDataChanged()
             End If
@@ -162,6 +163,7 @@ Namespace DevCommerc8ak
                         End Using
 
                         tx.Commit()
+                        AuditActionService.Enregistrer("Caisse", "Validation paiement", "Paiement validé pour la facture " & numeroFacture & ".")
                         AppEvents.OnVenteValidee()
                         AppEvents.OnPaiementValide()
                         AppEvents.OnStockModifie()

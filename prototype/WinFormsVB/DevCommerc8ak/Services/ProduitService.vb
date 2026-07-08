@@ -21,6 +21,7 @@ Namespace DevCommerc8ak
         Public Function Ajouter(produit As Produit) As Integer
             Dim produitId As Integer = _repo.Ajouter(produit)
             If produitId > 0 Then
+                AuditActionService.Enregistrer("Produits", "Création produit", "Produit " & produit.Libelle & " créé.")
                 AppEvents.OnProduitModifie()
                 AppEvents.OnDataChanged()
             End If
@@ -53,6 +54,7 @@ Namespace DevCommerc8ak
                                          produit.VenteDouzaine))
             Dim resultat As Integer = _repo.MettreAJour(produit)
             If resultat > 0 Then
+                AuditActionService.Enregistrer("Produits", "Modification prix produit", "Produit " & produit.Libelle & " mis à jour.")
                 AppEvents.OnProduitModifie()
                 AppEvents.OnDataChanged()
             End If

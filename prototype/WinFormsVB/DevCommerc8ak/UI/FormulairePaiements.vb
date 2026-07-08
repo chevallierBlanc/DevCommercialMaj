@@ -3,6 +3,7 @@ Option Explicit On
 
 Imports System
 Imports System.Configuration
+Imports System.Globalization
 Imports System.Windows.Forms
 
 Namespace DevCommerc8ak
@@ -42,7 +43,14 @@ Namespace DevCommerc8ak
 
         Private Sub Charger(sender As Object, e As EventArgs)
             Try
-                Dim id As Integer = Convert.ToInt32(txtFactureId.Text.Trim())
+                Dim id As Integer = SafeInteger(txtFactureId.Text)
+                If id <= 0 Then
+                    grid.DataSource = Nothing
+                    If Object.ReferenceEquals(sender, btnCharger) Then
+                        MessageBox.Show("Saisissez un identifiant de facture valide.")
+                    End If
+                    Return
+                End If
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
                 Dim repo As New PaiementRepository(dal)
@@ -51,5 +59,20 @@ Namespace DevCommerc8ak
                 MessageBox.Show("Erreur chargement paiements: " & ex.Message)
             End Try
         End Sub
+
+        Private Function SafeInteger(value As String) As Integer
+            If String.IsNullOrWhiteSpace(value) Then
+                Return 0
+            End If
+
+            Dim resultat As Integer
+            If Integer.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, resultat) Then
+                Return resultat
+            End If
+            If Integer.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.CurrentCulture, resultat) Then
+                Return resultat
+            End If
+            Return 0
+        End Function
     End Class
 End Namespace

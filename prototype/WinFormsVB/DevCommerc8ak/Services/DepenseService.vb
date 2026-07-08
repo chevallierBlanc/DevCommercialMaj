@@ -21,6 +21,7 @@ Namespace DevCommerc8ak
             Catch
             End Try
             If id > 0 Then
+                AuditActionService.Enregistrer("Finance", "Ajout dépense", "Dépense enregistrée.")
                 AppEvents.OnDepenseAjoutee()
                 AppEvents.OnCaisseModifiee()
                 AppEvents.OnAnalyseVenteModifiee()
