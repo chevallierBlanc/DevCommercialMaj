@@ -217,6 +217,9 @@
     <Compile Include="UI\FormulaireSuperAdminJournal.vb">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="UI\FormulaireSuperAdminDashboard.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="UI\FormulaireStockInitialTechnique.vb">
       <SubType>Form</SubType>
     </Compile>

@@ -29,6 +29,19 @@ Namespace DevCommerc8ak
             Return ObtenirRepository().ListerRoles()
         End Function
 
+        Public Function ListerNomsRoles() As List(Of String)
+            Dim resultat As New List(Of String)()
+            Dim dt As DataTable = ListerRoles()
+            For Each row As DataRow In dt.Rows
+                Dim nomRole As String = Convert.ToString(row("NomRole")).Trim()
+                If nomRole <> String.Empty Then
+                    resultat.Add(nomRole)
+                End If
+            Next
+
+            Return resultat.OrderBy(Function(x) x).ToList()
+        End Function
+
         Public Function ListerInterfaces() As DataTable
             Return ObtenirRepository().ListerInterfaces()
         End Function

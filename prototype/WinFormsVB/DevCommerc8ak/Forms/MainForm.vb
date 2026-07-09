@@ -496,7 +496,7 @@ Namespace DevCommerc8ak
             End If
 
             If VerifierPermission("SUPERADMIN_TECH") Then
-                AjouterBoutonSidebar(_flowPnlMenu, "Interfaces techniques SuperAdmin", y, AddressOf AfficherRolesSuperAdmin)
+                AjouterBoutonSidebar(_flowPnlMenu, "Interfaces techniques SuperAdmin", y, AddressOf AfficherTableauTechniqueSuperAdmin)
                 y += 50
             End If
             If VerifierPermission("SUPERADMIN_STOCK_INITIAL") Then
@@ -1036,6 +1036,13 @@ Namespace DevCommerc8ak
 
         Private Sub AfficherStockInitialTechnique(sender As Object, e As EventArgs)
             LoadForm(New FormulaireStockInitialTechnique())
+        End Sub
+
+        Private Sub AfficherTableauTechniqueSuperAdmin(sender As Object, e As EventArgs)
+            LoadForm(New FormulaireSuperAdminDashboard(
+                Sub() LoadForm(New FormulaireStockInitialTechnique()),
+                Sub() LoadForm(New FormulaireSuperAdminRoles()),
+                Sub() LoadForm(New FormulaireSuperAdminJournal())))
         End Sub
 
         Private Sub AfficherRolesSuperAdmin(sender As Object, e As EventArgs)

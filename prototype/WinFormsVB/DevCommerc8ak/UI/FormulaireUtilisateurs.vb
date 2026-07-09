@@ -65,6 +65,7 @@ Namespace DevCommerc8ak
         Private ReadOnly splitGrids As TableLayoutPanel
         Private _chargementUtilisateursEnCours As Boolean
         Private _chargementConnectesEnCours As Boolean
+        Private _chargementRolesEnCours As Boolean
 
         Public Sub New()
             ' Configuration de base du formulaire
@@ -122,8 +123,6 @@ Namespace DevCommerc8ak
                 .FlatStyle = FlatStyle.Flat,
                 .Margin = New Padding(0, 0, 20, 0)
             }
-            cmbRole.Items.AddRange(New Object() {"SUPERADMIN", "ADMIN", "CAISSIERE", "CAISSIER", "FACTURIER"})
-
             chkActif = New CheckBox() With {
                 .Text = "Compte Actif",
                 .Font = FontControl,
@@ -202,6 +201,7 @@ Namespace DevCommerc8ak
             timer = New Timer() With {.Interval = 5000}
             AddHandler timer.Tick, AddressOf ChargerConnectes
             timer.Start()
+            AddHandler AppEvents.RolePermissionsChanged, AddressOf RafraichirRolesDepuisEvenement
 
             ' Chargement initial
             AddHandler Me.Load, AddressOf Charger
@@ -297,6 +297,36 @@ Namespace DevCommerc8ak
             Return New UtilisateurService(utilisateurRepo, roleRepo, sessionRepo)
         End Function
 
+        Private Async Function ChargerRolesDisponiblesAsync() As Task
+            If _chargementRolesEnCours Then
+                Return
+            End If
+
+            _chargementRolesEnCours = True
+            Try
+                Dim service As New SuperAdminService()
+                Dim roles As List(Of String) = Await Task.Run(Function() service.ListerNomsRoles())
+                If IsDisposed OrElse cmbRole Is Nothing Then
+                    Return
+                End If
+
+                Dim roleSelectionne As String = If(cmbRole.SelectedItem Is Nothing, String.Empty, Convert.ToString(cmbRole.SelectedItem))
+                cmbRole.Items.Clear()
+                For Each role As String In roles
+                    cmbRole.Items.Add(role)
+                Next
+
+                If roleSelectionne <> String.Empty AndAlso cmbRole.Items.Contains(roleSelectionne) Then
+                    cmbRole.SelectedItem = roleSelectionne
+                ElseIf cmbRole.Items.Count > 0 AndAlso cmbRole.SelectedIndex < 0 Then
+                    cmbRole.SelectedIndex = 0
+                End If
+            Catch
+            Finally
+                _chargementRolesEnCours = False
+            End Try
+        End Function
+
         Private Async Sub Charger(sender As Object, e As EventArgs)
             If _chargementUtilisateursEnCours Then
                 Return
@@ -304,6 +334,7 @@ Namespace DevCommerc8ak
 
             _chargementUtilisateursEnCours = True
             Try
+                Await ChargerRolesDisponiblesAsync()
                 Dim service As UtilisateurService = ObtenirService()
                 Dim utilisateurs As List(Of UtilisateurDTO) = Await Task.Run(Function() service.Lister())
                 If IsDisposed OrElse grid Is Nothing Then
@@ -429,6 +460,24 @@ Namespace DevCommerc8ak
 
         Private Sub Grid_CellClick(sender As Object, e As DataGridViewCellEventArgs)
             ChargerSelectionUtilisateur(sender, EventArgs.Empty)
+        End Sub
+
+        Private Sub RafraichirRolesDepuisEvenement(sender As Object, e As EventArgs)
+            If IsDisposed Then
+                Return
+            End If
+
+            If InvokeRequired Then
+                BeginInvoke(New MethodInvoker(Sub() RafraichirRolesDepuisEvenement(Nothing, EventArgs.Empty)))
+                Return
+            End If
+
+            Dim t As Task = ChargerRolesDisponiblesAsync()
+        End Sub
+
+        Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+            RemoveHandler AppEvents.RolePermissionsChanged, AddressOf RafraichirRolesDepuisEvenement
+            MyBase.OnFormClosed(e)
         End Sub
     End Class
 End Namespace
