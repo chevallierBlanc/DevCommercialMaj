@@ -8,6 +8,7 @@ Imports System.Drawing
 Imports System.Drawing.Drawing2D
 Imports System.Drawing.Printing
 Imports System.IO
+Imports System.Linq
 Imports System.Windows.Forms
 Imports System.Windows.Forms.DataVisualization.Charting
 Imports System.Collections.Generic
@@ -56,7 +57,7 @@ Namespace DevCommerc8ak
 
         Private ReadOnly txtLibelle As TextBox
         Private ReadOnly txtCodeBarres As TextBox
-        Private ReadOnly txtCategorieId As TextBox
+        Private ReadOnly cmbCategorie As ComboBox
         Private ReadOnly chkActif As CheckBox
 
         Private ReadOnly cmbUnitePrincipale As ComboBox
@@ -105,6 +106,7 @@ Namespace DevCommerc8ak
         Private ReadOnly chkFiltreDate As CheckBox
         Private ReadOnly chartTopProduits As Chart
         Private ReadOnly chartCategories As Chart
+        Private ReadOnly gridLegendeCategories As DataGridView
         Private ReadOnly lblKpiProduitRentable As Label
         Private ReadOnly lblKpiTotalRecettes As Label
         Private ReadOnly lblKpiNombreProduits As Label
@@ -115,6 +117,7 @@ Namespace DevCommerc8ak
         Private _produitsTable As DataTable
         Private _historiqueTable As DataTable
         Private _produitsView As DataView
+        Private _categoriesTable As DataTable
         Private _produitId As Integer
         Private _pageCourante As Integer
         Private _isRefreshingFromEvent As Boolean
@@ -179,7 +182,7 @@ Namespace DevCommerc8ak
             Dim cardInfos As Panel = CreateCard("Fiche Produit")
             txtLibelle = CreateField(cardInfos, "Désignation", 20, 45, 280)
             txtCodeBarres = CreateField(cardInfos, "Code Barres / QR", 20, 105, 160)
-            txtCategorieId = CreateField(cardInfos, "Catégorie ID", 190, 105, 60)
+            cmbCategorie = CreateComboField(cardInfos, "Catégorie", 190, 105, 110)
             chkActif = New CheckBox() With {.Text = "Actif", .Left = 260, .Top = 108, .Font = FontControl, .AutoSize = True}
             cardInfos.Controls.Add(chkActif)
 
@@ -307,11 +310,20 @@ Namespace DevCommerc8ak
             gridProduitVedette = CreateStyledGrid()
             chartTopProduits = New Chart() With {.Dock = DockStyle.Fill, .BackColor = ColorCard}
             chartCategories = New Chart() With {.Dock = DockStyle.Fill, .BackColor = ColorCard}
+            gridLegendeCategories = CreateStyledGrid()
+            gridLegendeCategories.AutoGenerateColumns = False
+            gridLegendeCategories.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+            gridLegendeCategories.ScrollBars = ScrollBars.Vertical
 
             tableCharts.Controls.Add(gridProduitVedette, 0, 0)
             tableCharts.SetRowSpan(gridProduitVedette, 2)
             tableCharts.Controls.Add(chartTopProduits, 1, 0)
-            tableCharts.Controls.Add(chartCategories, 1, 1)
+            Dim panelCategories As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 1}
+            panelCategories.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 45))
+            panelCategories.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 55))
+            panelCategories.Controls.Add(chartCategories, 0, 0)
+            panelCategories.Controls.Add(gridLegendeCategories, 1, 0)
+            tableCharts.Controls.Add(panelCategories, 1, 1)
 
             mainTableDash.Controls.Add(flowDashTop, 0, 0)
             mainTableDash.Controls.Add(tableKpi, 0, 1)
@@ -434,6 +446,10 @@ Namespace DevCommerc8ak
         Private Sub ConfigurerCharts()
             ConfigurerChart(chartTopProduits, SeriesChartType.Bar, "TopProduits")
             ConfigurerChart(chartCategories, SeriesChartType.Pie, "Categories")
+            chartCategories.Series(0).IsValueShownAsLabel = False
+            chartCategories.Series(0).LegendText = String.Empty
+            chartCategories.Series(0).ToolTip = "#VALX : #PERCENT{P1}"
+            ConfigurerGrilleLegendeCategories()
         End Sub
 
         Private Sub ConfigurerChart(chart As Chart, type As SeriesChartType, name As String)
@@ -483,6 +499,14 @@ Namespace DevCommerc8ak
             gridHistorique.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "Utilisateur", .HeaderText = "Utilisateur", .Width = 140})
         End Sub
 
+        Private Sub ConfigurerGrilleLegendeCategories()
+            gridLegendeCategories.Columns.Clear()
+            gridLegendeCategories.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "Couleur", .HeaderText = "", .Width = 35})
+            gridLegendeCategories.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "Categorie", .DataPropertyName = "Categorie", .HeaderText = "Catégorie", .Width = 180})
+            gridLegendeCategories.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "Valeur", .DataPropertyName = "Valeur", .HeaderText = "Qté", .Width = 70})
+            gridLegendeCategories.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "Pourcentage", .DataPropertyName = "Pourcentage", .HeaderText = "%", .Width = 70})
+        End Sub
+
         Private Sub ConfigurerGrilleTypesPersonnalises()
             gridTypesPersonnalises.Columns.Clear()
             gridTypesPersonnalises.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
@@ -525,6 +549,7 @@ Namespace DevCommerc8ak
                 Dim dal As New DAL(cs)
                 Dim repo As New ProduitRepository(dal)
                 _produitsTable = repo.ListerTable()
+                _categoriesTable = (New SuperAdminService()).ListerCategories()
                 If Not _produitsTable.Columns.Contains("MargePourcent") Then
                     _produitsTable.Columns.Add("MargePourcent", GetType(Decimal))
                 End If
@@ -540,6 +565,7 @@ Namespace DevCommerc8ak
                 Next
 
                 _produitsView = New DataView(_produitsTable)
+                ChargerCategories()
                 ChargerPageProduits(True)
                 RemplirComboProduitsHistorique()
                 ChargerHistoriquePrix(Nothing, EventArgs.Empty)
@@ -625,7 +651,7 @@ Namespace DevCommerc8ak
             _produitId = 0
             txtLibelle.Clear()
             txtCodeBarres.Clear()
-            txtCategorieId.Clear()
+            cmbCategorie.SelectedIndex = -1
             txtPrixAchat.Clear()
             txtPrixGros.Clear()
             txtPrixUnite.Clear()
@@ -681,7 +707,11 @@ Namespace DevCommerc8ak
             _produitId = Convert.ToInt32(row("ProduitId"))
             txtLibelle.Text = Convert.ToString(row("Libelle"))
             txtCodeBarres.Text = Convert.ToString(row("CodeBarres"))
-            txtCategorieId.Text = If(r.IsNull("CategorieId"), "", Convert.ToString(row("CategorieId")))
+            If Not r.IsNull("CategorieId") AndAlso cmbCategorie.DataSource IsNot Nothing Then
+                cmbCategorie.SelectedValue = Convert.ToInt32(row("CategorieId"))
+            Else
+                cmbCategorie.SelectedIndex = -1
+            End If
             chkActif.Checked = SafeBoolean(row("EstActif"))
             cmbUnitePrincipale.Text = If(r.IsNull("UnitePrincipale"), "", Convert.ToString(row("UnitePrincipale")))
             cmbUniteSecondaire.Text = If(r.IsNull("UniteSecondaire"), "", Convert.ToString(row("UniteSecondaire")))
@@ -733,7 +763,7 @@ Namespace DevCommerc8ak
                     .CoefficientGros = LireDecimal(txtCoeffGros.Text),
                     .SeuilCritique = LireDecimal(txtSeuil.Text),
                     .DateExpiration = dtpExpiration.Value,
-                    .CategorieId = If(txtCategorieId.Text.Trim() = "", CType(Nothing, Integer?), Convert.ToInt32(txtCategorieId.Text.Trim())),
+                    .CategorieId = LireCategorieSelectionnee(),
                     .UnitePrincipale = If(cmbUnitePrincipale.Text.Trim() = "", Nothing, cmbUnitePrincipale.Text.Trim()),
                     .UniteSecondaire = If(cmbUniteSecondaire.Text.Trim() = "", Nothing, cmbUniteSecondaire.Text.Trim()),
                     .ConversionUnite = LireDecimal(txtConversion.Text),
@@ -1007,10 +1037,25 @@ Namespace DevCommerc8ak
                 Dim dtCategories As DataTable = service.RepartitionParCategorie()
                 Dim dtKpi As DataTable = service.KpiProduits()
 
+                If dtVedette IsNot Nothing AndAlso dtVedette.Columns.Contains("Mois") AndAlso Not dtVedette.Columns.Contains("NomMois") Then
+                    dtVedette.Columns.Add("NomMois", GetType(String))
+                    For Each row As DataRow In dtVedette.Rows
+                        Dim mois As Integer = Convert.ToInt32(row("Mois"))
+                        row("NomMois") = Globalization.CultureInfo.GetCultureInfo("fr-FR").DateTimeFormat.GetMonthName(mois)
+                    Next
+                End If
+
                 gridProduitVedette.DataSource = dtVedette
-                'StyliserGrille(gridProduitVedette)
+                If gridProduitVedette.Columns.Contains("Mois") Then
+                    gridProduitVedette.Columns("Mois").Visible = False
+                End If
+                If gridProduitVedette.Columns.Contains("NomMois") Then
+                    gridProduitVedette.Columns("NomMois").DisplayIndex = 0
+                    gridProduitVedette.Columns("NomMois").HeaderText = "Mois"
+                    gridProduitVedette.Columns("NomMois").Width = 120
+                End If
                 AlimenterChart(chartTopProduits, dtTop, "Libelle", "QuantiteVendue")
-                AlimenterChart(chartCategories, dtCategories, "Categorie", "NombreProduits")
+                AlimenterChartCategories(dtCategories)
 
                 If dtKpi.Rows.Count > 0 Then
                     lblKpiProduitRentable.Text = Convert.ToString(dtKpi.Rows(0)("ProduitPlusRentable"))
@@ -1028,6 +1073,50 @@ Namespace DevCommerc8ak
             chart.Series(0).Points.Clear()
             For Each row As DataRow In dt.Rows
                 chart.Series(0).Points.AddXY(Convert.ToString(row(colX)), Convert.ToDecimal(row(colY)))
+            Next
+        End Sub
+
+        Private Sub AlimenterChartCategories(dt As DataTable)
+            chartCategories.Series(0).Points.Clear()
+            Dim legende As New DataTable()
+            legende.Columns.Add("Categorie", GetType(String))
+            legende.Columns.Add("Valeur", GetType(String))
+            legende.Columns.Add("Pourcentage", GetType(String))
+
+            If dt Is Nothing Then
+                gridLegendeCategories.DataSource = legende
+                Return
+            End If
+
+            Dim total As Decimal = 0D
+            For Each row As DataRow In dt.Rows
+                total += Convert.ToDecimal(row("NombreProduits"))
+            Next
+
+            Dim lignes As IEnumerable(Of DataRow) =
+                dt.AsEnumerable().OrderByDescending(Function(r) Convert.ToDecimal(r("NombreProduits")))
+
+            For Each row As DataRow In lignes
+                Dim categorie As String = Convert.ToString(row("Categorie"))
+                Dim valeur As Decimal = Convert.ToDecimal(row("NombreProduits"))
+                Dim pourcentage As Decimal = If(total > 0D, (valeur / total) * 100D, 0D)
+                Dim point As DataPoint = chartCategories.Series(0).Points(chartCategories.Series(0).Points.AddXY(categorie, valeur))
+                point.Label = String.Empty
+                point.LegendText = String.Empty
+
+                Dim ligne As DataRow = legende.NewRow()
+                ligne("Categorie") = categorie
+                ligne("Valeur") = valeur.ToString("N0")
+                ligne("Pourcentage") = pourcentage.ToString("N2") & " %"
+                legende.Rows.Add(ligne)
+            Next
+
+            gridLegendeCategories.DataSource = legende
+            For i As Integer = 0 To Math.Min(gridLegendeCategories.Rows.Count, chartCategories.Series(0).Points.Count) - 1
+                Dim couleur As Color = chartCategories.Series(0).Points(i).Color
+                gridLegendeCategories.Rows(i).Cells("Couleur").Style.BackColor = couleur
+                gridLegendeCategories.Rows(i).Cells("Couleur").Style.SelectionBackColor = couleur
+                gridLegendeCategories.Rows(i).Cells("Couleur").Style.SelectionForeColor = couleur
             Next
         End Sub
 
@@ -1052,13 +1141,13 @@ Namespace DevCommerc8ak
 
         Private Sub ImprimerTableau(titre As String, table As DataTable, colonnes As String(), Optional largeurs As Integer() = Nothing, Optional sousTitre As String = "")
             Try
-                Dim dal As New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)
-                Dim param As ParametreDTO = (New ParametreService(New ParametreRepository(dal))).Charger()
                 Dim doc As New PrintDocument()
-                If param IsNot Nothing AndAlso param.ImprimanteA4 <> "" Then
-                    doc.PrinterSettings.PrinterName = param.ImprimanteA4
+                If table Is Nothing OrElse table.Rows.Count = 0 Then
+                    MessageBox.Show("Aucune donnée à imprimer.", "Impression", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    Return
                 End If
-                doc.DefaultPageSettings.Color = If(param IsNot Nothing, param.ImpressionCouleur, True)
+
+                Dim param As ParametreDTO = PrintConfigurationHelper.ConfigurerDocumentA4(doc, Me, "FormulaireProduits", "ImprimerTableau")
                 Dim largeurColonnes() As Integer = ConstruireLargeursColonnes(colonnes, largeurs, If(doc.DefaultPageSettings.Landscape, 1000, 760))
                 Dim largeurTotale As Integer = 0
                 For Each largeur As Integer In largeurColonnes
@@ -1068,9 +1157,8 @@ Namespace DevCommerc8ak
                     doc.DefaultPageSettings.Landscape = True
                     largeurColonnes = ConstruireLargeursColonnes(colonnes, largeurs, 1000)
                 End If
-                doc.DefaultPageSettings.Margins = New System.Drawing.Printing.Margins(25, 25, 25, 25)
-
                 Dim ligneCourante As Integer = 0
+                Dim numeroPage As Integer = 1
 
                 AddHandler doc.PrintPage,
                     Sub(s As Object, pe As PrintPageEventArgs)
@@ -1125,9 +1213,14 @@ Namespace DevCommerc8ak
                         y += headerHeight
 
                         Dim rowHeight As Integer = 22
+                        Dim lignesImprimeesSurPage As Integer = 0
                         While ligneCourante < table.Rows.Count
                             If y + rowHeight > pe.MarginBounds.Bottom Then
-                                pe.HasMorePages = True
+                                pe.Graphics.DrawString("Page " & numeroPage.ToString(), fontBloc, pinceauGris, pe.MarginBounds.Right - 80, pe.MarginBounds.Bottom + 10)
+                                pe.HasMorePages = lignesImprimeesSurPage > 0
+                                If pe.HasMorePages Then
+                                    numeroPage += 1
+                                End If
                                 Return
                             End If
 
@@ -1143,8 +1236,10 @@ Namespace DevCommerc8ak
                             Next
                             y += rowHeight
                             ligneCourante += 1
+                            lignesImprimeesSurPage += 1
                         End While
 
+                        pe.Graphics.DrawString("Page " & numeroPage.ToString(), fontBloc, pinceauGris, pe.MarginBounds.Right - 80, pe.MarginBounds.Bottom + 10)
                         pe.HasMorePages = False
                     End Sub
 
@@ -1177,6 +1272,31 @@ Namespace DevCommerc8ak
             End If
 
             Return String.Join(" | ", morceaux)
+        End Function
+
+        Private Sub ChargerCategories()
+            If _categoriesTable Is Nothing Then
+                Return
+            End If
+
+            Dim source As DataTable = _categoriesTable.Copy()
+            Dim ligneVide As DataRow = source.NewRow()
+            ligneVide("CategorieId") = DBNull.Value
+            ligneVide("NomCategorie") = String.Empty
+            source.Rows.InsertAt(ligneVide, 0)
+
+            cmbCategorie.DataSource = source
+            cmbCategorie.DisplayMember = "NomCategorie"
+            cmbCategorie.ValueMember = "CategorieId"
+            cmbCategorie.SelectedIndex = -1
+        End Sub
+
+        Private Function LireCategorieSelectionnee() As Integer?
+            If cmbCategorie.SelectedValue Is Nothing OrElse TypeOf cmbCategorie.SelectedValue Is DataRowView OrElse Convert.IsDBNull(cmbCategorie.SelectedValue) Then
+                Return Nothing
+            End If
+
+            Return Convert.ToInt32(cmbCategorie.SelectedValue)
         End Function
 
         Private Function ConstruireLargeursColonnes(colonnes As String(), largeurs As Integer(), largeurTotale As Integer) As Integer()

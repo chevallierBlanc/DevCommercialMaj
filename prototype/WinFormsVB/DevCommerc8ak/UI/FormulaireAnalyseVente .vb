@@ -6,6 +6,7 @@ Imports System.Collections.Generic
 Imports System.Configuration
 Imports System.Data
 Imports System.Drawing
+Imports System.IO
 Imports System.Drawing.Printing
 Imports System.Windows.Forms
 Imports System.Drawing.Drawing2D
@@ -74,8 +75,10 @@ Namespace DevCommerc8ak
         Private ReadOnly printPreviewDetailVentes As New PrintPreviewDialog()
         Private dtDetailVentesAImprimer As DataTable
         Private _impressionIndexDetailVentes As Integer
+        Private _impressionPageDetailVentes As Integer
         Private _titreDetailVentes As String = String.Empty
         Private _isRefreshingFromEvent As Boolean
+        Private _parametres As ParametreDTO
 
         Private lblValeurStockEntree As Label
         Private lblCoutMarchandisesVendues As Label
@@ -121,6 +124,7 @@ Namespace DevCommerc8ak
             Dim dal As New DAL(cs)
             rapportService = New RapportService(dal)
             venteService = New VenteService()
+            _parametres = PrintConfigurationHelper.ChargerParametres()
 
             ' --- LAYOUT PRINCIPAL ---
             Dim mainLayout As New TableLayoutPanel() With {
@@ -691,9 +695,9 @@ Namespace DevCommerc8ak
 
                 dtDetailVentesAImprimer = dt
                 _impressionIndexDetailVentes = 0
+                _impressionPageDetailVentes = 1
                 _titreDetailVentes = "RAPPORT DES VENTES - " & Convert.ToString(cmbPeriode.SelectedItem).ToUpperInvariant()
-                printDocDetailVentes.DefaultPageSettings.Margins = New System.Drawing.Printing.Margins(30, 30, 30, 30)
-                printDocDetailVentes.DefaultPageSettings.Landscape = False
+                _parametres = PrintConfigurationHelper.ConfigurerDocumentA4(printDocDetailVentes, Me, "FormulaireAnalyseVente", "ImprimerDetailVentes", True)
                 printPreviewDetailVentes.Document = printDocDetailVentes
                 printPreviewDetailVentes.Width = 1000
                 printPreviewDetailVentes.Height = 720
@@ -763,25 +767,37 @@ Namespace DevCommerc8ak
                 Dim fontBlocGras As New Font("Segoe UI", 10, FontStyle.Bold)
                 Dim rowPen As New Pen(Color.FromArgb(232, 236, 242))
 
-                e.Graphics.DrawString("ANALYSE DES VENTES", fontTitre, pinceauBleu, x, y)
-                y += 28
+                Dim logoPath As String = LogoPathHelper.GetLogoPath(_parametres)
+                If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
+                    Using img As Image = Image.FromFile(logoPath)
+                        e.Graphics.DrawImage(img, x, y, 60, 60)
+                    End Using
+                    x += 74
+                End If
+
+                e.Graphics.DrawString(If(_parametres IsNot Nothing AndAlso _parametres.NomMagasin <> "", _parametres.NomMagasin, "ERPCommercial"), fontTitre, pinceauBleu, x, y)
+                y += 24
+                e.Graphics.DrawString(If(_parametres IsNot Nothing, _parametres.AdresseMagasin, ""), fontSousTitre, pinceauGris, x, y)
+                y += 18
+                e.Graphics.DrawString(If(_parametres IsNot Nothing, _parametres.TelephoneMagasin, ""), fontSousTitre, pinceauGris, x, y)
+                y += 18
                 e.Graphics.DrawString("Période : " & ChargerContexteTexte(), fontSousTitre, pinceauGris, x, y)
                 y += 18
                 e.Graphics.DrawString("Date d'impression : " & Date.Now.ToString("dd/MM/yyyy HH:mm"), fontSousTitre, pinceauGris, x, y)
-                y = 110
+                y = 140
 
-                e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(17, 35, 74)), 30, y, 760, 32)
+                e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(17, 35, 74)), 30, y, 1020, 32)
                 e.Graphics.DrawString(_titreDetailVentes, fontBlocGras, Brushes.White, 42, y + 7)
                 y += 46
 
                 Dim colDate As Integer = 42
-                Dim colProduit As Integer = 162
-                Dim colPrix As Integer = 370
-                Dim colQte As Integer = 500
-                Dim colMontant As Integer = 595
-                Dim colBenefice As Integer = 700
+                Dim colProduit As Integer = 220
+                Dim colPrix As Integer = 520
+                Dim colQte As Integer = 660
+                Dim colMontant As Integer = 790
+                Dim colBenefice As Integer = 920
 
-                e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(229, 239, 252)), 30, y, 760, 28)
+                e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(229, 239, 252)), 30, y, 1020, 28)
                 e.Graphics.DrawString("Date", fontBlocGras, pinceauBleu, colDate, y + 6)
                 e.Graphics.DrawString("Produit", fontBlocGras, pinceauBleu, colProduit, y + 6)
                 e.Graphics.DrawString("Prix achat", fontBlocGras, pinceauBleu, colPrix, y + 6)
@@ -790,15 +806,20 @@ Namespace DevCommerc8ak
                 e.Graphics.DrawString("Bénéfice", fontBlocGras, pinceauBleu, colBenefice, y + 6)
                 y += 34
 
+                Dim lignesImprimees As Integer = 0
                 For i As Integer = _impressionIndexDetailVentes To dt.Rows.Count - 1
                     Dim row As DataRow = dt.Rows(i)
                     If y > e.MarginBounds.Bottom - 40 Then
-                        _impressionIndexDetailVentes = i
-                        e.HasMorePages = True
+                        e.Graphics.DrawString("Page " & _impressionPageDetailVentes.ToString(), fontSousTitre, pinceauGris, e.MarginBounds.Right - 80, e.MarginBounds.Bottom + 8)
+                        e.HasMorePages = lignesImprimees > 0
+                        If e.HasMorePages Then
+                            _impressionIndexDetailVentes = i
+                            _impressionPageDetailVentes += 1
+                        End If
                         Return
                     End If
 
-                    e.Graphics.DrawLine(rowPen, 30, y + 16, 790, y + 16)
+                    e.Graphics.DrawLine(rowPen, 30, y + 16, 1050, y + 16)
                     e.Graphics.DrawString(If(row.IsNull("DateVente"), "", Convert.ToDateTime(row("DateVente")).ToString("dd/MM/yyyy HH:mm")), fontBloc, Brushes.Black, colDate, y)
                     e.Graphics.DrawString(LireTexte(row, "Produit"), fontBloc, Brushes.Black, colProduit, y)
                     e.Graphics.DrawString(Convert.ToDecimal(If(row.IsNull("PrixAchatCarton"), 0D, row("PrixAchatCarton"))).ToString("N0"), fontBloc, Brushes.Black, colPrix, y)
@@ -806,9 +827,12 @@ Namespace DevCommerc8ak
                     e.Graphics.DrawString(Convert.ToDecimal(If(row.IsNull("MontantGenere"), 0D, row("MontantGenere"))).ToString("N0"), fontBloc, Brushes.Black, colMontant, y)
                     e.Graphics.DrawString(Convert.ToDecimal(If(row.IsNull("Benefice"), 0D, row("Benefice"))).ToString("N0"), fontBloc, Brushes.Black, colBenefice, y)
                     y += 24
+                    lignesImprimees += 1
                 Next
 
+                e.Graphics.DrawString("Page " & _impressionPageDetailVentes.ToString(), fontSousTitre, pinceauGris, e.MarginBounds.Right - 80, e.MarginBounds.Bottom + 8)
                 _impressionIndexDetailVentes = 0
+                _impressionPageDetailVentes = 1
                 e.HasMorePages = False
             Catch ex As Exception
                 MessageBox.Show("Erreur impression ventes: " & ex.Message, "Analyse ventes", MessageBoxButtons.OK, MessageBoxIcon.Error)

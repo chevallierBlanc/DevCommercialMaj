@@ -198,6 +198,9 @@ Namespace DevCommerc8ak
         Private _prochainTypeTemporaireId As Integer
         Private ReadOnly _prixManuelOverrides As Dictionary(Of String, Boolean)
         Private _isUpdatingPrixAutomatiques As Boolean
+        Private _rapportEntreesPrintRowIndex As Integer
+        Private _rapportEntreesPrintPageIndex As Integer
+        Private _rapportEntreesTable As DataTable
 
         Private Class PanierLigne
             Public Property ProduitId As Integer
@@ -735,6 +738,7 @@ Namespace DevCommerc8ak
             AddHandler btnEnregistrerPerte.Click, AddressOf EnregistrerPerte
             AddHandler btnChargerRapportEntrees.Click, AddressOf ChargerRapportEntrees
             AddHandler btnImprimerRapportEntrees.Click, AddressOf ImprimerRapportEntrees
+            AddHandler gridRapportEntrees.CellFormatting, AddressOf FormaterCelluleRapportEntrees
 
             AddHandler btnAjouter.Click, AddressOf AjouterAuPanier
             ' AddHandler btnVider.Click, AddressOf RetirerDuPanier
@@ -2994,7 +2998,8 @@ Namespace DevCommerc8ak
                     New System.Data.SqlClient.SqlParameter("@Du", dtpRapportDu.Value.Date),
                     New System.Data.SqlClient.SqlParameter("@Au", dtpRapportAu.Value.Date)
                 }
-                gridRapportEntrees.DataSource = dal.ExecuterTable(sql, CommandType.Text, p)
+                _rapportEntreesTable = dal.ExecuterTable(sql, CommandType.Text, p)
+                gridRapportEntrees.DataSource = _rapportEntreesTable
             Catch ex As Exception
                 MessageBox.Show("Erreur rapport entrées: " & ex.Message)
             End Try
@@ -3006,11 +3011,16 @@ Namespace DevCommerc8ak
                     ChargerRapportEntrees(Nothing, EventArgs.Empty)
                 End If
 
-                Dim doc As New PrintDocument()
-                If _parametres IsNot Nothing AndAlso _parametres.ImprimanteA4 <> "" Then
-                    doc.PrinterSettings.PrinterName = _parametres.ImprimanteA4
+                Dim dt As DataTable = TryCast(gridRapportEntrees.DataSource, DataTable)
+                If dt Is Nothing OrElse dt.Rows.Count = 0 Then
+                    MessageBox.Show("Aucune ligne à imprimer pour la période sélectionnée.", "Rapport des entrées", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    Return
                 End If
-                doc.DefaultPageSettings.Landscape = True
+
+                Dim doc As New PrintDocument()
+                _parametres = PrintConfigurationHelper.ConfigurerDocumentA4(doc, Me, "FormulaireStock", "ImprimerRapportEntrees", True)
+                _rapportEntreesPrintRowIndex = 0
+                _rapportEntreesPrintPageIndex = 1
                 AddHandler doc.PrintPage, AddressOf ImprimerPageRapportEntrees
 
                 Dim preview As New PrintPreviewDialog()
@@ -3049,34 +3059,69 @@ Namespace DevCommerc8ak
             Next
             y += 26
 
-            For Each row As DataGridViewRow In gridRapportEntrees.Rows
-                If row.IsNewRow Then Continue For
+            If _rapportEntreesTable Is Nothing OrElse _rapportEntreesTable.Rows.Count = 0 Then
+                e.HasMorePages = False
+                Return
+            End If
+
+            Dim lignesImprimees As Integer = 0
+            For i As Integer = _rapportEntreesPrintRowIndex To _rapportEntreesTable.Rows.Count - 1
+                Dim row As DataRow = _rapportEntreesTable.Rows(i)
                 x = 40
                 Dim values As String() = {
-                    Convert.ToDateTime(row.Cells("DateEntree").Value).ToString("dd/MM/yyyy"),
-                    Convert.ToString(row.Cells("ReferenceStock").Value),
-                    Convert.ToString(row.Cells("Produit").Value),
-                    Convert.ToString(row.Cells("QuantiteEntree").Value),
-                    Convert.ToString(row.Cells("StockApresEntree").Value),
-                    Convert.ToString(row.Cells("PrixAchat").Value),
-                    Convert.ToString(row.Cells("PrixGros").Value),
-                    Convert.ToString(row.Cells("MargePourcent").Value),
-                    Convert.ToString(row.Cells("Devise").Value)
+                    Convert.ToDateTime(row("DateEntree")).ToString("dd/MM/yyyy"),
+                    Convert.ToString(row("ReferenceStock")),
+                    Convert.ToString(row("Produit")),
+                    Convert.ToDecimal(row("QuantiteEntree")).ToString("N0"),
+                    Convert.ToDecimal(row("StockApresEntree")).ToString("N0"),
+                    Convert.ToDecimal(row("PrixAchat")).ToString("N0"),
+                    Convert.ToDecimal(row("PrixGros")).ToString("N0"),
+                    FormaterMargePourcent(row("MargePourcent")),
+                    Convert.ToString(row("Devise"))
                 }
-                For i As Integer = 0 To values.Length - 1
-                    g.DrawRectangle(Pens.Gray, x, y, widths(i), 22)
-                    g.DrawString(values(i), fontTexte, Brushes.Black, x + 2, y + 4)
-                    x += widths(i)
+                For j As Integer = 0 To values.Length - 1
+                    g.DrawRectangle(Pens.Gray, x, y, widths(j), 22)
+                    g.DrawString(values(j), fontTexte, Brushes.Black, x + 2, y + 4)
+                    x += widths(j)
                 Next
                 y += 22
+                lignesImprimees += 1
                 If y > e.MarginBounds.Bottom - 40 Then
-                    e.HasMorePages = True
+                    g.DrawString("Page " & _rapportEntreesPrintPageIndex.ToString(), fontTexte, Brushes.Black, e.MarginBounds.Right - 70, e.MarginBounds.Bottom + 10)
+                    e.HasMorePages = lignesImprimees > 0
+                    If e.HasMorePages Then
+                        _rapportEntreesPrintRowIndex = i + 1
+                        _rapportEntreesPrintPageIndex += 1
+                    End If
                     Return
                 End If
             Next
 
+            g.DrawString("Page " & _rapportEntreesPrintPageIndex.ToString(), fontTexte, Brushes.Black, e.MarginBounds.Right - 70, e.MarginBounds.Bottom + 10)
+            _rapportEntreesPrintRowIndex = 0
+            _rapportEntreesPrintPageIndex = 1
             e.HasMorePages = False
         End Sub
+
+        Private Sub FormaterCelluleRapportEntrees(sender As Object, e As DataGridViewCellFormattingEventArgs)
+            If e.RowIndex < 0 OrElse Not gridRapportEntrees.Columns.Contains("MargePourcent") Then
+                Return
+            End If
+
+            If String.Equals(gridRapportEntrees.Columns(e.ColumnIndex).Name, "MargePourcent", StringComparison.OrdinalIgnoreCase) Then
+                e.Value = FormaterMargePourcent(e.Value)
+                e.FormattingApplied = True
+            End If
+        End Sub
+
+        Private Function FormaterMargePourcent(valeur As Object) As String
+            If valeur Is Nothing OrElse Convert.IsDBNull(valeur) Then
+                Return String.Empty
+            End If
+
+            Dim marge As Decimal = Convert.ToDecimal(valeur)
+            Return marge.ToString("0.##") & " %"
+        End Function
         'Private Sub EnregistrerPerte(sender As Object, e As EventArgs)
         '    ' Logique de perte originale
         'End Sub

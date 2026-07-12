@@ -142,6 +142,7 @@
     <Compile Include="Services\NotificationService.vb" />
     <Compile Include="Services\IconsHelper.vb" />
     <Compile Include="Services\LogoPathHelper.vb" />
+    <Compile Include="Services\PrintConfigurationHelper.vb" />
     <Compile Include="Services\SuperAdminService.vb" />
     <Compile Include="UI\FormAPropos_Retouche.VB">
       <SubType>Form</SubType>

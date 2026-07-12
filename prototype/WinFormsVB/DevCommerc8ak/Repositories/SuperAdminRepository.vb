@@ -183,39 +183,111 @@ Namespace DevCommerc8ak
 
         Public Sub EnregistrerRole(roleId As Integer?, nomRole As String, estActif As Boolean, interfaceIds As IEnumerable(Of Integer))
             AssurerInfrastructure()
-            Dim roleIdFinal As Integer
-            If roleId.HasValue AndAlso roleId.Value > 0 Then
-                Dim sqlUpdate As String = "UPDATE dbo.Roles SET NomRole=@NomRole, EstActif=@EstActif WHERE RoleId=@RoleId"
-                Dim pUpdate As New List(Of SqlParameter) From {
-                    New SqlParameter("@NomRole", nomRole),
-                    New SqlParameter("@EstActif", estActif),
-                    New SqlParameter("@RoleId", roleId.Value)
-                }
-                _dal.ExecuterNonRequete(sqlUpdate, CommandType.Text, pUpdate)
-                roleIdFinal = roleId.Value
-            Else
-                Dim sqlInsert As String = "INSERT INTO dbo.Roles (NomRole, EstActif) VALUES (@NomRole, @EstActif); SELECT CAST(SCOPE_IDENTITY() AS INT);"
-                Dim pInsert As New List(Of SqlParameter) From {
-                    New SqlParameter("@NomRole", nomRole),
-                    New SqlParameter("@EstActif", estActif)
-                }
-                roleIdFinal = Convert.ToInt32(_dal.ExecuterScalaire(sqlInsert, CommandType.Text, pInsert))
+            If RoleExisteDeja(nomRole, roleId) Then
+                Throw New InvalidOperationException("Un rôle portant ce nom existe déjà.")
             End If
 
-            Dim pDelete As New List(Of SqlParameter) From {New SqlParameter("@RoleId", roleIdFinal)}
-            _dal.ExecuterNonRequete("DELETE FROM dbo.RoleInterfaces WHERE RoleId=@RoleId", CommandType.Text, pDelete)
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    Try
+                        Dim roleIdFinal As Integer
+                        If roleId.HasValue AndAlso roleId.Value > 0 Then
+                            Using cmdUpdate As New SqlCommand("UPDATE dbo.Roles SET NomRole=@NomRole, EstActif=@EstActif WHERE RoleId=@RoleId", cn, tx)
+                                cmdUpdate.Parameters.AddWithValue("@NomRole", nomRole)
+                                cmdUpdate.Parameters.AddWithValue("@EstActif", estActif)
+                                cmdUpdate.Parameters.AddWithValue("@RoleId", roleId.Value)
+                                cmdUpdate.ExecuteNonQuery()
+                            End Using
+                            roleIdFinal = roleId.Value
+                        Else
+                            Using cmdInsert As New SqlCommand("INSERT INTO dbo.Roles (NomRole, EstActif) VALUES (@NomRole, @EstActif); SELECT CAST(SCOPE_IDENTITY() AS INT);", cn, tx)
+                                cmdInsert.Parameters.AddWithValue("@NomRole", nomRole)
+                                cmdInsert.Parameters.AddWithValue("@EstActif", estActif)
+                                roleIdFinal = Convert.ToInt32(cmdInsert.ExecuteScalar())
+                            End Using
+                        End If
 
-            If interfaceIds Is Nothing Then
-                Return
-            End If
+                        Using cmdDelete As New SqlCommand("DELETE FROM dbo.RoleInterfaces WHERE RoleId=@RoleId", cn, tx)
+                            cmdDelete.Parameters.AddWithValue("@RoleId", roleIdFinal)
+                            cmdDelete.ExecuteNonQuery()
+                        End Using
 
-            For Each interfaceId As Integer In interfaceIds
-                Dim pInsertRole As New List(Of SqlParameter) From {
-                    New SqlParameter("@RoleId", roleIdFinal),
-                    New SqlParameter("@InterfaceId", interfaceId)
-                }
-                _dal.ExecuterNonRequete("INSERT INTO dbo.RoleInterfaces (RoleId, InterfaceId) VALUES (@RoleId, @InterfaceId)", CommandType.Text, pInsertRole)
-            Next
+                        If interfaceIds IsNot Nothing Then
+                            For Each interfaceId As Integer In interfaceIds
+                                Using cmdInsertRole As New SqlCommand("INSERT INTO dbo.RoleInterfaces (RoleId, InterfaceId) VALUES (@RoleId, @InterfaceId)", cn, tx)
+                                    cmdInsertRole.Parameters.AddWithValue("@RoleId", roleIdFinal)
+                                    cmdInsertRole.Parameters.AddWithValue("@InterfaceId", interfaceId)
+                                    cmdInsertRole.ExecuteNonQuery()
+                                End Using
+                            Next
+                        End If
+
+                        tx.Commit()
+                    Catch
+                        tx.Rollback()
+                        Throw
+                    End Try
+                End Using
+            End Using
+        End Sub
+
+        Public Function RoleExisteDeja(nomRole As String, roleIdExclu As Integer?) As Boolean
+            Dim sql As String = "SELECT COUNT(*) FROM dbo.Roles WHERE UPPER(NomRole)=@NomRole AND (@RoleIdExclu IS NULL OR RoleId<>@RoleIdExclu)"
+            Dim p As New List(Of SqlParameter) From {
+                New SqlParameter("@NomRole", nomRole.Trim().ToUpperInvariant()),
+                New SqlParameter("@RoleIdExclu", If(roleIdExclu.HasValue, CType(roleIdExclu.Value, Object), DBNull.Value))
+            }
+            Return Convert.ToInt32(_dal.ExecuterScalaire(sql, CommandType.Text, p)) > 0
+        End Function
+
+        Public Function CompterUtilisateursParRole(roleId As Integer) As Integer
+            Dim sql As String = "SELECT COUNT(*) FROM dbo.UtilisateurRoles WHERE RoleId=@RoleId"
+            Dim p As New List(Of SqlParameter) From {New SqlParameter("@RoleId", roleId)}
+            Return Convert.ToInt32(_dal.ExecuterScalaire(sql, CommandType.Text, p))
+        End Function
+
+        Public Function EstDernierRoleCritique(roleId As Integer) As Boolean
+            Dim sql As String =
+                "SELECT COUNT(DISTINCT r.RoleId) " &
+                "FROM dbo.Roles r " &
+                "INNER JOIN dbo.RoleInterfaces ri ON ri.RoleId = r.RoleId " &
+                "INNER JOIN dbo.InterfacesApplication i ON i.InterfaceId = ri.InterfaceId " &
+                "WHERE ISNULL(r.EstActif,1)=1 " &
+                "AND i.CodeInterface IN ('ADMINISTRATION','PARAMETRES','SUPERADMIN_ROLES','SUPERADMIN_TECH') " &
+                "AND r.RoleId <> @RoleId"
+            Dim p As New List(Of SqlParameter) From {New SqlParameter("@RoleId", roleId)}
+            Return Convert.ToInt32(_dal.ExecuterScalaire(sql, CommandType.Text, p)) = 0
+        End Function
+
+        Public Sub DesactiverRole(roleId As Integer)
+            Dim sql As String = "UPDATE dbo.Roles SET EstActif = 0 WHERE RoleId=@RoleId"
+            Dim p As New List(Of SqlParameter) From {New SqlParameter("@RoleId", roleId)}
+            _dal.ExecuterNonRequete(sql, CommandType.Text, p)
+        End Sub
+
+        Public Sub SupprimerRole(roleId As Integer)
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    Try
+                        Using cmdDeleteInterfaces As New SqlCommand("DELETE FROM dbo.RoleInterfaces WHERE RoleId=@RoleId", cn, tx)
+                            cmdDeleteInterfaces.Parameters.AddWithValue("@RoleId", roleId)
+                            cmdDeleteInterfaces.ExecuteNonQuery()
+                        End Using
+
+                        Using cmdDeleteRole As New SqlCommand("DELETE FROM dbo.Roles WHERE RoleId=@RoleId", cn, tx)
+                            cmdDeleteRole.Parameters.AddWithValue("@RoleId", roleId)
+                            cmdDeleteRole.ExecuteNonQuery()
+                        End Using
+
+                        tx.Commit()
+                    Catch
+                        tx.Rollback()
+                        Throw
+                    End Try
+                End Using
+            End Using
         End Sub
 
         Public Sub AjouterAuditAction(utilisateur As String, role As String, moduleName As String, actionName As String, description As String, machine As String, statut As String)

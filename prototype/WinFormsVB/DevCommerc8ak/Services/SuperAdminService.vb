@@ -56,6 +56,30 @@ Namespace DevCommerc8ak
             AppEvents.OnRolePermissionsChanged()
         End Sub
 
+        Public Function RoleExisteDeja(nomRole As String, roleIdExclu As Integer?) As Boolean
+            Return ObtenirRepository().RoleExisteDeja(nomRole, roleIdExclu)
+        End Function
+
+        Public Function CompterUtilisateursParRole(roleId As Integer) As Integer
+            Return ObtenirRepository().CompterUtilisateursParRole(roleId)
+        End Function
+
+        Public Function EstDernierRoleCritique(roleId As Integer) As Boolean
+            Return ObtenirRepository().EstDernierRoleCritique(roleId)
+        End Function
+
+        Public Sub DesactiverRole(roleId As Integer, nomRole As String)
+            ObtenirRepository().DesactiverRole(roleId)
+            AuditActionService.Enregistrer("SuperAdmin", "Désactivation rôle", "Rôle " & nomRole.Trim().ToUpperInvariant() & " désactivé.")
+            AppEvents.OnRolePermissionsChanged()
+        End Sub
+
+        Public Sub SupprimerRole(roleId As Integer, nomRole As String)
+            ObtenirRepository().SupprimerRole(roleId)
+            AuditActionService.Enregistrer("SuperAdmin", "Suppression rôle", "Rôle " & nomRole.Trim().ToUpperInvariant() & " supprimé.")
+            AppEvents.OnRolePermissionsChanged()
+        End Sub
+
         Public Function RoleUtilisePermissions(nomRole As String) As Boolean
             Return ObtenirRepository().RoleUtilisePermissions(nomRole)
         End Function

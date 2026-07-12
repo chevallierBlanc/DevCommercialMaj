@@ -1567,8 +1567,7 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                printDoc.DefaultPageSettings.Margins = New System.Drawing.Printing.Margins(30, 30, 30, 30)
-                printDoc.DefaultPageSettings.Landscape = False
+                _parametres = PrintConfigurationHelper.ConfigurerDocumentA4(printDoc, Me, "FormulaireFinance", "PreparerImpression", True)
                 _impressionIndex = 0
                 _impressionTotalFC = 0D
                 _impressionTotalUSD = 0D

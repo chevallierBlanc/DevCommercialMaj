@@ -8,6 +8,7 @@ Imports System.Data
 Imports System.Drawing
 Imports System.Globalization
 Imports System.Linq
+Imports System.Text
 Imports System.Windows.Forms
 Imports System.Drawing.Drawing2D
 Imports System.Data.SqlClient
@@ -26,10 +27,16 @@ Namespace DevCommerc8ak
         Private btnEnregistrer As Button
         Private lblTitle As Label
         Private lblSubtitle As Label
+        Private txtRecherche As TextBox
+        Private cmbFiltreRapide As ComboBox
+        Private cmbCategorieFiltre As ComboBox
+        Private lblResultats As Label
 
         ' --- Données ---
         Private _categories As DataTable
         Private _majGrilleEnCours As Boolean
+        Private _sourceTable As DataTable
+        Private ReadOnly _bindingSource As New BindingSource()
 
         ' --- Palette de Couleurs Enterprise ERP ---
         Private ReadOnly ColorBg As Color = Color.FromArgb(240, 242, 245)
@@ -118,6 +125,47 @@ Namespace DevCommerc8ak
                 .Padding = New Padding(1)
             }
 
+            Dim contentLayout As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 2}
+            contentLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 64))
+            contentLayout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+
+            Dim pnlFiltres As New FlowLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .Padding = New Padding(16, 12, 16, 8),
+                .WrapContents = False,
+                .AutoScroll = True,
+                .BackColor = Color.White
+            }
+            txtRecherche = New TextBox() With {.Width = 260, .Font = FontMain}
+            cmbFiltreRapide = New ComboBox() With {.Width = 210, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontMain}
+            cmbCategorieFiltre = New ComboBox() With {.Width = 220, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontMain}
+            lblResultats = New Label() With {.AutoSize = True, .ForeColor = ColorTextSecondary, .Font = FontBold, .Margin = New Padding(12, 10, 0, 0)}
+            cmbFiltreRapide.Items.AddRange(New Object() {
+                "Tous les produits",
+                "Sans prix d'achat",
+                "Sans prix de gros",
+                "Sans prix de détail",
+                "Sans aucun prix de vente",
+                "Sans catégorie",
+                "Sans unité principale",
+                "Sans conversion d'unité",
+                "Stock égal à zéro",
+                "Stock non initialisé",
+                "Produits inactifs",
+                "Produits actifs",
+                "Avec incohérence de données"
+            })
+            cmbFiltreRapide.SelectedIndex = 0
+            pnlFiltres.Controls.AddRange({
+                New Label() With {.Text = "Recherche", .AutoSize = True, .Margin = New Padding(0, 10, 6, 0), .ForeColor = ColorTextSecondary},
+                txtRecherche,
+                New Label() With {.Text = "Filtre", .AutoSize = True, .Margin = New Padding(14, 10, 6, 0), .ForeColor = ColorTextSecondary},
+                cmbFiltreRapide,
+                New Label() With {.Text = "Catégorie", .AutoSize = True, .Margin = New Padding(14, 10, 6, 0), .ForeColor = ColorTextSecondary},
+                cmbCategorieFiltre,
+                lblResultats
+            })
+
             grid = New DataGridView() With {
                 .Dock = DockStyle.Fill,
                 .BackgroundColor = Color.White,
@@ -150,7 +198,9 @@ Namespace DevCommerc8ak
             grid.DefaultCellStyle = cellStyle
             grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(252, 253, 255)
 
-            card.Controls.Add(grid)
+            contentLayout.Controls.Add(pnlFiltres, 0, 0)
+            contentLayout.Controls.Add(grid, 0, 1)
+            card.Controls.Add(contentLayout)
             pnlMain.Controls.Add(card)
             rootLayout.Controls.Add(pnlMain, 0, 1)
 
@@ -184,6 +234,9 @@ Namespace DevCommerc8ak
             AddHandler btnEnregistrer.Click, AddressOf EnregistrerStockInitial
             AddHandler grid.CellValueChanged, AddressOf Grid_CellValueChanged
             AddHandler grid.CurrentCellDirtyStateChanged, AddressOf Grid_CurrentCellDirtyStateChanged
+            AddHandler txtRecherche.TextChanged, AddressOf ChangerFiltres
+            AddHandler cmbFiltreRapide.SelectedIndexChanged, AddressOf ChangerFiltres
+            AddHandler cmbCategorieFiltre.SelectedIndexChanged, AddressOf ChangerFiltres
         End Sub
 
         Private Sub StyliserBouton(btn As Button, bgColor As Color, fgColor As Color, hasBorder As Boolean)
@@ -233,6 +286,13 @@ Namespace DevCommerc8ak
 
         Private Sub Recharger(sender As Object, e As EventArgs)
             Try
+                If _sourceTable IsNot Nothing AndAlso _sourceTable.GetChanges() IsNot Nothing Then
+                    Dim confirmation As DialogResult = MessageBox.Show("Des modifications non enregistrées existent. Voulez-vous recharger et perdre ces changements ?", "Confirmation", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
+                    If confirmation <> DialogResult.Yes Then
+                        Return
+                    End If
+                End If
+
                 _categories = _service.ListerCategories()
                 Dim dt As DataTable = _service.ListerProduitsStockInitial()
                 If Not dt.Columns.Contains("QuantiteInitiale") Then dt.Columns.Add("QuantiteInitiale", GetType(Decimal))
@@ -245,14 +305,20 @@ Namespace DevCommerc8ak
                 If Not dt.Columns.Contains("StockActuelLisible") Then dt.Columns.Add("StockActuelLisible", GetType(String))
                 If Not dt.Columns.Contains("StockApresLisible") Then dt.Columns.Add("StockApresLisible", GetType(String))
                 If Not dt.Columns.Contains("ResumeQuantite") Then dt.Columns.Add("ResumeQuantite", GetType(String))
+                If Not dt.Columns.Contains("RechercheNormalisee") Then dt.Columns.Add("RechercheNormalisee", GetType(String))
                 For Each row As DataRow In dt.Rows
                     If row.IsNull("DateInitiale") Then
                         row("DateInitiale") = Date.Now
                     End If
+                    row("RechercheNormalisee") = ConstruireTexteRecherche(row)
                     CalculerLigne(row)
                 Next
 
-                grid.DataSource = dt
+                _sourceTable = dt
+                _bindingSource.DataSource = dt.DefaultView
+                grid.DataSource = _bindingSource
+                ChargerCategoriesFiltre()
+                AppliquerFiltres()
                 ConfigurerColonnes()
             Catch ex As Exception
                 Dim log As New ProductionLogService()
@@ -311,6 +377,10 @@ Namespace DevCommerc8ak
                     grid.Columns(col).DefaultCellStyle.Font = FontBold
                 End If
             Next
+
+            If grid.Columns.Contains("RechercheNormalisee") Then
+                grid.Columns("RechercheNormalisee").Visible = False
+            End If
         End Sub
 
         'Private Sub Grid_CurrentCellDirtyStateChanged(sender As Object, e As EventArgs)
@@ -345,8 +415,115 @@ Namespace DevCommerc8ak
                 Return
             End If
 
+            dt.Rows(e.RowIndex)("RechercheNormalisee") = ConstruireTexteRecherche(dt.Rows(e.RowIndex))
             CalculerLigne(dt.Rows(e.RowIndex))
         End Sub
+
+        Private Sub ChangerFiltres(sender As Object, e As EventArgs)
+            AppliquerFiltres()
+        End Sub
+
+        Private Sub ChargerCategoriesFiltre()
+            If _categories Is Nothing Then
+                Return
+            End If
+
+            Dim dt As DataTable = _categories.Copy()
+            Dim ligneToutes As DataRow = dt.NewRow()
+            ligneToutes("CategorieId") = DBNull.Value
+            ligneToutes("NomCategorie") = "Toutes les catégories"
+            dt.Rows.InsertAt(ligneToutes, 0)
+
+            cmbCategorieFiltre.DataSource = dt
+            cmbCategorieFiltre.DisplayMember = "NomCategorie"
+            cmbCategorieFiltre.ValueMember = "CategorieId"
+            If cmbCategorieFiltre.Items.Count > 0 Then
+                cmbCategorieFiltre.SelectedIndex = 0
+            End If
+        End Sub
+
+        Private Sub AppliquerFiltres()
+            Dim vue As DataView = TryCast(_bindingSource.DataSource, DataView)
+            If vue Is Nothing Then
+                Return
+            End If
+
+            Dim filtres As New List(Of String)()
+            Dim recherche As String = NormaliserTexte(txtRecherche.Text)
+            If recherche <> String.Empty Then
+                filtres.Add(String.Format(CultureInfo.InvariantCulture, "[RechercheNormalisee] LIKE '%{0}%'", recherche.Replace("'", "''")))
+            End If
+
+            Dim filtreRapide As String = ConstruireExpressionFiltreRapide()
+            If filtreRapide <> String.Empty Then
+                filtres.Add(filtreRapide)
+            End If
+
+            If cmbCategorieFiltre.SelectedValue IsNot Nothing AndAlso Not Convert.IsDBNull(cmbCategorieFiltre.SelectedValue) Then
+                filtres.Add(String.Format(CultureInfo.InvariantCulture, "[CategorieId] = {0}", Convert.ToInt32(cmbCategorieFiltre.SelectedValue)))
+            End If
+
+            vue.RowFilter = String.Join(" AND ", filtres)
+            lblResultats.Text = vue.Count.ToString("N0", CultureInfo.InvariantCulture) & " produits"
+        End Sub
+
+        Private Function ConstruireExpressionFiltreRapide() As String
+            Select Case Convert.ToString(cmbFiltreRapide.SelectedItem)
+                Case "Sans prix d'achat"
+                    Return "IsNull([PrixAchat], 0) <= 0 AND IsNull([PrixAchatOptionnel], 0) <= 0"
+                Case "Sans prix de gros"
+                    Return "IsNull([PrixGros], 0) <= 0"
+                Case "Sans prix de détail"
+                    Return "IsNull([PrixDetail], 0) <= 0"
+                Case "Sans aucun prix de vente"
+                    Return "IsNull([PrixGros], 0) <= 0 AND IsNull([PrixDemi], 0) <= 0 AND IsNull([PrixQuart], 0) <= 0 AND IsNull([PrixDetail], 0) <= 0 AND IsNull([PrixDouzaine], 0) <= 0"
+                Case "Sans catégorie"
+                    Return "IsNull([CategorieId], 0) = 0"
+                Case "Sans unité principale"
+                    Return "IsNull([UnitePrincipale], '') = ''"
+                Case "Sans conversion d'unité"
+                    Return "IsNull([ConversionUnite], 0) <= 0"
+                Case "Stock égal à zéro"
+                    Return "IsNull([QuantiteStock], 0) = 0"
+                Case "Stock non initialisé"
+                    Return "IsNull([QuantiteInitiale], 0) = 0 AND IsNull([QuantiteStock], 0) = 0"
+                Case "Produits inactifs"
+                    Return "[EstActif] = False"
+                Case "Produits actifs"
+                    Return "[EstActif] = True"
+                Case "Avec incohérence de données"
+                    Return "IsNull([Libelle], '') = '' OR IsNull([CategorieId], 0) = 0 OR IsNull([UnitePrincipale], '') = '' OR IsNull([ConversionUnite], 0) <= 0 OR (IsNull([PrixGros], 0) < 0 OR IsNull([PrixDetail], 0) < 0)"
+                Case Else
+                    Return String.Empty
+            End Select
+        End Function
+
+        Private Function ConstruireTexteRecherche(row As DataRow) As String
+            Dim morceaux As New List(Of String) From {
+                SafeString(row("Libelle")),
+                SafeString(row("CodeBarres")),
+                SafeString(row("NomCategorie")),
+                SafeString(row("CategorieId"))
+            }
+            Return NormaliserTexte(String.Join(" ", morceaux))
+        End Function
+
+        Private Function NormaliserTexte(texte As String) As String
+            If String.IsNullOrWhiteSpace(texte) Then
+                Return String.Empty
+            End If
+
+            Dim normalized As String = texte.Normalize(NormalizationForm.FormD)
+            Dim builder As New StringBuilder()
+            For Each caractere As Char In normalized
+                Dim category As UnicodeCategory = CharUnicodeInfo.GetUnicodeCategory(caractere)
+                If category <> UnicodeCategory.NonSpacingMark Then
+                    builder.Append(Char.ToUpperInvariant(caractere))
+                End If
+            Next
+
+            Return builder.ToString().Normalize(NormalizationForm.FormC)
+        End Function
 
         'Private Sub CalculerLigne(row As DataRow)
         '    Dim qteP As Decimal = SafeDecimal(row("QuantitePrincipale"))

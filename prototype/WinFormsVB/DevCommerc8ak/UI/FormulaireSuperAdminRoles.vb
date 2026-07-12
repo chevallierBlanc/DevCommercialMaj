@@ -24,6 +24,7 @@ Namespace DevCommerc8ak
         Private chkActif As CheckBox
         Private btnNouveau As Button
         Private btnEnregistrer As Button
+        Private btnSupprimer As Button
         Private lblInfo As Label
         Private lblTitle As Label
         Private lblSubtitle As Label
@@ -69,6 +70,7 @@ Namespace DevCommerc8ak
             AddHandler gridRoles.SelectionChanged, AddressOf ChargerRoleSelectionne
             AddHandler btnNouveau.Click, AddressOf NouveauRole
             AddHandler btnEnregistrer.Click, AddressOf EnregistrerRole
+            AddHandler btnSupprimer.Click, AddressOf SupprimerRoleSelectionne
         End Sub
 
         Private Sub BuildUi()
@@ -184,8 +186,10 @@ Namespace DevCommerc8ak
             
             btnEnregistrer = New Button() With {.Text = "ENREGISTRER", .Size = New Size(150, 38), .Margin = New Padding(10, 0, 0, 0)}
             StyliserBouton(btnEnregistrer, ColorPrimary, Color.White, False)
-            
-            pnlActions.Controls.AddRange({btnNouveau, btnEnregistrer})
+            btnSupprimer = New Button() With {.Text = "SUPPRIMER", .Size = New Size(150, 38), .Margin = New Padding(10, 0, 0, 0)}
+            StyliserBouton(btnSupprimer, ColorDanger, Color.White, False)
+
+            pnlActions.Controls.AddRange({btnNouveau, btnEnregistrer, btnSupprimer})
             pnlForm.Controls.AddRange({lblNomRole, txtNomRole, chkActif, pnlActions})
 
             ' Liste des interfaces
@@ -315,6 +319,12 @@ Namespace DevCommerc8ak
                 Return
             End If
 
+            If _service.RoleExisteDeja(nomRole, _roleIdCourant) Then
+                MessageBox.Show("Un rôle portant ce nom existe déjà.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                txtNomRole.Focus()
+                Return
+            End If
+
             Dim interfaceIds As New List(Of Integer)()
             For Each item As Object In clbInterfaces.CheckedItems
                 Dim intItem As InterfaceItem = TryCast(item, InterfaceItem)
@@ -323,10 +333,16 @@ Namespace DevCommerc8ak
                 End If
             Next
 
+            If _roleIdCourant.HasValue AndAlso String.Equals(SessionUtilisateur.Role, nomRole, StringComparison.OrdinalIgnoreCase) AndAlso Not SelectionContientAccesCritique(interfaceIds) Then
+                MessageBox.Show("Vous ne pouvez pas retirer tous les accès critiques du rôle actuellement connecté.", "Sécurité", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return
+            End If
+
             Try
                 Me.Cursor = Cursors.WaitCursor
                 _service.EnregistrerRole(_roleIdCourant, nomRole, chkActif.Checked, interfaceIds)
                 ChargerRoles()
+                AppEvents.OnRolePermissionsChanged()
                 MessageBox.Show("Le rôle et ses privilèges ont été enregistrés avec succès.", "Succès", MessageBoxButtons.OK, MessageBoxIcon.Information)
             Catch ex As Exception
                 _log.Error("FormulaireSuperAdminRoles", "EnregistrerRole", "Erreur d'enregistrement.", ex)
@@ -335,6 +351,79 @@ Namespace DevCommerc8ak
                 Me.Cursor = Cursors.Default
             End Try
         End Sub
+
+        Private Sub SupprimerRoleSelectionne(sender As Object, e As EventArgs)
+            If Not _roleIdCourant.HasValue OrElse _roleIdCourant.Value <= 0 Then
+                MessageBox.Show("Sélectionnez un rôle à supprimer.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return
+            End If
+
+            Dim nomRole As String = txtNomRole.Text.Trim().ToUpperInvariant()
+            If String.Equals(nomRole, "SUPERADMIN", StringComparison.OrdinalIgnoreCase) Then
+                MessageBox.Show("Le rôle SUPERADMIN ne peut pas être supprimé.", "Protection", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return
+            End If
+
+            If String.Equals(SessionUtilisateur.Role, nomRole, StringComparison.OrdinalIgnoreCase) Then
+                MessageBox.Show("Vous ne pouvez pas supprimer le rôle de votre session active.", "Protection", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return
+            End If
+
+            If _service.EstDernierRoleCritique(_roleIdCourant.Value) Then
+                MessageBox.Show("Ce rôle est le dernier rôle actif disposant d'un accès critique au système. Suppression interdite.", "Protection", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return
+            End If
+
+            Dim utilisateursAffectes As Integer = _service.CompterUtilisateursParRole(_roleIdCourant.Value)
+            If utilisateursAffectes > 0 Then
+                Dim choix As DialogResult = MessageBox.Show("Ce rôle est encore affecté à " & utilisateursAffectes.ToString() & " utilisateur(s)." & Environment.NewLine &
+                                                           "Oui : désactiver le rôle" & Environment.NewLine &
+                                                           "Non : annuler", "Rôle utilisé", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+                If choix = DialogResult.Yes Then
+                    _service.DesactiverRole(_roleIdCourant.Value, nomRole)
+                    ChargerRoles()
+                    NouveauRole(Nothing, EventArgs.Empty)
+                End If
+                Return
+            End If
+
+            Dim confirmation As DialogResult = MessageBox.Show("Confirmez-vous la suppression du rôle " & nomRole & " ?", "Confirmation", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
+            If confirmation <> DialogResult.Yes Then
+                Return
+            End If
+
+            Try
+                Me.Cursor = Cursors.WaitCursor
+                _service.SupprimerRole(_roleIdCourant.Value, nomRole)
+                ChargerRoles()
+                NouveauRole(Nothing, EventArgs.Empty)
+                MessageBox.Show("Le rôle a été supprimé.", "Succès", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Catch ex As Exception
+                _log.Error("FormulaireSuperAdminRoles", "SupprimerRole", "Erreur de suppression.", ex)
+                MessageBox.Show("Impossible de supprimer le rôle : " & ex.Message, "Erreur", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Finally
+                Me.Cursor = Cursors.Default
+            End Try
+        End Sub
+
+        Private Function SelectionContientAccesCritique(interfaceIds As IEnumerable(Of Integer)) As Boolean
+            If interfaceIds Is Nothing OrElse _interfaces Is Nothing Then
+                Return False
+            End If
+
+            Dim ids As HashSet(Of Integer) = New HashSet(Of Integer)(interfaceIds)
+            For Each row As DataRow In _interfaces.Rows
+                Dim code As String = Convert.ToString(row("CodeInterface"))
+                If code = "ADMINISTRATION" OrElse code = "PARAMETRES" OrElse code = "SUPERADMIN_ROLES" OrElse code = "SUPERADMIN_TECH" Then
+                    Dim interfaceId As Integer = Convert.ToInt32(row("InterfaceId"))
+                    If ids.Contains(interfaceId) Then
+                        Return True
+                    End If
+                End If
+            Next
+
+            Return False
+        End Function
 
         ' --- Classe Interne pour les Items de la CheckedListBox ---
         Private NotInheritable Class InterfaceItem

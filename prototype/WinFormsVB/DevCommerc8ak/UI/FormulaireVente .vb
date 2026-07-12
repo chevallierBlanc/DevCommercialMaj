@@ -2,10 +2,12 @@ Option Strict On
 Option Explicit On
 
 Imports System
+Imports System.Configuration
 Imports System.Collections.Generic
 Imports System.Data
 Imports System.Drawing
 Imports System.Drawing.Printing
+Imports System.IO
 Imports System.Windows.Forms
 Imports System.Drawing.Drawing2D
 
@@ -79,8 +81,12 @@ Namespace DevCommerc8ak
         Private _stockCourant As DataTable
         Private _ventePrintRowIndex As Integer
         Private _stockPrintRowIndex As Integer
+        Private _depensePrintPageIndex As Integer
+        Private _ventePrintPageIndex As Integer
+        Private _stockPrintPageIndex As Integer
         Private _venteRapportTitre As String = String.Empty
         Private _stockRapportTitre As String = String.Empty
+        Private _parametres As ParametreDTO
 
         Public Sub New()
             Me.Text = "Ventes"
@@ -90,6 +96,7 @@ Namespace DevCommerc8ak
             Me.DoubleBuffered = True
 
             _service = New VenteService()
+            _parametres = PrintConfigurationHelper.ChargerParametres()
 
             ' --- LAYOUT PRINCIPAL ---
             Dim mainLayout As New TableLayoutPanel() With {
@@ -891,7 +898,9 @@ Namespace DevCommerc8ak
             End If
 
             _ventePrintRowIndex = 0
+            _ventePrintPageIndex = 1
             _venteRapportTitre = "RAPPORT DES VENTES"
+            _parametres = PrintConfigurationHelper.ConfigurerDocumentA4(pdocVentes, Me, "FormulaireVente", "ImprimerVentes", True)
             Using preview As New PrintPreviewDialog()
                 preview.Document = pdocVentes
                 preview.Width = 1200
@@ -928,7 +937,9 @@ Namespace DevCommerc8ak
             End If
 
             _stockPrintRowIndex = 0
+            _stockPrintPageIndex = 1
             _stockRapportTitre = "RAPPORT STOCK PRODUITS"
+            _parametres = PrintConfigurationHelper.ConfigurerDocumentA4(pdocStock, Me, "FormulaireVente", "ImprimerStock", True)
             Using preview As New PrintPreviewDialog()
                 preview.Document = pdocStock
                 preview.Width = 1200
@@ -1028,10 +1039,25 @@ Namespace DevCommerc8ak
                   fondBloc As New SolidBrush(Color.White),
                   bordure As New Pen(Color.FromArgb(210, 219, 232)),
                   ligneSep As New Pen(Color.FromArgb(232, 236, 242))
+                Dim xHeader As Integer = left
+                Dim logoPath As String = LogoPathHelper.GetLogoPath(_parametres)
+                If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
+                    Using img As Image = Image.FromFile(logoPath)
+                        e.Graphics.DrawImage(img, xHeader, y, 60, 60)
+                    End Using
+                    xHeader += 74
+                End If
+
+                e.Graphics.DrawString(If(_parametres IsNot Nothing AndAlso _parametres.NomMagasin <> "", _parametres.NomMagasin, "ERPCommercial"), titreFont, pinceauBleu, xHeader, y)
+                y += 24
+                e.Graphics.DrawString(If(_parametres IsNot Nothing, _parametres.AdresseMagasin, ""), sousTitreFont, pinceauGris, xHeader, y)
+                y += 18
+                e.Graphics.DrawString(If(_parametres IsNot Nothing, _parametres.TelephoneMagasin, ""), sousTitreFont, pinceauGris, xHeader, y)
+                y += 28
 
                 e.Graphics.FillRectangle(fondBande, left, y, largeur, 36)
                 Using sfTitre As New StringFormat() With {.Alignment = StringAlignment.Center, .LineAlignment = StringAlignment.Center}
-                    e.Graphics.DrawString("RAPPORT DES VENTES", titreFont, Brushes.White, New RectangleF(left, y, largeur, 36), sfTitre)
+                    e.Graphics.DrawString(_venteRapportTitre, titreFont, Brushes.White, New RectangleF(left, y, largeur, 36), sfTitre)
                 End Using
                 y += 48
 
@@ -1071,10 +1097,15 @@ Namespace DevCommerc8ak
                 Next
                 y += hauteurEntete
 
+                Dim lignesImprimees As Integer = 0
                 While _ventePrintRowIndex < data.Rows.Count
                     Dim row As DataRow = data.Rows(_ventePrintRowIndex)
                     If y + hauteurLigne > e.MarginBounds.Bottom Then
-                        e.HasMorePages = True
+                        e.Graphics.DrawString("Page " & _ventePrintPageIndex.ToString(), sousTitreFont, pinceauGris, e.MarginBounds.Right - 80, e.MarginBounds.Bottom + 8)
+                        e.HasMorePages = lignesImprimees > 0
+                        If e.HasMorePages Then
+                            _ventePrintPageIndex += 1
+                        End If
                         Return
                     End If
 
@@ -1098,15 +1129,18 @@ Namespace DevCommerc8ak
 
                     y += hauteurLigne
                     _ventePrintRowIndex += 1
+                    lignesImprimees += 1
                 End While
 
                 y += 18
                 e.Graphics.DrawLine(ligneSep, left, y, left + largeur, y)
                 y += 16
                 e.Graphics.DrawString("Impression professionnelle générée depuis le module d'analyse des ventes.", sousTitreFont, pinceauGris, left, y)
+                e.Graphics.DrawString("Page " & _ventePrintPageIndex.ToString(), sousTitreFont, pinceauGris, e.MarginBounds.Right - 80, e.MarginBounds.Bottom + 8)
             End Using
 
             _ventePrintRowIndex = 0
+            _ventePrintPageIndex = 1
             e.HasMorePages = False
         End Sub
 
@@ -1134,10 +1168,25 @@ Namespace DevCommerc8ak
                   fondTable As New SolidBrush(Color.FromArgb(229, 239, 252)),
                   bordure As New Pen(Color.FromArgb(210, 219, 232)),
                   ligneSep As New Pen(Color.FromArgb(232, 236, 242))
+                Dim xHeader As Integer = left
+                Dim logoPath As String = LogoPathHelper.GetLogoPath(_parametres)
+                If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
+                    Using img As Image = Image.FromFile(logoPath)
+                        e.Graphics.DrawImage(img, xHeader, y, 60, 60)
+                    End Using
+                    xHeader += 74
+                End If
+
+                e.Graphics.DrawString(If(_parametres IsNot Nothing AndAlso _parametres.NomMagasin <> "", _parametres.NomMagasin, "ERPCommercial"), titreFont, pinceauBleu, xHeader, y)
+                y += 24
+                e.Graphics.DrawString(If(_parametres IsNot Nothing, _parametres.AdresseMagasin, ""), sousTitreFont, pinceauGris, xHeader, y)
+                y += 18
+                e.Graphics.DrawString(If(_parametres IsNot Nothing, _parametres.TelephoneMagasin, ""), sousTitreFont, pinceauGris, xHeader, y)
+                y += 28
 
                 e.Graphics.FillRectangle(fondBande, left, y, largeur, 36)
                 Using sfTitre As New StringFormat() With {.Alignment = StringAlignment.Center, .LineAlignment = StringAlignment.Center}
-                    e.Graphics.DrawString("RAPPORT STOCK PRODUITS", titreFont, Brushes.White, New RectangleF(left, y, largeur, 36), sfTitre)
+                    e.Graphics.DrawString(_stockRapportTitre, titreFont, Brushes.White, New RectangleF(left, y, largeur, 36), sfTitre)
                 End Using
                 y += 48
 
@@ -1175,10 +1224,15 @@ Namespace DevCommerc8ak
                 Next
                 y += hauteurEntete
 
+                Dim lignesImprimees As Integer = 0
                 While _stockPrintRowIndex < data.Rows.Count
                     Dim row As DataRow = data.Rows(_stockPrintRowIndex)
                     If y + hauteurLigne > e.MarginBounds.Bottom Then
-                        e.HasMorePages = True
+                        e.Graphics.DrawString("Page " & _stockPrintPageIndex.ToString(), sousTitreFont, pinceauGris, e.MarginBounds.Right - 80, e.MarginBounds.Bottom + 8)
+                        e.HasMorePages = lignesImprimees > 0
+                        If e.HasMorePages Then
+                            _stockPrintPageIndex += 1
+                        End If
                         Return
                     End If
 
@@ -1199,15 +1253,18 @@ Namespace DevCommerc8ak
 
                     y += hauteurLigne
                     _stockPrintRowIndex += 1
+                    lignesImprimees += 1
                 End While
 
                 y += 18
                 e.Graphics.DrawLine(ligneSep, left, y, left + largeur, y)
                 y += 16
                 e.Graphics.DrawString("Impression professionnelle générée depuis le module d'analyse du stock.", sousTitreFont, pinceauGris, left, y)
+                e.Graphics.DrawString("Page " & _stockPrintPageIndex.ToString(), sousTitreFont, pinceauGris, e.MarginBounds.Right - 80, e.MarginBounds.Bottom + 8)
             End Using
 
             _stockPrintRowIndex = 0
+            _stockPrintPageIndex = 1
             e.HasMorePages = False
         End Sub
 
@@ -1218,6 +1275,8 @@ Namespace DevCommerc8ak
             End If
 
             _depensePrintRowIndex = 0
+            _depensePrintPageIndex = 1
+            _parametres = PrintConfigurationHelper.ConfigurerDocumentA4(pdocDepenses, Me, "FormulaireVente", "ImprimerDepenses", True)
             Using preview As New PrintPreviewDialog()
                 preview.Document = pdocDepenses
                 preview.Width = 1200
@@ -1244,6 +1303,21 @@ Namespace DevCommerc8ak
                   enteteFont As New Font("Segoe UI", 9.0F, FontStyle.Bold),
                   ligneFont As New Font("Segoe UI", 9.0F, FontStyle.Regular)
 
+                Dim xHeader As Integer = left
+                Dim logoPath As String = LogoPathHelper.GetLogoPath(_parametres)
+                If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
+                    Using img As Image = Image.FromFile(logoPath)
+                        e.Graphics.DrawImage(img, xHeader, y, 60, 60)
+                    End Using
+                    xHeader += 74
+                End If
+
+                e.Graphics.DrawString(If(_parametres IsNot Nothing AndAlso _parametres.NomMagasin <> "", _parametres.NomMagasin, "ERPCommercial"), titreFont, Brushes.Black, xHeader, y)
+                y += 24
+                e.Graphics.DrawString(If(_parametres IsNot Nothing, _parametres.AdresseMagasin, ""), sousTitreFont, Brushes.Black, xHeader, y)
+                y += 18
+                e.Graphics.DrawString(If(_parametres IsNot Nothing, _parametres.TelephoneMagasin, ""), sousTitreFont, Brushes.Black, xHeader, y)
+                y += 22
                 e.Graphics.DrawString("Liste des dépenses", titreFont, Brushes.Black, left, y)
                 y += 26
                 e.Graphics.DrawString(lblResumeDepenses.Text, sousTitreFont, Brushes.Black, left, y)
@@ -1270,10 +1344,15 @@ Namespace DevCommerc8ak
                 Next
                 y += hauteurEntete
 
+                Dim lignesImprimees As Integer = 0
                 While _depensePrintRowIndex < data.Rows.Count
                     Dim row As DataRow = data.Rows(_depensePrintRowIndex)
                     If y + hauteurLigne > e.MarginBounds.Bottom Then
-                        e.HasMorePages = True
+                        e.Graphics.DrawString("Page " & _depensePrintPageIndex.ToString(), sousTitreFont, Brushes.Black, e.MarginBounds.Right - 80, e.MarginBounds.Bottom + 8)
+                        e.HasMorePages = lignesImprimees > 0
+                        If e.HasMorePages Then
+                            _depensePrintPageIndex += 1
+                        End If
                         Return
                     End If
 
@@ -1299,10 +1378,13 @@ Namespace DevCommerc8ak
 
                     y += hauteurLigne
                     _depensePrintRowIndex += 1
+                    lignesImprimees += 1
                 End While
+                e.Graphics.DrawString("Page " & _depensePrintPageIndex.ToString(), sousTitreFont, Brushes.Black, e.MarginBounds.Right - 80, e.MarginBounds.Bottom + 8)
             End Using
 
             _depensePrintRowIndex = 0
+            _depensePrintPageIndex = 1
             e.HasMorePages = False
         End Sub
 
