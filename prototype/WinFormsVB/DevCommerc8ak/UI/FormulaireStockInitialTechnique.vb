@@ -9,60 +9,227 @@ Imports System.Drawing
 Imports System.Globalization
 Imports System.Linq
 Imports System.Windows.Forms
+Imports System.Drawing.Drawing2D
+Imports System.Data.SqlClient
 
 Namespace DevCommerc8ak
     Public Class FormulaireStockInitialTechnique
         Inherits Form
 
-        Private ReadOnly _service As SuperAdminService
-        Private ReadOnly grid As DataGridView
-        Private ReadOnly btnRecharger As Button
-        Private ReadOnly btnEnregistrer As Button
+        ' --- Services ---
+        Private _service As SuperAdminService
+        Private _log As New ProductionLogService()
+
+        ' --- Composants UI ---
+        Private grid As DataGridView
+        Private btnRecharger As Button
+        Private btnEnregistrer As Button
+        Private lblTitle As Label
+        Private lblSubtitle As Label
+
+        ' --- Données ---
         Private _categories As DataTable
         Private _majGrilleEnCours As Boolean
 
+        ' --- Palette de Couleurs Enterprise ERP ---
+        Private ReadOnly ColorBg As Color = Color.FromArgb(240, 242, 245)
+        Private ReadOnly ColorHeaderBg As Color = Color.White
+        Private ReadOnly ColorCardBg As Color = Color.White
+        Private ReadOnly ColorPrimary As Color = Color.FromArgb(0, 102, 204)
+        Private ReadOnly ColorAccent As Color = Color.FromArgb(0, 102, 204)
+        Private ReadOnly ColorSuccess As Color = Color.FromArgb(34, 197, 94)
+        Private ReadOnly ColorDanger As Color = Color.FromArgb(211, 47, 47)
+        Private ReadOnly ColorTextPrimary As Color = Color.FromArgb(33, 43, 54)
+        Private ReadOnly ColorTextSecondary As Color = Color.FromArgb(99, 115, 129)
+        Private ReadOnly ColorBorder As Color = Color.FromArgb(224, 224, 224)
+
+        ' --- Polices ---
+        Private ReadOnly FontMain As New Font("Segoe UI", 9.0F)
+        Private ReadOnly FontBold As New Font("Segoe UI", 9.0F, FontStyle.Bold)
+        Private ReadOnly FontTitle As New Font("Segoe UI", 15.0F, FontStyle.Bold)
+        Private ReadOnly FontSubtitle As New Font("Segoe UI", 9.5F)
+        Private ReadOnly FontButton As New Font("Segoe UI", 9.0F, FontStyle.Bold)
+
         Public Sub New()
-            _service = New SuperAdminService()
+            Try
+                _service = New SuperAdminService()
+            Catch ex As Exception
+                MessageBox.Show("Erreur d'initialisation du service : " & ex.Message)
+            End Try
 
-            Text = "SuperAdmin - Stock initial technique"
-            Width = 1450
-            Height = 780
-            StartPosition = FormStartPosition.CenterParent
-            BackColor = Color.FromArgb(245, 247, 250)
+            Me.Text = "Administration - Stock Initial Technique"
+            Me.Size = New Size(1450, 850)
+            Me.MinimumSize = New Size(1100, 750)
+            Me.StartPosition = FormStartPosition.CenterParent
+            Me.BackColor = ColorBg
+            Me.Font = FontMain
+            Me.DoubleBuffered = True
 
-            Dim root As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 2, .Padding = New Padding(16)}
-            root.RowStyles.Add(New RowStyle(SizeType.Absolute, 48))
-            root.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+            BuildUi()
+            AddHandler Me.Load, AddressOf FormulaireStockInitialTechnique_Load
+        End Sub
 
-            Dim toolbar As New FlowLayoutPanel() With {.Dock = DockStyle.Fill}
-            btnRecharger = New Button() With {.Text = "Recharger", .AutoSize = True}
-            btnEnregistrer = New Button() With {.Text = "Enregistrer le stock initial", .AutoSize = True}
-            toolbar.Controls.Add(btnRecharger)
-            toolbar.Controls.Add(btnEnregistrer)
+        Private Sub BuildUi()
+            Me.Controls.Clear()
+
+            Dim rootLayout As New TableLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .ColumnCount = 1,
+                .RowCount = 3,
+                .BackColor = ColorBg
+            }
+            rootLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 100))
+            rootLayout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+            rootLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 80))
+
+            Dim pnlHeader As New Panel() With {
+                .Dock = DockStyle.Fill,
+                .BackColor = ColorHeaderBg,
+                .Padding = New Padding(30, 20, 30, 20)
+            }
+
+            lblTitle = New Label() With {
+                .Text = "Gestion du Stock Initial Technique",
+                .Font = FontTitle,
+                .ForeColor = ColorTextPrimary,
+                .AutoSize = True,
+                .Location = New Point(30, 20)
+            }
+
+            lblSubtitle = New Label() With {
+                .Text = "Initialisation des quantités réelles et configuration des types de vente par produit.",
+                .Font = FontSubtitle,
+                .ForeColor = ColorTextSecondary,
+                .AutoSize = True,
+                .Location = New Point(30, 55)
+            }
+
+            pnlHeader.Controls.AddRange({lblTitle, lblSubtitle})
+            rootLayout.Controls.Add(pnlHeader, 0, 0)
+
+            Dim pnlMain As New Panel() With {
+                .Dock = DockStyle.Fill,
+                .Padding = New Padding(30, 10, 30, 10)
+            }
+
+            Dim card As New Panel() With {
+                .Dock = DockStyle.Fill,
+                .BackColor = ColorCardBg,
+                .Padding = New Padding(1)
+            }
 
             grid = New DataGridView() With {
                 .Dock = DockStyle.Fill,
+                .BackgroundColor = Color.White,
+                .BorderStyle = BorderStyle.None,
+                .RowHeadersVisible = False,
                 .AllowUserToAddRows = True,
                 .AllowUserToDeleteRows = False,
-                .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells,
-                .BackgroundColor = Color.White,
-                .BorderStyle = BorderStyle.None
+                .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                .EnableHeadersVisualStyles = False,
+                .GridColor = ColorBorder,
+                .ColumnHeadersHeight = 45
             }
 
-            root.Controls.Add(toolbar, 0, 0)
-            root.Controls.Add(grid, 0, 1)
-            Controls.Add(root)
+            Dim headerStyle As New DataGridViewCellStyle() With {
+                .BackColor = Color.FromArgb(248, 249, 251),
+                .ForeColor = ColorTextPrimary,
+                .Font = FontBold,
+                .SelectionBackColor = Color.FromArgb(248, 249, 251),
+                .Alignment = DataGridViewContentAlignment.MiddleLeft
+            }
+            grid.ColumnHeadersDefaultCellStyle = headerStyle
 
-            AddHandler Load, AddressOf FormulaireStockInitialTechnique_Load
+            Dim cellStyle As New DataGridViewCellStyle() With {
+                .Font = FontMain,
+                .ForeColor = ColorTextPrimary,
+                .SelectionBackColor = Color.FromArgb(232, 240, 254),
+                .SelectionForeColor = ColorPrimary,
+                .Padding = New Padding(5, 0, 5, 0)
+            }
+            grid.DefaultCellStyle = cellStyle
+            grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(252, 253, 255)
+
+            card.Controls.Add(grid)
+            pnlMain.Controls.Add(card)
+            rootLayout.Controls.Add(pnlMain, 0, 1)
+
+            Dim pnlFooter As New Panel() With {
+                .Dock = DockStyle.Fill,
+                .BackColor = Color.White,
+                .Padding = New Padding(30, 15, 30, 15)
+            }
+            AddHandler pnlFooter.Paint, Sub(s, e) e.Graphics.DrawLine(New Pen(ColorBorder), 0, 0, pnlFooter.Width, 0)
+
+            btnRecharger = New Button() With {
+                .Text = "RECHARGER LES DONNÉES",
+                .Size = New Size(200, 45),
+                .Location = New Point(30, 17)
+            }
+            StyliserBouton(btnRecharger, Color.White, ColorTextSecondary, True)
+
+            btnEnregistrer = New Button() With {
+                .Text = "ENREGISTRER LE STOCK INITIAL",
+                .Size = New Size(250, 45)
+                            }
+            btnEnregistrer.Location = New Point(250, 17)
+            StyliserBouton(btnEnregistrer, ColorPrimary, Color.White, False)
+
+            pnlFooter.Controls.AddRange({btnRecharger, btnEnregistrer})
+            rootLayout.Controls.Add(pnlFooter, 0, 2)
+
+            Me.Controls.Add(rootLayout)
+
             AddHandler btnRecharger.Click, AddressOf Recharger
             AddHandler btnEnregistrer.Click, AddressOf EnregistrerStockInitial
             AddHandler grid.CellValueChanged, AddressOf Grid_CellValueChanged
             AddHandler grid.CurrentCellDirtyStateChanged, AddressOf Grid_CurrentCellDirtyStateChanged
         End Sub
 
+        Private Sub StyliserBouton(btn As Button, bgColor As Color, fgColor As Color, hasBorder As Boolean)
+            btn.FlatStyle = FlatStyle.Flat
+            btn.BackColor = bgColor
+            btn.ForeColor = fgColor
+            btn.Font = FontButton
+            btn.Cursor = Cursors.Hand
+            btn.FlatAppearance.BorderSize = If(hasBorder, 1, 0)
+            If hasBorder Then btn.FlatAppearance.BorderColor = ColorBorder
+        End Sub
+
         Private Sub FormulaireStockInitialTechnique_Load(sender As Object, e As EventArgs)
             Recharger(Nothing, EventArgs.Empty)
         End Sub
+
+        'Private Sub Recharger(sender As Object, e As EventArgs)
+        '    Try
+        '        Me.Cursor = Cursors.WaitCursor
+        '        _categories = _service.ListerCategories()
+        '        Dim dt As DataTable = _service.ListerProduitsStockInitial()
+
+        '        Dim colonnes As String() = {"QuantiteInitiale", "QuantitePrincipale", "QuantiteSecondaire", "PrixAchatOptionnel", "TypesPersonnalises", "DateInitiale", "EquivalentSecondaire", "StockActuelLisible", "StockApresLisible", "ResumeQuantite"}
+        '        For Each col As String In colonnes
+        '            If Not dt.Columns.Contains(col) Then
+        '                Dim type As Type = GetType(Decimal)
+        '                If col = "TypesPersonnalises" Or col.Contains("Lisible") Or col = "ResumeQuantite" Then type = GetType(String)
+        '                If col = "DateInitiale" Then type = GetType(Date)
+        '                dt.Columns.Add(col, type)
+        '            End If
+        '        Next
+
+        '        For Each row As DataRow In dt.Rows
+        '            If row.IsNull("DateInitiale") Then row("DateInitiale") = Date.Now
+        '            CalculerLigne(row)
+        '        Next
+
+        '        grid.DataSource = dt
+        '        ConfigurerColonnes()
+        '    Catch ex As Exception
+        '        _log.Error("FormulaireStockInitialTechnique", "Recharger", "Erreur de chargement.", ex)
+        '        MessageBox.Show("Erreur : " & ex.Message)
+        '    Finally
+        '        Me.Cursor = Cursors.Default
+        '    End Try
+        'End Sub
 
         Private Sub Recharger(sender As Object, e As EventArgs)
             Try
@@ -98,43 +265,192 @@ Namespace DevCommerc8ak
             If grid.Columns.Contains("ProduitId") Then grid.Columns("ProduitId").Visible = False
             If grid.Columns.Contains("CategorieId") Then grid.Columns("CategorieId").Visible = False
 
-            RenommerColonne("Libelle", "Produit")
-            RenommerColonne("NomCategorie", "Catégorie")
-            RenommerColonne("CodeBarres", "Référence / Code-barres")
-            RenommerColonne("UnitePrincipale", "Unité principale")
-            RenommerColonne("UniteSecondaire", "Unité secondaire")
-            RenommerColonne("ConversionUnite", "Nb unités/base")
-            RenommerColonne("QuantitePrincipale", "Qté unité principale")
-            RenommerColonne("QuantiteSecondaire", "Qté unité secondaire")
-            RenommerColonne("QuantiteInitiale", "Stock réel en base")
-            RenommerColonne("EquivalentSecondaire", "Équiv. unité secondaire")
-            RenommerColonne("StockActuelLisible", "Stock actuel")
-            RenommerColonne("StockApresLisible", "Stock après")
-            RenommerColonne("ResumeQuantite", "Résumé saisie")
-            RenommerColonne("PrixAchatOptionnel", "Prix achat optionnel")
-            RenommerColonne("PrixGros", "Prix Gros")
-            RenommerColonne("PrixDemi", "Prix Demi")
-            RenommerColonne("PrixQuart", "Prix Quart")
-            RenommerColonne("PrixDetail", "Prix Pièce")
-            RenommerColonne("PrixDouzaine", "Prix Douzaine")
-            RenommerColonne("TypesPersonnalises", "Types personnalisés")
-            RenommerColonne("DateInitiale", "Date initiale")
-            RenommerColonne("EstActif", "Actif")
+            Dim mappings As New Dictionary(Of String, String) From {
+                {"Libelle", "PRODUIT"},
+                {"NomCategorie", "CATÉGORIE"},
+                {"CodeBarres", "CODE-BARRES"},
+                {"UnitePrincipale", "UNITÉ (P)"},
+                {"UniteSecondaire", "UNITÉ (S)"},
+                {"ConversionUnite", "CONVERSION"},
+                {"QuantitePrincipale", "QTÉ (P)"},
+                {"QuantiteSecondaire", "QTÉ (S)"},
+                {"QuantiteInitiale", "STOCK BASE"},
+                {"EquivalentSecondaire", "ÉQUIV. (S)"},
+                {"StockActuelLisible", "STOCK ACTUEL"},
+                {"StockApresLisible", "STOCK APRÈS"},
+                {"ResumeQuantite", "RÉSUMÉ"},
+                {"PrixAchatOptionnel", "PRIX ACHAT"},
+                {"PrixGros", "PRIX GROS"},
+                {"PrixDemi", "PRIX DEMI"},
+                {"PrixQuart", "PRIX QUART"},
+                {"PrixDetail", "PRIX PIÈCE"},
+                {"PrixDouzaine", "PRIX DOUZAINE"},
+                {"TypesPersonnalises", "TYPES PERSO."},
+                {"DateInitiale", "DATE"},
+                {"EstActif", "ACTIF"}
+            }
 
-            Dim colonnesLectureSeule As String() = {"QuantiteInitiale", "EquivalentSecondaire", "StockActuelLisible", "StockApresLisible", "ResumeQuantite"}
-            For Each nomColonne As String In colonnesLectureSeule
-                If grid.Columns.Contains(nomColonne) Then
-                    grid.Columns(nomColonne).ReadOnly = True
-                    grid.Columns(nomColonne).DefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252)
+            For Each kvp As KeyValuePair(Of String, String) In mappings
+                If grid.Columns.Contains(kvp.Key) Then
+                    grid.Columns(kvp.Key).HeaderText = kvp.Value
+                End If
+            Next
+
+            Dim readOnlyCols As String() = {"QuantiteInitiale", "EquivalentSecondaire", "StockActuelLisible", "StockApresLisible", "ResumeQuantite"}
+            For Each col As String In readOnlyCols
+                If grid.Columns.Contains(col) Then
+                    grid.Columns(col).ReadOnly = True
+                    grid.Columns(col).DefaultCellStyle.BackColor = Color.FromArgb(245, 247, 250)
+                End If
+            Next
+
+            Dim inputCols As String() = {"QuantitePrincipale", "QuantiteSecondaire", "PrixAchatOptionnel", "PrixGros", "PrixDemi", "PrixQuart", "PrixDetail", "PrixDouzaine", "NomCategorie", "Libelle", "UnitePrincipale", "UniteSecondaire", "ConversionUnite"}
+            For Each col As String In inputCols
+                If grid.Columns.Contains(col) Then
+                    grid.Columns(col).DefaultCellStyle.ForeColor = ColorAccent
+                    grid.Columns(col).DefaultCellStyle.Font = FontBold
                 End If
             Next
         End Sub
 
-        Private Sub RenommerColonne(nom As String, titre As String)
-            If grid.Columns.Contains(nom) Then
-                grid.Columns(nom).HeaderText = titre
+        'Private Sub Grid_CurrentCellDirtyStateChanged(sender As Object, e As EventArgs)
+        '    If grid.IsCurrentCellDirty Then grid.CommitEdit(DataGridViewDataErrorContexts.Commit)
+        'End Sub
+
+        'Private Sub Grid_CellValueChanged(sender As Object, e As DataGridViewCellEventArgs)
+        '    If e.RowIndex < 0 Or _majGrilleEnCours Then Return
+
+        '    _majGrilleEnCours = True
+        '    Try
+        '        Dim row As DataRow = CType(grid.Rows(e.RowIndex).DataBoundItem, DataRowView).Row
+        '        CalculerLigne(row)
+        '    Finally
+        '        _majGrilleEnCours = False
+        '    End Try
+        'End Sub
+
+        Private Sub Grid_CurrentCellDirtyStateChanged(sender As Object, e As EventArgs)
+            If grid IsNot Nothing AndAlso grid.IsCurrentCellDirty Then
+                grid.CommitEdit(DataGridViewDataErrorContexts.Commit)
             End If
         End Sub
+
+        Private Sub Grid_CellValueChanged(sender As Object, e As DataGridViewCellEventArgs)
+            If _majGrilleEnCours OrElse e.RowIndex < 0 OrElse grid.DataSource Is Nothing Then
+                Return
+            End If
+
+            Dim dt As DataTable = TryCast(grid.DataSource, DataTable)
+            If dt Is Nothing OrElse e.RowIndex >= dt.Rows.Count Then
+                Return
+            End If
+
+            CalculerLigne(dt.Rows(e.RowIndex))
+        End Sub
+
+        'Private Sub CalculerLigne(row As DataRow)
+        '    Dim qteP As Decimal = SafeDecimal(row("QuantitePrincipale"))
+        '    Dim qteS As Decimal = SafeDecimal(row("QuantiteSecondaire"))
+        '    Dim conv As Decimal = SafeDecimal(row("ConversionUnite"))
+
+        '    Dim qteBase As Decimal = CalculerQuantiteBase(qteP, qteS, conv)
+        '    row("QuantiteInitiale") = qteBase
+
+        '    'If conv > 0 Then
+        '    '    row("EquivalentSecondaire") = qteBase * conv
+        '    'Else
+        '    '    row("EquivalentSecondaire") = 0
+        '    'End If
+
+        '    Dim uP As String = SafeString(row("UnitePrincipale"))
+        '    Dim uS As String = SafeString(row("UniteSecondaire"))
+        '    'row("ResumeQuantite") = $"{qteP} {uP}" & If(conv > 0, $" + {qteS} {uS}", "")
+
+
+        '    row("ResumeQuantite") = qteP.ToString("N0") & " " & uP & " + " & qteS.ToString("N0") & " " & uS
+        '    row("StockActuelLisible") = "Calculé..."
+        '    row("StockApresLisible") = "Prêt"
+        'End Sub
+
+
+        Private Sub CalculerLigne(row As DataRow)
+            If row Is Nothing Then
+                Return
+            End If
+
+            _majGrilleEnCours = True
+            Try
+                Dim conversion As Decimal = Math.Max(1D, SafeDecimal(row("ConversionUnite")))
+                Dim quantitePrincipale As Decimal = SafeDecimal(row("QuantitePrincipale"))
+                Dim quantiteSecondaire As Decimal = SafeDecimal(row("QuantiteSecondaire"))
+                Dim stockActuelBase As Decimal = SafeDecimal(row("QuantiteStock"))
+                Dim totalBase As Decimal = CalculerQuantiteBase(quantitePrincipale, quantiteSecondaire, conversion)
+                Dim unitePrincipale As String = If(SafeString(row("UnitePrincipale")) = String.Empty, "Unité", SafeString(row("UnitePrincipale")))
+                Dim uniteSecondaire As String = If(SafeString(row("UniteSecondaire")) = String.Empty, "pièce", SafeString(row("UniteSecondaire")))
+
+                row("QuantiteInitiale") = totalBase
+                row("EquivalentSecondaire") = totalBase
+                row("StockActuelLisible") = FormaterStock(stockActuelBase, conversion, unitePrincipale, uniteSecondaire)
+                row("StockApresLisible") = FormaterStock(stockActuelBase + totalBase, conversion, unitePrincipale, uniteSecondaire)
+                row("ResumeQuantite") = quantitePrincipale.ToString("N0") & " " & unitePrincipale & " + " & quantiteSecondaire.ToString("N0") & " " & uniteSecondaire
+            Finally
+                _majGrilleEnCours = False
+            End Try
+        End Sub
+        Private Function CalculerQuantiteBase(quantitePrincipale As Decimal, quantiteSecondaire As Decimal, conversion As Decimal) As Decimal
+            Dim conversionValide As Decimal = If(conversion > 0D, conversion, 1D)
+            Return (quantitePrincipale * conversionValide) + quantiteSecondaire
+        End Function
+
+        Private Function FormaterStock(stockBase As Decimal, conversion As Decimal, unitePrincipale As String, uniteSecondaire As String) As String
+            Dim conversionValide As Decimal = If(conversion > 0D, conversion, 1D)
+            Dim principal As Decimal = Decimal.Floor(stockBase / conversionValide)
+            Dim secondaire As Decimal = stockBase - (principal * conversionValide)
+            Return principal.ToString("N0") & " " & unitePrincipale & " + " & secondaire.ToString("N0") & " " & uniteSecondaire & " (" & stockBase.ToString("N0") & " " & uniteSecondaire & ")"
+        End Function
+
+        'Private Sub EnregistrerStockInitial(sender As Object, e As EventArgs)
+        '    If MessageBox.Show("Voulez-vous enregistrer ces modifications ?", "Confirmation", MessageBoxButtons.YesNo, MessageBoxIcon.Question) <> DialogResult.Yes Then Return
+
+        '    Try
+        '        Me.Cursor = Cursors.WaitCursor
+        '        Dim dt As DataTable = CType(grid.DataSource, DataTable)
+        '        Dim count As Integer = 0
+
+        '        For Each row As DataRow In dt.Rows
+        '            Dim p As New Produit() With {
+        '                .ProduitId = SafeInteger(row("ProduitId")),
+        '                .Libelle = SafeString(row("Libelle")),
+        '                .PrixAchat = SafeDecimal(row("PrixAchatOptionnel")),
+        '                .PrixGros = SafeDecimal(row("PrixGros")),
+        '                .PrixDemi = SafeDecimal(row("PrixDemi")),
+        '                .PrixQuart = SafeDecimal(row("PrixQuart")),
+        '                .PrixDetail = SafeDecimal(row("PrixDetail")),
+        '                .PrixDouzaine = SafeDecimal(row("PrixDouzaine")),
+        '                .EstActif = SafeBoolean(row("EstActif"), True)
+        '            }
+
+        '            Dim prodService As New ProduitService(New ProduitRepository(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)))
+        '            prodService.MettreAJour(p)
+
+        '            Dim qteInit As Decimal = SafeDecimal(row("QuantiteInitiale"))
+        '            If qteInit > 0 Then
+        '                Dim stockService As New StockService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString))
+        '                stockService.EnregistrerEntree(p.ProduitId, qteInit, SafeString(row("UnitePrincipale")), SafeString(row("CodeBarres")), "INITIALISATION TECHNIQUE", SessionUtilisateur.UtilisateurId, p.PrixAchat)
+        '            End If
+
+        '            count += 1
+        '        Next
+
+        '        MessageBox.Show($"{count} produits mis à jour.", "Succès", MessageBoxButtons.OK, MessageBoxIcon.Information)
+        '        Recharger(Nothing, EventArgs.Empty)
+        '    Catch ex As Exception
+        '        _log.Error("FormulaireStockInitialTechnique", "Enregistrer", "Erreur.", ex)
+        '        MessageBox.Show("Erreur : " & ex.Message)
+        '    Finally
+        '        Me.Cursor = Cursors.Default
+        '    End Try
+        'End Sub
 
         Private Sub EnregistrerStockInitial(sender As Object, e As EventArgs)
             Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
@@ -271,62 +587,53 @@ Namespace DevCommerc8ak
 
             Return resultat
         End Function
+        'Private Function SafeNullableInteger(value As Object) As Integer?
+        '    Dim resultat As Integer = SafeInteger(value)
+        '    If resultat <= 0 Then
+        '        Return Nothing
+        '    End If
+        '    Return resultat
+        'End Function
 
-        Private Sub Grid_CurrentCellDirtyStateChanged(sender As Object, e As EventArgs)
-            If grid IsNot Nothing AndAlso grid.IsCurrentCellDirty Then
-                grid.CommitEdit(DataGridViewDataErrorContexts.Commit)
-            End If
-        End Sub
+        'Private Function SafeDate(value As Object) As Date?
+        '    If value Is Nothing OrElse Convert.IsDBNull(value) Then
+        '        Return Nothing
+        '    End If
+        '    Dim resultat As Date
+        '    If Date.TryParse(Convert.ToString(value), resultat) Then
+        '        Return resultat
+        '    End If
+        '    Return Nothing
+        'End Function
+        'Private Function SafeDecimal(value As Object) As Decimal
+        '    If value Is Nothing OrElse DBNull.Value.Equals(value) Then Return 0D
+        '    Dim res As Decimal
+        '    If Decimal.TryParse(value.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, res) Then Return res
+        '    Return 0D
+        'End Function
 
-        Private Sub Grid_CellValueChanged(sender As Object, e As DataGridViewCellEventArgs)
-            If _majGrilleEnCours OrElse e.RowIndex < 0 OrElse grid.DataSource Is Nothing Then
-                Return
-            End If
+        'Private Function SafeInteger(value As Object) As Integer
+        '    If value Is Nothing OrElse DBNull.Value.Equals(value) Then Return 0
+        '    Dim res As Integer
+        '    If Integer.TryParse(value.ToString(), res) Then Return res
+        '    Return 0
+        'End Function
 
-            Dim dt As DataTable = TryCast(grid.DataSource, DataTable)
-            If dt Is Nothing OrElse e.RowIndex >= dt.Rows.Count Then
-                Return
-            End If
+        'Private Function SafeString(value As Object) As String
+        '    Return If(value Is Nothing OrElse DBNull.Value.Equals(value), String.Empty, value.ToString())
+        'End Function
 
-            CalculerLigne(dt.Rows(e.RowIndex))
-        End Sub
+        'Private Function SafeBoolean(value As Object, def As Boolean) As Boolean
+        '    If value Is Nothing OrElse DBNull.Value.Equals(value) Then Return def
+        '    Dim res As Boolean
+        '    If Boolean.TryParse(value.ToString(), res) Then Return res
+        '    Return def
+        'End Function
 
-        Private Sub CalculerLigne(row As DataRow)
-            If row Is Nothing Then
-                Return
-            End If
 
-            _majGrilleEnCours = True
-            Try
-                Dim conversion As Decimal = Math.Max(1D, SafeDecimal(row("ConversionUnite")))
-                Dim quantitePrincipale As Decimal = SafeDecimal(row("QuantitePrincipale"))
-                Dim quantiteSecondaire As Decimal = SafeDecimal(row("QuantiteSecondaire"))
-                Dim stockActuelBase As Decimal = SafeDecimal(row("QuantiteStock"))
-                Dim totalBase As Decimal = CalculerQuantiteBase(quantitePrincipale, quantiteSecondaire, conversion)
-                Dim unitePrincipale As String = If(SafeString(row("UnitePrincipale")) = String.Empty, "Unité", SafeString(row("UnitePrincipale")))
-                Dim uniteSecondaire As String = If(SafeString(row("UniteSecondaire")) = String.Empty, "pièce", SafeString(row("UniteSecondaire")))
 
-                row("QuantiteInitiale") = totalBase
-                row("EquivalentSecondaire") = totalBase
-                row("StockActuelLisible") = FormaterStock(stockActuelBase, conversion, unitePrincipale, uniteSecondaire)
-                row("StockApresLisible") = FormaterStock(stockActuelBase + totalBase, conversion, unitePrincipale, uniteSecondaire)
-                row("ResumeQuantite") = quantitePrincipale.ToString("N0") & " " & unitePrincipale & " + " & quantiteSecondaire.ToString("N0") & " " & uniteSecondaire
-            Finally
-                _majGrilleEnCours = False
-            End Try
-        End Sub
 
-        Private Function CalculerQuantiteBase(quantitePrincipale As Decimal, quantiteSecondaire As Decimal, conversion As Decimal) As Decimal
-            Dim conversionValide As Decimal = If(conversion > 0D, conversion, 1D)
-            Return (quantitePrincipale * conversionValide) + quantiteSecondaire
-        End Function
 
-        Private Function FormaterStock(stockBase As Decimal, conversion As Decimal, unitePrincipale As String, uniteSecondaire As String) As String
-            Dim conversionValide As Decimal = If(conversion > 0D, conversion, 1D)
-            Dim principal As Decimal = Decimal.Floor(stockBase / conversionValide)
-            Dim secondaire As Decimal = stockBase - (principal * conversionValide)
-            Return principal.ToString("N0") & " " & unitePrincipale & " + " & secondaire.ToString("N0") & " " & uniteSecondaire & " (" & stockBase.ToString("N0") & " " & uniteSecondaire & ")"
-        End Function
 
         Private Function SafeString(value As Object) As String
             If value Is Nothing OrElse Convert.IsDBNull(value) Then
@@ -400,5 +707,6 @@ Namespace DevCommerc8ak
             End If
             Return defaultValue
         End Function
+
     End Class
 End Namespace

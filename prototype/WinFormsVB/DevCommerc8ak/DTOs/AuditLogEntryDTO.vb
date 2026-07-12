@@ -8,7 +8,7 @@ Namespace DevCommerc8ak
         Public Property DateAction As Date
         Public Property Utilisateur As String
         Public Property Role As String
-        Public Property Module As String
+        Public Property Modul As String
         Public Property Action As String
         Public Property Description As String
         Public Property Machine As String

@@ -7,43 +7,139 @@ Imports System.Data
 Imports System.Drawing
 Imports System.Linq
 Imports System.Windows.Forms
+Imports System.Drawing.Drawing2D
 
 Namespace DevCommerc8ak
     Public Class FormulaireSuperAdminRoles
         Inherits Form
 
+        ' --- Services ---
         Private ReadOnly _service As SuperAdminService
-        Private ReadOnly gridRoles As DataGridView
-        Private ReadOnly clbInterfaces As CheckedListBox
-        Private ReadOnly txtNomRole As TextBox
-        Private ReadOnly chkActif As CheckBox
-        Private ReadOnly btnNouveau As Button
-        Private ReadOnly btnEnregistrer As Button
-        Private ReadOnly lblInfo As Label
+        Private ReadOnly _log As New ProductionLogService()
+
+        ' --- Composants UI ---
+        Private gridRoles As DataGridView
+        Private clbInterfaces As CheckedListBox
+        Private txtNomRole As TextBox
+        Private chkActif As CheckBox
+        Private btnNouveau As Button
+        Private btnEnregistrer As Button
+        Private lblInfo As Label
+        Private lblTitle As Label
+        Private lblSubtitle As Label
+        
+        ' --- Données ---
         Private _roleIdCourant As Integer?
         Private _interfaces As DataTable
+
+        ' --- Palette de Couleurs Enterprise ERP ---
+        Private ReadOnly ColorBg As Color = Color.FromArgb(240, 242, 245)
+        Private ReadOnly ColorHeaderBg As Color = Color.White
+        Private ReadOnly ColorCardBg As Color = Color.White
+        Private ReadOnly ColorPrimary As Color = Color.FromArgb(0, 102, 204) ' Bleu Enterprise
+        Private ReadOnly ColorAccent As Color = Color.FromArgb(0, 102, 204)
+        Private ReadOnly ColorSuccess As Color = Color.FromArgb(34, 197, 94)
+        Private ReadOnly ColorDanger As Color = Color.FromArgb(211, 47, 47)
+        Private ReadOnly ColorTextPrimary As Color = Color.FromArgb(33, 43, 54)
+        Private ReadOnly ColorTextSecondary As Color = Color.FromArgb(99, 115, 129)
+        Private ReadOnly ColorBorder As Color = Color.FromArgb(224, 224, 224)
+
+        ' --- Polices ---
+        Private ReadOnly FontMain As New Font("Segoe UI", 9.0F)
+        Private ReadOnly FontBold As New Font("Segoe UI", 9.0F, FontStyle.Bold)
+        Private ReadOnly FontTitle As New Font("Segoe UI", 15.0F, FontStyle.Bold)
+        Private ReadOnly FontSubtitle As New Font("Segoe UI", 9.5F)
+        Private ReadOnly FontButton As New Font("Segoe UI", 9.0F, FontStyle.Bold)
 
         Public Sub New()
             _service = New SuperAdminService()
 
-            Text = "SuperAdmin - Rôles et privilèges"
-            Width = 1100
-            Height = 720
-            StartPosition = FormStartPosition.CenterParent
-            BackColor = Color.FromArgb(245, 247, 250)
+            ' Configuration de la Form
+            Me.Text = "Administration - Rôles et Privilèges"
+            Me.Size = New Size(1200, 800)
+            Me.MinimumSize = New Size(1000, 700)
+            Me.StartPosition = FormStartPosition.CenterParent
+            Me.BackColor = ColorBg
+            Me.Font = FontMain
+            Me.DoubleBuffered = True
 
-            Dim root As New TableLayoutPanel() With {
+            BuildUi()
+            
+            AddHandler Me.Load, AddressOf FormulaireSuperAdminRoles_Load
+            AddHandler gridRoles.SelectionChanged, AddressOf ChargerRoleSelectionne
+            AddHandler btnNouveau.Click, AddressOf NouveauRole
+            AddHandler btnEnregistrer.Click, AddressOf EnregistrerRole
+        End Sub
+
+        Private Sub BuildUi()
+            Me.Controls.Clear()
+
+            ' --- Layout Principal ---
+            Dim rootLayout As New TableLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .ColumnCount = 1,
+                .RowCount = 2,
+                .BackColor = ColorBg
+            }
+            rootLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 100)) ' Header
+            rootLayout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))  ' Contenu
+
+            ' --- 1. Header ---
+            Dim pnlHeader As New Panel() With {
+                .Dock = DockStyle.Fill,
+                .BackColor = ColorHeaderBg,
+                .Padding = New Padding(30, 20, 30, 20)
+            }
+            
+            lblTitle = New Label() With {
+                .Text = "Gestion des Rôles et Privilèges",
+                .Font = FontTitle,
+                .ForeColor = ColorTextPrimary,
+                .AutoSize = True,
+                .Location = New Point(30, 20)
+            }
+            
+            lblSubtitle = New Label() With {
+                .Text = "Définissez les profils utilisateurs et gérez les autorisations d'accès aux modules du système.",
+                .Font = FontSubtitle,
+                .ForeColor = ColorTextSecondary,
+                .AutoSize = True,
+                .Location = New Point(30, 55)
+            }
+            
+            pnlHeader.Controls.AddRange({lblTitle, lblSubtitle})
+            rootLayout.Controls.Add(pnlHeader, 0, 0)
+
+            ' --- 2. Zone de Contenu (Splitter) ---
+            Dim pnlContent As New Panel() With {
+                .Dock = DockStyle.Fill,
+                .Padding = New Padding(30, 20, 30, 30)
+            }
+            
+            Dim splitContainer As New TableLayoutPanel() With {
                 .Dock = DockStyle.Fill,
                 .ColumnCount = 2,
-                .RowCount = 1,
-                .Padding = New Padding(16)
+                .RowCount = 1
             }
-            root.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 42))
-            root.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 58))
+            splitContainer.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 40))
+            splitContainer.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 60))
 
-            Dim leftCard As New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.White, .Padding = New Padding(12)}
-            Dim rightCard As New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.White, .Padding = New Padding(16)}
-
+            ' --- Gauche : Liste des Rôles ---
+            Dim cardLeft As New Panel() With {
+                .Dock = DockStyle.Fill,
+                .BackColor = ColorCardBg,
+                .Padding = New Padding(20),
+                .Margin = New Padding(0, 0, 10, 0)
+            }
+            
+            Dim lblListTitle As New Label() With {
+                .Text = "RÔLES EXISTANTS",
+                .Font = FontBold,
+                .ForeColor = ColorTextSecondary,
+                .Dock = DockStyle.Top,
+                .Height = 30
+            }
+            
             gridRoles = New DataGridView() With {
                 .Dock = DockStyle.Fill,
                 .ReadOnly = True,
@@ -52,103 +148,141 @@ Namespace DevCommerc8ak
                 .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 .BackgroundColor = Color.White,
-                .BorderStyle = BorderStyle.None
+                .BorderStyle = BorderStyle.None,
+                .RowHeadersVisible = False,
+                .EnableHeadersVisualStyles = False,
+                .GridColor = ColorBorder,
+                .ColumnHeadersHeight = 40
+            }
+            gridRoles.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(248, 249, 251)
+            gridRoles.ColumnHeadersDefaultCellStyle.Font = FontBold
+            gridRoles.DefaultCellStyle.SelectionBackColor = Color.FromArgb(232, 240, 254)
+            gridRoles.DefaultCellStyle.SelectionForeColor = ColorPrimary
+
+            cardLeft.Controls.AddRange({gridRoles, lblListTitle})
+            splitContainer.Controls.Add(cardLeft, 0, 0)
+
+            ' --- Droite : Détails et Privilèges ---
+            Dim cardRight As New Panel() With {
+                .Dock = DockStyle.Fill,
+                .BackColor = ColorCardBg,
+                .Padding = New Padding(25),
+                .Margin = New Padding(10, 0, 0, 0)
+            }
+            
+            ' Formulaire de saisie
+            Dim pnlForm As New Panel() With {.Dock = DockStyle.Top, .Height = 150}
+            
+            Dim lblNomRole As New Label() With {.Text = "NOM DU RÔLE", .Font = FontBold, .ForeColor = ColorTextSecondary, .Location = New Point(0, 0), .AutoSize = True}
+            txtNomRole = New TextBox() With {.Location = New Point(0, 22), .Width = 350, .Font = FontMain, .BorderStyle = BorderStyle.FixedSingle}
+            
+            chkActif = New CheckBox() With {.Text = "Rôle actif et autorisé à se connecter", .Location = New Point(0, 60), .AutoSize = True, .Font = FontMain, .Checked = True}
+            
+            Dim pnlActions As New FlowLayoutPanel() With {.Location = New Point(0, 100), .Size = New Size(400, 50), .FlowDirection = FlowDirection.LeftToRight}
+            btnNouveau = New Button() With {.Text = "NOUVEAU", .Size = New Size(120, 38)}
+            StyliserBouton(btnNouveau, Color.White, ColorTextSecondary, True)
+            
+            btnEnregistrer = New Button() With {.Text = "ENREGISTRER", .Size = New Size(150, 38), .Margin = New Padding(10, 0, 0, 0)}
+            StyliserBouton(btnEnregistrer, ColorPrimary, Color.White, False)
+            
+            pnlActions.Controls.AddRange({btnNouveau, btnEnregistrer})
+            pnlForm.Controls.AddRange({lblNomRole, txtNomRole, chkActif, pnlActions})
+
+            ' Liste des interfaces
+            Dim pnlInterfaces As New Panel() With {.Dock = DockStyle.Fill, .Padding = New Padding(0, 20, 0, 0)}
+            Dim lblIntTitle As New Label() With {.Text = "PRIVILÈGES ET ACCÈS AUX MODULES", .Font = FontBold, .ForeColor = ColorTextSecondary, .Dock = DockStyle.Top, .Height = 30}
+            
+            clbInterfaces = New CheckedListBox() With {
+                .Dock = DockStyle.Fill, 
+                .CheckOnClick = True, 
+                .BorderStyle = BorderStyle.FixedSingle,
+                .Font = FontMain,
+                .BackColor = Color.White
+            }
+            
+            lblInfo = New Label() With {
+                .Text = "Note : Le rôle SUPERADMIN hérite automatiquement de tous les privilèges techniques.",
+                .Font = New Font("Segoe UI", 8.5F, FontStyle.Italic),
+                .ForeColor = ColorTextSecondary,
+                .Dock = DockStyle.Bottom,
+                .Height = 40,
+                .TextAlign = ContentAlignment.MiddleLeft
             }
 
-            Dim leftTitle As New Label() With {.Text = "Rôles existants", .Dock = DockStyle.Top, .Height = 28, .Font = New Font("Segoe UI", 11, FontStyle.Bold)}
-            leftCard.Controls.Add(gridRoles)
-            leftCard.Controls.Add(leftTitle)
+            pnlInterfaces.Controls.AddRange({clbInterfaces, lblIntTitle, lblInfo})
+            
+            cardRight.Controls.AddRange({pnlInterfaces, pnlForm})
+            splitContainer.Controls.Add(cardRight, 1, 0)
 
-            Dim formLayout As New TableLayoutPanel() With {.Dock = DockStyle.Top, .Height = 120, .ColumnCount = 2, .RowCount = 3}
-            formLayout.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 160))
-            formLayout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
+            pnlContent.Controls.Add(splitContainer)
+            rootLayout.Controls.Add(pnlContent, 0, 1)
 
-            formLayout.Controls.Add(New Label() With {.Text = "Nom du rôle", .AutoSize = True, .Anchor = AnchorStyles.Left, .Font = New Font("Segoe UI", 9, FontStyle.Bold)}, 0, 0)
-            txtNomRole = New TextBox() With {.Dock = DockStyle.Top}
-            formLayout.Controls.Add(txtNomRole, 1, 0)
+            Me.Controls.Add(rootLayout)
+        End Sub
 
-            formLayout.Controls.Add(New Label() With {.Text = "État", .AutoSize = True, .Anchor = AnchorStyles.Left, .Font = New Font("Segoe UI", 9, FontStyle.Bold)}, 0, 1)
-            chkActif = New CheckBox() With {.Text = "Rôle actif", .Checked = True, .AutoSize = True}
-            formLayout.Controls.Add(chkActif, 1, 1)
-
-            Dim buttonPanel As New FlowLayoutPanel() With {.Dock = DockStyle.Top, .Height = 42, .FlowDirection = FlowDirection.LeftToRight}
-            btnNouveau = New Button() With {.Text = "Nouveau", .AutoSize = True}
-            btnEnregistrer = New Button() With {.Text = "Enregistrer", .AutoSize = True}
-            buttonPanel.Controls.Add(btnNouveau)
-            buttonPanel.Controls.Add(btnEnregistrer)
-            formLayout.Controls.Add(buttonPanel, 1, 2)
-
-            Dim lblInterfaces As New Label() With {.Text = "Interfaces autorisées", .Dock = DockStyle.Top, .Height = 28, .Font = New Font("Segoe UI", 11, FontStyle.Bold)}
-            clbInterfaces = New CheckedListBox() With {.Dock = DockStyle.Fill, .CheckOnClick = True, .BorderStyle = BorderStyle.FixedSingle}
-            lblInfo = New Label() With {.Dock = DockStyle.Bottom, .Height = 42, .ForeColor = Color.DimGray, .Text = "SUPERADMIN hérite d'ADMIN et des interfaces techniques réservées."}
-
-            rightCard.Controls.Add(clbInterfaces)
-            rightCard.Controls.Add(lblInfo)
-            rightCard.Controls.Add(lblInterfaces)
-            rightCard.Controls.Add(formLayout)
-
-            root.Controls.Add(leftCard, 0, 0)
-            root.Controls.Add(rightCard, 1, 0)
-            Controls.Add(root)
-
-            AddHandler Load, AddressOf FormulaireSuperAdminRoles_Load
-            AddHandler gridRoles.SelectionChanged, AddressOf ChargerRoleSelectionne
-            AddHandler btnNouveau.Click, AddressOf NouveauRole
-            AddHandler btnEnregistrer.Click, AddressOf EnregistrerRole
+        Private Sub StyliserBouton(btn As Button, bgColor As Color, fgColor As Color, hasBorder As Boolean)
+            btn.FlatStyle = FlatStyle.Flat
+            btn.BackColor = bgColor
+            btn.ForeColor = fgColor
+            btn.Font = FontButton
+            btn.Cursor = Cursors.Hand
+            btn.FlatAppearance.BorderSize = If(hasBorder, 1, 0)
+            If hasBorder Then btn.FlatAppearance.BorderColor = ColorBorder
         End Sub
 
         Private Sub FormulaireSuperAdminRoles_Load(sender As Object, e As EventArgs)
             Try
+                Me.Cursor = Cursors.WaitCursor
                 _service.AssurerInfrastructure()
                 _interfaces = _service.ListerInterfaces()
+                
                 clbInterfaces.Items.Clear()
                 For Each row As DataRow In _interfaces.Rows
-                    clbInterfaces.Items.Add(New InterfaceItem(Convert.ToInt32(row("InterfaceId")), Convert.ToString(row("CodeInterface")), Convert.ToString(row("Libelle"))))
+                    clbInterfaces.Items.Add(New InterfaceItem(
+                        Convert.ToInt32(row("InterfaceId")), 
+                        Convert.ToString(row("CodeInterface")), 
+                        Convert.ToString(row("Libelle"))
+                    ))
                 Next
 
                 ChargerRoles()
                 NouveauRole(Nothing, EventArgs.Empty)
             Catch ex As Exception
-                Dim log As New ProductionLogService()
-                log.Error("FormulaireSuperAdminRoles", "Load", "Chargement des rôles impossible.", ex)
-                MessageBox.Show("Impossible de charger les rôles et privilèges : " & ex.Message)
+                _log.Error("FormulaireSuperAdminRoles", "Load", "Erreur de chargement.", ex)
+                MessageBox.Show("Impossible de charger les rôles : " & ex.Message, "Erreur", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Finally
+                Me.Cursor = Cursors.Default
             End Try
         End Sub
 
         Private Sub ChargerRoles()
             Dim dt As DataTable = _service.ListerRoles()
             gridRoles.DataSource = dt
-            If gridRoles.Columns.Contains("RoleId") Then
-                gridRoles.Columns("RoleId").Visible = False
-            End If
-            If gridRoles.Columns.Contains("NomRole") Then
-                gridRoles.Columns("NomRole").HeaderText = "Rôle"
-            End If
-            If gridRoles.Columns.Contains("EstActif") Then
-                gridRoles.Columns("EstActif").HeaderText = "Actif"
-            End If
+            
+            If gridRoles.Columns.Contains("RoleId") Then gridRoles.Columns("RoleId").Visible = False
+            If gridRoles.Columns.Contains("NomRole") Then gridRoles.Columns("NomRole").HeaderText = "RÔLE"
+            If gridRoles.Columns.Contains("EstActif") Then gridRoles.Columns("EstActif").HeaderText = "ACTIF"
         End Sub
 
         Private Sub ChargerRoleSelectionne(sender As Object, e As EventArgs)
-            If gridRoles.CurrentRow Is Nothing OrElse gridRoles.CurrentRow.DataBoundItem Is Nothing Then
-                Return
-            End If
+            If gridRoles.CurrentRow Is Nothing OrElse gridRoles.CurrentRow.DataBoundItem Is Nothing Then Return
 
             Dim rowView As DataRowView = TryCast(gridRoles.CurrentRow.DataBoundItem, DataRowView)
-            If rowView Is Nothing Then
-                Return
-            End If
+            If rowView Is Nothing Then Return
 
             _roleIdCourant = Convert.ToInt32(rowView("RoleId"))
             txtNomRole.Text = Convert.ToString(rowView("NomRole"))
             chkActif.Checked = Convert.ToBoolean(rowView("EstActif"))
 
+            ' Reset des sélections
             For i As Integer = 0 To clbInterfaces.Items.Count - 1
                 clbInterfaces.SetItemChecked(i, False)
             Next
 
+            ' Chargement des autorisations réelles
             Dim autorisations As DataTable = _service.ListerInterfacesParRole(_roleIdCourant.Value)
             Dim idsAutorises As New HashSet(Of Integer)()
+            
             For Each row As DataRow In autorisations.Rows
                 If Convert.ToBoolean(row("Autorise")) Then
                     idsAutorises.Add(Convert.ToInt32(row("InterfaceId")))
@@ -175,39 +309,42 @@ Namespace DevCommerc8ak
 
         Private Sub EnregistrerRole(sender As Object, e As EventArgs)
             Dim nomRole As String = txtNomRole.Text.Trim().ToUpperInvariant()
-            If nomRole = String.Empty Then
-                MessageBox.Show("Le nom du rôle est obligatoire.")
+            If String.IsNullOrEmpty(nomRole) Then
+                MessageBox.Show("Le nom du rôle est obligatoire.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                 txtNomRole.Focus()
                 Return
             End If
 
             Dim interfaceIds As New List(Of Integer)()
             For Each item As Object In clbInterfaces.CheckedItems
-                Dim interfaceItem As InterfaceItem = TryCast(item, InterfaceItem)
-                If interfaceItem IsNot Nothing Then
-                    interfaceIds.Add(interfaceItem.InterfaceId)
+                Dim intItem As InterfaceItem = TryCast(item, InterfaceItem)
+                If intItem IsNot Nothing Then
+                    interfaceIds.Add(intItem.InterfaceId)
                 End If
             Next
 
             Try
+                Me.Cursor = Cursors.WaitCursor
                 _service.EnregistrerRole(_roleIdCourant, nomRole, chkActif.Checked, interfaceIds)
                 ChargerRoles()
-                MessageBox.Show("Rôle enregistré.")
+                MessageBox.Show("Le rôle et ses privilèges ont été enregistrés avec succès.", "Succès", MessageBoxButtons.OK, MessageBoxIcon.Information)
             Catch ex As Exception
-                Dim log As New ProductionLogService()
-                log.Error("FormulaireSuperAdminRoles", "EnregistrerRole", "Enregistrement du rôle impossible.", ex)
-                MessageBox.Show("Impossible d'enregistrer le rôle : " & ex.Message)
+                _log.Error("FormulaireSuperAdminRoles", "EnregistrerRole", "Erreur d'enregistrement.", ex)
+                MessageBox.Show("Erreur lors de l'enregistrement : " & ex.Message, "Erreur", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Finally
+                Me.Cursor = Cursors.Default
             End Try
         End Sub
 
+        ' --- Classe Interne pour les Items de la CheckedListBox ---
         Private NotInheritable Class InterfaceItem
             Public ReadOnly Property InterfaceId As Integer
             Public ReadOnly Property CodeInterface As String
             Public ReadOnly Property Libelle As String
 
-            Public Sub New(interfaceId As Integer, codeInterface As String, libelle As String)
-                Me.InterfaceId = interfaceId
-                Me.CodeInterface = codeInterface
+            Public Sub New(id As Integer, code As String, libelle As String)
+                Me.InterfaceId = id
+                Me.CodeInterface = code
                 Me.Libelle = libelle
             End Sub
 
@@ -215,5 +352,6 @@ Namespace DevCommerc8ak
                 Return Libelle
             End Function
         End Class
+
     End Class
 End Namespace

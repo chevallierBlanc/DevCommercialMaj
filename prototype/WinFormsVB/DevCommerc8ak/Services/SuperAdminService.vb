@@ -84,7 +84,7 @@ Namespace DevCommerc8ak
                             .DateAction = If(row.IsNull("CreeLe"), Date.MinValue, Convert.ToDateTime(row("CreeLe"))),
                             .Utilisateur = If(row.IsNull("Utilisateur"), "SYSTEM", Convert.ToString(row("Utilisateur"))),
                             .Role = If(row.IsNull("Role"), "N/A", Convert.ToString(row("Role"))),
-                            .Module = If(row.IsNull("Module"), String.Empty, Convert.ToString(row("Module"))),
+                            .Modul = If(row.IsNull("Module"), String.Empty, Convert.ToString(row("Module"))),
                             .Action = If(row.IsNull("Action"), String.Empty, Convert.ToString(row("Action"))),
                             .Description = If(row.IsNull("Description"), String.Empty, Convert.ToString(row("Description"))),
                             .Machine = If(row.IsNull("Machine"), String.Empty, Convert.ToString(row("Machine"))),
@@ -126,7 +126,7 @@ Namespace DevCommerc8ak
                     If Not String.IsNullOrWhiteSpace(role) AndAlso Not String.Equals(entry.Role, role.Trim(), StringComparison.OrdinalIgnoreCase) Then
                         Continue For
                     End If
-                    If Not String.IsNullOrWhiteSpace(moduleName) AndAlso entry.Module.IndexOf(moduleName.Trim(), StringComparison.OrdinalIgnoreCase) < 0 Then
+                    If Not String.IsNullOrWhiteSpace(moduleName) AndAlso entry.Modul.IndexOf(moduleName.Trim(), StringComparison.OrdinalIgnoreCase) < 0 Then
                         Continue For
                     End If
                     If Not String.IsNullOrWhiteSpace(actionName) AndAlso entry.Action.IndexOf(actionName.Trim(), StringComparison.OrdinalIgnoreCase) < 0 Then
@@ -188,7 +188,7 @@ Namespace DevCommerc8ak
                 .DateAction = dateAction,
                 .Utilisateur = If(utilisateur = String.Empty, "SYSTEM", utilisateur),
                 .Role = role,
-                .Module = moduleName,
+                .Modul = moduleName,
                 .Action = actionName,
                 .Description = message,
                 .Machine = machine,

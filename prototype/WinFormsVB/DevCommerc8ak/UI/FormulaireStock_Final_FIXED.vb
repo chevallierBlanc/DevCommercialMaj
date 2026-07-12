@@ -298,11 +298,11 @@ Namespace DevCommerc8ak
 
             ' Card 2: Unite
             Dim cardUnite As Panel = CreateCard(600, 180, "UNITÉ & CONVERSION")
-            cmbUniteBase = New ComboBox() With {.Left = 150, .Top = 45, .Width = 150, .DropDownStyle = ComboBoxStyle.DropDownList}
+            cmbUniteBase = New ComboBox() With {.Left = 160, .Top = 45, .Width = 150, .DropDownStyle = ComboBoxStyle.DropDownList}
             cmbUniteBase.Items.AddRange(New Object() {"Carton", "Sac", "Pack", "Paquet", "Bidon", "Sachet", "Kg", "Piece"})
-            txtNbUniteParBase = New TextBox() With {.Left = 150, .Top = 75, .Width = 100}
-            txtQuantiteEntree = New TextBox() With {.Left = 150, .Top = 105, .Width = 100}
-            txtQuantiteSecondaireEntree = New TextBox() With {.Left = 150, .Top = 135, .Width = 100}
+            txtNbUniteParBase = New TextBox() With {.Left = 160, .Top = 75, .Width = 100}
+            txtQuantiteEntree = New TextBox() With {.Left = 160, .Top = 105, .Width = 100}
+            txtQuantiteSecondaireEntree = New TextBox() With {.Left = 160, .Top = 135, .Width = 100}
             lblStockActuel = New Label() With {.Left = 330, .Top = 45, .AutoSize = True, .ForeColor = ColorSecondary}
             lblStockActuelPiece = New Label() With {.Left = 330, .Top = 65, .AutoSize = True}
             lblStockApres = New Label() With {.Left = 330, .Top = 95, .AutoSize = True, .ForeColor = ColorAccent}
@@ -323,35 +323,35 @@ Namespace DevCommerc8ak
             cmbDevise.Items.AddRange(New Object() {"CDF", "USD"})
             cmbDevise.SelectedIndex = 0
             txtTaux = New TextBox() With {.Left = 360, .Top = 45, .Width = 80, .ReadOnly = True}
-            lblEquivalentCdf = New Label() With {.Left = 150, .Top = 105, .Width = 300, .AutoSize = False, .ForeColor = ColorSecondary}
+            lblEquivalentCdf = New Label() With {.Left = 440, .Top = 45, .Width = 300, .AutoSize = False, .ForeColor = ColorSecondary}
             txtCoefficientInput = New TextBox() With {.Left = 150, .Top = 75, .Width = 120}
-            txtCoefficientDetail = New TextBox() With {.Left = 150, .Top = 155, .Width = 120}
+            txtCoefficientDetail = New TextBox() With {.Left = 150, .Top = 135, .Width = 120}
             lblTypeCoefficient = New Label() With {.Left = 280, .Top = 78, .AutoSize = True}
-            lblMargeCalculee = New Label() With {.Left = 150, .Top = 125, .AutoSize = True, .ForeColor = ColorAccent}
-            lblMargeDetailCalculee = New Label() With {.Left = 150, .Top = 185, .AutoSize = True, .ForeColor = ColorAccent}
+            lblMargeCalculee = New Label() With {.Left = 150, .Top = 105, .AutoSize = True, .ForeColor = ColorAccent}
+            lblMargeDetailCalculee = New Label() With {.Left = 150, .Top = 165, .AutoSize = True, .ForeColor = ColorAccent}
             cardFinance.Controls.AddRange(New Control() {
                 New Label() With {.Text = "Prix Achat", .Left = 20, .Top = 48, .AutoSize = True},
                 New Label() With {.Text = "Coeff. Gros", .Left = 20, .Top = 78, .AutoSize = True},
-                New Label() With {.Text = "Coeff. Détail", .Left = 20, .Top = 158, .AutoSize = True},
+                New Label() With {.Text = "Coeff. Détail", .Left = 20, .Top = 138, .AutoSize = True},
                 txtPrixAchat, cmbDevise, txtTaux, lblEquivalentCdf, txtCoefficientInput, txtCoefficientDetail, lblTypeCoefficient, lblMargeCalculee, lblMargeDetailCalculee
             })
             'layoutEntree.Controls.Add(cardFinance)
 
             ' Card 4: Prix Vente
             Dim cardPrix As Panel = CreateCard(600, 350, "PRIX DE VENTE CALCULÉS")
-            txtPrixGros = New TextBox() With {.Name = "txtPrixGros", .Left = 150, .Top = 45, .Width = 120}
-            txtPrixDemi = New TextBox() With {.Name = "txtPrixDemi", .Left = 150, .Top = 75, .Width = 120}
-            txtPrixQuart = New TextBox() With {.Name = "txtPrixQuart", .Left = 150, .Top = 105, .Width = 120}
-            txtPrixPiece = New TextBox() With {.Name = "txtPrixPiece", .Left = 150, .Top = 135, .Width = 120}
-            txtPrixDouzaine = New TextBox() With {.Name = "txtPrixDouzaine", .Left = 150, .Top = 165, .Width = 120, .Visible = True}
+            txtPrixGros = New TextBox() With {.Name = "txtPrixGros", .Left = 160, .Top = 45, .Width = 120}
+            txtPrixDemi = New TextBox() With {.Name = "txtPrixDemi", .Left = 160, .Top = 75, .Width = 120}
+            txtPrixQuart = New TextBox() With {.Name = "txtPrixQuart", .Left = 160, .Top = 105, .Width = 120}
+            txtPrixPiece = New TextBox() With {.Name = "txtPrixPiece", .Left = 160, .Top = 135, .Width = 120}
+            txtPrixDouzaine = New TextBox() With {.Name = "txtPrixDouzaine", .Left = 160, .Top = 165, .Width = 120, .Visible = True}
             btnTypesPersonnalisesEntree = New Button() With {.Text = "Créer type personnalisé", .Left = 300, .Top = 42, .Width = 210, .Height = 32, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .FlatStyle = FlatStyle.Flat}
             btnTypesPersonnalisesEntree.FlatAppearance.BorderSize = 0
             Dim lblTypesPersonnalisesEntree As New Label() With {.Text = "Types personnalisés", .Left = 300, .Top = 82, .AutoSize = True}
             pnlTypesPersonnalisesEntree = New FlowLayoutPanel() With {
                 .Left = 300,
                 .Top = 105,
-                .Width = 260,
-                .Height = 145,
+                .Width = 290,
+                .Height = 85,
                 .AutoScroll = True,
                 .FlowDirection = FlowDirection.TopDown,
                 .WrapContents = False,
@@ -448,25 +448,12 @@ Namespace DevCommerc8ak
                 .TextAlign = HorizontalAlignment.Center
             }
 
-            ' cmbProduitSortie = New ComboBox() With {.Left = 160, .Top = 75, .Width = 240, .DropDownStyle = ComboBoxStyle.DropDownList}
+
             dtpDateSortie = New DateTimePicker() With {.Left = 160, .Top = 105, .Width = 140, .Format = DateTimePickerFormat.Short}
-            ' txtQuantiteSortie = New TextBox() With {.Left = 160, .Top = 135, .Width = 120}
-            ' txtStockRestant = New TextBox() With {.Left = 160, .Top = 165, .Width = 120, .ReadOnly = True}
-
-
-            ' cmbTypeVente = New ComboBox() With {.Left = 160, .Top = 165, .Width = 160, .DropDownStyle = ComboBoxStyle.DropDownList}
             lblPrixProd = New Label() With {.Left = 320, .Top = 165, .AutoSize = True, .ForeColor = ColorSecondary}
             lblStock = New Label() With {.Left = 530, .Top = 120, .AutoSize = True, .ForeColor = ColorSecondary, .Font = New Font("Segoe UI", 9, FontStyle.Italic)}
             lblEquivalent = New Label() With {.Left = 530, .Top = 140, .AutoSize = True, .ForeColor = ColorDanger, .Font = New Font("Segoe UI", 9, FontStyle.Italic)}
             lblTotalReel = New Label() With {.Left = 530, .Top = 162, .AutoSize = True, .ForeColor = ColorAccent, .Font = New Font("Segoe UI", 9, FontStyle.Italic)}
-
-
-
-            'lblStock = New Label() With {.Left = 20, .Top = 410, .AutoSize = True, .ForeColor = ColorDanger, .Font = New Font("Segoe UI", 9, FontStyle.Italic)}
-            'lblEquivalent = New Label() With {.Left = 20, .Top = 432, .AutoSize = True, .ForeColor = ColorDanger, .Font = New Font("Segoe UI", 9, FontStyle.Italic)} '#########nouveau
-            'lblTotalReel = New Label() With {.Left = 20, .Top = 454, .AutoSize = True, .ForeColor = ColorDanger, .Font = New Font("Segoe UI", 9, FontStyle.Italic)} '########### nouveau
-            '' lblStockApresPieceS = New Label() With {.Left = 330, .Top = 105, .AutoSize = True}
-
             cmbSortieManuelleMotif = New ComboBox() With {.Left = 160, .Top = 195, .Width = 160, .DropDownStyle = ComboBoxStyle.DropDownList}
             cmbSortieManuelleMotif.Items.AddRange(New Object() {"Dettes Client", "Demande Patron", "Don", "Dettes Patron", "Colis Noel", "Colis Nouvel ans"})
             cmbSortieManuelleClient = New ComboBox() With {.Left = 530, .Top = 45, .Width = 240, .DropDownStyle = ComboBoxStyle.DropDownList}
@@ -474,10 +461,6 @@ Namespace DevCommerc8ak
             lblSMontantAchat = New Label() With {.Left = 1030, .Top = 38, .AutoSize = True, .BackColor = ColorPrimary, .ForeColor = Color.White, .Font = New Font("Segoe UI Variable Display", 9.5F, FontStyle.Bold)}
             lblSMoyenneAchat = New Label() With {.Left = 890, .Top = 56, .AutoSize = True, .BackColor = ColorSecondary, .ForeColor = Color.White, .Font = New Font("Segoe UI Variable Display", 9.5F, FontStyle.Bold)}
             txtDescriptionSortie = New TextBox() With {.Left = 530, .Top = 75, .Width = 500, .Height = 500}
-
-
-            'txtSortieManuelleMotif = New TextBox() With {.Left = 250, .Top = 45, .Width = 250}
-            ' txtSortieManuelleClient = New TextBox() With {.Left = 580, .Top = 45, .Width = 200}
             btnEnregistrerSortie = New Button() With {.Text = "Valider Sortie", .Left = 860, .Top = 195, .Width = 160, .Height = 35, .BackColor = ColorDanger, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             cardSortieManuelle.Controls.AddRange(New Control() {
                 New Label() With {.Text = "Ref facture", .Left = 20, .Top = 48, .AutoSize = True}, txtReferenceFacture,
@@ -515,11 +498,13 @@ Namespace DevCommerc8ak
             Dim lblM As New Label() With {.Text = "Motif:", .Location = New Point(370, 20), .AutoSize = True}
             cmbMotif = New ComboBox() With {.Location = New Point(370, 40), .Width = 150, .DropDownStyle = ComboBoxStyle.DropDownList}
 
+
+
             lblSortieManuelleClient = New Label() With {.Text = "Client", .Location = New Point(530, 20), .AutoSize = True}
             cmbSortieManuelleClient = New ComboBox() With {.Location = New Point(530, 40), .Width = 200, .DropDownStyle = ComboBoxStyle.DropDownList}
-            lblMagasinDestination = New Label() With {.Text = "Magasin destination:", .Location = New Point(530, 75), .AutoSize = True, .Visible = False}
-            cmbMagasinDestination = New ComboBox() With {.Location = New Point(530, 95), .Width = 200, .DropDownStyle = ComboBoxStyle.DropDownList, .Visible = False}
-            btnAjouterMagasin = New Button() With {.Text = "+", .Location = New Point(735, 94), .Width = 34, .Height = 28, .Visible = False, .BackColor = ColorAccent, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            lblMagasinDestination = New Label() With {.Text = "Magasin destination:", .Location = New Point(530, 20), .AutoSize = True, .Visible = False}
+            cmbMagasinDestination = New ComboBox() With {.Location = New Point(530, 40), .Width = 200, .DropDownStyle = ComboBoxStyle.DropDownList, .Visible = False}
+            btnAjouterMagasin = New Button() With {.Text = "+", .Location = New Point(735, 39), .Width = 34, .Height = 28, .Visible = False, .BackColor = ColorAccent, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             lblQte = New Label() With {.Text = "Qte deja Acheter", .Left = 780, .Top = 30, .AutoSize = True}
             lblMont = New Label() With {.Text = "Montant Global", .Left = 920, .Top = 30, .AutoSize = True}
             lblMoyenne = New Label() With {.Text = "Moyenne Achat", .Left = 780, .Top = 48, .AutoSize = True}
@@ -555,11 +540,7 @@ Namespace DevCommerc8ak
 
             ' Grille du Panier
             gridPanier = CreateStyledGrid()
-            'gridPanier.Columns.Add("Produit", "Produit")
-            'gridPanier.Columns.Add("Qte", "Quantité")
-            'gridPanier.Columns.Add("Unite", "Unité")
-            'gridPanier.Columns.Add("Prix", "Prix Unitaire")
-            'gridPanier.Columns.Add("Total", "Sous-Total")
+
 
             ' ... (Configuration des colonnes)
 

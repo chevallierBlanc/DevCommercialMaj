@@ -29,6 +29,9 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>icons_Logo1.ico</ApplicationIcon>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="Guna.UI2">
       <HintPath>C:\Users\Ntanta\Downloads\_Getintopc.com_Guna_UI_Framework_Ultimate_v2.0.0.1\Guna_UI_Framework_Ultimate_v2.0.0.1\Guna_UI_Framework_Ultimate_v2.0.0.1\Guna.UI-Framework-Lib-master\Guna.UI2 WinForms\.net 4.0\Guna.UI2.dll</HintPath>
@@ -43,6 +46,7 @@
     <Reference Include="System.Windows.Forms.DataVisualization" />
     <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DTOs\FinanceDTOs.vb" />
@@ -139,6 +143,12 @@
     <Compile Include="Services\IconsHelper.vb" />
     <Compile Include="Services\LogoPathHelper.vb" />
     <Compile Include="Services\SuperAdminService.vb" />
+    <Compile Include="UI\FormAPropos_Retouche.VB">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormConfigurationSQLM.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="UI\FormulaireAnalyseVente .vb">
       <SubType>Form</SubType>
     </Compile>
@@ -148,13 +158,10 @@
     <Compile Include="UI\FormulaireEvaluationDetails.vb">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="UI\FormulaireClients.vb">
+    <Compile Include="UI\FormulaireClients1.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FormulaireFinance %286%29.vb">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="UI\FormulaireFinance .vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FormulaireNotificationsA.vb">
@@ -178,7 +185,16 @@
     <Compile Include="UI\FormulaireRapports.vb">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="UI\FormulaireStockInitialTechnique.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="UI\FormulaireStock_Final_FIXED.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireSuperAdminJournal.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireSuperAdminRoles.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FrmInventaireIntelligent.vb">
@@ -202,25 +218,10 @@
     <Compile Include="UI\FormulaireApprovisionnement.vb">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="UI\FormAPropos.vb">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="UI\FormConfigurationSQL.vb">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Include="UI\FormulaireTypesVenteProduit.vb">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="UI\FormulaireSuperAdminRoles.vb">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="UI\FormulaireSuperAdminJournal.vb">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Include="UI\FormulaireSuperAdminDashboard.vb">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="UI\FormulaireStockInitialTechnique.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\NotificationPopupB.vb">
@@ -254,6 +255,7 @@
   <ItemGroup>
     <None Include="My Project\App.config" />
     <None Include="My Project\Settings.settings" />
+    <Content Include="icons_Logo1.ico" />
     <Content Include="Resources\images\logo.bmp">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

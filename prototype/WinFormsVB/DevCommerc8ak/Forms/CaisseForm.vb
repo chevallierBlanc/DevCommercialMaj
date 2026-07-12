@@ -713,7 +713,7 @@ Namespace DevCommerc8ak
             graphics.DrawString(libelle & " :", font, Brushes.Black, xGauche, y)
             graphics.DrawString(valeur, font, Brushes.Black, New RectangleF(xGauche + 70, y, Math.Max(60, xDroite - (xGauche + 70)), 12), New StringFormat With {.Alignment = StringAlignment.Far})
             Return y + 12
-        End Sub
+        End Function
 
         Private Sub AnnulerSelection(sender As Object, e As EventArgs)
             gridDetails.DataSource = Nothing

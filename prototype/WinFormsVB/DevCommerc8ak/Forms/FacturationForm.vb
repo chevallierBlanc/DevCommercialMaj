@@ -425,6 +425,7 @@ Namespace DevCommerc8ak
             Dim colSeuilCritique As New DataGridViewTextBoxColumn() With {.DataPropertyName = "SeuilCritique", .HeaderText = "SeuilCritique", .Width = 80, .Visible = False}
             Dim colDateExpiration As New DataGridViewTextBoxColumn() With {.DataPropertyName = "DateExpiration", .HeaderText = "DateExpiration", .Width = 80, .Visible = False}
             Dim colCategorieId As New DataGridViewTextBoxColumn() With {.DataPropertyName = "CategorieId", .HeaderText = "CategorieId", .Width = 80, .Visible = False}
+            Dim colNomCategorie As New DataGridViewTextBoxColumn() With {.DataPropertyName = "NomCategorie", .HeaderText = "NomCategorie", .Width = 80, .Visible = False}
             Dim colEstActif As New DataGridViewTextBoxColumn() With {.DataPropertyName = "EstActif", .HeaderText = "EstActif", .Width = 80, .Visible = False}
             Dim colUnitePrincipale As New DataGridViewTextBoxColumn() With {.DataPropertyName = "UnitePrincipale", .HeaderText = "UnitePrincipale", .Width = 120, .Visible = False, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleCenter}}
             Dim colUniteSecondaire As New DataGridViewTextBoxColumn() With {.DataPropertyName = "UniteSecondaire", .HeaderText = "UniteSecondaire", .Width = 80, .Visible = False}
@@ -433,7 +434,7 @@ Namespace DevCommerc8ak
             Dim colSVenteDemi As New DataGridViewTextBoxColumn() With {.DataPropertyName = "VenteDemi", .HeaderText = "VenteDemi", .Width = 80, .Visible = False}
             Dim colVenteDouzaine As New DataGridViewTextBoxColumn() With {.DataPropertyName = "VenteDouzaine", .HeaderText = "VenteDouzaine", .Width = 80, .Visible = False}
             Dim colVenteGros As New DataGridViewTextBoxColumn() With {.DataPropertyName = "VenteGros", .HeaderText = "VenteGros", .Width = 80, .Visible = False}
-            gridProduits.Columns.AddRange(New DataGridViewColumn() {colProduitId, colCodeBarres, colLibelle, colPrixDetail, colPrixAchat, colPrixDemi, colPrixQuart, colPrixDouzaine, colPrixGros, colPrixSpecial, colCoefficientGros, colQuantiteStock, colSeuilCritique, colDateExpiration, colCategorieId, colEstActif, colUnitePrincipale, colUniteSecondaire, colConversionUnite, colVenteDetail, colSVenteDemi, colVenteDouzaine, colVenteGros})
+            gridProduits.Columns.AddRange(New DataGridViewColumn() {colProduitId, colCodeBarres, colLibelle, colPrixDetail, colPrixAchat, colPrixDemi, colPrixQuart, colPrixDouzaine, colPrixGros, colPrixSpecial, colCoefficientGros, colQuantiteStock, colSeuilCritique, colDateExpiration, colCategorieId, colNomCategorie, colEstActif, colUnitePrincipale, colUniteSecondaire, colConversionUnite, colVenteDetail, colSVenteDemi, colVenteDouzaine, colVenteGros})
 
 
         End Sub
@@ -558,21 +559,21 @@ Namespace DevCommerc8ak
 
         Private Sub ChargerUnites(sender As Object, e As EventArgs)
             If gridProduits.CurrentRow Is Nothing Then Return
-            Dim row As DataGridViewRow = gridProduits.CurrentRow
-            Dim produitId As Integer = Convert.ToInt32(row.Cells("ProduitId").Value)
-            Dim nbUnites As Decimal = SafeDecimal(row.Cells("ConversionUnite").Value)
-            Dim prixAchat As Decimal = SafeDecimal(row.Cells("PrixAchat").Value)
-            Dim prixGros As Decimal = SafeDecimal(row.Cells("PrixGros").Value)
-            Dim prixDemi As Decimal = SafeDecimal(row.Cells("PrixDemi").Value)
-            Dim prixDetail As Decimal = SafeDecimal(row.Cells("PrixDetail").Value)
-            Dim prixQuart As Decimal = SafeDecimal(row.Cells("PrixQuart").Value)
-            Dim prixDouzaine As Decimal = SafeDecimal(row.Cells("PrixDouzaine").Value)
-            Dim prixSpecial As Decimal = SafeDecimal(row.Cells("PrixSpecial").Value)
-            Dim venteDetail As Boolean = SafeBoolean(row.Cells("VenteDetail").Value)
-            Dim venteDemi As Boolean = SafeBoolean(row.Cells("VenteDemi").Value)
-            Dim venteDouzaine As Boolean = SafeBoolean(row.Cells("VenteDouzaine").Value)
-            Dim venteGros As Boolean = SafeBoolean(row.Cells("VenteGros").Value)
+            Dim produitId As Integer = Convert.ToInt32(gridProduits.CurrentRow.Cells(0).Value)
+            Dim nbUnites As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(19).Value)
+            Dim prixAchat As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(4).Value)
+            Dim prixGros As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(8).Value)
+            Dim prixDemi As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(5).Value)
+            Dim prixDetail As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(3).Value)
+            Dim prixQuart As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(6).Value)
+            Dim prixDouzaine As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(7).Value)
+            Dim prixSpecial As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(9).Value)
+            Dim venteDetail As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells(20).Value)
+            Dim venteDemi As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells(21).Value)
+            Dim venteDouzaine As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells(22).Value)
+            Dim venteGros As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells(23).Value)
             Dim typesPersonnalisesActifs As List(Of TypeVenteProduitDTO) = _typeVenteProduitService.ListerParProduit(produitId, True)
+
 
             _typesVenteCourants = _typeVenteService.ConstruireTypesVentePourProduit(produitId, nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine, typesPersonnalisesActifs)
             cmbUnite.DataSource = Nothing
@@ -690,9 +691,9 @@ Namespace DevCommerc8ak
             If gridProduits.CurrentRow Is Nothing Then Return
             Dim produitId As Integer = Convert.ToInt32(gridProduits.CurrentRow.Cells(0).Value)
             Dim stock As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(11).Value)
-            Dim nbUnites As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(18).Value)
-            Dim uniteBase As String = Convert.ToString(gridProduits.CurrentRow.Cells(16).Value)
-            Dim uniteSecondaire As String = Convert.ToString(gridProduits.CurrentRow.Cells(17).Value)
+            Dim nbUnites As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(19).Value)
+            Dim uniteBase As String = Convert.ToString(gridProduits.CurrentRow.Cells(17).Value)
+            Dim uniteSecondaire As String = Convert.ToString(gridProduits.CurrentRow.Cells(18).Value)
             Dim reserve As Decimal = 0D
             For Each ligne As PanierLigne In _panier
                 If ligne.ProduitId = produitId Then

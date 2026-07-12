@@ -1068,7 +1068,7 @@ Namespace DevCommerc8ak
                     doc.DefaultPageSettings.Landscape = True
                     largeurColonnes = ConstruireLargeursColonnes(colonnes, largeurs, 1000)
                 End If
-                doc.DefaultPageSettings.Margins = New Margins(25, 25, 25, 25)
+                doc.DefaultPageSettings.Margins = New System.Drawing.Printing.Margins(25, 25, 25, 25)
 
                 Dim ligneCourante As Integer = 0
 
