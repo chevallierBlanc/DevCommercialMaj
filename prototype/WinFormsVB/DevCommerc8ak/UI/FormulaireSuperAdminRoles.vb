@@ -173,21 +173,32 @@ Namespace DevCommerc8ak
             }
             
             ' Formulaire de saisie
-            Dim pnlForm As New Panel() With {.Dock = DockStyle.Top, .Height = 150}
+            Dim pnlForm As New Panel() With {.Dock = DockStyle.Top, .Height = 170}
             
             Dim lblNomRole As New Label() With {.Text = "NOM DU RÔLE", .Font = FontBold, .ForeColor = ColorTextSecondary, .Location = New Point(0, 0), .AutoSize = True}
             txtNomRole = New TextBox() With {.Location = New Point(0, 22), .Width = 350, .Font = FontMain, .BorderStyle = BorderStyle.FixedSingle}
             
             chkActif = New CheckBox() With {.Text = "Rôle actif et autorisé à se connecter", .Location = New Point(0, 60), .AutoSize = True, .Font = FontMain, .Checked = True}
             
-            Dim pnlActions As New FlowLayoutPanel() With {.Location = New Point(0, 100), .Size = New Size(400, 50), .FlowDirection = FlowDirection.LeftToRight}
-            btnNouveau = New Button() With {.Text = "NOUVEAU", .Size = New Size(120, 38)}
+            Dim pnlActions As New FlowLayoutPanel() With {
+                .Dock = DockStyle.Top,
+                .Location = New Point(0, 100),
+                .Height = 50,
+                .AutoSize = True,
+                .AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                .WrapContents = False,
+                .FlowDirection = FlowDirection.LeftToRight,
+                .Margin = New Padding(0),
+                .Padding = New Padding(0)
+            }
+            btnNouveau = New Button() With {.Text = "NOUVEAU", .Size = New Size(120, 38), .Margin = New Padding(0)}
             StyliserBouton(btnNouveau, Color.White, ColorTextSecondary, True)
             
             btnEnregistrer = New Button() With {.Text = "ENREGISTRER", .Size = New Size(150, 38), .Margin = New Padding(10, 0, 0, 0)}
             StyliserBouton(btnEnregistrer, ColorPrimary, Color.White, False)
             btnSupprimer = New Button() With {.Text = "SUPPRIMER", .Size = New Size(150, 38), .Margin = New Padding(10, 0, 0, 0)}
             StyliserBouton(btnSupprimer, ColorDanger, Color.White, False)
+            btnSupprimer.Enabled = False
 
             pnlActions.Controls.AddRange({btnNouveau, btnEnregistrer, btnSupprimer})
             pnlForm.Controls.AddRange({lblNomRole, txtNomRole, chkActif, pnlActions})
@@ -266,6 +277,7 @@ Namespace DevCommerc8ak
             If gridRoles.Columns.Contains("RoleId") Then gridRoles.Columns("RoleId").Visible = False
             If gridRoles.Columns.Contains("NomRole") Then gridRoles.Columns("NomRole").HeaderText = "RÔLE"
             If gridRoles.Columns.Contains("EstActif") Then gridRoles.Columns("EstActif").HeaderText = "ACTIF"
+            UpdateDeleteButtonState()
         End Sub
 
         Private Sub ChargerRoleSelectionne(sender As Object, e As EventArgs)
@@ -299,6 +311,8 @@ Namespace DevCommerc8ak
                     clbInterfaces.SetItemChecked(i, True)
                 End If
             Next
+
+            UpdateDeleteButtonState()
         End Sub
 
         Private Sub NouveauRole(sender As Object, e As EventArgs)
@@ -308,6 +322,7 @@ Namespace DevCommerc8ak
             For i As Integer = 0 To clbInterfaces.Items.Count - 1
                 clbInterfaces.SetItemChecked(i, False)
             Next
+            UpdateDeleteButtonState()
             txtNomRole.Focus()
         End Sub
 
@@ -376,18 +391,13 @@ Namespace DevCommerc8ak
 
             Dim utilisateursAffectes As Integer = _service.CompterUtilisateursParRole(_roleIdCourant.Value)
             If utilisateursAffectes > 0 Then
-                Dim choix As DialogResult = MessageBox.Show("Ce rôle est encore affecté à " & utilisateursAffectes.ToString() & " utilisateur(s)." & Environment.NewLine &
-                                                           "Oui : désactiver le rôle" & Environment.NewLine &
-                                                           "Non : annuler", "Rôle utilisé", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
-                If choix = DialogResult.Yes Then
-                    _service.DesactiverRole(_roleIdCourant.Value, nomRole)
-                    ChargerRoles()
-                    NouveauRole(Nothing, EventArgs.Empty)
-                End If
+                MessageBox.Show("Ce rôle est encore affecté à " & utilisateursAffectes.ToString() & " utilisateur(s)." & Environment.NewLine &
+                                "Réaffectez d'abord les utilisateurs ou désactivez le rôle avant de le supprimer.", "Rôle utilisé", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                 Return
             End If
 
-            Dim confirmation As DialogResult = MessageBox.Show("Confirmez-vous la suppression du rôle " & nomRole & " ?", "Confirmation", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
+            Dim confirmation As DialogResult = MessageBox.Show("Voulez-vous réellement supprimer le rôle « " & nomRole & " » ?" & Environment.NewLine &
+                                                               "Cette opération supprimera également ses associations de privilèges.", "Confirmation", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
             If confirmation <> DialogResult.Yes Then
                 Return
             End If
@@ -404,6 +414,16 @@ Namespace DevCommerc8ak
             Finally
                 Me.Cursor = Cursors.Default
             End Try
+        End Sub
+
+        Private Sub UpdateDeleteButtonState()
+            If btnSupprimer Is Nothing Then
+                Return
+            End If
+
+            Dim nomRole As String = If(txtNomRole Is Nothing, String.Empty, txtNomRole.Text.Trim())
+            btnSupprimer.Enabled = _roleIdCourant.HasValue AndAlso _roleIdCourant.Value > 0 AndAlso
+                                   Not String.Equals(nomRole, "SUPERADMIN", StringComparison.OrdinalIgnoreCase)
         End Sub
 
         Private Function SelectionContientAccesCritique(interfaceIds As IEnumerable(Of Integer)) As Boolean

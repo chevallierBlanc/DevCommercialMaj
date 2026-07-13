@@ -5,6 +5,7 @@ Imports System
 Imports System.Collections.Generic
 Imports System.Configuration
 Imports System.Data
+Imports System.Diagnostics
 Imports System.Drawing
 Imports System.Globalization
 Imports System.Linq
@@ -35,6 +36,7 @@ Namespace DevCommerc8ak
         ' --- Données ---
         Private _categories As DataTable
         Private _majGrilleEnCours As Boolean
+        Private _chargementEnCours As Boolean
         Private _sourceTable As DataTable
         Private ReadOnly _bindingSource As New BindingSource()
 
@@ -293,6 +295,8 @@ Namespace DevCommerc8ak
                     End If
                 End If
 
+                _chargementEnCours = True
+                Me.Cursor = Cursors.WaitCursor
                 _categories = _service.ListerCategories()
                 Dim dt As DataTable = _service.ListerProduitsStockInitial()
                 If Not dt.Columns.Contains("QuantiteInitiale") Then dt.Columns.Add("QuantiteInitiale", GetType(Decimal))
@@ -321,9 +325,18 @@ Namespace DevCommerc8ak
                 AppliquerFiltres()
                 ConfigurerColonnes()
             Catch ex As Exception
+                Debug.WriteLine("FormulaireStockInitialTechnique.Recharger")
+                Debug.WriteLine("Type SelectedItem : " & If(cmbCategorieFiltre Is Nothing OrElse cmbCategorieFiltre.SelectedItem Is Nothing, "Nothing", cmbCategorieFiltre.SelectedItem.GetType().FullName))
+                Debug.WriteLine("Type SelectedValue : " & If(cmbCategorieFiltre Is Nothing OrElse cmbCategorieFiltre.SelectedValue Is Nothing, "Nothing", cmbCategorieFiltre.SelectedValue.GetType().FullName))
+                Debug.WriteLine("SelectedItem : " & If(cmbCategorieFiltre Is Nothing OrElse cmbCategorieFiltre.SelectedItem Is Nothing, "Nothing", cmbCategorieFiltre.SelectedItem.ToString()))
+                Debug.WriteLine("SelectedValue : " & If(cmbCategorieFiltre Is Nothing OrElse cmbCategorieFiltre.SelectedValue Is Nothing, "Nothing", cmbCategorieFiltre.SelectedValue.ToString()))
+                Debug.WriteLine(ex.ToString())
                 Dim log As New ProductionLogService()
                 log.Error("FormulaireStockInitialTechnique", "Recharger", "Chargement du stock initial impossible.", ex)
                 MessageBox.Show("Impossible de charger le stock initial : " & ex.Message)
+            Finally
+                _chargementEnCours = False
+                Me.Cursor = Cursors.Default
             End Try
         End Sub
 
@@ -420,6 +433,10 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub ChangerFiltres(sender As Object, e As EventArgs)
+            If _chargementEnCours Then
+                Return
+            End If
+
             AppliquerFiltres()
         End Sub
 
@@ -443,6 +460,10 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub AppliquerFiltres()
+            If _chargementEnCours Then
+                Return
+            End If
+
             Dim vue As DataView = TryCast(_bindingSource.DataSource, DataView)
             If vue Is Nothing Then
                 Return
@@ -459,13 +480,37 @@ Namespace DevCommerc8ak
                 filtres.Add(filtreRapide)
             End If
 
-            If cmbCategorieFiltre.SelectedValue IsNot Nothing AndAlso Not Convert.IsDBNull(cmbCategorieFiltre.SelectedValue) Then
-                filtres.Add(String.Format(CultureInfo.InvariantCulture, "[CategorieId] = {0}", Convert.ToInt32(cmbCategorieFiltre.SelectedValue)))
+            Dim categorieId As Integer? = GetSelectedIntegerValueSafe(cmbCategorieFiltre, "CategorieId")
+            If categorieId.HasValue Then
+                filtres.Add(String.Format(CultureInfo.InvariantCulture, "[CategorieId] = {0}", categorieId.Value))
             End If
 
             vue.RowFilter = String.Join(" AND ", filtres)
             lblResultats.Text = vue.Count.ToString("N0", CultureInfo.InvariantCulture) & " produits"
         End Sub
+
+        Private Function GetSelectedIntegerValueSafe(combo As ComboBox, columnName As String) As Integer?
+            If combo Is Nothing Then
+                Return Nothing
+            End If
+
+            If combo.SelectedValue IsNot Nothing AndAlso
+               Not Convert.IsDBNull(combo.SelectedValue) AndAlso
+               Not TypeOf combo.SelectedValue Is DataRowView Then
+                Return SafeNullableInteger(combo.SelectedValue)
+            End If
+
+            Dim rowView As DataRowView = TryCast(combo.SelectedItem, DataRowView)
+            If rowView Is Nothing OrElse rowView.Row Is Nothing OrElse rowView.Row.Table Is Nothing Then
+                Return Nothing
+            End If
+
+            If Not rowView.Row.Table.Columns.Contains(columnName) Then
+                Return Nothing
+            End If
+
+            Return SafeNullableInteger(rowView(columnName))
+        End Function
 
         Private Function ConstruireExpressionFiltreRapide() As String
             Select Case Convert.ToString(cmbFiltreRapide.SelectedItem)
@@ -816,11 +861,17 @@ Namespace DevCommerc8ak
             If value Is Nothing OrElse Convert.IsDBNull(value) Then
                 Return String.Empty
             End If
+            If TypeOf value Is DataRowView Then
+                Return String.Empty
+            End If
             Return Convert.ToString(value).Trim()
         End Function
 
         Private Function SafeDecimal(value As Object) As Decimal
             If value Is Nothing OrElse Convert.IsDBNull(value) Then
+                Return 0D
+            End If
+            If TypeOf value Is DataRowView Then
                 Return 0D
             End If
 
@@ -837,6 +888,9 @@ Namespace DevCommerc8ak
 
         Private Function SafeInteger(value As Object) As Integer
             If value Is Nothing OrElse Convert.IsDBNull(value) Then
+                Return 0
+            End If
+            If TypeOf value Is DataRowView Then
                 Return 0
             End If
             Dim resultat As Integer
@@ -858,6 +912,9 @@ Namespace DevCommerc8ak
             If value Is Nothing OrElse Convert.IsDBNull(value) Then
                 Return Nothing
             End If
+            If TypeOf value Is DataRowView Then
+                Return Nothing
+            End If
             Dim resultat As Date
             If Date.TryParse(Convert.ToString(value), resultat) Then
                 Return resultat
@@ -867,6 +924,9 @@ Namespace DevCommerc8ak
 
         Private Function SafeBoolean(value As Object, defaultValue As Boolean) As Boolean
             If value Is Nothing OrElse Convert.IsDBNull(value) Then
+                Return defaultValue
+            End If
+            If TypeOf value Is DataRowView Then
                 Return defaultValue
             End If
 
