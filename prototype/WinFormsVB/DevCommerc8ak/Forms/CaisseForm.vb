@@ -62,6 +62,9 @@ Namespace DevCommerc8ak
             Public Property MontantRecu As Decimal
             Public Property Monnaie As Decimal
             Public Property Devise As String
+            Public Property ModePaiement As String
+            Public Property ReferencePaiement As String
+            Public Property Caissier As String
             Public Property Lignes As DataTable
         End Class
 
@@ -299,6 +302,7 @@ Namespace DevCommerc8ak
             ConfigurerGrilleChargerLignes()
             ChargerParametres()
             ChargerFactures(Nothing, EventArgs.Empty)
+            MettreAJourEtatActions()
             AddHandler AppEvents.VenteCreee, AddressOf RafraichirFacturesDepuisEvenement
             AddHandler AppEvents.VenteValidee, AddressOf RafraichirFacturesDepuisEvenement
             AddHandler AppEvents.PaiementValide, AddressOf RafraichirFacturesDepuisEvenement
@@ -371,6 +375,12 @@ Namespace DevCommerc8ak
                         row.DefaultCellStyle.SelectionForeColor = ColorDanger
                     End If
                 Next
+                gridFactures.ClearSelection()
+                Try
+                    gridFactures.CurrentCell = Nothing
+                Catch
+                End Try
+                AnnulerSelection(Nothing, EventArgs.Empty)
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement factures: " & ex.Message)
             End Try
@@ -418,12 +428,17 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub ChargerDetails(sender As Object, e As EventArgs)
-            If gridFactures.CurrentRow Is Nothing Then Return
-            Dim numero As String = Convert.ToString(gridFactures.CurrentRow.Cells(1).Value)
-            Dim client As String = Convert.ToString(gridFactures.CurrentRow.Cells(2).Value)
-            Dim tel As String = Convert.ToString(gridFactures.CurrentRow.Cells(3).Value)
-            Dim dtFacture As Date = Convert.ToDateTime(gridFactures.CurrentRow.Cells(4).Value)
-            _totalCourant = Convert.ToDecimal(gridFactures.CurrentRow.Cells(5).Value)
+            Dim row As DataGridViewRow = Nothing
+            If Not TryGetSelectedFactureRow(row) Then
+                AnnulerSelection(Nothing, EventArgs.Empty)
+                Return
+            End If
+
+            Dim numero As String = Convert.ToString(row.Cells(1).Value)
+            Dim client As String = Convert.ToString(row.Cells(2).Value)
+            Dim tel As String = Convert.ToString(row.Cells(3).Value)
+            Dim dtFacture As Date = Convert.ToDateTime(row.Cells(4).Value)
+            _totalCourant = Convert.ToDecimal(row.Cells(5).Value)
 
             lblNumeroFacture.Text = "Facture: " & numero
             lblClient.Text = "Client: " & client & " / " & tel
@@ -433,11 +448,15 @@ Namespace DevCommerc8ak
             lblTotal.Text = FormatageGlobal.FormatMontant(_totalCourant)
             txtMontantRecu.Text = _totalCourant.ToString("N0")
             CalculerMonnaie(Nothing, EventArgs.Empty)
+            MettreAJourEtatActions()
         End Sub
 
         Private Sub ChargerLignes()
-            If gridFactures.CurrentRow Is Nothing Then Return
-            Dim factureId As Integer = Convert.ToInt32(gridFactures.CurrentRow.Cells(0).Value)
+            Dim factureId As Integer
+            If Not TryGetSelectedFactureId(factureId) Then
+                gridDetails.DataSource = Nothing
+                Return
+            End If
             Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
             Dim dal As New DAL(cs)
             Dim repo As New LigneFactureVenteRepository(dal)
@@ -465,12 +484,52 @@ Namespace DevCommerc8ak
 
         Private Sub Encaisser(sender As Object, e As EventArgs)
             Try
-                If gridFactures.CurrentRow Is Nothing Then
-                    MessageBox.Show("Selectionnez une facture.")
+                Dim selectedRow As DataGridViewRow = Nothing
+                If Not TryGetSelectedFactureRow(selectedRow) Then
+                    MessageBox.Show("Veuillez sélectionner une facture à encaisser.")
                     Return
                 End If
 
-                Dim montantSaisi As Decimal = Decimal.Parse(If(txtMontantRecu.Text.Trim() = "", "0", txtMontantRecu.Text.Trim()))
+                Dim factureId As Integer
+                If Not TryGetSelectedFactureId(factureId) OrElse factureId <= 0 Then
+                    MessageBox.Show("Veuillez sélectionner une facture à encaisser.")
+                    Return
+                End If
+
+                If _totalCourant <= 0D Then
+                    MessageBox.Show("Le montant à percevoir est invalide pour cette facture.")
+                    Return
+                End If
+
+                If cmbDevise.SelectedItem Is Nothing Then
+                    MessageBox.Show("Veuillez sélectionner une devise.")
+                    Return
+                End If
+
+                If cmbMode.SelectedItem Is Nothing Then
+                    MessageBox.Show("Veuillez sélectionner un mode de paiement.")
+                    Return
+                End If
+
+                If SessionUtilisateur.UtilisateurId <= 0 Then
+                    MessageBox.Show("Utilisateur non connecté. Veuillez vous reconnecter.")
+                    Return
+                End If
+
+                Dim repoVerification As New FactureVenteRepository(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString))
+                Dim facture As FactureVenteDTO = repoVerification.ObtenirParId(factureId)
+                If facture Is Nothing OrElse Not String.Equals(facture.Statut, "EN_ATTENTE", StringComparison.OrdinalIgnoreCase) Then
+                    MessageBox.Show("La facture sélectionnée n'est plus disponible pour encaissement.")
+                    ChargerFactures(Nothing, EventArgs.Empty)
+                    Return
+                End If
+
+                Dim montantSaisi As Decimal
+                If Not Decimal.TryParse(If(txtMontantRecu.Text.Trim() = "", "0", txtMontantRecu.Text.Trim()), montantSaisi) Then
+                    MessageBox.Show("Le montant reçu est invalide.")
+                    Return
+                End If
+
                 Dim devise As String = cmbDevise.SelectedItem.ToString()
                 Dim montantFC As Decimal = ConvertirMontant(montantSaisi, devise)
                 If montantFC < _totalCourant Then
@@ -478,15 +537,15 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                Dim factureId As Integer = Convert.ToInt32(gridFactures.CurrentRow.Cells(0).Value)
                 Dim monnaieFC As Decimal = montantFC - _totalCourant
+                Dim ticket As TicketData = ConstruireTicketDepuisSelection(montantFC, monnaieFC, devise)
 
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
                 Dim service As New FacturationService(dal)
                 service.EncaisserFacture(factureId, cmbMode.SelectedItem.ToString(), txtReference.Text.Trim(), montantFC, monnaieFC, devise, SessionUtilisateur.UtilisateurId)
 
-                _dernierTicket = ConstruireTicketDepuisSelection(montantFC, monnaieFC, devise)
+                _dernierTicket = ticket
                 If Not ImprimerTicket(_dernierTicket, 2, True) Then
                     Dim log As New ProductionLogService()
                     log.Warn("CaisseForm", "Encaisser", "Le paiement a été validé, mais aucune imprimante ticket n'est configurée ou disponible.")
@@ -500,22 +559,38 @@ Namespace DevCommerc8ak
                 ChargerFactures(Nothing, EventArgs.Empty)
                 AnnulerSelection(Nothing, EventArgs.Empty)
             Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("CaisseForm", "Encaisser", "Erreur de validation de paiement." & Environment.NewLine &
+                          "CurrentRow=" & If(gridFactures.CurrentRow Is Nothing, "Nothing", "Present") & Environment.NewLine &
+                          "SelectedRows=" & gridFactures.SelectedRows.Count.ToString() & Environment.NewLine &
+                          "TotalCourant=" & _totalCourant.ToString("N2") & Environment.NewLine &
+                          "Devise=" & If(cmbDevise.SelectedItem Is Nothing, "Nothing", cmbDevise.SelectedItem.ToString()) & Environment.NewLine &
+                          "Mode=" & If(cmbMode.SelectedItem Is Nothing, "Nothing", cmbMode.SelectedItem.ToString()) & Environment.NewLine &
+                          "Utilisateur=" & SessionUtilisateur.UtilisateurId.ToString(), ex)
                 MessageBox.Show("Erreur paiement: " & ex.Message)
             End Try
         End Sub
 
         Private Function ConstruireTicketDepuisSelection(montantRecuFc As Decimal, monnaieFc As Decimal, devise As String) As TicketData
+            Dim row As DataGridViewRow = Nothing
+            If Not TryGetSelectedFactureRow(row) Then
+                Throw New InvalidOperationException("Aucune facture valide sélectionnée pour construire le ticket.")
+            End If
+
             Dim ticket As New TicketData()
-            ticket.Numero = Convert.ToString(gridFactures.CurrentRow.Cells(1).Value)
-            ticket.Client = Convert.ToString(gridFactures.CurrentRow.Cells(2).Value)
-            ticket.Telephone = Convert.ToString(gridFactures.CurrentRow.Cells(3).Value)
-            ticket.DateFacture = Convert.ToDateTime(gridFactures.CurrentRow.Cells(4).Value)
-            ticket.Total = Convert.ToDecimal(gridFactures.CurrentRow.Cells(5).Value)
+            ticket.Numero = Convert.ToString(row.Cells(1).Value)
+            ticket.Client = Convert.ToString(row.Cells(2).Value)
+            ticket.Telephone = Convert.ToString(row.Cells(3).Value)
+            ticket.DateFacture = Convert.ToDateTime(row.Cells(4).Value)
+            ticket.Total = Convert.ToDecimal(row.Cells(5).Value)
             ticket.MontantRecu = montantRecuFc
             ticket.Monnaie = monnaieFc
             ticket.Devise = devise
+            ticket.ModePaiement = If(cmbMode.SelectedItem Is Nothing, String.Empty, cmbMode.SelectedItem.ToString())
+            ticket.ReferencePaiement = txtReference.Text.Trim()
+            ticket.Caissier = If(String.IsNullOrWhiteSpace(SessionUtilisateur.NomUtilisateur), "SYSTEM", SessionUtilisateur.NomUtilisateur)
 
-            Dim factureId As Integer = Convert.ToInt32(gridFactures.CurrentRow.Cells(0).Value)
+            Dim factureId As Integer = Convert.ToInt32(row.Cells(0).Value)
             Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
             Dim dal As New DAL(cs)
             Dim repo As New LigneFactureVenteRepository(dal)
@@ -526,8 +601,9 @@ Namespace DevCommerc8ak
         Private Sub ImprimerTicket(sender As Object, e As EventArgs)
             Try
                 Dim ticket As TicketData = Nothing
-                If gridFactures.CurrentRow IsNot Nothing Then
-                    Dim montantSaisi As Decimal = Decimal.Parse(If(txtMontantRecu.Text.Trim() = "", "0", txtMontantRecu.Text.Trim()))
+                If HasFactureSelectionValide() Then
+                    Dim montantSaisi As Decimal
+                    Decimal.TryParse(If(txtMontantRecu.Text.Trim() = "", "0", txtMontantRecu.Text.Trim()), montantSaisi)
                     Dim devise As String = cmbDevise.SelectedItem.ToString()
                     Dim montantFC As Decimal = ConvertirMontant(montantSaisi, devise)
                     Dim monnaieFC As Decimal = montantFC - _totalCourant
@@ -588,9 +664,8 @@ Namespace DevCommerc8ak
 
         Private Function CreerDocumentTicket(ticket As TicketData, copies As Integer) As Printing.PrintDocument
             Dim doc As New Printing.PrintDocument()
-            doc.PrinterSettings.PrinterName = _param.ImprimanteTicket
+            _param = PrintConfigurationHelper.ConfigurerDocumentThermique(doc, Me, "CaisseForm", "ImprimerTicket", 315, 1400)
             doc.PrinterSettings.Copies = 1S
-            ConfigurerTicket80Mm(doc)
             doc.DefaultPageSettings.Color = If(_param IsNot Nothing, _param.ImpressionCouleur, True)
 
             Dim totalCopies As Integer = Math.Max(1, copies)
@@ -643,42 +718,46 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub ImprimerPageTicket(e As Printing.PrintPageEventArgs, ticket As TicketData, copieCourante As Integer, totalCopies As Integer)
-            Dim margeGauche As Integer = 8
-            Dim margeDroite As Integer = Math.Max(margeGauche + 180, e.MarginBounds.Right - 8)
-            Dim largeurContenu As Integer = margeDroite - margeGauche
-            Dim y As Integer = 8
+            Dim margeInterne As Integer = 10
+            Dim gauche As Integer = e.MarginBounds.Left + margeInterne
+            Dim largeurDisponible As Integer = Math.Max(180, e.MarginBounds.Width - (margeInterne * 2))
+            Dim droite As Integer = gauche + largeurDisponible
+            Dim y As Integer = e.MarginBounds.Top + 6
             Dim fontTitre As New Font("Segoe UI", 10, FontStyle.Bold)
-            Dim fontSection As New Font("Segoe UI", 7, FontStyle.Bold)
-            Dim fontLigne As New Font("Segoe UI", 7)
-            Dim fontTotal As New Font("Segoe UI", 8, FontStyle.Bold)
+            Dim fontSection As New Font("Segoe UI", 7.5F, FontStyle.Bold)
+            Dim fontLigne As New Font("Segoe UI", 7.5F)
+            Dim fontTotal As New Font("Segoe UI", 8.5F, FontStyle.Bold)
             Dim titre As String = If(_param Is Nothing OrElse _param.NomMagasin = "", "MAGASIN", _param.NomMagasin)
 
-            e.Graphics.DrawString(titre, fontTitre, Brushes.Black, New RectangleF(margeGauche, y, largeurContenu, 16), New StringFormat With {.Alignment = StringAlignment.Center})
-            y += 16
-            If _param IsNot Nothing Then
-                If Not String.IsNullOrWhiteSpace(_param.AdresseMagasin) Then
-                    e.Graphics.DrawString(_param.AdresseMagasin, fontLigne, Brushes.Black, New RectangleF(margeGauche, y, largeurContenu, 12), New StringFormat With {.Alignment = StringAlignment.Center})
-                    y += 12
-                End If
-                If Not String.IsNullOrWhiteSpace(_param.TelephoneMagasin) Then
-                    e.Graphics.DrawString(_param.TelephoneMagasin, fontLigne, Brushes.Black, New RectangleF(margeGauche, y, largeurContenu, 12), New StringFormat With {.Alignment = StringAlignment.Center})
-                    y += 12
-                End If
+            Dim logoPath As String = If(_param Is Nothing, String.Empty, LogoPathHelper.GetLogoPath(_param))
+            If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
+                Using image As Image = Image.FromFile(logoPath)
+                    Dim ratio As Decimal = If(image.Height <= 0, 1D, CDec(image.Width) / CDec(image.Height))
+                    Dim hauteurLogo As Integer = 50
+                    Dim largeurLogo As Integer = CInt(Math.Min(90D, hauteurLogo * CDbl(ratio)))
+                    Dim xLogo As Integer = gauche + ((largeurDisponible - largeurLogo) \ 2)
+                    e.Graphics.DrawImage(image, xLogo, y, largeurLogo, hauteurLogo)
+                    y += hauteurLogo + 4
+                End Using
             End If
 
-            y = DessinerSeparateurTicket(e.Graphics, fontLigne, margeGauche, y)
-            y = DessinerBlocTicket(e.Graphics, "Facture", ticket.Numero, fontLigne, margeGauche, margeDroite, y)
-            y = DessinerBlocTicket(e.Graphics, "Date", ticket.DateFacture.ToString("dd/MM/yyyy HH:mm"), fontLigne, margeGauche, margeDroite, y)
+            y = DessinerTexteCentre(e.Graphics, titre, fontTitre, gauche, largeurDisponible, y)
+            If _param IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(_param.AdresseMagasin) Then
+                y = DessinerTexteCentre(e.Graphics, _param.AdresseMagasin, fontLigne, gauche, largeurDisponible, y)
+            End If
+            If _param IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(_param.TelephoneMagasin) Then
+                y = DessinerTexteCentre(e.Graphics, _param.TelephoneMagasin, fontLigne, gauche, largeurDisponible, y)
+            End If
+            y = DessinerTexteCentre(e.Graphics, "TICKET DE CAISSE", fontSection, gauche, largeurDisponible, y + 2)
+            y = DessinerSeparateurTicket(e.Graphics, fontLigne, gauche, y, largeurDisponible)
+            y = DessinerBlocTicket(e.Graphics, "Facture", ticket.Numero, fontLigne, gauche, droite, y)
+            y = DessinerBlocTicket(e.Graphics, "Date", ticket.DateFacture.ToString("dd/MM/yyyy HH:mm"), fontLigne, gauche, droite, y)
+            y = DessinerBlocTicket(e.Graphics, "Caissier", ticket.Caissier, fontLigne, gauche, droite, y)
             If Not String.IsNullOrWhiteSpace(ticket.Client) Then
-                y = DessinerBlocTicket(e.Graphics, "Client", ticket.Client, fontLigne, margeGauche, margeDroite, y)
+                y = DessinerBlocTicket(e.Graphics, "Client", ticket.Client, fontLigne, gauche, droite, y)
             End If
-            y = DessinerBlocTicket(e.Graphics, "Exemplaire", copieCourante.ToString() & "/" & totalCopies.ToString(), fontLigne, margeGauche, margeDroite, y)
-
-            y = DessinerSeparateurTicket(e.Graphics, fontLigne, margeGauche, y)
-            e.Graphics.DrawString("DÉSIGNATION", fontSection, Brushes.Black, margeGauche, y)
-            e.Graphics.DrawString("TOTAL", fontSection, Brushes.Black, margeDroite - 48, y)
-            y += 12
-            y = DessinerSeparateurTicket(e.Graphics, fontLigne, margeGauche, y)
+            y = DessinerBlocTicket(e.Graphics, "Exemplaire", copieCourante.ToString() & "/" & totalCopies.ToString(), fontLigne, gauche, droite, y)
+            y = DessinerSeparateurTicket(e.Graphics, fontLigne, gauche, y, largeurDisponible)
 
             If ticket.Lignes IsNot Nothing Then
                 For Each row As DataRow In ticket.Lignes.Rows
@@ -688,36 +767,107 @@ Namespace DevCommerc8ak
                     Dim prix As Decimal = Convert.ToDecimal(row("PrixUnitaire"))
                     Dim total As Decimal = Convert.ToDecimal(row("MontantLigne"))
 
-                    e.Graphics.DrawString(libelle, fontLigne, Brushes.Black, New RectangleF(margeGauche, y, largeurContenu, 12))
-                    y += 12
-                    e.Graphics.DrawString(qte.ToString("N0") & " " & unite & " x " & prix.ToString("N0"), fontLigne, Brushes.Black, margeGauche + 6, y)
-                    e.Graphics.DrawString(total.ToString("N0"), fontLigne, Brushes.Black, margeDroite - 48, y)
-                    y += 12
+                    y = DessinerTexteGauche(e.Graphics, libelle, fontSection, gauche, largeurDisponible, y)
+                    y = DessinerBlocTicket(e.Graphics, qte.ToString("N0") & " x " & prix.ToString("N0") & " (" & unite & ")", total.ToString("N0") & " FC", fontLigne, gauche + 4, droite, y)
                 Next
             End If
 
-            y = DessinerSeparateurTicket(e.Graphics, fontLigne, margeGauche, y)
-            y = DessinerBlocTicket(e.Graphics, "TOTAL", ticket.Total.ToString("N0") & " FC", fontTotal, margeGauche, margeDroite, y)
-            y = DessinerBlocTicket(e.Graphics, "Reçu", ticket.MontantRecu.ToString("N0") & " " & ticket.Devise, fontLigne, margeGauche, margeDroite, y)
-            y = DessinerBlocTicket(e.Graphics, "Monnaie", ticket.Monnaie.ToString("N0") & " FC", fontLigne, margeGauche, margeDroite, y)
-            y = DessinerSeparateurTicket(e.Graphics, fontLigne, margeGauche, y)
-            e.Graphics.DrawString("Merci pour votre visite", fontSection, Brushes.Black, New RectangleF(margeGauche, y, largeurContenu, 12), New StringFormat With {.Alignment = StringAlignment.Center})
+            y = DessinerSeparateurTicket(e.Graphics, fontLigne, gauche, y, largeurDisponible)
+            y = DessinerBlocTicket(e.Graphics, "Sous-total", ticket.Total.ToString("N0") & " FC", fontLigne, gauche, droite, y)
+            y = DessinerBlocTicket(e.Graphics, "Montant à payer", ticket.Total.ToString("N0") & " FC", fontTotal, gauche, droite, y)
+            y = DessinerBlocTicket(e.Graphics, "Montant reçu", ticket.MontantRecu.ToString("N0") & " " & ticket.Devise, fontLigne, gauche, droite, y)
+            y = DessinerBlocTicket(e.Graphics, "Monnaie rendue", ticket.Monnaie.ToString("N0") & " FC", fontLigne, gauche, droite, y)
+            y = DessinerBlocTicket(e.Graphics, "Mode paiement", ticket.ModePaiement, fontLigne, gauche, droite, y)
+            If Not String.IsNullOrWhiteSpace(ticket.ReferencePaiement) Then
+                y = DessinerBlocTicket(e.Graphics, "Référence", ticket.ReferencePaiement, fontLigne, gauche, droite, y)
+            End If
+            y = DessinerSeparateurTicket(e.Graphics, fontLigne, gauche, y, largeurDisponible)
+            y = DessinerTexteCentre(e.Graphics, "ACHAT DÉFINITIF - Aucun échange ni reprise.", fontLigne, gauche, largeurDisponible, y)
+            y = DessinerTexteCentre(e.Graphics, "Merci pour votre confiance", fontSection, gauche, largeurDisponible, y)
+            y = DessinerTexteCentre(e.Graphics, "Imprimé le " & Date.Now.ToString("dd/MM/yyyy HH:mm"), fontLigne, gauche, largeurDisponible, y)
         End Sub
 
-        Private Function DessinerSeparateurTicket(graphics As Graphics, font As Font, x As Integer, y As Integer) As Integer
-            graphics.DrawString(New String("-"c, 32), font, Brushes.Black, x, y)
-            Return y + 12
+        Private Function DessinerSeparateurTicket(graphics As Graphics, font As Font, x As Integer, y As Integer, largeur As Integer) As Integer
+            graphics.DrawLine(Pens.Black, x, y + 4, x + largeur, y + 4)
+            Return y + CInt(Math.Ceiling(font.GetHeight(graphics))) + 4
         End Function
 
         Private Function DessinerBlocTicket(graphics As Graphics, libelle As String, valeur As String, font As Font, xGauche As Integer, xDroite As Integer, y As Integer) As Integer
+            Dim hauteur As Integer = CInt(Math.Ceiling(font.GetHeight(graphics))) + 4
             graphics.DrawString(libelle & " :", font, Brushes.Black, xGauche, y)
-            graphics.DrawString(valeur, font, Brushes.Black, New RectangleF(xGauche + 70, y, Math.Max(60, xDroite - (xGauche + 70)), 12), New StringFormat With {.Alignment = StringAlignment.Far})
-            Return y + 12
+            graphics.DrawString(valeur, font, Brushes.Black, New RectangleF(xGauche + 78, y, Math.Max(60, xDroite - (xGauche + 78)), hauteur), New StringFormat With {.Alignment = StringAlignment.Far})
+            Return y + hauteur
         End Function
+
+        Private Function DessinerTexteCentre(graphics As Graphics, texte As String, font As Font, x As Integer, largeur As Integer, y As Integer) As Integer
+            If String.IsNullOrWhiteSpace(texte) Then
+                Return y
+            End If
+
+            Dim layout As New SizeF(largeur, 1000)
+            Dim taille As SizeF = graphics.MeasureString(texte, font, layout)
+            graphics.DrawString(texte, font, Brushes.Black, New RectangleF(x, y, largeur, taille.Height), New StringFormat With {.Alignment = StringAlignment.Center})
+            Return y + CInt(Math.Ceiling(taille.Height)) + 2
+        End Function
+
+        Private Function DessinerTexteGauche(graphics As Graphics, texte As String, font As Font, x As Integer, largeur As Integer, y As Integer) As Integer
+            If String.IsNullOrWhiteSpace(texte) Then
+                Return y
+            End If
+
+            Dim layout As New SizeF(largeur, 1000)
+            Dim taille As SizeF = graphics.MeasureString(texte, font, layout)
+            graphics.DrawString(texte, font, Brushes.Black, New RectangleF(x, y, largeur, taille.Height))
+            Return y + CInt(Math.Ceiling(taille.Height)) + 2
+        End Function
+
+        Private Function HasFactureSelectionValide() As Boolean
+            Dim row As DataGridViewRow = Nothing
+            Return TryGetSelectedFactureRow(row)
+        End Function
+
+        Private Function TryGetSelectedFactureRow(ByRef row As DataGridViewRow) As Boolean
+            row = Nothing
+            If gridFactures Is Nothing OrElse gridFactures.SelectedRows Is Nothing OrElse gridFactures.SelectedRows.Count = 0 Then
+                Return False
+            End If
+
+            Dim candidate As DataGridViewRow = gridFactures.SelectedRows(0)
+            If candidate Is Nothing OrElse candidate.IsNewRow Then
+                Return False
+            End If
+            If candidate.Cells.Count = 0 OrElse candidate.Cells(0) Is Nothing OrElse candidate.Cells(0).Value Is Nothing OrElse candidate.Cells(0).Value Is DBNull.Value Then
+                Return False
+            End If
+
+            row = candidate
+            Return True
+        End Function
+
+        Private Function TryGetSelectedFactureId(ByRef factureId As Integer) As Boolean
+            factureId = 0
+            Dim row As DataGridViewRow = Nothing
+            If Not TryGetSelectedFactureRow(row) Then
+                Return False
+            End If
+
+            Return Integer.TryParse(Convert.ToString(row.Cells(0).Value), factureId) AndAlso factureId > 0
+        End Function
+
+        Private Sub MettreAJourEtatActions()
+            Dim factureValide As Boolean = HasFactureSelectionValide() AndAlso _totalCourant > 0D
+            btnEncaisser.Enabled = factureValide
+            btnAnnulerFacture.Enabled = HasFactureSelectionValide()
+            btnImprimer.Enabled = HasFactureSelectionValide() OrElse _dernierTicket IsNot Nothing
+        End Sub
 
         Private Sub AnnulerSelection(sender As Object, e As EventArgs)
             gridDetails.DataSource = Nothing
             gridFactures.ClearSelection()
+            Try
+                gridFactures.CurrentCell = Nothing
+            Catch
+            End Try
             _totalCourant = 0D
             lblNumeroFacture.Text = ""
             lblClient.Text = ""
@@ -725,6 +875,7 @@ Namespace DevCommerc8ak
             lblTotal.Text = "0 FC"
             txtMontantRecu.Text = ""
             lblMonnaie.Text = ""
+            MettreAJourEtatActions()
         End Sub
 
         Private Sub AnnulerFactureBrouillon(sender As Object, e As EventArgs)

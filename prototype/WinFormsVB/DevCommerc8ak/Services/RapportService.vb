@@ -48,7 +48,7 @@ Namespace DevCommerc8ak
                 "    SELECT se.ProduitId," &
                 "           CASE " &
                 "               WHEN ISNULL(p.ConversionUnite, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0) " &
-                "               ELSE SUM(ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) " &
+                "               ELSE SUM(ISNULL(se.QuantiteBase, 0) * ISNULL(se.PrixAchat, 0) / NULLIF(NULLIF(ISNULL(p.ConversionUnite, 0), 0), 0)) / NULLIF(SUM(CASE WHEN ISNULL(se.PrixAchat, 0) > 0 THEN ISNULL(se.QuantiteBase, 0) ELSE 0 END), 0) " &
                 "           END AS CoutAchatMoyenPiece " &
                 "    FROM StockEntree se " &
                 "    INNER JOIN Produits p ON p.ProduitId = se.ProduitId " &
@@ -64,25 +64,46 @@ Namespace DevCommerc8ak
         ' Analyse vente et rentabilite sur une periode.
         Public Function AnalyseVente(dateDebut As Date, dateFin As Date) As DataTable
             Dim sql As String = "" &
-                "WITH CTEStockEntree AS " &
+                "WITH EntreesValorisees AS " &
                 "( " &
-                "    SELECT se.ProduitId, " &
-                "           SUM(ISNULL(se.QuantiteBase, 0)) AS QuantiteEntreePieces, " &
-                "           SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) AS ValeurStockEntree, " &
-                "           SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) AS CoutAchatMoyenPiece " &
+                "    SELECT se.StockEntreeId, se.ProduitId, se.DateEntree, se.QuantiteBase, " &
+                "           CASE " &
+                "               WHEN ISNULL(se.PrixAchat, 0) <= 0 THEN NULL " &
+                "               WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN ISNULL(se.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0) " &
+                "               ELSE ISNULL(se.PrixAchat, 0) " &
+                "           END AS CoutUnitaireBase, " &
+                "           CASE " &
+                "               WHEN EXISTS ( " &
+                "                   SELECT 1 " &
+                "                   FROM MouvementsStock ms " &
+                "                   WHERE ms.ProduitId = se.ProduitId " &
+                "                     AND UPPER(ISNULL(ms.TypeMouvement, '')) = 'ENTREE' " &
+                "                     AND UPPER(ISNULL(ms.Observation, '')) LIKE '%STOCK INITIAL TECHNIQUE%' " &
+                "                     AND CAST(ms.EffectueLe AS DATE) = CAST(se.DateEntree AS DATE) " &
+                "                     AND ISNULL(ms.QuantiteBase, 0) = ISNULL(se.QuantiteBase, 0) " &
+                "               ) THEN 1 ELSE 0 " &
+                "           END AS EstStockInitialTechnique " &
                 "    FROM StockEntree se " &
-                "    WHERE se.DateEntree >= @DateDebut " &
-                "      AND se.DateEntree < DATEADD(DAY, 1, @DateFin) " &
-                "      AND (se.IdStock LIKE 'ENT%' OR se.IdStock LIKE 'INIT%') " &
-                "    GROUP BY se.ProduitId " &
+                "    INNER JOIN Produits p ON p.ProduitId = se.ProduitId " &
+                "    WHERE se.DateEntree < DATEADD(DAY, 1, @DateFin) " &
+                "), " &
+                "CTEStockEntree AS " &
+                "( " &
+                "    SELECT ev.ProduitId, " &
+                "           SUM(CASE WHEN ev.EstStockInitialTechnique = 0 THEN ISNULL(ev.QuantiteBase, 0) ELSE 0 END) AS QuantiteEntreePieces, " &
+                "           SUM(CASE WHEN ev.EstStockInitialTechnique = 0 AND ev.CoutUnitaireBase IS NOT NULL THEN ISNULL(ev.QuantiteBase, 0) * ev.CoutUnitaireBase ELSE 0 END) AS ValeurStockEntree " &
+                "    FROM EntreesValorisees ev " &
+                "    WHERE ev.DateEntree >= @DateDebut " &
+                "      AND ev.DateEntree < DATEADD(DAY, 1, @DateFin) " &
+                "    GROUP BY ev.ProduitId " &
                 "), " &
                 "CoutProduit AS " &
                 "( " &
-                "    SELECT se.ProduitId, " &
-                "           SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) AS CoutMoyenPiece " &
-                "    FROM StockEntree se " &
-                "    WHERE se.IdStock LIKE 'ENT%' OR se.IdStock LIKE 'INIT%' " &
-                "    GROUP BY se.ProduitId " &
+                "    SELECT ev.ProduitId, " &
+                "           SUM(ISNULL(ev.QuantiteBase, 0) * ISNULL(ev.CoutUnitaireBase, 0)) / NULLIF(SUM(CASE WHEN ev.CoutUnitaireBase IS NOT NULL THEN ISNULL(ev.QuantiteBase, 0) ELSE 0 END), 0) AS CoutMoyenPiece " &
+                "    FROM EntreesValorisees ev " &
+                "    WHERE ev.CoutUnitaireBase IS NOT NULL " &
+                "    GROUP BY ev.ProduitId " &
                 "), " &
                 "Ventes AS " &
                 "( " &
@@ -118,10 +139,12 @@ Namespace DevCommerc8ak
                 "           ISNULL(se.ValeurStockEntree, 0) AS ValeurStockEntree, " &
                 "           ISNULL(v.QuantiteVenduePieces, 0) AS QuantiteVenduePieces, " &
                 "           ISNULL(v.ChiffreAffaires, 0) AS ChiffreAffaires, " &
-                "           ISNULL(v.QuantiteVenduePieces, 0) * ISNULL(cp.CoutMoyenPiece, 0) AS CoutMarchandisesVendues, " &
-                "           ISNULL(v.ChiffreAffaires, 0) - (ISNULL(v.QuantiteVenduePieces, 0) * ISNULL(cp.CoutMoyenPiece, 0)) AS Benefice, " &
+                "           CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN ISNULL(v.QuantiteVenduePieces, 0) * cp.CoutMoyenPiece ELSE 0 END AS CoutMarchandisesVendues, " &
+                "           CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN ISNULL(v.ChiffreAffaires, 0) - (ISNULL(v.QuantiteVenduePieces, 0) * cp.CoutMoyenPiece) ELSE 0 END AS Benefice, " &
                 "           ISNULL(s.QuantiteStock, 0) AS StockRestantPieces, " &
-                "           ISNULL(s.QuantiteStock, 0) * ISNULL(cp.CoutMoyenPiece, 0) AS CoutStockRestant " &
+                "           CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN ISNULL(s.QuantiteStock, 0) * cp.CoutMoyenPiece ELSE 0 END AS CoutStockRestant, " &
+                "           CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN 0 ELSE CASE WHEN ISNULL(v.QuantiteVenduePieces, 0) > 0 THEN 1 ELSE 0 END END AS VenteSansCout, " &
+                "           CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN 0 ELSE CASE WHEN ISNULL(s.QuantiteStock, 0) > 0 THEN 1 ELSE 0 END END AS StockSansCout " &
                 "    FROM Produits p " &
                 "    LEFT JOIN CTEStockEntree se ON se.ProduitId = p.ProduitId " &
                 "    LEFT JOIN CoutProduit cp ON cp.ProduitId = p.ProduitId " &
@@ -138,6 +161,9 @@ Namespace DevCommerc8ak
                 "       ISNULL(CAST(SUM(CoutStockRestant) AS BIGINT), 0) AS CoutStockRestant, " &
                 "       ISNULL(CAST(SUM(CoutStockRestant) * (1.0 * ISNULL(SUM(Benefice), 0) / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS BIGINT), 0) AS ProjectionBeneficeRestant, " &
                 "       ISNULL(CAST(((ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS DECIMAL(10,2)), 0) AS MargeBeneficiairePourcentage, " &
+                "       CAST(CASE WHEN SUM(VenteSansCout) > 0 OR SUM(StockSansCout) > 0 THEN 1 ELSE 0 END AS BIT) AS AnalysePartielle, " &
+                "       ISNULL(SUM(VenteSansCout), 0) AS ProduitsVendusSansCout, " &
+                "       ISNULL(SUM(StockSansCout), 0) AS ProduitsStockSansCout, " &
                 "       CASE " &
                 "           WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) < 0 THEN 'CRITIQUE / PERTE' " &
                 "           WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) = 0 THEN 'POINT MORT' " &
@@ -202,7 +228,7 @@ Namespace DevCommerc8ak
                 "    SELECT se.ProduitId, " &
                 "           CASE " &
                 "               WHEN ISNULL(p.ConversionUnite, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0) " &
-                "               ELSE SUM(ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) " &
+                "               ELSE SUM(ISNULL(se.QuantiteBase, 0) * ISNULL(se.PrixAchat, 0) / NULLIF(NULLIF(ISNULL(p.ConversionUnite, 0), 0), 0)) / NULLIF(SUM(CASE WHEN ISNULL(se.PrixAchat, 0) > 0 THEN ISNULL(se.QuantiteBase, 0) ELSE 0 END), 0) " &
                 "           END AS CoutPiece " &
                 "    FROM StockEntree se " &
                 "    INNER JOIN Produits p ON p.ProduitId = se.ProduitId " &
@@ -272,7 +298,7 @@ Namespace DevCommerc8ak
                 "    SELECT se.ProduitId, " &
                 "           CASE " &
                 "               WHEN ISNULL(p.ConversionUnite, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0) " &
-                "               ELSE SUM(ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) " &
+                "               ELSE SUM(ISNULL(se.QuantiteBase, 0) * ISNULL(se.PrixAchat, 0) / NULLIF(NULLIF(ISNULL(p.ConversionUnite, 0), 0), 0)) / NULLIF(SUM(CASE WHEN ISNULL(se.PrixAchat, 0) > 0 THEN ISNULL(se.QuantiteBase, 0) ELSE 0 END), 0) " &
                 "           END AS CoutPiece " &
                 "    FROM StockEntree se " &
                 "    INNER JOIN Produits p ON p.ProduitId = se.ProduitId " &

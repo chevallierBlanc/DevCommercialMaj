@@ -65,6 +65,7 @@ Namespace DevCommerc8ak
         Private ReadOnly panelEvaluationCard As Panel
         Private ReadOnly panelBeneficeNetCard As Panel
         Private ReadOnly lblEvaluationValue As Label
+        Private ReadOnly lblNoteAnalyse As Label
 
         Private ReadOnly btnTabSynthese As Button
         Private ReadOnly btnTabDetail As Button
@@ -389,7 +390,7 @@ Namespace DevCommerc8ak
             RendreCarteCliquable(panelEvaluationCard, AddressOf OuvrirDetailsEvaluation)
             tableKpi.Controls.Add(panelEvaluationCard, 2, 2)
 
-            Dim lblNote As New Label() With {
+            lblNoteAnalyse = New Label() With {
                 .Text = "Les valeurs sont affichées sans décimales inutiles. Les montants sont en FC.",
                 .Dock = DockStyle.Bottom,
                 .Height = 30,
@@ -407,7 +408,7 @@ Namespace DevCommerc8ak
             syntheseLayout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
             syntheseLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 30))
             syntheseLayout.Controls.Add(tableKpi, 0, 0)
-            syntheseLayout.Controls.Add(lblNote, 0, 1)
+            syntheseLayout.Controls.Add(lblNoteAnalyse, 0, 1)
 
             pnlSynthese.Controls.Add(syntheseLayout)
             tabSynthese.Controls.Add(pnlSynthese)
@@ -488,6 +489,7 @@ Namespace DevCommerc8ak
             AddHandler printDocDetailVentes.PrintPage, AddressOf PrintDocDetailVentes_PrintPage
             AddHandler tabs.SelectedIndexChanged, AddressOf ChargerDetailSiBesoin
             AddHandler Me.Load, AddressOf FormulaireAnalyseVente_Load
+            AddHandler gridDetailVentes.CellFormatting, AddressOf GridDetailVentes_CellFormatting
 
             InitialiserFiltres()
             SetSelectedTab(0) ' Sélectionne l'onglet Synthèse par défaut
@@ -593,6 +595,18 @@ Namespace DevCommerc8ak
             _cibleEvaluation = evaluation
             lblEvaluationValue.Text = If(String.IsNullOrWhiteSpace(evaluation), "-", evaluation)
             AppliquerStyleEvaluation(lblEvaluationValue.Text)
+
+            Dim analysePartielle As Boolean = LireBoolean(row, "AnalysePartielle")
+            Dim produitsVendusSansCout As Integer = LireInteger(row, "ProduitsVendusSansCout")
+            Dim produitsStockSansCout As Integer = LireInteger(row, "ProduitsStockSansCout")
+            If analysePartielle Then
+                lblNoteAnalyse.Text = "Analyse partielle : certains produits n'ont pas de prix d'achat renseigné. Ventes sans coût : " &
+                                      produitsVendusSansCout.ToString() & " | Stock sans coût : " & produitsStockSansCout.ToString()
+                lblNoteAnalyse.ForeColor = ColorDanger
+            Else
+                lblNoteAnalyse.Text = "Les valeurs sont affichées sans décimales inutiles. Les montants sont en FC."
+                lblNoteAnalyse.ForeColor = ColorTextSecondary
+            End If
 
             _courantValeurStockEntree = 0D
             _courantCoutMarchandisesVendues = 0D
@@ -721,11 +735,11 @@ Namespace DevCommerc8ak
                 For Each row As DataRow In dt.Rows
                     Dim dateVente As String = If(row.IsNull("DateVente"), "", Convert.ToDateTime(row("DateVente")).ToString("dd/MM/yyyy HH:mm"))
                     Dim produit As String = LireTexte(row, "Produit")
-                    Dim prix As String = Convert.ToDecimal(If(row.IsNull("PrixAchatCarton"), 0D, row("PrixAchatCarton"))).ToString("N0")
+                    Dim prix As String = LireCoutDetailTexte(row)
                     Dim qte As String = Convert.ToDecimal(If(row.IsNull("QuantiteVenduePieces"), 0D, row("QuantiteVenduePieces"))).ToString("N0")
                     Dim montant As String = Convert.ToDecimal(If(row.IsNull("MontantGenere"), 0D, row("MontantGenere"))).ToString("N0")
                     Dim benefice As String = Convert.ToDecimal(If(row.IsNull("Benefice"), 0D, row("Benefice"))).ToString("N0")
-                    lignes.Add(dateVente & " | " & produit & " | Prix:" & prix & " | Qte:" & qte & " | Mnt:" & montant & " | Bénéf:" & benefice)
+                    lignes.Add(dateVente & " | " & produit & " | Coût:" & prix & " | Qte:" & qte & " | Mnt:" & montant & " | Bénéf:" & benefice)
                 Next
 
                 Using sfd As New SaveFileDialog()
@@ -800,7 +814,7 @@ Namespace DevCommerc8ak
                 e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(229, 239, 252)), 30, y, 1020, 28)
                 e.Graphics.DrawString("Date", fontBlocGras, pinceauBleu, colDate, y + 6)
                 e.Graphics.DrawString("Produit", fontBlocGras, pinceauBleu, colProduit, y + 6)
-                e.Graphics.DrawString("Prix achat", fontBlocGras, pinceauBleu, colPrix, y + 6)
+                e.Graphics.DrawString("Coût unitaire", fontBlocGras, pinceauBleu, colPrix, y + 6)
                 e.Graphics.DrawString("Qté", fontBlocGras, pinceauBleu, colQte, y + 6)
                 e.Graphics.DrawString("Montant", fontBlocGras, pinceauBleu, colMontant, y + 6)
                 e.Graphics.DrawString("Bénéfice", fontBlocGras, pinceauBleu, colBenefice, y + 6)
@@ -822,7 +836,7 @@ Namespace DevCommerc8ak
                     e.Graphics.DrawLine(rowPen, 30, y + 16, 1050, y + 16)
                     e.Graphics.DrawString(If(row.IsNull("DateVente"), "", Convert.ToDateTime(row("DateVente")).ToString("dd/MM/yyyy HH:mm")), fontBloc, Brushes.Black, colDate, y)
                     e.Graphics.DrawString(LireTexte(row, "Produit"), fontBloc, Brushes.Black, colProduit, y)
-                    e.Graphics.DrawString(Convert.ToDecimal(If(row.IsNull("PrixAchatCarton"), 0D, row("PrixAchatCarton"))).ToString("N0"), fontBloc, Brushes.Black, colPrix, y)
+                    e.Graphics.DrawString(LireCoutDetailTexte(row), fontBloc, Brushes.Black, colPrix, y)
                     e.Graphics.DrawString(Convert.ToDecimal(If(row.IsNull("QuantiteVenduePieces"), 0D, row("QuantiteVenduePieces"))).ToString("N0"), fontBloc, Brushes.Black, colQte, y)
                     e.Graphics.DrawString(Convert.ToDecimal(If(row.IsNull("MontantGenere"), 0D, row("MontantGenere"))).ToString("N0"), fontBloc, Brushes.Black, colMontant, y)
                     e.Graphics.DrawString(Convert.ToDecimal(If(row.IsNull("Benefice"), 0D, row("Benefice"))).ToString("N0"), fontBloc, Brushes.Black, colBenefice, y)
@@ -1063,7 +1077,7 @@ Namespace DevCommerc8ak
 
             ConfigurerColonne(gridDetailVentes, "DateVente", "Date vente", 150, "dd/MM/yyyy HH:mm")
             ConfigurerColonne(gridDetailVentes, "Produit", "Produit", 240)
-            ConfigurerColonne(gridDetailVentes, "PrixAchatCarton", "Prix achat carton (FC)", 150, "N0")
+            ConfigurerColonne(gridDetailVentes, "CoutUnitaireBase", "Coût unitaire base (FC)", 170, "N0")
             ConfigurerColonne(gridDetailVentes, "QuantiteVenduePieces", "Quantité vendue (pièces)", 150, "N0")
             ConfigurerColonne(gridDetailVentes, "MontantGenere", "Montant généré (FC)", 170, "N0")
             ConfigurerColonne(gridDetailVentes, "Benefice", "Bénéfice (FC)", 140, "N0")
@@ -1080,6 +1094,26 @@ Namespace DevCommerc8ak
             If Not String.IsNullOrWhiteSpace(format) Then
                 col.DefaultCellStyle.Format = format
                 col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+            End If
+        End Sub
+
+        Private Sub GridDetailVentes_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs)
+            If e.RowIndex < 0 OrElse e.ColumnIndex < 0 Then
+                Return
+            End If
+            If Not gridDetailVentes.Columns.Contains("CoutUnitaireBase") Then
+                Return
+            End If
+
+            If String.Equals(gridDetailVentes.Columns(e.ColumnIndex).Name, "CoutUnitaireBase", StringComparison.OrdinalIgnoreCase) Then
+                Dim valeur As Decimal = 0D
+                If e.Value IsNot Nothing AndAlso Not Convert.IsDBNull(e.Value) Then
+                    Decimal.TryParse(Convert.ToString(e.Value), valeur)
+                End If
+                If valeur <= 0D Then
+                    e.Value = "Non renseigné"
+                    e.FormattingApplied = True
+                End If
             End If
         End Sub
 
@@ -1150,6 +1184,28 @@ Namespace DevCommerc8ak
                 Return String.Empty
             End If
             Return Convert.ToString(row(colonne))
+        End Function
+
+        Private Shared Function LireBoolean(row As DataRow, colonne As String) As Boolean
+            If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains(colonne) OrElse row.IsNull(colonne) Then
+                Return False
+            End If
+            Return Convert.ToBoolean(row(colonne))
+        End Function
+
+        Private Shared Function LireInteger(row As DataRow, colonne As String) As Integer
+            If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains(colonne) OrElse row.IsNull(colonne) Then
+                Return 0
+            End If
+            Return Convert.ToInt32(row(colonne))
+        End Function
+
+        Private Shared Function LireCoutDetailTexte(row As DataRow) As String
+            Dim cout As Decimal = LireDecimal(row, "CoutUnitaireBase")
+            If cout <= 0D Then
+                Return "Non renseigné"
+            End If
+            Return cout.ToString("N0")
         End Function
 
         Private NotInheritable Class MoisItem

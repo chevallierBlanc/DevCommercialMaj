@@ -158,26 +158,46 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
         await cn.OpenAsync(ct);
 
         const string sql = """
-            WITH CTEStockEntree AS
+            WITH EntreesValorisees AS
             (
-                SELECT se.ProduitId,
-                       SUM(ISNULL(se.QuantiteBase, 0)) AS QuantiteEntreePieces,
-                       SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) AS ValeurStockEntree,
-                       SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0))
-                       / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) AS CoutAchatMoyenPiece
+                SELECT se.StockEntreeId, se.ProduitId, se.DateEntree, se.QuantiteBase,
+                       CASE
+                           WHEN ISNULL(se.PrixAchat, 0) <= 0 THEN NULL
+                           WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN ISNULL(se.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0)
+                           ELSE ISNULL(se.PrixAchat, 0)
+                       END AS CoutUnitaireBase,
+                       CASE
+                           WHEN EXISTS (
+                               SELECT 1
+                               FROM MouvementsStock ms
+                               WHERE ms.ProduitId = se.ProduitId
+                                 AND UPPER(ISNULL(ms.TypeMouvement, '')) = 'ENTREE'
+                                 AND UPPER(ISNULL(ms.Observation, '')) LIKE '%STOCK INITIAL TECHNIQUE%'
+                                 AND CAST(ms.EffectueLe AS DATE) = CAST(se.DateEntree AS DATE)
+                                 AND ISNULL(ms.QuantiteBase, 0) = ISNULL(se.QuantiteBase, 0)
+                           ) THEN 1 ELSE 0
+                       END AS EstStockInitialTechnique
                 FROM StockEntree se
-                WHERE se.DateEntree >= @DateDebut
-                  AND se.DateEntree < DATEADD(DAY, 1, @DateFin)
-                  AND (se.IdStock LIKE 'ENT%' OR se.IdStock LIKE 'INIT%')
-                GROUP BY se.ProduitId
+                INNER JOIN Produits p ON p.ProduitId = se.ProduitId
+                WHERE se.DateEntree < DATEADD(DAY, 1, @DateFin)
+            ),
+            CTEStockEntree AS
+            (
+                SELECT ev.ProduitId,
+                       SUM(CASE WHEN ev.EstStockInitialTechnique = 0 THEN ISNULL(ev.QuantiteBase, 0) ELSE 0 END) AS QuantiteEntreePieces,
+                       SUM(CASE WHEN ev.EstStockInitialTechnique = 0 AND ev.CoutUnitaireBase IS NOT NULL THEN ISNULL(ev.QuantiteBase, 0) * ev.CoutUnitaireBase ELSE 0 END) AS ValeurStockEntree
+                FROM EntreesValorisees ev
+                WHERE ev.DateEntree >= @DateDebut
+                  AND ev.DateEntree < DATEADD(DAY, 1, @DateFin)
+                GROUP BY ev.ProduitId
             ),
             CoutProduit AS
             (
-                SELECT se.ProduitId,
-                       SUM(ISNULL(se.QuantiteSaisie, 0) * ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) AS CoutMoyenPiece
-                FROM StockEntree se
-                WHERE se.IdStock LIKE 'ENT%' OR se.IdStock LIKE 'INIT%'
-                GROUP BY se.ProduitId
+                SELECT ev.ProduitId,
+                       SUM(ISNULL(ev.QuantiteBase, 0) * ISNULL(ev.CoutUnitaireBase, 0)) / NULLIF(SUM(CASE WHEN ev.CoutUnitaireBase IS NOT NULL THEN ISNULL(ev.QuantiteBase, 0) ELSE 0 END), 0) AS CoutMoyenPiece
+                FROM EntreesValorisees ev
+                WHERE ev.CoutUnitaireBase IS NOT NULL
+                GROUP BY ev.ProduitId
             ),
             Ventes AS
             (
@@ -213,10 +233,10 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
                        ISNULL(se.ValeurStockEntree, 0) AS ValeurStockEntree,
                        ISNULL(v.QuantiteVenduePieces, 0) AS QuantiteVenduePieces,
                        ISNULL(v.ChiffreAffaires, 0) AS ChiffreAffaires,
-                       ISNULL(v.QuantiteVenduePieces, 0) * ISNULL(cp.CoutMoyenPiece, 0) AS CoutMarchandisesVendues,
-                       ISNULL(v.ChiffreAffaires, 0) - (ISNULL(v.QuantiteVenduePieces, 0) * ISNULL(cp.CoutMoyenPiece, 0)) AS Benefice,
+                       CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN ISNULL(v.QuantiteVenduePieces, 0) * cp.CoutMoyenPiece ELSE 0 END AS CoutMarchandisesVendues,
+                       CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN ISNULL(v.ChiffreAffaires, 0) - (ISNULL(v.QuantiteVenduePieces, 0) * cp.CoutMoyenPiece) ELSE 0 END AS Benefice,
                        ISNULL(s.QuantiteStock, 0) AS StockRestantPieces,
-                       ISNULL(s.QuantiteStock, 0) * ISNULL(cp.CoutMoyenPiece, 0) AS CoutStockRestant
+                       CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN ISNULL(s.QuantiteStock, 0) * cp.CoutMoyenPiece ELSE 0 END AS CoutStockRestant
                 FROM Produits p
                 LEFT JOIN CTEStockEntree se ON se.ProduitId = p.ProduitId
                 LEFT JOIN CoutProduit cp ON cp.ProduitId = p.ProduitId
@@ -711,7 +731,8 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
                 SELECT se.ProduitId,
                        CASE
                            WHEN ISNULL(p.ConversionUnite, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0)
-                           ELSE SUM(ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0)
+                           ELSE SUM(ISNULL(se.QuantiteBase, 0) * ISNULL(se.PrixAchat, 0) / NULLIF(NULLIF(ISNULL(p.ConversionUnite, 0), 0), 0))
+                                / NULLIF(SUM(CASE WHEN ISNULL(se.PrixAchat, 0) > 0 THEN ISNULL(se.QuantiteBase, 0) ELSE 0 END), 0)
                        END AS CoutPiece
                 FROM StockEntree se
                 INNER JOIN Produits p ON p.ProduitId = se.ProduitId
@@ -774,7 +795,8 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
                 SELECT se.ProduitId,
                        CASE
                            WHEN ISNULL(p.ConversionUnite, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0)
-                           ELSE SUM(ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0)
+                           ELSE SUM(ISNULL(se.QuantiteBase, 0) * ISNULL(se.PrixAchat, 0) / NULLIF(NULLIF(ISNULL(p.ConversionUnite, 0), 0), 0))
+                                / NULLIF(SUM(CASE WHEN ISNULL(se.PrixAchat, 0) > 0 THEN ISNULL(se.QuantiteBase, 0) ELSE 0 END), 0)
                        END AS CoutPiece
                 FROM StockEntree se
                 INNER JOIN Produits p ON p.ProduitId = se.ProduitId

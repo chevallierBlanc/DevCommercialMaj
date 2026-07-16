@@ -98,7 +98,7 @@ Namespace DevCommerc8ak
                 "    SELECT se.ProduitId, " &
                 "           CASE " &
                 "               WHEN ISNULL(p.ConversionUnite, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0) " &
-                "               ELSE SUM(ISNULL(se.PrixAchat, 0)) / NULLIF(SUM(ISNULL(se.QuantiteBase, 0)), 0) " &
+                "               ELSE SUM(ISNULL(se.QuantiteBase, 0) * ISNULL(se.PrixAchat, 0) / NULLIF(NULLIF(ISNULL(p.ConversionUnite, 0), 0), 0)) / NULLIF(SUM(CASE WHEN ISNULL(se.PrixAchat, 0) > 0 THEN ISNULL(se.QuantiteBase, 0) ELSE 0 END), 0) " &
                 "           END AS CoutPiece " &
                 "    FROM StockEntree se " &
                 "    INNER JOIN Produits p ON p.ProduitId = se.ProduitId " &
@@ -107,7 +107,7 @@ Namespace DevCommerc8ak
                 ") " &
                 "SELECT MAX(f.CreeLe) AS DateVente, " &
                 "p.Libelle AS Produit, " &
-                "CAST(MAX(ISNULL(p.PrixAchat, 0)) AS BIGINT) AS PrixAchatCarton, " &
+                "CAST(MAX(ISNULL(cp.CoutPiece, 0)) AS BIGINT) AS CoutUnitaireBase, " &
                 "CAST(SUM(ISNULL(l.Quantite, 0)) AS BIGINT) AS QuantiteVenduePieces, " &
                 "CAST(SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS BIGINT) AS MontantGenere, " &
                 "CAST(SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0)) - (ISNULL(l.Quantite, 0) * ISNULL(cp.CoutPiece, 0))) AS BIGINT) AS Benefice " &
