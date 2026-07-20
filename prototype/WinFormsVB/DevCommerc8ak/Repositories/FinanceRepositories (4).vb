@@ -160,6 +160,38 @@ Namespace DevCommerc8ak.Finance
         Private ReadOnly _dal As DAL
         Public Sub New(dal As DAL)
             _dal = dal
+            AssurerTableCloturesCaisse()
+        End Sub
+
+        Private Sub AssurerTableCloturesCaisse()
+            Dim sql As String =
+                "IF OBJECT_ID('dbo.CloturesCaisse', 'U') IS NULL " &
+                "BEGIN " &
+                "CREATE TABLE dbo.CloturesCaisse (" &
+                "ClotureCaisseId INT IDENTITY(1,1) PRIMARY KEY, " &
+                "DateCaisse DATE NOT NULL, " &
+                "UtilisateurId INT NULL, " &
+                "NomUtilisateur NVARCHAR(80) NULL, " &
+                "RoleSession NVARCHAR(80) NULL, " &
+                "SoldeTheoriqueFC DECIMAL(18,2) NOT NULL CONSTRAINT DF_CloturesCaisse_SoldeTheoriqueFC DEFAULT(0), " &
+                "MontantPhysiqueFC DECIMAL(18,2) NULL, " &
+                "EcartFC DECIMAL(18,2) NULL, " &
+                "SoldeTheoriqueUSD DECIMAL(18,2) NULL, " &
+                "MontantPhysiqueUSD DECIMAL(18,2) NULL, " &
+                "EcartUSD DECIMAL(18,2) NULL, " &
+                "MotifEcart NVARCHAR(250) NULL, " &
+                "Observation NVARCHAR(500) NULL, " &
+                "Statut NVARCHAR(30) NOT NULL CONSTRAINT DF_CloturesCaisse_Statut DEFAULT('A_VERIFIER'), " &
+                "ResponsableValidationId INT NULL, " &
+                "ValidePar NVARCHAR(80) NULL, " &
+                "ValideLe DATETIME2 NULL, " &
+                "CreeLe DATETIME2 NOT NULL CONSTRAINT DF_CloturesCaisse_CreeLe DEFAULT(GETDATE()), " &
+                "ModifieLe DATETIME2 NULL, " &
+                "ModifiePar NVARCHAR(80) NULL, " &
+                "EstCloturee BIT NOT NULL CONSTRAINT DF_CloturesCaisse_EstCloturee DEFAULT(0)); " &
+                "CREATE UNIQUE INDEX UX_CloturesCaisse_Date_Utilisateur ON dbo.CloturesCaisse(DateCaisse, UtilisateurId) WHERE UtilisateurId IS NOT NULL; " &
+                "END"
+            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
         End Sub
 
         Public Function GetEncaisse(dateJour As DateTime, devise As String) As Decimal
@@ -208,6 +240,59 @@ Namespace DevCommerc8ak.Finance
                 New SqlParameter("@usd", usd)
             }
             _dal.ExecuterNonRequete(sql, CommandType.Text, params)
+        End Sub
+
+        Public Sub EnregistrerComptagePhysique(dateCaisse As DateTime, utilisateurId As Integer, nomUtilisateur As String, roleSession As String, soldeTheoriqueFc As Decimal, montantPhysiqueFc As Decimal, motif As String, observation As String)
+            AssurerTableCloturesCaisse()
+            Dim ecartFc As Decimal = montantPhysiqueFc - soldeTheoriqueFc
+            Dim statut As String = "CONFORME"
+            If ecartFc < 0D Then
+                statut = "MANQUANT"
+            ElseIf ecartFc > 0D Then
+                statut = "SURPLUS"
+            End If
+
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    Try
+                        Using cmd As New SqlCommand("" &
+                            "IF EXISTS (SELECT 1 FROM dbo.CloturesCaisse WITH (UPDLOCK, HOLDLOCK) WHERE DateCaisse=@DateCaisse AND UtilisateurId=@UtilisateurId) " &
+                            "BEGIN " &
+                            "UPDATE dbo.CloturesCaisse SET " &
+                            "SoldeTheoriqueFC=@SoldeTheoriqueFC, MontantPhysiqueFC=@MontantPhysiqueFC, EcartFC=@EcartFC, " &
+                            "MotifEcart=@MotifEcart, Observation=@Observation, Statut=@Statut, " &
+                            "ValidePar=@ValidePar, ValideLe=GETDATE(), ModifieLe=GETDATE(), ModifiePar=@ModifiePar, EstCloturee=1 " &
+                            "WHERE DateCaisse=@DateCaisse AND UtilisateurId=@UtilisateurId " &
+                            "END " &
+                            "ELSE " &
+                            "BEGIN " &
+                            "INSERT INTO dbo.CloturesCaisse (DateCaisse, UtilisateurId, NomUtilisateur, RoleSession, SoldeTheoriqueFC, MontantPhysiqueFC, EcartFC, MotifEcart, Observation, Statut, ResponsableValidationId, ValidePar, ValideLe, ModifiePar, EstCloturee) " &
+                            "VALUES (@DateCaisse, @UtilisateurId, @NomUtilisateur, @RoleSession, @SoldeTheoriqueFC, @MontantPhysiqueFC, @EcartFC, @MotifEcart, @Observation, @Statut, @ResponsableValidationId, @ValidePar, GETDATE(), @ModifiePar, 1) " &
+                            "END", cn, tx)
+                            cmd.Parameters.AddWithValue("@DateCaisse", dateCaisse.Date)
+                            cmd.Parameters.AddWithValue("@UtilisateurId", utilisateurId)
+                            cmd.Parameters.AddWithValue("@NomUtilisateur", If(String.IsNullOrWhiteSpace(nomUtilisateur), CType(DBNull.Value, Object), nomUtilisateur.Trim()))
+                            cmd.Parameters.AddWithValue("@RoleSession", If(String.IsNullOrWhiteSpace(roleSession), CType(DBNull.Value, Object), roleSession.Trim()))
+                            cmd.Parameters.AddWithValue("@SoldeTheoriqueFC", soldeTheoriqueFc)
+                            cmd.Parameters.AddWithValue("@MontantPhysiqueFC", montantPhysiqueFc)
+                            cmd.Parameters.AddWithValue("@EcartFC", ecartFc)
+                            cmd.Parameters.AddWithValue("@MotifEcart", If(String.IsNullOrWhiteSpace(motif), CType(DBNull.Value, Object), motif.Trim()))
+                            cmd.Parameters.AddWithValue("@Observation", If(String.IsNullOrWhiteSpace(observation), CType(DBNull.Value, Object), observation.Trim()))
+                            cmd.Parameters.AddWithValue("@Statut", statut)
+                            cmd.Parameters.AddWithValue("@ResponsableValidationId", If(SessionUtilisateur.UtilisateurId > 0, CType(SessionUtilisateur.UtilisateurId, Object), DBNull.Value))
+                            cmd.Parameters.AddWithValue("@ValidePar", If(String.IsNullOrWhiteSpace(SessionUtilisateur.NomUtilisateur), CType(DBNull.Value, Object), SessionUtilisateur.NomUtilisateur.Trim()))
+                            cmd.Parameters.AddWithValue("@ModifiePar", If(String.IsNullOrWhiteSpace(SessionUtilisateur.NomUtilisateur), CType(DBNull.Value, Object), SessionUtilisateur.NomUtilisateur.Trim()))
+                            cmd.ExecuteNonQuery()
+                        End Using
+
+                        tx.Commit()
+                    Catch
+                        tx.Rollback()
+                        Throw
+                    End Try
+                End Using
+            End Using
         End Sub
 
         Private Function ObtenirTauxUsdActuel() As Decimal?

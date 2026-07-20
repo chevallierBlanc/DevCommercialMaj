@@ -18,19 +18,55 @@ Namespace DevCommerc8ak
 
         ' Verifie les identifiants et initialise la session.
         Public Function VerifierConnexion(nomUtilisateur As String, motDePasse As String) As Boolean
-            Dim user As Utilisateur = _utilisateurRepo.ObtenirParNom(nomUtilisateur)
+            Dim user As Utilisateur = VerifierIdentifiants(nomUtilisateur, motDePasse)
             If user Is Nothing Then Return False
-            If Not user.EstActif Then Return False
 
-            Dim ok As Boolean = VerifierMotDePasse(motDePasse, user.MotDePasseSel, user.MotDePasseHash)
-            If Not ok Then Return False
+            Dim roles As List(Of RoleSessionInfo) = _utilisateurRepo.ListerRolesActifs(user.UtilisateurId)
+            If roles.Count = 0 Then Return False
+            Dim roleActif As RoleSessionInfo = roles(0)
 
             SessionUtilisateur.UtilisateurId = user.UtilisateurId
             SessionUtilisateur.NomUtilisateur = user.NomUtilisateur
-            SessionUtilisateur.Role = _utilisateurRepo.ObtenirRole(user.UtilisateurId)
-            SessionUtilisateur.SessionId = _sessionRepo.DemarrerSession(user.UtilisateurId)
+            SessionUtilisateur.Role = roleActif.NomRole
+            SessionUtilisateur.RoleIdActif = roleActif.RoleId
+            SessionUtilisateur.NomRoleActif = roleActif.NomRole
+            SessionUtilisateur.DateConnexion = Date.Now
+            SessionUtilisateur.Poste = Environment.MachineName
+            SessionUtilisateur.SessionId = _sessionRepo.DemarrerSession(user.UtilisateurId, roleActif.RoleId, roleActif.NomRole)
             Return True
         End Function
+
+        Public Function VerifierIdentifiants(nomUtilisateur As String, motDePasse As String) As Utilisateur
+            Dim user As Utilisateur = _utilisateurRepo.ObtenirParNom(nomUtilisateur)
+            If user Is Nothing Then Return Nothing
+            If Not user.EstActif Then Return Nothing
+
+            Dim ok As Boolean = VerifierMotDePasse(motDePasse, user.MotDePasseSel, user.MotDePasseHash)
+            If Not ok Then Return Nothing
+            Return user
+        End Function
+
+        Public Function ListerRolesActifs(utilisateurId As Integer) As List(Of RoleSessionInfo)
+            Return _utilisateurRepo.ListerRolesActifs(utilisateurId)
+        End Function
+
+        Public Sub DemarrerSession(user As Utilisateur, roleSession As RoleSessionInfo)
+            If user Is Nothing Then Throw New ArgumentNullException("user")
+            If roleSession Is Nothing OrElse roleSession.RoleId <= 0 Then Throw New ArgumentException("Rôle session invalide.")
+
+            If _sessionRepo.UtilisateurDejaConnecte(user.UtilisateurId) Then
+                Throw New InvalidOperationException("Cet utilisateur possède déjà une session active. Fermez l'autre session ou demandez au SUPERADMIN de la libérer.")
+            End If
+
+            SessionUtilisateur.UtilisateurId = user.UtilisateurId
+            SessionUtilisateur.NomUtilisateur = user.NomUtilisateur
+            SessionUtilisateur.Role = roleSession.NomRole
+            SessionUtilisateur.RoleIdActif = roleSession.RoleId
+            SessionUtilisateur.NomRoleActif = roleSession.NomRole
+            SessionUtilisateur.DateConnexion = Date.Now
+            SessionUtilisateur.Poste = Environment.MachineName
+            SessionUtilisateur.SessionId = _sessionRepo.DemarrerSession(user.UtilisateurId, roleSession.RoleId, roleSession.NomRole)
+        End Sub
 
         ' Les comptes initiaux sont créés hors application, via les scripts de déploiement.
         Public Sub CreerUtilisateur(nomUtilisateur As String, motDePasse As String, nomRole As String)
@@ -44,7 +80,8 @@ Namespace DevCommerc8ak
                 .MotDePasseSel = sel,
                 .EstActif = True
             }
-            _utilisateurRepo.Ajouter(u, roleId)
+            Dim utilisateurId As Integer = _utilisateurRepo.Ajouter(u, roleId)
+            _utilisateurRepo.MettreAJourRolesUtilisateur(utilisateurId, New List(Of Integer) From {roleId}, roleId)
             AuditActionService.Enregistrer("Utilisateurs", "Création utilisateur", "Utilisateur " & nomUtilisateur.Trim() & " créé avec le rôle " & nomRole.Trim().ToUpperInvariant() & ".")
         End Sub
 
@@ -70,6 +107,25 @@ Namespace DevCommerc8ak
 
             _utilisateurRepo.MettreAJour(utilisateurId, nomUtilisateur.Trim(), estActif, roleId, hash, sel)
             AuditActionService.Enregistrer("Utilisateurs", "Modification utilisateur", "Utilisateur " & nomUtilisateur.Trim() & " mis à jour avec le rôle " & nomRole.Trim().ToUpperInvariant() & ".")
+        End Sub
+
+        Public Sub MettreAJourUtilisateurRoles(utilisateurId As Integer, nomUtilisateur As String, roles As IEnumerable(Of String), rolePrincipal As String, estActif As Boolean, Optional nouveauMotDePasse As String = Nothing)
+            If roles Is Nothing Then Throw New ArgumentException("Au moins un rôle est obligatoire.")
+            Dim nomsRoles As New List(Of String)(roles)
+            If nomsRoles.Count = 0 Then Throw New ArgumentException("Au moins un rôle est obligatoire.")
+            If String.IsNullOrWhiteSpace(rolePrincipal) Then Throw New ArgumentException("Rôle principal obligatoire.")
+
+            Dim roleIds As New List(Of Integer)()
+            For Each nomRole As String In nomsRoles
+                If Not String.IsNullOrWhiteSpace(nomRole) Then
+                    roleIds.Add(_roleRepo.ObtenirIdParNom(nomRole.Trim()))
+                End If
+            Next
+            Dim rolePrincipalId As Integer = _roleRepo.ObtenirIdParNom(rolePrincipal.Trim())
+
+            MettreAJourUtilisateur(utilisateurId, nomUtilisateur, rolePrincipal, estActif, nouveauMotDePasse)
+            _utilisateurRepo.MettreAJourRolesUtilisateur(utilisateurId, roleIds, rolePrincipalId)
+            AuditActionService.Enregistrer("Utilisateurs", "Modification rôles utilisateur", "Rôles autorisés mis à jour pour " & nomUtilisateur.Trim() & ". Rôle principal : " & rolePrincipal.Trim().ToUpperInvariant() & ".")
         End Sub
 
         ' Met a jour mot de passe.

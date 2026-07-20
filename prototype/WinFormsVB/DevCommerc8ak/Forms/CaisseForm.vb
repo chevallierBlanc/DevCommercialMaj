@@ -667,6 +667,7 @@ Namespace DevCommerc8ak
             _param = PrintConfigurationHelper.ConfigurerDocumentThermique(doc, Me, "CaisseForm", "ImprimerTicket", 315, 1400)
             doc.PrinterSettings.Copies = 1S
             doc.DefaultPageSettings.Color = If(_param IsNot Nothing, _param.ImpressionCouleur, True)
+            doc.DefaultPageSettings.Margins = New Printing.Margins(2, 2, 2, 2)
 
             Dim totalCopies As Integer = Math.Max(1, copies)
             Dim copieCourante As Integer = 1
@@ -700,6 +701,10 @@ Namespace DevCommerc8ak
                         Dim docImpression As Printing.PrintDocument = CreerDocumentTicket(ticket, totalCopies)
                         docImpression.Print()
                         preview.Close()
+                    ElseIf eArgs.KeyCode = Keys.Escape Then
+                        eArgs.Handled = True
+                        eArgs.SuppressKeyPress = True
+                        preview.Close()
                     End If
                 End Sub
         End Sub
@@ -718,11 +723,11 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub ImprimerPageTicket(e As Printing.PrintPageEventArgs, ticket As TicketData, copieCourante As Integer, totalCopies As Integer)
-            Dim margeInterne As Integer = 10
-            Dim gauche As Integer = e.MarginBounds.Left + margeInterne
-            Dim largeurDisponible As Integer = Math.Max(180, e.MarginBounds.Width - (margeInterne * 2))
+            Dim largeurUtile As Integer = Math.Min(300, Math.Max(180, e.MarginBounds.Width))
+            Dim gauche As Integer = e.MarginBounds.Left + Math.Max(0, (e.MarginBounds.Width - largeurUtile) \ 2)
+            Dim largeurDisponible As Integer = largeurUtile
             Dim droite As Integer = gauche + largeurDisponible
-            Dim y As Integer = e.MarginBounds.Top + 6
+            Dim y As Integer = e.MarginBounds.Top + 2
             Dim fontTitre As New Font("Segoe UI", 10, FontStyle.Bold)
             Dim fontSection As New Font("Segoe UI", 7.5F, FontStyle.Bold)
             Dim fontLigne As New Font("Segoe UI", 7.5F)
@@ -735,7 +740,7 @@ Namespace DevCommerc8ak
                     Dim ratio As Decimal = If(image.Height <= 0, 1D, CDec(image.Width) / CDec(image.Height))
                     Dim hauteurLogo As Integer = 50
                     Dim largeurLogo As Integer = CInt(Math.Min(90D, hauteurLogo * CDbl(ratio)))
-                    Dim xLogo As Integer = gauche + ((largeurDisponible - largeurLogo) \ 2)
+                    Dim xLogo As Integer = e.MarginBounds.Left + ((e.MarginBounds.Width - largeurLogo) \ 2)
                     e.Graphics.DrawImage(image, xLogo, y, largeurLogo, hauteurLogo)
                     y += hauteurLogo + 4
                 End Using
@@ -788,14 +793,24 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Function DessinerSeparateurTicket(graphics As Graphics, font As Font, x As Integer, y As Integer, largeur As Integer) As Integer
-            graphics.DrawLine(Pens.Black, x, y + 4, x + largeur, y + 4)
-            Return y + CInt(Math.Ceiling(font.GetHeight(graphics))) + 4
+            graphics.DrawLine(Pens.Black, x, y + 3, x + largeur, y + 3)
+            Return y + CInt(Math.Ceiling(font.GetHeight(graphics))) + 2
         End Function
 
         Private Function DessinerBlocTicket(graphics As Graphics, libelle As String, valeur As String, font As Font, xGauche As Integer, xDroite As Integer, y As Integer) As Integer
-            Dim hauteur As Integer = CInt(Math.Ceiling(font.GetHeight(graphics))) + 4
-            graphics.DrawString(libelle & " :", font, Brushes.Black, xGauche, y)
-            graphics.DrawString(valeur, font, Brushes.Black, New RectangleF(xGauche + 78, y, Math.Max(60, xDroite - (xGauche + 78)), hauteur), New StringFormat With {.Alignment = StringAlignment.Far})
+            Dim largeurTotale As Integer = Math.Max(120, xDroite - xGauche)
+            Dim largeurLibelle As Integer = Math.Min(82, Math.Max(58, CInt(largeurTotale * 0.38R)))
+            Dim xValeur As Integer = xGauche + largeurLibelle
+            Dim largeurValeur As Integer = Math.Max(50, xDroite - xValeur)
+            Dim layoutValeur As New SizeF(largeurValeur, 1000)
+            Dim tailleValeur As SizeF = graphics.MeasureString(If(valeur, String.Empty), font, layoutValeur)
+            Dim hauteur As Integer = Math.Max(CInt(Math.Ceiling(font.GetHeight(graphics))), CInt(Math.Ceiling(tailleValeur.Height))) + 3
+
+            graphics.DrawString(libelle & " :", font, Brushes.Black, New RectangleF(xGauche, y, largeurLibelle, hauteur))
+            Using formatValeur As New StringFormat()
+                formatValeur.Alignment = StringAlignment.Far
+                graphics.DrawString(If(valeur, String.Empty), font, Brushes.Black, New RectangleF(xValeur, y, largeurValeur, hauteur), formatValeur)
+            End Using
             Return y + hauteur
         End Function
 

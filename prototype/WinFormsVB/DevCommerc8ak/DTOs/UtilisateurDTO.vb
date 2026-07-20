@@ -15,4 +15,10 @@ Namespace DevCommerc8ak
         Public Property EstActif As Boolean
         Public Property Role As String
     End Class
+
+    Public Class RoleSessionInfo
+        Public Property RoleId As Integer
+        Public Property NomRole As String
+        Public Property EstRolePrincipal As Boolean
+    End Class
 End Namespace

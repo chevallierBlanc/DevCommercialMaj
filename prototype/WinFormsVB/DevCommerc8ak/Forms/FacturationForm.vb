@@ -7,6 +7,7 @@ Imports System.Data
 Imports System.Drawing
 Imports System.Collections.Generic
 Imports System.IO
+Imports System.Linq
 Imports System.Windows.Forms
 
 Namespace DevCommerc8ak
@@ -69,6 +70,8 @@ Namespace DevCommerc8ak
         Private _typesVenteCourants As List(Of TypeVenteDTO) 'nouveau
         Private _factureEnEditionId As Integer?
         Private _isRefreshingFromEvent As Boolean
+        Private _normalisationTelephoneEnCours As Boolean
+        Private ReadOnly _prefixesTelephoneRdc As String() = {"081", "082", "083", "084", "085", "089", "097", "098", "099"}
 
         Private Class PanierLigne
             Public Property ProduitId As Integer
@@ -135,6 +138,11 @@ Namespace DevCommerc8ak
             pnlHeader.Controls.Add(lblAppTitle)
             pnlHeader.Controls.Add(lblNumFactLabel)
             pnlHeader.Controls.Add(txtNumeroFacture)
+            AddHandler pnlHeader.Resize,
+                Sub()
+                    txtNumeroFacture.Left = Math.Max(20, pnlHeader.ClientSize.Width - txtNumeroFacture.Width - 24)
+                    lblNumFactLabel.Left = Math.Max(20, txtNumeroFacture.Left - lblNumFactLabel.Width - 12)
+                End Sub
 
             ' --- Main Container ---
             Dim pnlMain As New Panel() With {
@@ -362,6 +370,8 @@ Namespace DevCommerc8ak
             AddHandler btnAnnuler.Click, AddressOf AnnulerFacture
             AddHandler btnDeconnexion.Click, AddressOf Deconnecter
             AddHandler txtClientTel.TextChanged, AddressOf RechercherClientParTelephone
+            AddHandler txtClientTel.KeyPress, AddressOf Telephone_KeyPress
+            AddHandler txtClientTel.TextChanged, AddressOf NormaliserTelephoneClient
 
             ' Initialisation
             ChargerParametres()
@@ -806,9 +816,12 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub RechercherClientParTelephone(sender As Object, e As EventArgs)
-            Dim tel As String = txtClientTel.Text.Trim()
+            Dim tel As String = NettoyerTelephone(txtClientTel.Text)
             If tel = "" Then
                 txtClientId.Text = ""
+                Return
+            End If
+            If tel.Length <> 10 Then
                 Return
             End If
 
@@ -942,8 +955,14 @@ Namespace DevCommerc8ak
                 Dim total As Decimal = sousTotal - remiseMontant
 
                 Dim clientId As Integer? = Nothing
-                Dim tel As String = txtClientTel.Text.Trim()
+                Dim tel As String = NettoyerTelephone(txtClientTel.Text)
                 Dim nom As String = txtClientNom.Text.Trim()
+                If tel <> "" AndAlso Not NumeroTelephoneValide(tel) Then
+                    MessageBox.Show("Le numéro de téléphone doit contenir exactement 10 chiffres.")
+                    txtClientTel.Focus()
+                    txtClientTel.SelectAll()
+                    Return
+                End If
 
                 If tel <> "" Then
                     Dim c As ClientDTO = clientService.ObtenirParTelephone(tel)
@@ -1027,10 +1046,59 @@ Namespace DevCommerc8ak
                 Dim dal As New DAL(cs)
                 Dim repo As New FactureVenteRepository(dal)
                 txtNumeroFacture.Text = repo.GenererNumeroFacture()
-            Catch
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("FacturationForm", "GenererNouveauNumeroFacture", "Impossible de générer le numéro automatique de facture.", ex)
                 txtNumeroFacture.Text = ""
             End Try
         End Sub
+
+        Private Sub Telephone_KeyPress(sender As Object, e As KeyPressEventArgs)
+            If Char.IsControl(e.KeyChar) Then
+                Return
+            End If
+
+            If Not Char.IsDigit(e.KeyChar) OrElse txtClientTel.TextLength >= 10 Then
+                e.Handled = True
+            End If
+        End Sub
+
+        Private Sub NormaliserTelephoneClient(sender As Object, e As EventArgs)
+            If _normalisationTelephoneEnCours Then
+                Return
+            End If
+
+            Dim nettoye As String = NettoyerTelephone(txtClientTel.Text)
+            If nettoye.Length > 10 Then
+                nettoye = nettoye.Substring(0, 10)
+            End If
+
+            If txtClientTel.Text <> nettoye Then
+                _normalisationTelephoneEnCours = True
+                Dim position As Integer = Math.Min(nettoye.Length, txtClientTel.SelectionStart)
+                txtClientTel.Text = nettoye
+                txtClientTel.SelectionStart = position
+                _normalisationTelephoneEnCours = False
+            End If
+        End Sub
+
+        Private Function NumeroTelephoneValide(numero As String) As Boolean
+            Dim nettoye As String = NettoyerTelephone(numero)
+            If nettoye = String.Empty Then
+                Return True
+            End If
+            If nettoye.Length <> 10 OrElse Not nettoye.All(Function(c) Char.IsDigit(c)) Then
+                Return False
+            End If
+            Return _prefixesTelephoneRdc.Any(Function(prefixe) nettoye.StartsWith(prefixe, StringComparison.Ordinal))
+        End Function
+
+        Private Shared Function NettoyerTelephone(numero As String) As String
+            If String.IsNullOrWhiteSpace(numero) Then
+                Return String.Empty
+            End If
+            Return New String(numero.Where(Function(c) Char.IsDigit(c)).ToArray())
+        End Function
 
         Private Sub ImprimerA4(sender As Object, e As EventArgs)
             Try

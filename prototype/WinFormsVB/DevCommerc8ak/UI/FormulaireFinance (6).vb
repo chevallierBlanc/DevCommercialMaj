@@ -81,6 +81,7 @@ Namespace DevCommerc8ak
         Private lblSoldeCaisseFC As Label
         Private lblSoldeCaisseUSD As Label
         Private lblStatusCloture As Label
+        Private btnControleCaissePhysique As Button
 
         ' Onglet Banque
         Private lblSoldeBanqueFC As Label
@@ -459,6 +460,21 @@ Namespace DevCommerc8ak
             lblDepensesCaisseUSD = CreerKpiCard(flowCaisse, "Dépenses Caisse (USD)", ColorDanger)
             lblSoldeCaisseFC = CreerKpiCard(flowCaisse, "Solde Actuel (FC)", ColorPrimary)
             lblSoldeCaisseUSD = CreerKpiCard(flowCaisse, "Solde Actuel (USD)", ColorPrimary)
+
+            btnControleCaissePhysique = New Button() With {
+                .Text = "Contrôle caisse physique",
+                .Width = 230,
+                .Height = 42,
+                .FlatStyle = FlatStyle.Flat,
+                .BackColor = ColorWarning,
+                .ForeColor = Color.White,
+                .Font = FontButton,
+                .Cursor = Cursors.Hand,
+                .Margin = New Padding(10, 20, 0, 0)
+            }
+            btnControleCaissePhysique.FlatAppearance.BorderSize = 0
+            AddHandler btnControleCaissePhysique.Click, AddressOf OuvrirControleCaissePhysique
+            flowCaisse.Controls.Add(btnControleCaissePhysique)
 
             lblStatusCloture = New Label() With {.Text = "Statut : Prêt", .Width = 1000, .Font = FontLabel, .ForeColor = ColorTextSecondary, .Margin = New Padding(10, 20, 0, 0)}
             flowCaisse.Controls.Add(lblStatusCloture)
@@ -1134,6 +1150,129 @@ Namespace DevCommerc8ak
                 lblStatusCloture.Text = "Erreur clôture : " & ex.Message
             End Try
         End Sub
+
+        Private Sub OuvrirControleCaissePhysique(sender As Object, e As EventArgs)
+            Try
+                Dim dateJour As DateTime = DateTime.Now.Date
+                Dim soldeTheorique As Decimal = _caisseService.GetSoldeCaisse(dateJour, "FC")
+
+                Using frm As New Form()
+                    frm.Text = "Contrôle caisse physique"
+                    frm.StartPosition = FormStartPosition.CenterParent
+                    frm.FormBorderStyle = FormBorderStyle.FixedDialog
+                    frm.MinimizeBox = False
+                    frm.MaximizeBox = False
+                    frm.ClientSize = New Size(520, 420)
+                    frm.BackColor = ColorBg
+                    frm.Font = FontControl
+
+                    Dim layout As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 9, .Padding = New Padding(20)}
+                    layout.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 170))
+                    layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
+                    For i As Integer = 0 To 8
+                        layout.RowStyles.Add(New RowStyle(SizeType.Absolute, If(i = 7, 80, 38)))
+                    Next
+
+                    Dim lblDate As New Label() With {.Text = dateJour.ToString("dd/MM/yyyy"), .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
+                    Dim lblUser As New Label() With {.Text = If(String.IsNullOrWhiteSpace(SessionUtilisateur.NomUtilisateur), "SYSTEM", SessionUtilisateur.NomUtilisateur), .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
+                    Dim lblRole As New Label() With {.Text = If(String.IsNullOrWhiteSpace(SessionUtilisateur.Role), "N/A", SessionUtilisateur.Role), .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
+                    Dim lblTheorique As New Label() With {.Text = FormatMontant(soldeTheorique, "FC"), .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft, .Font = FontButton}
+                    Dim txtPhysique As New TextBox() With {.Dock = DockStyle.Fill, .TextAlign = HorizontalAlignment.Right}
+                    Dim lblEcart As New Label() With {.Text = "0 FC - CONFORME", .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft, .Font = FontButton}
+                    Dim cmbMotif As New ComboBox() With {.Dock = DockStyle.Fill, .DropDownStyle = ComboBoxStyle.DropDownList}
+                    cmbMotif.Items.AddRange(New Object() {"", "Erreur de rendu monnaie", "Erreur d'encaissement", "Dépense non enregistrée", "Billet manquant", "Billet détérioré", "Faux billet", "Perte constatée", "Surplus inexpliqué", "Correction validée par responsable", "Autre"})
+                    cmbMotif.SelectedIndex = 0
+                    Dim txtObservation As New TextBox() With {.Dock = DockStyle.Fill, .Multiline = True, .ScrollBars = ScrollBars.Vertical}
+
+                    AjouterLigneControle(layout, 0, "Date de caisse", lblDate)
+                    AjouterLigneControle(layout, 1, "Utilisateur", lblUser)
+                    AjouterLigneControle(layout, 2, "Rôle session", lblRole)
+                    AjouterLigneControle(layout, 3, "Solde théorique FC", lblTheorique)
+                    AjouterLigneControle(layout, 4, "Montant physique FC", txtPhysique)
+                    AjouterLigneControle(layout, 5, "Écart calculé", lblEcart)
+                    AjouterLigneControle(layout, 6, "Motif", cmbMotif)
+                    AjouterLigneControle(layout, 7, "Observation", txtObservation)
+
+                    Dim pnlActions As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft}
+                    Dim btnValider As New Button() With {.Text = "Valider le comptage", .Width = 160, .Height = 34, .BackColor = ColorSuccess, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+                    Dim btnAnnuler As New Button() With {.Text = "Annuler", .Width = 100, .Height = 34, .BackColor = ColorTextSecondary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+                    pnlActions.Controls.AddRange(New Control() {btnValider, btnAnnuler})
+                    layout.Controls.Add(pnlActions, 0, 8)
+                    layout.SetColumnSpan(pnlActions, 2)
+                    frm.Controls.Add(layout)
+
+                    AddHandler txtPhysique.TextChanged,
+                        Sub()
+                            Dim montant As Decimal
+                            If TryLireDecimal(txtPhysique.Text, montant) Then
+                                Dim ecart As Decimal = montant - soldeTheorique
+                                Dim statut As String = If(ecart = 0D, "CONFORME", If(ecart < 0D, "MANQUANT", "SURPLUS"))
+                                lblEcart.Text = FormatMontant(ecart, "FC") & " - " & statut
+                                lblEcart.ForeColor = If(ecart = 0D, ColorSuccess, If(ecart < 0D, ColorDanger, ColorWarning))
+                            Else
+                                lblEcart.Text = "Montant invalide"
+                                lblEcart.ForeColor = ColorDanger
+                            End If
+                        End Sub
+
+                    AddHandler btnAnnuler.Click, Sub() frm.DialogResult = DialogResult.Cancel
+                    AddHandler btnValider.Click,
+                        Sub()
+                            Dim montant As Decimal
+                            If Not TryLireDecimal(txtPhysique.Text, montant) OrElse montant < 0D Then
+                                MessageBox.Show(frm, "Montant physique invalide.", "Contrôle caisse", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                                txtPhysique.Focus()
+                                Return
+                            End If
+
+                            Dim ecart As Decimal = montant - soldeTheorique
+                            Dim motif As String = If(cmbMotif.SelectedItem Is Nothing, String.Empty, Convert.ToString(cmbMotif.SelectedItem))
+                            If ecart <> 0D AndAlso String.IsNullOrWhiteSpace(motif) Then
+                                MessageBox.Show(frm, "Le motif est obligatoire lorsqu'il existe un écart de caisse.", "Contrôle caisse", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                                cmbMotif.Focus()
+                                Return
+                            End If
+                            If String.Equals(motif, "Autre", StringComparison.OrdinalIgnoreCase) AndAlso String.IsNullOrWhiteSpace(txtObservation.Text) Then
+                                MessageBox.Show(frm, "L'observation est obligatoire lorsque le motif est Autre.", "Contrôle caisse", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                                txtObservation.Focus()
+                                Return
+                            End If
+
+                            Try
+                                _caisseService.EnregistrerComptagePhysique(dateJour, montant, motif, txtObservation.Text.Trim())
+                                frm.DialogResult = DialogResult.OK
+                            Catch ex As Exception
+                                Dim log As New ProductionLogService()
+                                log.Error("FormulaireFinance", "OuvrirControleCaissePhysique", "Erreur lors de l'enregistrement du comptage physique.", ex)
+                                MessageBox.Show(frm, "Impossible d'enregistrer le contrôle de caisse : " & ex.Message, "Contrôle caisse", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                            End Try
+                        End Sub
+
+                    If frm.ShowDialog(Me) = DialogResult.OK Then
+                        ChargerCaisse()
+                        lblStatusCloture.Text = "Statut : comptage physique enregistré."
+                    End If
+                End Using
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("FormulaireFinance", "OuvrirControleCaissePhysique", "Erreur ouverture contrôle caisse physique.", ex)
+                MessageBox.Show("Impossible d'ouvrir le contrôle caisse : " & ex.Message)
+            End Try
+        End Sub
+
+        Private Sub AjouterLigneControle(layout As TableLayoutPanel, rowIndex As Integer, libelle As String, ctrl As Control)
+            layout.Controls.Add(New Label() With {.Text = libelle, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft, .ForeColor = ColorTextSecondary}, 0, rowIndex)
+            layout.Controls.Add(ctrl, 1, rowIndex)
+        End Sub
+
+        Private Shared Function TryLireDecimal(texte As String, ByRef valeur As Decimal) As Boolean
+            valeur = 0D
+            If String.IsNullOrWhiteSpace(texte) Then
+                Return False
+            End If
+            Dim normalise As String = texte.Trim().Replace(" ", "").Replace(",", ".")
+            Return Decimal.TryParse(normalise, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, valeur)
+        End Function
 
         Private Sub ConfigurerGrilleDepenses()
             If gridHistoriqueDepenses.Columns.Count = 0 Then Return

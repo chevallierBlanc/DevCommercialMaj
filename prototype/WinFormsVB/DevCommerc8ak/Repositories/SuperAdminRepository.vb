@@ -36,6 +36,26 @@ Namespace DevCommerc8ak
                 "InterfaceId INT NOT NULL, " &
                 "PRIMARY KEY (RoleId, InterfaceId)); " &
                 "END " &
+                "IF OBJECT_ID('dbo.UtilisateurRoles', 'U') IS NULL " &
+                "BEGIN " &
+                "CREATE TABLE dbo.UtilisateurRoles (" &
+                "UtilisateurRoleId INT IDENTITY(1,1) PRIMARY KEY, " &
+                "UtilisateurId INT NOT NULL, " &
+                "RoleId INT NOT NULL, " &
+                "EstActif BIT NOT NULL CONSTRAINT DF_UtilisateurRoles_EstActif DEFAULT(1), " &
+                "EstRolePrincipal BIT NOT NULL CONSTRAINT DF_UtilisateurRoles_EstRolePrincipal DEFAULT(0), " &
+                "CreeLe DATETIME2 NOT NULL CONSTRAINT DF_UtilisateurRoles_CreeLe DEFAULT(GETDATE()), " &
+                "CreePar NVARCHAR(80) NULL, " &
+                "ModifieLe DATETIME2 NULL, " &
+                "ModifiePar NVARCHAR(80) NULL); " &
+                "CREATE UNIQUE INDEX UX_UtilisateurRoles_Utilisateur_Role ON dbo.UtilisateurRoles(UtilisateurId, RoleId); " &
+                "END " &
+                "IF COL_LENGTH('dbo.UtilisateurRoles', 'EstActif') IS NULL ALTER TABLE dbo.UtilisateurRoles ADD EstActif BIT NOT NULL CONSTRAINT DF_UtilisateurRoles_EstActif_SA DEFAULT(1); " &
+                "IF COL_LENGTH('dbo.UtilisateurRoles', 'EstRolePrincipal') IS NULL ALTER TABLE dbo.UtilisateurRoles ADD EstRolePrincipal BIT NOT NULL CONSTRAINT DF_UtilisateurRoles_EstRolePrincipal_SA DEFAULT(0); " &
+                "IF COL_LENGTH('dbo.UtilisateurRoles', 'CreeLe') IS NULL ALTER TABLE dbo.UtilisateurRoles ADD CreeLe DATETIME2 NOT NULL CONSTRAINT DF_UtilisateurRoles_CreeLe_SA DEFAULT(GETDATE()); " &
+                "IF COL_LENGTH('dbo.UtilisateurRoles', 'CreePar') IS NULL ALTER TABLE dbo.UtilisateurRoles ADD CreePar NVARCHAR(80) NULL; " &
+                "IF COL_LENGTH('dbo.UtilisateurRoles', 'ModifieLe') IS NULL ALTER TABLE dbo.UtilisateurRoles ADD ModifieLe DATETIME2 NULL; " &
+                "IF COL_LENGTH('dbo.UtilisateurRoles', 'ModifiePar') IS NULL ALTER TABLE dbo.UtilisateurRoles ADD ModifiePar NVARCHAR(80) NULL; " &
                 "IF OBJECT_ID('dbo.AuditActions', 'U') IS NULL " &
                 "BEGIN " &
                 "CREATE TABLE dbo.AuditActions (" &

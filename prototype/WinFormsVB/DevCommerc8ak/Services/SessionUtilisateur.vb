@@ -13,6 +13,10 @@ Namespace DevCommerc8ak
         Public Property UtilisateurId As Integer
         Public Property NomUtilisateur As String
         Public Property Role As String
+        Public Property RoleIdActif As Integer
+        Public Property NomRoleActif As String
         Public Property SessionId As Integer
+        Public Property DateConnexion As Date
+        Public Property Poste As String
     End Module
 End Namespace

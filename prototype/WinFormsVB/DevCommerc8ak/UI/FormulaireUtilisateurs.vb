@@ -7,6 +7,7 @@ Imports System.Collections.Generic
 Imports System.Data
 Imports System.Drawing
 Imports System.Drawing.Drawing2D
+Imports System.Linq
 Imports System.Threading.Tasks
 Imports System.Windows.Forms
 
@@ -48,6 +49,7 @@ Namespace DevCommerc8ak
         Private ReadOnly txtNom As TextBox
         Private ReadOnly txtMotDePasse As TextBox
         Private ReadOnly cmbRole As ComboBox
+        Private ReadOnly clbRolesAutorises As CheckedListBox
         Private ReadOnly chkActif As CheckBox
         Private ReadOnly btnAjouter As Button
         Private ReadOnly btnModifier As Button
@@ -90,7 +92,7 @@ Namespace DevCommerc8ak
                 .RowCount = 3,
                 .Padding = New Padding(20)
             }
-            mainTableLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 120)) ' Carte Formulaire
+            mainTableLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 170)) ' Carte Formulaire
             mainTableLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 60))  ' Boutons
             mainTableLayout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))  ' Grilles
 
@@ -103,13 +105,14 @@ Namespace DevCommerc8ak
 
             Dim formTable As New TableLayoutPanel() With {
                 .Dock = DockStyle.Fill,
-                .ColumnCount = 4,
+                .ColumnCount = 5,
                 .RowCount = 2
             }
-            formTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 30))
-            formTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25))
-            formTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25))
+            formTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 24))
+            formTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 21))
             formTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 20))
+            formTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 23))
+            formTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 12))
 
             ' Initialisation des contrôles (Noms conservés)
             txtNom = CreateStyledTextBox()
@@ -121,6 +124,13 @@ Namespace DevCommerc8ak
                 .DropDownStyle = ComboBoxStyle.DropDownList,
                 .Font = FontControl,
                 .FlatStyle = FlatStyle.Flat,
+                .Margin = New Padding(0, 0, 20, 0)
+            }
+            clbRolesAutorises = New CheckedListBox() With {
+                .Dock = DockStyle.Fill,
+                .CheckOnClick = True,
+                .Font = FontControl,
+                .BorderStyle = BorderStyle.FixedSingle,
                 .Margin = New Padding(0, 0, 20, 0)
             }
             chkActif = New CheckBox() With {
@@ -138,7 +148,9 @@ Namespace DevCommerc8ak
             formTable.Controls.Add(txtMotDePasse, 1, 1)
             formTable.Controls.Add(CreateLabel("Rôle / Privilège"), 2, 0)
             formTable.Controls.Add(cmbRole, 2, 1)
-            formTable.Controls.Add(chkActif, 3, 1)
+            formTable.Controls.Add(CreateLabel("Rôles autorisés"), 3, 0)
+            formTable.Controls.Add(clbRolesAutorises, 3, 1)
+            formTable.Controls.Add(chkActif, 4, 1)
 
             cardForm.Controls.Add(formTable)
 
@@ -312,8 +324,10 @@ Namespace DevCommerc8ak
 
                 Dim roleSelectionne As String = If(cmbRole.SelectedItem Is Nothing, String.Empty, Convert.ToString(cmbRole.SelectedItem))
                 cmbRole.Items.Clear()
+                clbRolesAutorises.Items.Clear()
                 For Each role As String In roles
                     cmbRole.Items.Add(role)
+                    clbRolesAutorises.Items.Add(role, False)
                 Next
 
                 If roleSelectionne <> String.Empty AndAlso cmbRole.Items.Contains(roleSelectionne) Then
@@ -376,9 +390,24 @@ Namespace DevCommerc8ak
                     MessageBox.Show("Nom, mot de passe et role obligatoires.")
                     Return
                 End If
+                Dim rolesCoches As List(Of String) = ObtenirRolesCochesAvecPrincipal()
+                If rolesCoches.Any(Function(r) String.Equals(r, "SUPERADMIN", StringComparison.OrdinalIgnoreCase)) AndAlso
+                   Not String.Equals(SessionUtilisateur.Role, "SUPERADMIN", StringComparison.OrdinalIgnoreCase) Then
+                    MessageBox.Show("Seul un SUPERADMIN peut attribuer le rôle SUPERADMIN.")
+                    Return
+                End If
 
                 Dim service As UtilisateurService = ObtenirService()
                 service.CreerUtilisateur(txtNom.Text.Trim(), txtMotDePasse.Text.Trim(), cmbRole.SelectedItem.ToString())
+                Dim rolesAutorises As List(Of String) = rolesCoches
+                If rolesAutorises.Count > 1 Then
+                    Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                    Dim repo As New UtilisateurRepository(New DAL(cs))
+                    Dim utilisateurCree As Utilisateur = repo.ObtenirParNom(txtNom.Text.Trim())
+                    If utilisateurCree IsNot Nothing Then
+                        service.MettreAJourUtilisateurRoles(utilisateurCree.UtilisateurId, txtNom.Text.Trim(), rolesAutorises, cmbRole.SelectedItem.ToString(), True, Nothing)
+                    End If
+                End If
                 Charger(sender, e)
             Catch ex As Exception
                 MessageBox.Show("Erreur ajout utilisateur: " & ex.Message)
@@ -401,9 +430,20 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
+                Dim rolesAutorises As List(Of String) = ObtenirRolesCochesAvecPrincipal()
+                If rolesAutorises.Count = 0 Then
+                    MessageBox.Show("Sélectionnez au moins un rôle autorisé.")
+                    Return
+                End If
+                If rolesAutorises.Any(Function(r) String.Equals(r, "SUPERADMIN", StringComparison.OrdinalIgnoreCase)) AndAlso
+                   Not String.Equals(SessionUtilisateur.Role, "SUPERADMIN", StringComparison.OrdinalIgnoreCase) Then
+                    MessageBox.Show("Seul un SUPERADMIN peut attribuer le rôle SUPERADMIN.")
+                    Return
+                End If
+
                 Dim nouveauMotDePasse As String = txtMotDePasse.Text.Trim()
                 Dim service As UtilisateurService = ObtenirService()
-                service.MettreAJourUtilisateur(_utilisateurSelectionneId, txtNom.Text.Trim(), cmbRole.SelectedItem.ToString(), chkActif.Checked, If(nouveauMotDePasse = "", Nothing, nouveauMotDePasse))
+                service.MettreAJourUtilisateurRoles(_utilisateurSelectionneId, txtNom.Text.Trim(), rolesAutorises, cmbRole.SelectedItem.ToString(), chkActif.Checked, If(nouveauMotDePasse = "", Nothing, nouveauMotDePasse))
                 MessageBox.Show("Utilisateur mis a jour.")
                 Charger(sender, e)
             Catch ex As Exception
@@ -448,12 +488,52 @@ Namespace DevCommerc8ak
 
                 Dim valeurRole As Object = grid.CurrentRow.Cells("Role").Value
                 Dim role As String = If(valeurRole Is Nothing OrElse Convert.IsDBNull(valeurRole), "", Convert.ToString(valeurRole))
+                If role.Contains(",") Then
+                    role = role.Split(","c)(0).Trim()
+                End If
                 If cmbRole.Items.Contains(role) Then
                     cmbRole.SelectedItem = role
                 Else
                     cmbRole.SelectedIndex = -1
                 End If
+                ChargerRolesAutorisesUtilisateur(_utilisateurSelectionneId)
                 txtMotDePasse.Text = ""
+            Catch
+            End Try
+        End Sub
+
+        Private Function ObtenirRolesCochesAvecPrincipal() As List(Of String)
+            Dim roles As New List(Of String)()
+            For Each item As Object In clbRolesAutorises.CheckedItems
+                Dim role As String = Convert.ToString(item)
+                If role <> String.Empty AndAlso Not roles.Contains(role) Then
+                    roles.Add(role)
+                End If
+            Next
+            If cmbRole.SelectedItem IsNot Nothing Then
+                Dim principal As String = cmbRole.SelectedItem.ToString()
+                If principal <> String.Empty AndAlso Not roles.Contains(principal) Then
+                    roles.Add(principal)
+                End If
+            End If
+            Return roles
+        End Function
+
+        Private Sub ChargerRolesAutorisesUtilisateur(utilisateurId As Integer)
+            Try
+                For i As Integer = 0 To clbRolesAutorises.Items.Count - 1
+                    clbRolesAutorises.SetItemChecked(i, False)
+                Next
+
+                Dim service As UtilisateurService = ObtenirService()
+                Dim roles As List(Of RoleSessionInfo) = service.ListerRolesActifs(utilisateurId)
+                For Each role As RoleSessionInfo In roles
+                    For i As Integer = 0 To clbRolesAutorises.Items.Count - 1
+                        If String.Equals(Convert.ToString(clbRolesAutorises.Items(i)), role.NomRole, StringComparison.OrdinalIgnoreCase) Then
+                            clbRolesAutorises.SetItemChecked(i, True)
+                        End If
+                    Next
+                Next
             Catch
             End Try
         End Sub

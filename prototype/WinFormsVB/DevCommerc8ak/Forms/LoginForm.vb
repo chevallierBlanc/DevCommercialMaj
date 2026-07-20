@@ -4,6 +4,7 @@ Imports System.Configuration
 Imports System.Drawing.Drawing2D
 Imports Microsoft.VisualBasic
 Imports System
+Imports System.Collections.Generic
 
 Namespace DevCommerc8ak
     Public Class LoginForm
@@ -300,13 +301,90 @@ Namespace DevCommerc8ak
                 Dim roleRepo As New RoleRepository(dal)
                 Dim sessionRepo As New SessionRepository(dal)
                 Dim service As New UtilisateurService(utilisateurRepo, roleRepo, sessionRepo)
-                Return service.VerifierConnexion(nomUtilisateur, motDePasse)
+                Dim utilisateur As Utilisateur = service.VerifierIdentifiants(nomUtilisateur, motDePasse)
+                If utilisateur Is Nothing Then
+                    Return False
+                End If
+
+                Dim roles As List(Of RoleSessionInfo) = service.ListerRolesActifs(utilisateur.UtilisateurId)
+                If roles.Count = 0 Then
+                    Return False
+                End If
+
+                Dim roleChoisi As RoleSessionInfo = roles(0)
+                If roles.Count > 1 Then
+                    Using frm As New FormChoixRoleSession(roles)
+                        If frm.ShowDialog(Me) <> DialogResult.OK OrElse frm.RoleSelectionne Is Nothing Then
+                            Return False
+                        End If
+                        roleChoisi = frm.RoleSelectionne
+                    End Using
+                End If
+
+                service.DemarrerSession(utilisateur, roleChoisi)
+                Return True
             Catch ex As Exception
                 Dim log As New ProductionLogService()
                 log.Error("LoginForm", "Authentifier", "Erreur technique lors de l'authentification utilisateur.", ex)
+                MessageBox.Show(ex.Message, "Connexion", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                 Return False
             End Try
         End Function
+
+        Private NotInheritable Class FormChoixRoleSession
+            Inherits Form
+
+            Private ReadOnly lstRoles As ListBox
+            Private ReadOnly _roles As List(Of RoleSessionInfo)
+            Public Property RoleSelectionne As RoleSessionInfo
+
+            Public Sub New(roles As List(Of RoleSessionInfo))
+                _roles = roles
+                Text = "Choix du rôle"
+                StartPosition = FormStartPosition.CenterParent
+                FormBorderStyle = FormBorderStyle.FixedDialog
+                MinimizeBox = False
+                MaximizeBox = False
+                ClientSize = New Size(360, 260)
+                BackColor = Color.White
+
+                Dim lbl As New Label() With {
+                    .Text = "Sélectionnez le rôle pour cette session",
+                    .Dock = DockStyle.Top,
+                    .Height = 45,
+                    .TextAlign = ContentAlignment.MiddleCenter,
+                    .Font = New Font("Segoe UI", 10, FontStyle.Bold)
+                }
+                lstRoles = New ListBox() With {.Dock = DockStyle.Fill, .Font = New Font("Segoe UI", 10)}
+                For Each role As RoleSessionInfo In _roles
+                    lstRoles.Items.Add(role.NomRole)
+                Next
+                If lstRoles.Items.Count > 0 Then
+                    lstRoles.SelectedIndex = 0
+                End If
+
+                Dim pnlActions As New FlowLayoutPanel() With {.Dock = DockStyle.Bottom, .Height = 55, .FlowDirection = FlowDirection.RightToLeft, .Padding = New Padding(10)}
+                Dim btnOk As New Button() With {.Text = "Continuer", .Width = 110, .Height = 32, .DialogResult = DialogResult.None}
+                Dim btnCancel As New Button() With {.Text = "Annuler", .Width = 90, .Height = 32, .DialogResult = DialogResult.Cancel}
+                AddHandler btnOk.Click, AddressOf Valider
+                pnlActions.Controls.AddRange(New Control() {btnOk, btnCancel})
+
+                Controls.Add(lstRoles)
+                Controls.Add(pnlActions)
+                Controls.Add(lbl)
+                AcceptButton = btnOk
+                CancelButton = btnCancel
+            End Sub
+
+            Private Sub Valider(sender As Object, e As EventArgs)
+                If lstRoles.SelectedIndex < 0 OrElse lstRoles.SelectedIndex >= _roles.Count Then
+                    MessageBox.Show(Me, "Sélectionnez un rôle.", "Connexion", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    Return
+                End If
+                RoleSelectionne = _roles(lstRoles.SelectedIndex)
+                DialogResult = DialogResult.OK
+            End Sub
+        End Class
 
         Private Sub InitialiserCompteAdminSiNecessaire()
             Try

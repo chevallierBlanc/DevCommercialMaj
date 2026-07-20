@@ -125,6 +125,26 @@ Namespace DevCommerc8ak.Services
             Return _depenseRepo.GetSommeParDevise(dateJour, devise, "Caisse")
         End Function
 
+        Public Sub EnregistrerComptagePhysique(dateCaisse As DateTime, montantPhysiqueFc As Decimal, motif As String, observation As String)
+            If montantPhysiqueFc < 0D Then
+                Throw New ArgumentException("Le montant physique ne peut pas être négatif.")
+            End If
+
+            Dim soldeTheoriqueFc As Decimal = GetSoldeCaisse(dateCaisse, "FC")
+            Dim ecartFc As Decimal = montantPhysiqueFc - soldeTheoriqueFc
+            If ecartFc <> 0D AndAlso String.IsNullOrWhiteSpace(motif) Then
+                Throw New ArgumentException("Le motif est obligatoire lorsqu'il existe un écart de caisse.")
+            End If
+            If String.Equals(motif, "Autre", StringComparison.OrdinalIgnoreCase) AndAlso String.IsNullOrWhiteSpace(observation) Then
+                Throw New ArgumentException("L'observation est obligatoire lorsque le motif est Autre.")
+            End If
+
+            _caisseRepo.EnregistrerComptagePhysique(dateCaisse, SessionUtilisateur.UtilisateurId, SessionUtilisateur.NomUtilisateur, SessionUtilisateur.Role, soldeTheoriqueFc, montantPhysiqueFc, motif, observation)
+            AuditActionService.Enregistrer("Finance", "Contrôle caisse physique", "Comptage physique validé. Théorique=" & soldeTheoriqueFc.ToString("N2") & " FC; Physique=" & montantPhysiqueFc.ToString("N2") & " FC; Écart=" & ecartFc.ToString("N2") & " FC.")
+            AppEvents.OnCaisseModifiee()
+            AppEvents.OnDataChanged()
+        End Sub
+
         Public Sub ClotureAutomatique()
             Dim derniereCloture As DateTime? = _caisseRepo.GetDerniereCloture()
             Dim aujourdhui As DateTime = DateTime.Now.Date

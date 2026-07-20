@@ -33,6 +33,9 @@ Namespace DevCommerc8ak
             Dim resultat As New List(Of String)()
             Dim dt As DataTable = ListerRoles()
             For Each row As DataRow In dt.Rows
+                If dt.Columns.Contains("EstActif") AndAlso Not row.IsNull("EstActif") AndAlso Not Convert.ToBoolean(row("EstActif")) Then
+                    Continue For
+                End If
                 Dim nomRole As String = Convert.ToString(row("NomRole")).Trim()
                 If nomRole <> String.Empty Then
                     resultat.Add(nomRole)
