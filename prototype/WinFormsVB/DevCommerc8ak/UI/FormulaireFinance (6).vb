@@ -469,11 +469,18 @@ Namespace DevCommerc8ak
             lblSoldeCaisseFC = CreerKpiCard(flowCaisse, "Solde Actuel (FC)", ColorPrimary)
             lblSoldeCaisseUSD = CreerKpiCard(flowCaisse, "Solde Actuel (USD)", ColorPrimary)
 
+            If lblSoldeCaisseUSD.Parent IsNot Nothing Then
+                flowCaisse.SetFlowBreak(lblSoldeCaisseUSD.Parent, True)
+            End If
+
+            lblStatusCloture = New Label() With {.Text = "Statut : Prêt", .Width = 1120, .Height = 34, .Font = FontLabel, .ForeColor = ColorTextSecondary, .Margin = New Padding(10, 14, 0, 0), .TextAlign = ContentAlignment.MiddleLeft}
+            flowCaisse.Controls.Add(lblStatusCloture)
+            flowCaisse.SetFlowBreak(lblStatusCloture, True)
+
             pnlControleCaissePhysique = CreerCarteControleCaisse()
             flowCaisse.Controls.Add(pnlControleCaissePhysique)
-
-            lblStatusCloture = New Label() With {.Text = "Statut : Prêt", .Width = 1000, .Font = FontLabel, .ForeColor = ColorTextSecondary, .Margin = New Padding(10, 20, 0, 0)}
-            flowCaisse.Controls.Add(lblStatusCloture)
+            AddHandler flowCaisse.Resize, Sub() AjusterCarteControleCaisse(flowCaisse)
+            AjusterCarteControleCaisse(flowCaisse)
 
             tpCaisse.Controls.Add(flowCaisse)
         End Sub
@@ -1264,23 +1271,35 @@ Namespace DevCommerc8ak
 
         Private Function CreerCarteControleCaisse() As Panel
             Dim card As New Panel() With {
-                .Width = 590,
-                .Height = 190,
+                .Width = 1120,
+                .Height = 175,
                 .BackColor = ColorCardBg,
-                .Margin = New Padding(8),
-                .Padding = New Padding(16),
-                .MinimumSize = New Size(420, 185)
+                .Margin = New Padding(8, 4, 8, 8),
+                .Padding = New Padding(18),
+                .MinimumSize = New Size(720, 165)
             }
             AddHandler card.Paint, Sub(s, ev) DessinerCarteBordureOmbre(s, ev, card)
 
-            Dim layout As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 5}
-            layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 52))
-            layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 48))
-            layout.RowStyles.Add(New RowStyle(SizeType.Absolute, 34))
-            layout.RowStyles.Add(New RowStyle(SizeType.Absolute, 44))
-            layout.RowStyles.Add(New RowStyle(SizeType.Absolute, 34))
-            layout.RowStyles.Add(New RowStyle(SizeType.Absolute, 34))
-            layout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+            Dim layout As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 3, .RowCount = 1}
+            layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 40))
+            layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 35))
+            layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25))
+
+            Dim colGauche As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 4}
+            colGauche.RowStyles.Add(New RowStyle(SizeType.Absolute, 30))
+            colGauche.RowStyles.Add(New RowStyle(SizeType.Absolute, 42))
+            colGauche.RowStyles.Add(New RowStyle(SizeType.Absolute, 30))
+            colGauche.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+
+            Dim colCentre As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 3, .Padding = New Padding(12, 8, 12, 0)}
+            colCentre.RowStyles.Add(New RowStyle(SizeType.Absolute, 40))
+            colCentre.RowStyles.Add(New RowStyle(SizeType.Absolute, 40))
+            colCentre.RowStyles.Add(New RowStyle(SizeType.Absolute, 40))
+
+            Dim colDroite As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 3, .Padding = New Padding(8, 8, 0, 0)}
+            colDroite.RowStyles.Add(New RowStyle(SizeType.Absolute, 34))
+            colDroite.RowStyles.Add(New RowStyle(SizeType.Absolute, 44))
+            colDroite.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
 
             Dim lblTitre As New Label() With {
                 .Text = "Contrôle de caisse physique",
@@ -1290,10 +1309,10 @@ Namespace DevCommerc8ak
                 .TextAlign = ContentAlignment.MiddleLeft
             }
             lblControleBadge = New Label() With {
-                .Text = "Comptage non effectué",
+                .Text = "NON EFFECTUÉ",
                 .Dock = DockStyle.Right,
-                .Width = 180,
-                .Height = 26,
+                .Width = 135,
+                .Height = 24,
                 .Font = FontLabel,
                 .BackColor = ColorWarning,
                 .ForeColor = Color.White,
@@ -1301,7 +1320,7 @@ Namespace DevCommerc8ak
             }
 
             Dim lblSousTitre As New Label() With {
-                .Text = "Comparez le solde théorique avec le montant réellement compté.",
+                .Text = "Comparez le solde théorique au montant réellement compté en caisse.",
                 .Dock = DockStyle.Fill,
                 .Font = FontSubtitle,
                 .ForeColor = ColorTextSecondary,
@@ -1309,9 +1328,8 @@ Namespace DevCommerc8ak
             }
             btnControleCaissePhysique = New Button() With {
                 .Text = "Effectuer le contrôle",
-                .Dock = DockStyle.Right,
-                .Width = 190,
-                .Height = 34,
+                .Dock = DockStyle.Top,
+                .Height = 36,
                 .FlatStyle = FlatStyle.Flat,
                 .BackColor = ColorWarning,
                 .ForeColor = Color.White,
@@ -1327,16 +1345,21 @@ Namespace DevCommerc8ak
             lblControleResponsable = CreerLibelleControle("Responsable : -")
             lblControleHeure = CreerLibelleControle("Dernier comptage : -")
 
-            layout.Controls.Add(lblTitre, 0, 0)
-            layout.Controls.Add(lblControleBadge, 1, 0)
-            layout.Controls.Add(lblSousTitre, 0, 1)
-            layout.Controls.Add(btnControleCaissePhysique, 1, 1)
-            layout.Controls.Add(lblControleTheorique, 0, 2)
-            layout.Controls.Add(lblControlePhysique, 1, 2)
-            layout.Controls.Add(lblControleEcart, 0, 3)
-            layout.Controls.Add(lblControleResponsable, 1, 3)
-            layout.Controls.Add(lblControleHeure, 0, 4)
-            layout.SetColumnSpan(lblControleHeure, 2)
+            colGauche.Controls.Add(lblTitre, 0, 0)
+            colGauche.Controls.Add(lblSousTitre, 0, 1)
+            colGauche.Controls.Add(lblControleResponsable, 0, 2)
+            colGauche.Controls.Add(lblControleHeure, 0, 3)
+
+            colCentre.Controls.Add(lblControleTheorique, 0, 0)
+            colCentre.Controls.Add(lblControlePhysique, 0, 1)
+            colCentre.Controls.Add(lblControleEcart, 0, 2)
+
+            colDroite.Controls.Add(lblControleBadge, 0, 0)
+            colDroite.Controls.Add(btnControleCaissePhysique, 0, 1)
+
+            layout.Controls.Add(colGauche, 0, 0)
+            layout.Controls.Add(colCentre, 1, 0)
+            layout.Controls.Add(colDroite, 2, 0)
             card.Controls.Add(layout)
             Return card
         End Function
@@ -1352,6 +1375,13 @@ Namespace DevCommerc8ak
             }
         End Function
 
+        Private Sub AjusterCarteControleCaisse(flowCaisse As FlowLayoutPanel)
+            If flowCaisse Is Nothing Then Return
+            Dim largeur As Integer = Math.Max(720, flowCaisse.ClientSize.Width - 60)
+            If lblStatusCloture IsNot Nothing Then lblStatusCloture.Width = largeur
+            If pnlControleCaissePhysique IsNot Nothing Then pnlControleCaissePhysique.Width = largeur
+        End Sub
+
         Private Sub ChargerCarteControleCaisse()
             If pnlControleCaissePhysique Is Nothing OrElse pnlControleCaissePhysique.IsDisposed Then Return
 
@@ -1362,7 +1392,7 @@ Namespace DevCommerc8ak
 
                 lblControleTheorique.Text = "Solde théorique : " & FormatMontant(soldeTheorique, "FC")
                 If controle Is Nothing Then
-                    AppliquerStatutControle("A_VERIFIER", "Comptage non effectué", ColorWarning, "Effectuer le contrôle")
+                    AppliquerStatutControle("A_VERIFIER", "NON EFFECTUÉ", ColorWarning, "Effectuer le contrôle")
                     lblControlePhysique.Text = "Montant physique : -"
                     lblControleEcart.Text = "Écart : -"
                     lblControleEcart.ForeColor = ColorTextPrimary
@@ -1385,13 +1415,13 @@ Namespace DevCommerc8ak
 
                 Select Case statut.Trim().ToUpperInvariant()
                     Case "CONFORME"
-                        AppliquerStatutControle(statut, "Caisse conforme", ColorSuccess, "Voir le détail")
+                        AppliquerStatutControle(statut, "CONFORME", ColorSuccess, "Voir le détail")
                     Case "MANQUANT"
-                        AppliquerStatutControle(statut, "Manquant constaté", ColorDanger, "Consulter / Régulariser")
+                        AppliquerStatutControle(statut, "MANQUANT", ColorDanger, "Voir / Régulariser")
                     Case "SURPLUS"
-                        AppliquerStatutControle(statut, "Surplus constaté", ColorPrimary, "Consulter")
+                        AppliquerStatutControle(statut, "SURPLUS", ColorPrimary, "Voir le détail")
                     Case Else
-                        AppliquerStatutControle(statut, "À vérifier", ColorWarning, "Compléter le comptage")
+                        AppliquerStatutControle(statut, "À VÉRIFIER", ColorWarning, "Compléter le comptage")
                 End Select
             Catch ex As Exception
                 Dim log As New ProductionLogService()
