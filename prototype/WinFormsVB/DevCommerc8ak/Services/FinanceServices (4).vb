@@ -141,9 +141,14 @@ Namespace DevCommerc8ak.Services
 
             _caisseRepo.EnregistrerComptagePhysique(dateCaisse, SessionUtilisateur.UtilisateurId, SessionUtilisateur.NomUtilisateur, SessionUtilisateur.Role, soldeTheoriqueFc, montantPhysiqueFc, motif, observation)
             AuditActionService.Enregistrer("Finance", "Contrôle caisse physique", "Comptage physique validé. Théorique=" & soldeTheoriqueFc.ToString("N2") & " FC; Physique=" & montantPhysiqueFc.ToString("N2") & " FC; Écart=" & ecartFc.ToString("N2") & " FC.")
+            AppEvents.OnCaissePhysiqueModifiee()
             AppEvents.OnCaisseModifiee()
             AppEvents.OnDataChanged()
         End Sub
+
+        Public Function ObtenirControleCaisseDuJour(dateCaisse As DateTime, utilisateurId As Integer) As DataRow
+            Return _caisseRepo.ObtenirControleCaisse(dateCaisse, utilisateurId)
+        End Function
 
         Public Sub ClotureAutomatique()
             Dim derniereCloture As DateTime? = _caisseRepo.GetDerniereCloture()

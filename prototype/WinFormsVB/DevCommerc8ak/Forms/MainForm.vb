@@ -482,6 +482,10 @@ Namespace DevCommerc8ak
                 AjouterBoutonSidebar(_flowPnlMenu, "Administration", y, AddressOf Dashbord)
                 y += 50
             End If
+            If VerifierPermission("ANALYSE_CAISSE_PHYSIQUE") Then
+                AjouterBoutonSidebar(_flowPnlMenu, "Analyse caisse physique", y, AddressOf AfficherAnalyseCaissePhysique)
+                y += 50
+            End If
             If VerifierPermission("STOCK_INVENTAIRE") Then
                 AjouterBoutonSidebar(_flowPnlMenu, "Stock / Inventaire", y, AddressOf AfficherStockAdmin)
                 y += 50
@@ -591,6 +595,8 @@ Namespace DevCommerc8ak
                     Return "FINANCE"
                 Case "ADMIN", "ADMINISTRATION"
                     Return "ADMINISTRATION"
+                Case "ANALYSE_CAISSE_PHYSIQUE"
+                    Return "ANALYSE_CAISSE_PHYSIQUE"
                 Case "STOCK_INVENTAIRE"
                     Return "STOCK_INVENTAIRE"
                 Case "ANALYSE_VENTES"
@@ -1025,6 +1031,10 @@ Namespace DevCommerc8ak
         ''' </summary>
         Private Sub AfficherAnalyseVente(sender As Object, e As EventArgs)
             LoadForm(New FormulaireAnalyseVente())
+        End Sub
+
+        Private Sub AfficherAnalyseCaissePhysique(sender As Object, e As EventArgs)
+            LoadForm(New FormulaireAnalyseCaissePhysique())
         End Sub
 
         ''' <summary>

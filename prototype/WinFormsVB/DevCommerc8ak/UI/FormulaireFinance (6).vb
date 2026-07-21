@@ -82,6 +82,13 @@ Namespace DevCommerc8ak
         Private lblSoldeCaisseUSD As Label
         Private lblStatusCloture As Label
         Private btnControleCaissePhysique As Button
+        Private pnlControleCaissePhysique As Panel
+        Private lblControleBadge As Label
+        Private lblControleTheorique As Label
+        Private lblControlePhysique As Label
+        Private lblControleEcart As Label
+        Private lblControleResponsable As Label
+        Private lblControleHeure As Label
 
         ' Onglet Banque
         Private lblSoldeBanqueFC As Label
@@ -274,6 +281,7 @@ Namespace DevCommerc8ak
             AddHandler AppEvents.PaiementValide, AddressOf RafraichirDepuisEvenement
             AddHandler AppEvents.DepenseAjoutee, AddressOf RafraichirDepuisEvenement
             AddHandler AppEvents.CaisseModifiee, AddressOf RafraichirDepuisEvenement
+            AddHandler AppEvents.CaissePhysiqueModifiee, AddressOf RafraichirDepuisEvenement
         End Sub
 
         Private Sub InitialiserServices()
@@ -461,20 +469,8 @@ Namespace DevCommerc8ak
             lblSoldeCaisseFC = CreerKpiCard(flowCaisse, "Solde Actuel (FC)", ColorPrimary)
             lblSoldeCaisseUSD = CreerKpiCard(flowCaisse, "Solde Actuel (USD)", ColorPrimary)
 
-            btnControleCaissePhysique = New Button() With {
-                .Text = "Contrôle caisse physique",
-                .Width = 230,
-                .Height = 42,
-                .FlatStyle = FlatStyle.Flat,
-                .BackColor = ColorWarning,
-                .ForeColor = Color.White,
-                .Font = FontButton,
-                .Cursor = Cursors.Hand,
-                .Margin = New Padding(10, 20, 0, 0)
-            }
-            btnControleCaissePhysique.FlatAppearance.BorderSize = 0
-            AddHandler btnControleCaissePhysique.Click, AddressOf OuvrirControleCaissePhysique
-            flowCaisse.Controls.Add(btnControleCaissePhysique)
+            pnlControleCaissePhysique = CreerCarteControleCaisse()
+            flowCaisse.Controls.Add(pnlControleCaissePhysique)
 
             lblStatusCloture = New Label() With {.Text = "Statut : Prêt", .Width = 1000, .Font = FontLabel, .ForeColor = ColorTextSecondary, .Margin = New Padding(10, 20, 0, 0)}
             flowCaisse.Controls.Add(lblStatusCloture)
@@ -775,6 +771,7 @@ Namespace DevCommerc8ak
                 lblDepensesCaisseUSD.Text = FormaterSoldeUsd(_caisseService.GetDepensesCaisse(dateJour, "USD"))
                 lblSoldeCaisseFC.Text = FormatMontant(_caisseService.GetSoldeCaisse(dateJour, "FC"), "FC")
                 lblSoldeCaisseUSD.Text = If(usdDisponible, FormaterSoldeUsd(_caisseService.GetSoldeCaisse(dateJour, "USD")), "USD non disponible")
+                ChargerCarteControleCaisse()
                 ' lblStatusCloture.Text = If(caisse.EstCloture, "Statut : Clôturé", "Statut : Ouvert")
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement caisse: " & ex.Message)
@@ -1265,6 +1262,154 @@ Namespace DevCommerc8ak
             layout.Controls.Add(ctrl, 1, rowIndex)
         End Sub
 
+        Private Function CreerCarteControleCaisse() As Panel
+            Dim card As New Panel() With {
+                .Width = 590,
+                .Height = 190,
+                .BackColor = ColorCardBg,
+                .Margin = New Padding(8),
+                .Padding = New Padding(16),
+                .MinimumSize = New Size(420, 185)
+            }
+            AddHandler card.Paint, Sub(s, ev) DessinerCarteBordureOmbre(s, ev, card)
+
+            Dim layout As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 5}
+            layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 52))
+            layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 48))
+            layout.RowStyles.Add(New RowStyle(SizeType.Absolute, 34))
+            layout.RowStyles.Add(New RowStyle(SizeType.Absolute, 44))
+            layout.RowStyles.Add(New RowStyle(SizeType.Absolute, 34))
+            layout.RowStyles.Add(New RowStyle(SizeType.Absolute, 34))
+            layout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+
+            Dim lblTitre As New Label() With {
+                .Text = "Contrôle de caisse physique",
+                .Dock = DockStyle.Fill,
+                .Font = FontButton,
+                .ForeColor = ColorTextPrimary,
+                .TextAlign = ContentAlignment.MiddleLeft
+            }
+            lblControleBadge = New Label() With {
+                .Text = "Comptage non effectué",
+                .Dock = DockStyle.Right,
+                .Width = 180,
+                .Height = 26,
+                .Font = FontLabel,
+                .BackColor = ColorWarning,
+                .ForeColor = Color.White,
+                .TextAlign = ContentAlignment.MiddleCenter
+            }
+
+            Dim lblSousTitre As New Label() With {
+                .Text = "Comparez le solde théorique avec le montant réellement compté.",
+                .Dock = DockStyle.Fill,
+                .Font = FontSubtitle,
+                .ForeColor = ColorTextSecondary,
+                .TextAlign = ContentAlignment.MiddleLeft
+            }
+            btnControleCaissePhysique = New Button() With {
+                .Text = "Effectuer le contrôle",
+                .Dock = DockStyle.Right,
+                .Width = 190,
+                .Height = 34,
+                .FlatStyle = FlatStyle.Flat,
+                .BackColor = ColorWarning,
+                .ForeColor = Color.White,
+                .Font = FontButton,
+                .Cursor = Cursors.Hand
+            }
+            btnControleCaissePhysique.FlatAppearance.BorderSize = 0
+            AddHandler btnControleCaissePhysique.Click, AddressOf OuvrirControleCaissePhysique
+
+            lblControleTheorique = CreerLibelleControle("Solde théorique : 0 FC")
+            lblControlePhysique = CreerLibelleControle("Montant physique : -")
+            lblControleEcart = CreerLibelleControle("Écart : -")
+            lblControleResponsable = CreerLibelleControle("Responsable : -")
+            lblControleHeure = CreerLibelleControle("Dernier comptage : -")
+
+            layout.Controls.Add(lblTitre, 0, 0)
+            layout.Controls.Add(lblControleBadge, 1, 0)
+            layout.Controls.Add(lblSousTitre, 0, 1)
+            layout.Controls.Add(btnControleCaissePhysique, 1, 1)
+            layout.Controls.Add(lblControleTheorique, 0, 2)
+            layout.Controls.Add(lblControlePhysique, 1, 2)
+            layout.Controls.Add(lblControleEcart, 0, 3)
+            layout.Controls.Add(lblControleResponsable, 1, 3)
+            layout.Controls.Add(lblControleHeure, 0, 4)
+            layout.SetColumnSpan(lblControleHeure, 2)
+            card.Controls.Add(layout)
+            Return card
+        End Function
+
+        Private Function CreerLibelleControle(texte As String) As Label
+            Return New Label() With {
+                .Text = texte,
+                .Dock = DockStyle.Fill,
+                .Font = FontLabel,
+                .ForeColor = ColorTextPrimary,
+                .TextAlign = ContentAlignment.MiddleLeft,
+                .AutoEllipsis = True
+            }
+        End Function
+
+        Private Sub ChargerCarteControleCaisse()
+            If pnlControleCaissePhysique Is Nothing OrElse pnlControleCaissePhysique.IsDisposed Then Return
+
+            Try
+                Dim dateJour As DateTime = DateTime.Now.Date
+                Dim soldeTheorique As Decimal = _caisseService.GetSoldeCaisse(dateJour, "FC")
+                Dim controle As DataRow = _caisseService.ObtenirControleCaisseDuJour(dateJour, SessionUtilisateur.UtilisateurId)
+
+                lblControleTheorique.Text = "Solde théorique : " & FormatMontant(soldeTheorique, "FC")
+                If controle Is Nothing Then
+                    AppliquerStatutControle("A_VERIFIER", "Comptage non effectué", ColorWarning, "Effectuer le contrôle")
+                    lblControlePhysique.Text = "Montant physique : -"
+                    lblControleEcart.Text = "Écart : -"
+                    lblControleEcart.ForeColor = ColorTextPrimary
+                    lblControleResponsable.Text = "Responsable : " & If(String.IsNullOrWhiteSpace(SessionUtilisateur.NomUtilisateur), "SYSTEM", SessionUtilisateur.NomUtilisateur)
+                    lblControleHeure.Text = "Dernier comptage : -"
+                    Return
+                End If
+
+                Dim statut As String = LireString(controle, "Statut")
+                Dim montantPhysique As Decimal? = LireDecimalNullable(controle, "MontantPhysiqueFC")
+                Dim ecart As Decimal? = LireDecimalNullable(controle, "EcartFC")
+                Dim validePar As String = LireString(controle, "ValidePar")
+                Dim valideLe As DateTime? = LireDateNullable(controle, "ValideLe")
+
+                lblControlePhysique.Text = "Montant physique : " & If(montantPhysique.HasValue, FormatMontant(montantPhysique.Value, "FC"), "-")
+                lblControleEcart.Text = "Écart : " & If(ecart.HasValue, FormatMontant(ecart.Value, "FC"), "-")
+                lblControleEcart.ForeColor = If(ecart.HasValue AndAlso ecart.Value < 0D, ColorDanger, If(ecart.HasValue AndAlso ecart.Value > 0D, ColorWarning, ColorSuccess))
+                lblControleResponsable.Text = "Responsable : " & If(String.IsNullOrWhiteSpace(validePar), LireString(controle, "NomUtilisateur"), validePar)
+                lblControleHeure.Text = "Dernier comptage : " & If(valideLe.HasValue, valideLe.Value.ToString("dd/MM/yyyy HH:mm"), "-")
+
+                Select Case statut.Trim().ToUpperInvariant()
+                    Case "CONFORME"
+                        AppliquerStatutControle(statut, "Caisse conforme", ColorSuccess, "Voir le détail")
+                    Case "MANQUANT"
+                        AppliquerStatutControle(statut, "Manquant constaté", ColorDanger, "Consulter / Régulariser")
+                    Case "SURPLUS"
+                        AppliquerStatutControle(statut, "Surplus constaté", ColorPrimary, "Consulter")
+                    Case Else
+                        AppliquerStatutControle(statut, "À vérifier", ColorWarning, "Compléter le comptage")
+                End Select
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("FormulaireFinance", "ChargerCarteControleCaisse", "Erreur lors de l'actualisation de la carte contrôle caisse.", ex)
+            End Try
+        End Sub
+
+        Private Sub AppliquerStatutControle(statut As String, texteBadge As String, couleur As Color, texteBouton As String)
+            If lblControleBadge IsNot Nothing Then
+                lblControleBadge.Text = texteBadge
+                lblControleBadge.BackColor = couleur
+            End If
+            If btnControleCaissePhysique IsNot Nothing Then
+                btnControleCaissePhysique.Text = texteBouton
+                btnControleCaissePhysique.BackColor = couleur
+            End If
+        End Sub
+
         Private Shared Function TryLireDecimal(texte As String, ByRef valeur As Decimal) As Boolean
             valeur = 0D
             If String.IsNullOrWhiteSpace(texte) Then
@@ -1272,6 +1417,36 @@ Namespace DevCommerc8ak
             End If
             Dim normalise As String = texte.Trim().Replace(" ", "").Replace(",", ".")
             Return Decimal.TryParse(normalise, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, valeur)
+        End Function
+
+        Private Shared Function LireString(row As DataRow, colonne As String) As String
+            If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains(colonne) OrElse row(colonne) Is DBNull.Value Then
+                Return String.Empty
+            End If
+            Return Convert.ToString(row(colonne)).Trim()
+        End Function
+
+        Private Shared Function LireDecimalNullable(row As DataRow, colonne As String) As Decimal?
+            If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains(colonne) OrElse row(colonne) Is DBNull.Value Then
+                Return Nothing
+            End If
+            Dim valeur As Decimal
+            Dim texte As String = Convert.ToString(row(colonne)).Trim().Replace(" ", "").Replace(",", ".")
+            If Decimal.TryParse(texte, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, valeur) Then
+                Return valeur
+            End If
+            Return Nothing
+        End Function
+
+        Private Shared Function LireDateNullable(row As DataRow, colonne As String) As DateTime?
+            If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains(colonne) OrElse row(colonne) Is DBNull.Value Then
+                Return Nothing
+            End If
+            Dim valeur As DateTime
+            If DateTime.TryParse(Convert.ToString(row(colonne)), valeur) Then
+                Return valeur
+            End If
+            Return Nothing
         End Function
 
         Private Sub ConfigurerGrilleDepenses()
@@ -1627,36 +1802,85 @@ Namespace DevCommerc8ak
         End Function
 
         Private Sub AfficherRepartitionDepenses(items As List(Of RepartitionDepenseItem))
-            chartDepensesCat.Series(0).Points.Clear()
-            chartDepensesCat.Series(0).IsVisibleInLegend = False
-            chartDepensesCat.Series(0).IsValueShownAsLabel = True
-            chartDepensesCat.Series(0).SmartLabelStyle.Enabled = True
-            chartDepensesCat.Series(0).SmartLabelStyle.AllowOutsidePlotArea = LabelOutsidePlotAreaStyle.Yes
-            chartDepensesCat.Series(0).SmartLabelStyle.CalloutLineColor = ColorTextSecondary
-            chartDepensesCat.Series(0).LabelForeColor = ColorTextPrimary
-            chartDepensesCat.Series(0)("PieLabelStyle") = "Outside"
-            If chartDepensesCat.ChartAreas.Count > 0 Then
-                chartDepensesCat.ChartAreas(0).Area3DStyle.Enable3D = False
+            If IsDisposed OrElse Disposing Then Return
+            If InvokeRequired Then
+                BeginInvoke(New MethodInvoker(Sub() AfficherRepartitionDepenses(items)))
+                Return
             End If
 
-            gridLegendeDepenses.Rows.Clear()
+            Try
+                Dim serie As Series = PreparerGraphiqueDepenses()
+                If serie Is Nothing Then Return
 
-            For i As Integer = 0 To items.Count - 1
-                Dim item As RepartitionDepenseItem = items(i)
-                Dim couleur As Color = ObtenirCouleurDepense(i)
-                Dim indexPoint As Integer = chartDepensesCat.Series(0).Points.AddXY(item.Categorie, item.Montant)
-                Dim point As DataPoint = chartDepensesCat.Series(0).Points(indexPoint)
-                point.Color = couleur
-                point.LegendText = item.Categorie
-                point.Label = item.Categorie & Environment.NewLine & item.Montant.ToString("N0") & " " & item.Devise
-                point.ToolTip = item.Categorie & " : " & item.Montant.ToString("N0") & " " & item.Devise & " (" & item.Pourcentage.ToString("N2") & "%)"
+                serie.Points.Clear()
+                gridLegendeDepenses.Rows.Clear()
+                chartDepensesCat.Titles.Clear()
+                chartDepensesCat.Titles.Add("Dépenses par Catégorie")
+                chartDepensesCat.Titles(0).Font = FontLabel
+                chartDepensesCat.Titles(0).ForeColor = ColorTextPrimary
 
-                Dim rowIndex As Integer = gridLegendeDepenses.Rows.Add("", item.Categorie, item.Montant.ToString("N0"), item.Devise, item.Pourcentage.ToString("N2") & "%")
-                gridLegendeDepenses.Rows(rowIndex).Cells("Couleur").Style.BackColor = couleur
-                gridLegendeDepenses.Rows(rowIndex).Cells("Couleur").Style.SelectionBackColor = couleur
-                gridLegendeDepenses.Rows(rowIndex).Cells("Couleur").Style.SelectionForeColor = couleur
-            Next
+                If items Is Nothing OrElse items.Count = 0 Then
+                    chartDepensesCat.Titles.Clear()
+                    chartDepensesCat.Titles.Add("Aucune dépense pour cette période")
+                    chartDepensesCat.Titles(0).Font = FontLabel
+                    chartDepensesCat.Titles(0).ForeColor = ColorTextSecondary
+                    Return
+                End If
+
+                For i As Integer = 0 To items.Count - 1
+                    Dim item As RepartitionDepenseItem = items(i)
+                    Dim couleur As Color = ObtenirCouleurDepense(i)
+                    Dim indexPoint As Integer = serie.Points.AddXY(item.Categorie, item.Montant)
+                    Dim point As DataPoint = serie.Points(indexPoint)
+                    point.Color = couleur
+                    point.LegendText = item.Categorie
+                    point.Label = item.Categorie & Environment.NewLine & item.Montant.ToString("N0") & " " & item.Devise
+                    point.ToolTip = item.Categorie & " : " & item.Montant.ToString("N0") & " " & item.Devise & " (" & item.Pourcentage.ToString("N2") & "%)"
+
+                    Dim rowIndex As Integer = gridLegendeDepenses.Rows.Add("", item.Categorie, item.Montant.ToString("N0"), item.Devise, item.Pourcentage.ToString("N2") & "%")
+                    gridLegendeDepenses.Rows(rowIndex).Cells("Couleur").Style.BackColor = couleur
+                    gridLegendeDepenses.Rows(rowIndex).Cells("Couleur").Style.SelectionBackColor = couleur
+                    gridLegendeDepenses.Rows(rowIndex).Cells("Couleur").Style.SelectionForeColor = couleur
+                Next
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("FormulaireFinance", "AfficherRepartitionDepenses", "Erreur inattendue lors de l'affichage du camembert dépenses.", ex)
+            End Try
         End Sub
+
+        Private Function PreparerGraphiqueDepenses() As Series
+            If chartDepensesCat Is Nothing OrElse chartDepensesCat.IsDisposed OrElse chartDepensesCat.Disposing Then Return Nothing
+            If gridLegendeDepenses Is Nothing OrElse gridLegendeDepenses.IsDisposed OrElse gridLegendeDepenses.Disposing Then Return Nothing
+
+            If chartDepensesCat.ChartAreas.Count = 0 Then
+                chartDepensesCat.ChartAreas.Add(New ChartArea("MainArea"))
+            End If
+
+            If chartDepensesCat.Legends.Count = 0 Then
+                chartDepensesCat.Legends.Add(New Legend("MainLegend"))
+            End If
+
+            Dim chartArea As ChartArea = chartDepensesCat.ChartAreas(0)
+            Dim legend As Legend = chartDepensesCat.Legends(0)
+            Dim serie As Series = chartDepensesCat.Series.FindByName("RepartitionDepenses")
+            If serie Is Nothing Then
+                serie = New Series("RepartitionDepenses")
+                chartDepensesCat.Series.Add(serie)
+            End If
+
+            serie.ChartType = SeriesChartType.Pie
+            serie.ChartArea = chartArea.Name
+            serie.Legend = legend.Name
+            serie.IsVisibleInLegend = False
+            serie.IsValueShownAsLabel = True
+            serie.SmartLabelStyle.Enabled = True
+            serie.SmartLabelStyle.AllowOutsidePlotArea = LabelOutsidePlotAreaStyle.Yes
+            serie.SmartLabelStyle.CalloutLineColor = ColorTextSecondary
+            serie.LabelForeColor = ColorTextPrimary
+            serie("PieLabelStyle") = "Outside"
+            chartArea.Area3DStyle.Enable3D = False
+            Return serie
+        End Function
 
         Private Function ObtenirCouleurDepense(index As Integer) As Color
             Dim palette As Color() = {
@@ -1850,6 +2074,7 @@ Namespace DevCommerc8ak
             RemoveHandler AppEvents.PaiementValide, AddressOf RafraichirDepuisEvenement
             RemoveHandler AppEvents.DepenseAjoutee, AddressOf RafraichirDepuisEvenement
             RemoveHandler AppEvents.CaisseModifiee, AddressOf RafraichirDepuisEvenement
+            RemoveHandler AppEvents.CaissePhysiqueModifiee, AddressOf RafraichirDepuisEvenement
             MyBase.OnFormClosed(e)
         End Sub
 

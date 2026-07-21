@@ -82,6 +82,7 @@ Namespace DevCommerc8ak
             AssurerInterface("CAISSE", "Caisse", False)
             AssurerInterface("FINANCE", "Finance", False)
             AssurerInterface("ADMINISTRATION", "Administration", False)
+            AssurerInterface("ANALYSE_CAISSE_PHYSIQUE", "Analyse caisse physique", False)
             AssurerInterface("STOCK_INVENTAIRE", "Stock / Inventaire", False)
             AssurerInterface("ANALYSE_VENTES", "Analyse ventes", False)
             AssurerInterface("INVENTAIRE", "Inventaire", False)
@@ -118,8 +119,10 @@ Namespace DevCommerc8ak
             AssurerRoleInterfacesSiVide("FACTURIER", New String() {"FACTURIER", "HISTORIQUE_FACTURES"})
             AssurerRoleInterfacesSiVide("CAISSIER", New String() {"CAISSE", "FINANCE"})
             AssurerRoleInterfacesSiVide("CAISSIERE", New String() {"CAISSE", "FINANCE"})
-            AssurerRoleInterfacesSiVide("ADMIN", New String() {"FACTURIER", "HISTORIQUE_FACTURES", "CAISSE", "FINANCE", "ADMINISTRATION", "STOCK_INVENTAIRE", "ANALYSE_VENTES", "INVENTAIRE", "PARAMETRES"})
-            AssurerRoleInterfacesSiVide("SUPERADMIN", New String() {"FACTURIER", "HISTORIQUE_FACTURES", "CAISSE", "FINANCE", "ADMINISTRATION", "STOCK_INVENTAIRE", "ANALYSE_VENTES", "INVENTAIRE", "PARAMETRES", "SUPERADMIN_TECH", "SUPERADMIN_STOCK_INITIAL", "SUPERADMIN_ROLES", "SUPERADMIN_AUDIT"})
+            AssurerRoleInterfacesSiVide("ADMIN", New String() {"FACTURIER", "HISTORIQUE_FACTURES", "CAISSE", "FINANCE", "ADMINISTRATION", "ANALYSE_CAISSE_PHYSIQUE", "STOCK_INVENTAIRE", "ANALYSE_VENTES", "INVENTAIRE", "PARAMETRES"})
+            AssurerRoleInterfacesSiVide("SUPERADMIN", New String() {"FACTURIER", "HISTORIQUE_FACTURES", "CAISSE", "FINANCE", "ADMINISTRATION", "ANALYSE_CAISSE_PHYSIQUE", "STOCK_INVENTAIRE", "ANALYSE_VENTES", "INVENTAIRE", "PARAMETRES", "SUPERADMIN_TECH", "SUPERADMIN_STOCK_INITIAL", "SUPERADMIN_ROLES", "SUPERADMIN_AUDIT"})
+            AssurerRoleInterfaces("ADMIN", New String() {"ANALYSE_CAISSE_PHYSIQUE"})
+            AssurerRoleInterfaces("SUPERADMIN", New String() {"ANALYSE_CAISSE_PHYSIQUE"})
         End Sub
 
         Private Sub AssurerRoleInterfacesSiVide(nomRole As String, codesInterfaces As IEnumerable(Of String))

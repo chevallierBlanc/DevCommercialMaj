@@ -80,6 +80,7 @@
     <Compile Include="DTOs\MouvementStockDTO.vb" />
     <Compile Include="DTOs\UtilisateurDTO.vb" />
     <Compile Include="DTOs\ApiDashboardDTOs.vb" />
+    <Compile Include="DTOs\AnalyseCaissePhysiqueDTOs.vb" />
     <Compile Include="DTOs\ParametreDTO.vb" />
     <Compile Include="DTOs\BonApprovisionnementDTO.vb" />
     <Compile Include="DTOs\TypeVenteDTO.vb" />
@@ -88,6 +89,7 @@
     <Compile Include="DTOs\NotificationDTO.vb" />
     <Compile Include="Repositories\ClientRepository.vb" />
     <Compile Include="Repositories\FinanceRepositories %284%29.vb" />
+    <Compile Include="Repositories\AnalyseCaissePhysiqueRepository.vb" />
     <Compile Include="Repositories\ProduitRepository.vb" />
     <Compile Include="Repositories\TypeVenteProduitRepository.vb" />
     <Compile Include="Repositories\FournisseurRepository.vb" />
@@ -112,6 +114,7 @@
     <Compile Include="Repositories\DepensesNonSynchroniseesRepository.vb" />
     <Compile Include="Services\ClientService.vb" />
     <Compile Include="Services\FinanceServices %284%29.vb" />
+    <Compile Include="Services\AnalyseCaissePhysiqueService.vb" />
     <Compile Include="Services\ProduitService.vb" />
     <Compile Include="Services\FournisseurService.vb" />
     <Compile Include="Services\FacturationService.vb" />
@@ -178,6 +181,9 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FormulairePaiements.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireAnalyseCaissePhysique.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FormulaireParametres.vb">

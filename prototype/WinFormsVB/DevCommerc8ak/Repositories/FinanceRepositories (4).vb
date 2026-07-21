@@ -161,6 +161,7 @@ Namespace DevCommerc8ak.Finance
         Public Sub New(dal As DAL)
             _dal = dal
             AssurerTableCloturesCaisse()
+            AssurerTableHistoriqueStatutClotureCaisse()
         End Sub
 
         Private Sub AssurerTableCloturesCaisse()
@@ -190,6 +191,20 @@ Namespace DevCommerc8ak.Finance
                 "ModifiePar NVARCHAR(80) NULL, " &
                 "EstCloturee BIT NOT NULL CONSTRAINT DF_CloturesCaisse_EstCloturee DEFAULT(0)); " &
                 "CREATE UNIQUE INDEX UX_CloturesCaisse_Date_Utilisateur ON dbo.CloturesCaisse(DateCaisse, UtilisateurId) WHERE UtilisateurId IS NOT NULL; " &
+                "END"
+            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+        End Sub
+
+        Private Sub AssurerTableHistoriqueStatutClotureCaisse()
+            Dim sql As String =
+                "IF OBJECT_ID('dbo.HistoriqueStatutClotureCaisse', 'U') IS NULL " &
+                "BEGIN " &
+                "CREATE TABLE dbo.HistoriqueStatutClotureCaisse (" &
+                "HistoriqueStatutId INT IDENTITY(1,1) PRIMARY KEY, " &
+                "ClotureCaisseId INT NOT NULL, AncienStatut NVARCHAR(30) NULL, NouveauStatut NVARCHAR(30) NOT NULL, " &
+                "MontantEcartAvant DECIMAL(18,2) NULL, MontantRegularise DECIMAL(18,2) NULL, MontantRestant DECIMAL(18,2) NULL, " &
+                "Motif NVARCHAR(250) NULL, Observation NVARCHAR(500) NULL, UtilisateurResponsableId INT NULL, NomUtilisateurResponsable NVARCHAR(80) NULL, RoleResponsable NVARCHAR(80) NULL, " &
+                "ModifieParUtilisateurId INT NULL, ModifiePar NVARCHAR(80) NULL, RoleModificateur NVARCHAR(80) NULL, ModifieLe DATETIME2 NOT NULL DEFAULT(GETDATE()), Reference NVARCHAR(100) NULL); " &
                 "END"
             _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
         End Sub
@@ -244,6 +259,7 @@ Namespace DevCommerc8ak.Finance
 
         Public Sub EnregistrerComptagePhysique(dateCaisse As DateTime, utilisateurId As Integer, nomUtilisateur As String, roleSession As String, soldeTheoriqueFc As Decimal, montantPhysiqueFc As Decimal, motif As String, observation As String)
             AssurerTableCloturesCaisse()
+            AssurerTableHistoriqueStatutClotureCaisse()
             Dim ecartFc As Decimal = montantPhysiqueFc - soldeTheoriqueFc
             Dim statut As String = "CONFORME"
             If ecartFc < 0D Then
@@ -286,6 +302,24 @@ Namespace DevCommerc8ak.Finance
                             cmd.ExecuteNonQuery()
                         End Using
 
+                        Using cmdHist As New SqlCommand("" &
+                            "INSERT INTO dbo.HistoriqueStatutClotureCaisse (ClotureCaisseId, AncienStatut, NouveauStatut, MontantEcartAvant, MontantRegularise, MontantRestant, Motif, Observation, UtilisateurResponsableId, NomUtilisateurResponsable, RoleResponsable, ModifieParUtilisateurId, ModifiePar, RoleModificateur, Reference) " &
+                            "SELECT TOP 1 ClotureCaisseId, NULL, @Statut, @EcartFC, 0, ABS(@EcartFC), @MotifEcart, @Observation, @UtilisateurId, @NomUtilisateur, @RoleSession, @ModifieParUtilisateurId, @ModifiePar, @RoleModificateur, 'COMPTAGE_PHYSIQUE' " &
+                            "FROM dbo.CloturesCaisse WHERE DateCaisse=@DateCaisse AND UtilisateurId=@UtilisateurId ORDER BY ISNULL(ValideLe, CreeLe) DESC", cn, tx)
+                            cmdHist.Parameters.AddWithValue("@Statut", statut)
+                            cmdHist.Parameters.AddWithValue("@EcartFC", ecartFc)
+                            cmdHist.Parameters.AddWithValue("@MotifEcart", If(String.IsNullOrWhiteSpace(motif), CType(DBNull.Value, Object), motif.Trim()))
+                            cmdHist.Parameters.AddWithValue("@Observation", If(String.IsNullOrWhiteSpace(observation), CType(DBNull.Value, Object), observation.Trim()))
+                            cmdHist.Parameters.AddWithValue("@UtilisateurId", utilisateurId)
+                            cmdHist.Parameters.AddWithValue("@NomUtilisateur", If(String.IsNullOrWhiteSpace(nomUtilisateur), CType(DBNull.Value, Object), nomUtilisateur.Trim()))
+                            cmdHist.Parameters.AddWithValue("@RoleSession", If(String.IsNullOrWhiteSpace(roleSession), CType(DBNull.Value, Object), roleSession.Trim()))
+                            cmdHist.Parameters.AddWithValue("@ModifieParUtilisateurId", If(SessionUtilisateur.UtilisateurId > 0, CType(SessionUtilisateur.UtilisateurId, Object), DBNull.Value))
+                            cmdHist.Parameters.AddWithValue("@ModifiePar", If(String.IsNullOrWhiteSpace(SessionUtilisateur.NomUtilisateur), CType(DBNull.Value, Object), SessionUtilisateur.NomUtilisateur.Trim()))
+                            cmdHist.Parameters.AddWithValue("@RoleModificateur", If(String.IsNullOrWhiteSpace(SessionUtilisateur.Role), CType(DBNull.Value, Object), SessionUtilisateur.Role.Trim()))
+                            cmdHist.Parameters.AddWithValue("@DateCaisse", dateCaisse.Date)
+                            cmdHist.ExecuteNonQuery()
+                        End Using
+
                         tx.Commit()
                     Catch
                         tx.Rollback()
@@ -294,6 +328,26 @@ Namespace DevCommerc8ak.Finance
                 End Using
             End Using
         End Sub
+
+        Public Function ObtenirControleCaisse(dateCaisse As DateTime, utilisateurId As Integer) As DataRow
+            AssurerTableCloturesCaisse()
+            Dim sql As String =
+                "SELECT TOP 1 ClotureCaisseId, DateCaisse, UtilisateurId, NomUtilisateur, RoleSession, " &
+                "SoldeTheoriqueFC, MontantPhysiqueFC, EcartFC, MotifEcart, Observation, Statut, " &
+                "ValidePar, ValideLe, CreeLe, ModifieLe, ModifiePar, EstCloturee " &
+                "FROM dbo.CloturesCaisse " &
+                "WHERE DateCaisse=@DateCaisse AND ((@UtilisateurId > 0 AND UtilisateurId=@UtilisateurId) OR (@UtilisateurId <= 0 AND UtilisateurId IS NULL)) " &
+                "ORDER BY ISNULL(ValideLe, CreeLe) DESC"
+            Dim params As New List(Of SqlParameter) From {
+                New SqlParameter("@DateCaisse", dateCaisse.Date),
+                New SqlParameter("@UtilisateurId", utilisateurId)
+            }
+            Dim dt As DataTable = _dal.ExecuterTable(sql, CommandType.Text, params)
+            If dt Is Nothing OrElse dt.Rows.Count = 0 Then
+                Return Nothing
+            End If
+            Return dt.Rows(0)
+        End Function
 
         Private Function ObtenirTauxUsdActuel() As Decimal?
             Dim sql As String = "SELECT TOP 1 TauxUsd FROM Parametres WHERE TauxUsd IS NOT NULL AND TauxUsd > 0"
