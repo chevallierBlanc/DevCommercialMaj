@@ -690,6 +690,8 @@ Namespace DevCommerc8ak
         ' --- Logique Métier (Inchangée) ---
 
         Private Sub LoadForm(f As Form)
+            Dim sw As System.Diagnostics.Stopwatch = System.Diagnostics.Stopwatch.StartNew()
+            Dim nomFormulaire As String = If(f Is Nothing, String.Empty, f.GetType().Name)
             If f Is Nothing Then Return
             If panelContent Is Nothing Then Return
             If panelContent.Controls.Count = 1 Then
@@ -730,6 +732,11 @@ Namespace DevCommerc8ak
             AjusterFormulaireCharge()
             f.Show()
             panelContent.ResumeLayout(True)
+            sw.Stop()
+            If sw.ElapsedMilliseconds > 1000 Then
+                Dim log As New ProductionLogService()
+                log.Info("MainForm", "LoadForm", "Ouverture formulaire " & nomFormulaire & " en " & sw.ElapsedMilliseconds.ToString() & " ms.")
+            End If
         End Sub
 
         Private Sub PanelContent_Resize(sender As Object, e As EventArgs)

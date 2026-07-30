@@ -18,30 +18,37 @@ Namespace DevCommerc8ak
         Public Event CaissePhysiqueModifiee As EventHandler
 
         Public Sub OnVenteCreee()
+            AppDataVersionService.Touch("FACTURES")
             RaiseEvent VenteCreee(Nothing, EventArgs.Empty)
         End Sub
 
         Public Sub OnVenteValidee()
+            AppDataVersionService.Touch("FACTURES", "STOCK")
             RaiseEvent VenteValidee(Nothing, EventArgs.Empty)
         End Sub
 
         Public Sub OnPaiementValide()
+            AppDataVersionService.Touch("PAIEMENTS", "FACTURES", "FINANCE")
             RaiseEvent PaiementValide(Nothing, EventArgs.Empty)
         End Sub
 
         Public Sub OnStockModifie()
+            AppDataVersionService.Touch("STOCK")
             RaiseEvent StockModifie(Nothing, EventArgs.Empty)
         End Sub
 
         Public Sub OnProduitModifie()
+            AppDataVersionService.Touch("PRODUITS", "TYPES_VENTE")
             RaiseEvent ProduitModifie(Nothing, EventArgs.Empty)
         End Sub
 
         Public Sub OnDepenseAjoutee()
+            AppDataVersionService.Touch("FINANCE")
             RaiseEvent DepenseAjoutee(Nothing, EventArgs.Empty)
         End Sub
 
         Public Sub OnCaisseModifiee()
+            AppDataVersionService.Touch("FINANCE")
             RaiseEvent CaisseModifiee(Nothing, EventArgs.Empty)
         End Sub
 
@@ -58,6 +65,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Public Sub OnCaissePhysiqueModifiee()
+            AppDataVersionService.Touch("FINANCE")
             RaiseEvent CaissePhysiqueModifiee(Nothing, EventArgs.Empty)
         End Sub
     End Module

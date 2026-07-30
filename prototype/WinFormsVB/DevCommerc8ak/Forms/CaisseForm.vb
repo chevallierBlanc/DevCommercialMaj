@@ -52,6 +52,8 @@ Namespace DevCommerc8ak
         Private _totalCourant As Decimal
         Private _dernierTicket As TicketData
         Private _isRefreshingFromEvent As Boolean
+        Private _dataMonitor As DataChangeMonitorService
+        Private _impressionDepuisApercuEnCours As Boolean
 
         Private Class TicketData
             Public Property Numero As String
@@ -307,6 +309,9 @@ Namespace DevCommerc8ak
             AddHandler AppEvents.VenteValidee, AddressOf RafraichirFacturesDepuisEvenement
             AddHandler AppEvents.PaiementValide, AddressOf RafraichirFacturesDepuisEvenement
             AddHandler AppEvents.DataChanged, AddressOf RafraichirFacturesDepuisEvenement
+            _dataMonitor = New DataChangeMonitorService(New String() {"FACTURES", "PAIEMENTS"}, 3000)
+            AddHandler _dataMonitor.DomaineModifie, AddressOf RafraichirFacturesDepuisVersionSql
+            _dataMonitor.Start()
         End Sub
         Protected Overrides Sub OnKeyDown(e As KeyEventArgs)
             MyBase.OnKeyDown(e)
@@ -424,6 +429,19 @@ Namespace DevCommerc8ak
                 log.Error("CaisseForm", "RafraichirFacturesDepuisEvenement", "Erreur lors du rafraichissement automatique des factures caisse.", ex)
             Finally
                 _isRefreshingFromEvent = False
+            End Try
+        End Sub
+
+        Private Sub RafraichirFacturesDepuisVersionSql(sender As Object, e As DataChangeEventArgs)
+            If IsDisposed OrElse Disposing OrElse Not IsHandleCreated Then Return
+            Try
+                BeginInvoke(New MethodInvoker(Sub()
+                    If IsDisposed OrElse Disposing Then Return
+                    RafraichirFacturesDepuisEvenement(Nothing, EventArgs.Empty)
+                End Sub))
+            Catch ex As ObjectDisposedException
+                Dim log As New ProductionLogService()
+                log.Warn("CaisseForm", "RafraichirFacturesDepuisVersionSql", "Formulaire fermé avant rafraîchissement multi-postes : " & ex.Message)
             End Try
         End Sub
 
@@ -698,9 +716,18 @@ Namespace DevCommerc8ak
                     If eArgs.KeyCode = Keys.Enter Then
                         eArgs.Handled = True
                         eArgs.SuppressKeyPress = True
+                        If _impressionDepuisApercuEnCours Then
+                            Return
+                        End If
+
+                        _impressionDepuisApercuEnCours = True
                         Dim docImpression As Printing.PrintDocument = CreerDocumentTicket(ticket, totalCopies)
-                        docImpression.Print()
-                        preview.Close()
+                        Try
+                            docImpression.Print()
+                            preview.Close()
+                        Finally
+                            _impressionDepuisApercuEnCours = False
+                        End Try
                     ElseIf eArgs.KeyCode = Keys.Escape Then
                         eArgs.Handled = True
                         eArgs.SuppressKeyPress = True
@@ -723,11 +750,16 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub ImprimerPageTicket(e As Printing.PrintPageEventArgs, ticket As TicketData, copieCourante As Integer, totalCopies As Integer)
-            Dim largeurUtile As Integer = Math.Min(300, Math.Max(180, e.MarginBounds.Width))
-            Dim gauche As Integer = e.MarginBounds.Left + Math.Max(0, (e.MarginBounds.Width - largeurUtile) \ 2)
-            Dim largeurDisponible As Integer = largeurUtile
-            Dim droite As Integer = gauche + largeurDisponible
-            Dim y As Integer = e.MarginBounds.Top + 2
+            Dim margeInterne As Integer = Math.Max(4, CInt(Math.Round(e.Graphics.DpiX * 3D / 25.4D)))
+            Dim gauche As Integer = e.MarginBounds.Left + margeInterne
+            Dim droite As Integer = e.MarginBounds.Right - margeInterne
+            If droite <= gauche Then
+                gauche = e.MarginBounds.Left
+                droite = e.MarginBounds.Right
+            End If
+
+            Dim largeurDisponible As Integer = Math.Max(180, droite - gauche)
+            Dim y As Integer = e.MarginBounds.Top + 1
             Dim fontTitre As New Font("Segoe UI", 10, FontStyle.Bold)
             Dim fontSection As New Font("Segoe UI", 7.5F, FontStyle.Bold)
             Dim fontLigne As New Font("Segoe UI", 7.5F)
@@ -740,7 +772,7 @@ Namespace DevCommerc8ak
                     Dim ratio As Decimal = If(image.Height <= 0, 1D, CDec(image.Width) / CDec(image.Height))
                     Dim hauteurLogo As Integer = 50
                     Dim largeurLogo As Integer = CInt(Math.Min(90D, hauteurLogo * CDbl(ratio)))
-                    Dim xLogo As Integer = e.MarginBounds.Left + ((e.MarginBounds.Width - largeurLogo) \ 2)
+                    Dim xLogo As Integer = gauche + ((largeurDisponible - largeurLogo) \ 2)
                     e.Graphics.DrawImage(image, xLogo, y, largeurLogo, hauteurLogo)
                     y += hauteurLogo + 4
                 End Using
@@ -767,21 +799,21 @@ Namespace DevCommerc8ak
             If ticket.Lignes IsNot Nothing Then
                 For Each row As DataRow In ticket.Lignes.Rows
                     Dim libelle As String = Convert.ToString(row("Libelle"))
-                    Dim qte As Decimal = Convert.ToDecimal(row("QuantiteSaisie"))
-                    Dim unite As String = Convert.ToString(row("TypeVente"))
-                    Dim prix As Decimal = Convert.ToDecimal(row("PrixUnitaire"))
-                    Dim total As Decimal = Convert.ToDecimal(row("MontantLigne"))
+                    Dim qte As Decimal = SafeDecimalTicket(row, "QuantiteSaisie")
+                    Dim prix As Decimal = SafeDecimalTicket(row, "PrixUnitaire")
+                    Dim total As Decimal = SafeDecimalTicket(row, "MontantLigne")
+                    Dim libelleType As String = GetLibelleTypeVentePourTicket(row, qte)
 
                     y = DessinerTexteGauche(e.Graphics, libelle, fontSection, gauche, largeurDisponible, y)
-                    y = DessinerBlocTicket(e.Graphics, qte.ToString("N0") & " x " & prix.ToString("N0") & " (" & unite & ")", total.ToString("N0") & " FC", fontLigne, gauche + 4, droite, y)
+                    y = DessinerLigneArticleTicket(e.Graphics, FormaterQuantiteTicket(qte) & " " & libelleType & " (" & FormatMontantTicket(prix) & ")", FormatMontantTicket(total), fontLigne, gauche + 4, droite, y)
                 Next
             End If
 
             y = DessinerSeparateurTicket(e.Graphics, fontLigne, gauche, y, largeurDisponible)
-            y = DessinerBlocTicket(e.Graphics, "Sous-total", ticket.Total.ToString("N0") & " FC", fontLigne, gauche, droite, y)
-            y = DessinerBlocTicket(e.Graphics, "Montant à payer", ticket.Total.ToString("N0") & " FC", fontTotal, gauche, droite, y)
-            y = DessinerBlocTicket(e.Graphics, "Montant reçu", ticket.MontantRecu.ToString("N0") & " " & ticket.Devise, fontLigne, gauche, droite, y)
-            y = DessinerBlocTicket(e.Graphics, "Monnaie rendue", ticket.Monnaie.ToString("N0") & " FC", fontLigne, gauche, droite, y)
+            y = DessinerBlocTicket(e.Graphics, "Sous-total", FormatMontantTicket(ticket.Total), fontLigne, gauche, droite, y)
+            y = DessinerBlocTicket(e.Graphics, "Montant à payer", FormatMontantTicket(ticket.Total), fontTotal, gauche, droite, y)
+            y = DessinerBlocTicket(e.Graphics, "Montant reçu", FormaterMontantTicket(ticket.MontantRecu, ticket.Devise), fontLigne, gauche, droite, y)
+            y = DessinerBlocTicket(e.Graphics, "Monnaie rendue", FormatMontantTicket(ticket.Monnaie), fontLigne, gauche, droite, y)
             y = DessinerBlocTicket(e.Graphics, "Mode paiement", ticket.ModePaiement, fontLigne, gauche, droite, y)
             If Not String.IsNullOrWhiteSpace(ticket.ReferencePaiement) Then
                 y = DessinerBlocTicket(e.Graphics, "Référence", ticket.ReferencePaiement, fontLigne, gauche, droite, y)
@@ -793,7 +825,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Function DessinerSeparateurTicket(graphics As Graphics, font As Font, x As Integer, y As Integer, largeur As Integer) As Integer
-            graphics.DrawLine(Pens.Black, x, y + 3, x + largeur, y + 3)
+            graphics.DrawLine(Pens.Black, x, y + 3, x + largeur - 1, y + 3)
             Return y + CInt(Math.Ceiling(font.GetHeight(graphics))) + 2
         End Function
 
@@ -811,6 +843,22 @@ Namespace DevCommerc8ak
                 formatValeur.Alignment = StringAlignment.Far
                 graphics.DrawString(If(valeur, String.Empty), font, Brushes.Black, New RectangleF(xValeur, y, largeurValeur, hauteur), formatValeur)
             End Using
+            Return y + hauteur
+        End Function
+
+        Private Function DessinerLigneArticleTicket(graphics As Graphics, detail As String, montant As String, font As Font, xGauche As Integer, xDroite As Integer, y As Integer) As Integer
+            Dim largeurTotale As Integer = Math.Max(120, xDroite - xGauche)
+            Dim largeurMontant As Integer = Math.Min(CInt(largeurTotale * 0.45R), Math.Max(70, CInt(Math.Ceiling(graphics.MeasureString(If(montant, String.Empty), font).Width)) + 8))
+            Dim largeurDetail As Integer = Math.Max(60, largeurTotale - largeurMontant - 6)
+            Dim tailleDetail As SizeF = graphics.MeasureString(If(detail, String.Empty), font, New SizeF(largeurDetail, 1000))
+            Dim hauteur As Integer = Math.Max(CInt(Math.Ceiling(tailleDetail.Height)), CInt(Math.Ceiling(font.GetHeight(graphics)))) + 3
+
+            graphics.DrawString(If(detail, String.Empty), font, Brushes.Black, New RectangleF(xGauche, y, largeurDetail, hauteur))
+            Using formatMontant As New StringFormat()
+                formatMontant.Alignment = StringAlignment.Far
+                graphics.DrawString(If(montant, String.Empty), font, Brushes.Black, New RectangleF(xDroite - largeurMontant, y, largeurMontant, hauteur), formatMontant)
+            End Using
+
             Return y + hauteur
         End Function
 
@@ -834,6 +882,109 @@ Namespace DevCommerc8ak
             Dim taille As SizeF = graphics.MeasureString(texte, font, layout)
             graphics.DrawString(texte, font, Brushes.Black, New RectangleF(x, y, largeur, taille.Height))
             Return y + CInt(Math.Ceiling(taille.Height)) + 2
+        End Function
+
+        Private Shared Function SafeDecimalTicket(row As DataRow, colonne As String) As Decimal
+            If row Is Nothing OrElse String.IsNullOrWhiteSpace(colonne) OrElse Not row.Table.Columns.Contains(colonne) OrElse row.IsNull(colonne) Then
+                Return 0D
+            End If
+
+            Dim valeur As Object = row(colonne)
+            If TypeOf valeur Is Decimal Then
+                Return DirectCast(valeur, Decimal)
+            End If
+
+            Dim texte As String = Convert.ToString(valeur).Trim().Replace(" ", String.Empty).Replace(","c, "."c)
+            Dim resultat As Decimal
+            If Decimal.TryParse(texte, Globalization.NumberStyles.Any, Globalization.CultureInfo.InvariantCulture, resultat) Then
+                Return resultat
+            End If
+
+            Return 0D
+        End Function
+
+        Private Shared Function SafeStringTicket(row As DataRow, colonne As String) As String
+            If row Is Nothing OrElse String.IsNullOrWhiteSpace(colonne) OrElse Not row.Table.Columns.Contains(colonne) OrElse row.IsNull(colonne) Then
+                Return String.Empty
+            End If
+
+            Return Convert.ToString(row(colonne)).Trim()
+        End Function
+
+        Private Shared Function FormatMontantTicket(montant As Decimal) As String
+            Return FormaterMontantTicket(montant, "FC")
+        End Function
+
+        Private Shared Function FormaterMontantTicket(montant As Decimal, devise As String) As String
+            Dim deviseAffichee As String = If(String.IsNullOrWhiteSpace(devise), "FC", devise.Trim())
+            Return montant.ToString("#,##0", Globalization.CultureInfo.GetCultureInfo("fr-FR")) & " " & deviseAffichee
+        End Function
+
+        Private Shared Function FormaterQuantiteTicket(quantite As Decimal) As String
+            If Decimal.Truncate(quantite) = quantite Then
+                Return quantite.ToString("N0", Globalization.CultureInfo.GetCultureInfo("fr-FR"))
+            End If
+
+            Return quantite.ToString("N2", Globalization.CultureInfo.GetCultureInfo("fr-FR")).TrimEnd("0"c).TrimEnd(","c)
+        End Function
+
+        Private Shared Function GetLibelleTypeVentePourTicket(row As DataRow, quantiteSaisie As Decimal) As String
+            Dim typeVente As String = SafeStringTicket(row, "TypeVente")
+            Dim unitePrincipale As String = SafeStringTicket(row, "UnitePrincipale")
+            Dim uniteSecondaire As String = SafeStringTicket(row, "UniteSecondaire")
+            Dim typeNormalise As String = typeVente.Trim().ToUpperInvariant()
+
+            If String.IsNullOrWhiteSpace(unitePrincipale) Then
+                unitePrincipale = "unité"
+            End If
+            If String.IsNullOrWhiteSpace(uniteSecondaire) Then
+                uniteSecondaire = "pièce"
+            End If
+
+            Select Case typeNormalise
+                Case "GROS"
+                    Return PluraliserUnite(unitePrincipale, quantiteSaisie)
+                Case "DETAIL", "DÉTAIL", "PIECE", "PIÈCE", "UNITE", "UNITÉ"
+                    Return PluraliserUnite(uniteSecondaire, quantiteSaisie)
+                Case "DEMI"
+                    Return PluraliserExpression("demi-" & unitePrincipale.ToLowerInvariant(), quantiteSaisie)
+                Case "QUART"
+                    Return PluraliserExpression("quart de " & unitePrincipale.ToLowerInvariant(), quantiteSaisie)
+                Case "DOUZAINE"
+                    Return PluraliserUnite("douzaine", quantiteSaisie)
+                Case Else
+                    If String.IsNullOrWhiteSpace(typeVente) Then
+                        Return PluraliserUnite(uniteSecondaire, quantiteSaisie)
+                    End If
+                    Return PluraliserExpression(typeVente, quantiteSaisie)
+            End Select
+        End Function
+
+        Private Shared Function PluraliserUnite(unite As String, quantite As Decimal) As String
+            Dim texte As String = If(String.IsNullOrWhiteSpace(unite), "unité", unite.Trim())
+            If Math.Abs(quantite - 1D) < 0.0001D Then
+                Return texte.ToLowerInvariant()
+            End If
+
+            Dim lower As String = texte.ToLowerInvariant()
+            If lower.EndsWith("s", StringComparison.OrdinalIgnoreCase) OrElse lower.EndsWith("x", StringComparison.OrdinalIgnoreCase) Then
+                Return lower
+            End If
+
+            Return lower & "s"
+        End Function
+
+        Private Shared Function PluraliserExpression(expression As String, quantite As Decimal) As String
+            Dim texte As String = If(String.IsNullOrWhiteSpace(expression), "unité", expression.Trim())
+            If Math.Abs(quantite - 1D) < 0.0001D Then
+                Return texte
+            End If
+
+            If texte.EndsWith("s", StringComparison.OrdinalIgnoreCase) OrElse texte.EndsWith("x", StringComparison.OrdinalIgnoreCase) Then
+                Return texte
+            End If
+
+            Return texte & "s"
         End Function
 
         Private Function HasFactureSelectionValide() As Boolean
@@ -914,6 +1065,7 @@ Namespace DevCommerc8ak
                 Dim dal As New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)
                 Dim repo As New FactureVenteRepository(dal)
                 repo.MettreAJourStatut(factureId, "ANNULEE")
+                AppDataVersionService.Touch("FACTURES")
                 AppEvents.OnDataChanged()
 
                 Dim log As New ProductionLogService()
@@ -933,6 +1085,11 @@ Namespace DevCommerc8ak
             RemoveHandler AppEvents.VenteValidee, AddressOf RafraichirFacturesDepuisEvenement
             RemoveHandler AppEvents.PaiementValide, AddressOf RafraichirFacturesDepuisEvenement
             RemoveHandler AppEvents.DataChanged, AddressOf RafraichirFacturesDepuisEvenement
+            If _dataMonitor IsNot Nothing Then
+                RemoveHandler _dataMonitor.DomaineModifie, AddressOf RafraichirFacturesDepuisVersionSql
+                _dataMonitor.Dispose()
+                _dataMonitor = Nothing
+            End If
             MyBase.OnFormClosed(e)
         End Sub
     End Class

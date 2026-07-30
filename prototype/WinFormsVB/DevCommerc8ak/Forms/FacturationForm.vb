@@ -70,6 +70,8 @@ Namespace DevCommerc8ak
         Private _typesVenteCourants As List(Of TypeVenteDTO) 'nouveau
         Private _factureEnEditionId As Integer?
         Private _isRefreshingFromEvent As Boolean
+        Private _suppressSelectionEvents As Boolean
+        Private _dataMonitor As DataChangeMonitorService
         Private _normalisationTelephoneEnCours As Boolean
         Private ReadOnly _prefixesTelephoneRdc As String() = {"081", "082", "083", "084", "085", "089", "097", "098", "099"}
 
@@ -381,6 +383,9 @@ Namespace DevCommerc8ak
             MettreAJourBoutonsPanier()
             AddHandler AppEvents.ProduitModifie, AddressOf RafraichirProduitsDepuisEvenement
             AddHandler AppEvents.StockModifie, AddressOf RafraichirProduitsDepuisEvenement
+            _dataMonitor = New DataChangeMonitorService(New String() {"PRODUITS", "STOCK", "TYPES_VENTE"}, 5000)
+            AddHandler _dataMonitor.DomaineModifie, AddressOf RafraichirProduitsDepuisVersionSql
+            _dataMonitor.Start()
         End Sub
 
         Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
@@ -516,12 +521,17 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub RechargerProduits(sender As Object, e As EventArgs)
-            ChargerProduits()
-            FiltrerProduits(Nothing, EventArgs.Empty)
+            _suppressSelectionEvents = True
+            Try
+                ChargerProduits()
+                FiltrerProduits(Nothing, EventArgs.Empty)
+            Finally
+                _suppressSelectionEvents = False
+            End Try
         End Sub
 
         Private Sub RafraichirProduitsDepuisEvenement(sender As Object, e As EventArgs)
-            If IsDisposed Then Return
+            If IsDisposed OrElse Disposing Then Return
             If InvokeRequired Then
                 BeginInvoke(New MethodInvoker(Sub() RafraichirProduitsDepuisEvenement(Nothing, EventArgs.Empty)))
                 Return
@@ -557,6 +567,19 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
+        Private Sub RafraichirProduitsDepuisVersionSql(sender As Object, e As DataChangeEventArgs)
+            If IsDisposed OrElse Disposing OrElse Not IsHandleCreated Then Return
+            Try
+                BeginInvoke(New MethodInvoker(Sub()
+                    If IsDisposed OrElse Disposing Then Return
+                    RafraichirProduitsDepuisEvenement(Nothing, EventArgs.Empty)
+                End Sub))
+            Catch ex As ObjectDisposedException
+                Dim log As New ProductionLogService()
+                log.Warn("FacturationForm", "RafraichirProduitsDepuisVersionSql", "Formulaire fermé avant rafraîchissement multi-postes : " & ex.Message)
+            End Try
+        End Sub
+
         Private Sub FiltrerProduits(sender As Object, e As EventArgs)
             If _produitsView Is Nothing Then Return
             Dim q As String = txtRecherche.Text.Trim().Replace("'", "''")
@@ -568,20 +591,22 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub ChargerUnites(sender As Object, e As EventArgs)
-            If gridProduits.CurrentRow Is Nothing Then Return
-            Dim produitId As Integer = Convert.ToInt32(gridProduits.CurrentRow.Cells(0).Value)
-            Dim nbUnites As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(19).Value)
-            Dim prixAchat As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(4).Value)
-            Dim prixGros As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(8).Value)
-            Dim prixDemi As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(5).Value)
-            Dim prixDetail As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(3).Value)
-            Dim prixQuart As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(6).Value)
-            Dim prixDouzaine As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(7).Value)
-            Dim prixSpecial As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(9).Value)
-            Dim venteDetail As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells(20).Value)
-            Dim venteDemi As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells(21).Value)
-            Dim venteDouzaine As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells(22).Value)
-            Dim venteGros As Boolean = Convert.ToBoolean(gridProduits.CurrentRow.Cells(23).Value)
+            If _suppressSelectionEvents OrElse gridProduits.CurrentRow Is Nothing Then Return
+            Dim produitId As Integer = SafeInteger(CellValueByProperty(gridProduits.CurrentRow, "ProduitId"))
+            If produitId <= 0 Then Return
+
+            Dim nbUnites As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "ConversionUnite"))
+            Dim prixAchat As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "PrixAchat"))
+            Dim prixGros As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "PrixGros"))
+            Dim prixDemi As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "PrixDemi"))
+            Dim prixDetail As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "PrixDetail"))
+            Dim prixQuart As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "PrixQuart"))
+            Dim prixDouzaine As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "PrixDouzaine"))
+            Dim prixSpecial As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "PrixSpecial"))
+            Dim venteDetail As Boolean = SafeBoolean(CellValueByProperty(gridProduits.CurrentRow, "VenteDetail"))
+            Dim venteDemi As Boolean = SafeBoolean(CellValueByProperty(gridProduits.CurrentRow, "VenteDemi"))
+            Dim venteDouzaine As Boolean = SafeBoolean(CellValueByProperty(gridProduits.CurrentRow, "VenteDouzaine"))
+            Dim venteGros As Boolean = SafeBoolean(CellValueByProperty(gridProduits.CurrentRow, "VenteGros"))
             Dim typesPersonnalisesActifs As List(Of TypeVenteProduitDTO) = _typeVenteProduitService.ListerParProduit(produitId, True)
 
 
@@ -616,6 +641,34 @@ Namespace DevCommerc8ak
             End If
 
             Return 0D
+        End Function
+
+        Private Function SafeInteger(value As Object) As Integer
+            If value Is Nothing OrElse value Is DBNull.Value Then
+                Return 0
+            End If
+
+            Dim nombre As Integer
+            If Integer.TryParse(Convert.ToString(value).Trim(), nombre) Then
+                Return nombre
+            End If
+
+            Return 0
+        End Function
+
+        Private Function CellValueByProperty(row As DataGridViewRow, propertyName As String) As Object
+            If row Is Nothing OrElse row.DataGridView Is Nothing OrElse String.IsNullOrWhiteSpace(propertyName) Then
+                Return Nothing
+            End If
+
+            For Each column As DataGridViewColumn In row.DataGridView.Columns
+                If String.Equals(column.DataPropertyName, propertyName, StringComparison.OrdinalIgnoreCase) OrElse
+                   String.Equals(column.Name, propertyName, StringComparison.OrdinalIgnoreCase) Then
+                    Return row.Cells(column.Index).Value
+                End If
+            Next
+
+            Return Nothing
         End Function
 
         Private Function SafeBoolean(value As Object) As Boolean
@@ -1024,6 +1077,7 @@ Namespace DevCommerc8ak
                     service.AjouterLigne(factureId, l.ProduitId, l.QuantiteBase, l.QuantiteEquivalente, l.Unite, l.PrixUnitaire, 0D, l.Quantite)
                 Next
 
+                AppDataVersionService.Touch("FACTURES")
                 AppEvents.OnDataChanged()
 
                 MessageBox.Show(If(_factureEnEditionId.HasValue, "Facture brouillon mise a jour: ", "Facture en attente: ") & numeroFacture)
@@ -1295,6 +1349,11 @@ Namespace DevCommerc8ak
         Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
             RemoveHandler AppEvents.ProduitModifie, AddressOf RafraichirProduitsDepuisEvenement
             RemoveHandler AppEvents.StockModifie, AddressOf RafraichirProduitsDepuisEvenement
+            If _dataMonitor IsNot Nothing Then
+                RemoveHandler _dataMonitor.DomaineModifie, AddressOf RafraichirProduitsDepuisVersionSql
+                _dataMonitor.Dispose()
+                _dataMonitor = Nothing
+            End If
             MyBase.OnFormClosed(e)
         End Sub
     End Class
