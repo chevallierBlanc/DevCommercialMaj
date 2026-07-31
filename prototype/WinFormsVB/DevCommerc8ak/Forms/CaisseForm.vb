@@ -53,7 +53,6 @@ Namespace DevCommerc8ak
         Private _dernierTicket As TicketData
         Private _isRefreshingFromEvent As Boolean
         Private _dataMonitor As DataChangeMonitorService
-        Private _impressionDepuisApercuEnCours As Boolean
 
         Private Class TicketData
             Public Property Numero As String
@@ -665,10 +664,9 @@ Namespace DevCommerc8ak
                 Dim doc As Printing.PrintDocument = CreerDocumentTicket(ticket, totalCopies)
 
                 If afficherApercu AndAlso _param IsNot Nothing AndAlso _param.ApercuAvantImpression Then
-                    Dim preview As New PrintPreviewDialog()
-                    preview.Document = doc
-                    ConfigurerApercuImpression(preview, ticket, totalCopies)
-                    preview.ShowDialog(Me)
+                    Using preview As New FormApercuTicket(doc, Function() CreerDocumentTicket(ticket, totalCopies))
+                        preview.ShowDialog(Me)
+                    End Using
                 Else
                     doc.Print()
                 End If
@@ -698,43 +696,6 @@ Namespace DevCommerc8ak
 
             Return doc
         End Function
-
-        Private Sub ConfigurerApercuImpression(preview As PrintPreviewDialog, ticket As TicketData, totalCopies As Integer)
-            If preview Is Nothing Then
-                Return
-            End If
-
-            preview.Width = 1000
-            preview.Height = 720
-            preview.KeyPreview = True
-            AddHandler preview.Shown,
-                Sub()
-                    preview.Select()
-                End Sub
-            AddHandler preview.KeyDown,
-                Sub(sender, eArgs)
-                    If eArgs.KeyCode = Keys.Enter Then
-                        eArgs.Handled = True
-                        eArgs.SuppressKeyPress = True
-                        If _impressionDepuisApercuEnCours Then
-                            Return
-                        End If
-
-                        _impressionDepuisApercuEnCours = True
-                        Dim docImpression As Printing.PrintDocument = CreerDocumentTicket(ticket, totalCopies)
-                        Try
-                            docImpression.Print()
-                            preview.Close()
-                        Finally
-                            _impressionDepuisApercuEnCours = False
-                        End Try
-                    ElseIf eArgs.KeyCode = Keys.Escape Then
-                        eArgs.Handled = True
-                        eArgs.SuppressKeyPress = True
-                        preview.Close()
-                    End If
-                End Sub
-        End Sub
 
         Private Sub ConfigurerTicket80Mm(doc As Printing.PrintDocument)
             Try
