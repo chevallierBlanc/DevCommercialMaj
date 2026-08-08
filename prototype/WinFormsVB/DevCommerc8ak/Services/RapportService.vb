@@ -14,6 +14,13 @@ Namespace DevCommerc8ak
             _dal = dal
         End Sub
 
+        Private Sub AssurerSchemaAnalyseVente()
+            Dim sql As String =
+                "IF COL_LENGTH('dbo.LignesFactureVente', 'CoutUnitaireBaseVente') IS NULL " &
+                "BEGIN ALTER TABLE dbo.LignesFactureVente ADD CoutUnitaireBaseVente DECIMAL(18,4) NULL END"
+            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+        End Sub
+
         ' CA journalier pour une date.
         Public Function CAJournalier(dateRef As Date) As Decimal
             Dim sql As String = "SELECT ISNULL(CAST(SUM(ISNULL(MontantTotal,0)) AS DECIMAL(18,0)),0) FROM FacturesVente WHERE CAST(CreeLe AS DATE)=@d AND Statut='PAYEE'"
@@ -63,6 +70,7 @@ Namespace DevCommerc8ak
 
         ' Analyse vente et rentabilite sur une periode.
         Public Function AnalyseVente(dateDebut As Date, dateFin As Date) As DataTable
+            AssurerSchemaAnalyseVente()
             Dim sql As String = "" &
                 "WITH EntreesValorisees AS " &
                 "( " &
@@ -99,19 +107,24 @@ Namespace DevCommerc8ak
                 "), " &
                 "CoutProduit AS " &
                 "( " &
-                "    SELECT ev.ProduitId, " &
-                "           SUM(ISNULL(ev.QuantiteBase, 0) * ISNULL(ev.CoutUnitaireBase, 0)) / NULLIF(SUM(CASE WHEN ev.CoutUnitaireBase IS NOT NULL THEN ISNULL(ev.QuantiteBase, 0) ELSE 0 END), 0) AS CoutMoyenPiece " &
-                "    FROM EntreesValorisees ev " &
-                "    WHERE ev.CoutUnitaireBase IS NOT NULL " &
-                "    GROUP BY ev.ProduitId " &
+                "    SELECT p.ProduitId, " &
+                "           CASE " &
+                "               WHEN ISNULL(p.PrixAchat, 0) <= 0 THEN NULL " &
+                "               WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0) " &
+                "               ELSE ISNULL(p.PrixAchat, 0) " &
+                "           END AS CoutMoyenPiece " &
+                "    FROM Produits p " &
                 "), " &
                 "Ventes AS " &
                 "( " &
                 "    SELECT l.ProduitId, " &
                 "           SUM(ISNULL(l.Quantite, 0)) AS QuantiteVenduePieces, " &
-                "           SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS ChiffreAffaires " &
+                "           SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS ChiffreAffaires, " &
+                "           SUM(CASE WHEN COALESCE(l.CoutUnitaireBaseVente, cp.CoutMoyenPiece) IS NOT NULL THEN ISNULL(l.Quantite, 0) * COALESCE(l.CoutUnitaireBaseVente, cp.CoutMoyenPiece) ELSE 0 END) AS CoutMarchandisesVendues, " &
+                "           SUM(CASE WHEN COALESCE(l.CoutUnitaireBaseVente, cp.CoutMoyenPiece) IS NULL AND ISNULL(l.Quantite, 0) > 0 THEN 1 ELSE 0 END) AS NbVentesSansCout " &
                 "    FROM LignesFactureVente l " &
                 "    INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
+                "    LEFT JOIN CoutProduit cp ON cp.ProduitId = l.ProduitId " &
                 "    WHERE f.Statut = 'PAYEE' " &
                 "      AND f.CreeLe >= @DateDebut " &
                 "      AND f.CreeLe < DATEADD(DAY, 1, @DateFin) " &
@@ -139,11 +152,11 @@ Namespace DevCommerc8ak
                 "           ISNULL(se.ValeurStockEntree, 0) AS ValeurStockEntree, " &
                 "           ISNULL(v.QuantiteVenduePieces, 0) AS QuantiteVenduePieces, " &
                 "           ISNULL(v.ChiffreAffaires, 0) AS ChiffreAffaires, " &
-                "           CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN ISNULL(v.QuantiteVenduePieces, 0) * cp.CoutMoyenPiece ELSE 0 END AS CoutMarchandisesVendues, " &
-                "           CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN ISNULL(v.ChiffreAffaires, 0) - (ISNULL(v.QuantiteVenduePieces, 0) * cp.CoutMoyenPiece) ELSE 0 END AS Benefice, " &
+                "           ISNULL(v.CoutMarchandisesVendues, 0) AS CoutMarchandisesVendues, " &
+                "           ISNULL(v.ChiffreAffaires, 0) - ISNULL(v.CoutMarchandisesVendues, 0) AS Benefice, " &
                 "           ISNULL(s.QuantiteStock, 0) AS StockRestantPieces, " &
                 "           CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN ISNULL(s.QuantiteStock, 0) * cp.CoutMoyenPiece ELSE 0 END AS CoutStockRestant, " &
-                "           CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN 0 ELSE CASE WHEN ISNULL(v.QuantiteVenduePieces, 0) > 0 THEN 1 ELSE 0 END END AS VenteSansCout, " &
+                "           ISNULL(v.NbVentesSansCout, 0) AS VenteSansCout, " &
                 "           CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN 0 ELSE CASE WHEN ISNULL(s.QuantiteStock, 0) > 0 THEN 1 ELSE 0 END END AS StockSansCout " &
                 "    FROM Produits p " &
                 "    LEFT JOIN CTEStockEntree se ON se.ProduitId = p.ProduitId " &
@@ -160,15 +173,17 @@ Namespace DevCommerc8ak
                 "       ISNULL(CAST(SUM(Benefice) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) AS BIGINT), 0) AS BeneficeNetRealise, " &
                 "       ISNULL(CAST(SUM(CoutStockRestant) AS BIGINT), 0) AS CoutStockRestant, " &
                 "       ISNULL(CAST(SUM(CoutStockRestant) * (1.0 * ISNULL(SUM(Benefice), 0) / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS BIGINT), 0) AS ProjectionBeneficeRestant, " &
-                "       ISNULL(CAST(((ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS DECIMAL(10,2)), 0) AS MargeBeneficiairePourcentage, " &
+                "       ISNULL(CAST((ISNULL(SUM(Benefice), 0) * 100.0 / NULLIF(ISNULL(SUM(ChiffreAffaires), 0), 0)) AS DECIMAL(10,2)), 0) AS MargeBeneficiairePourcentage, " &
                 "       CAST(CASE WHEN SUM(VenteSansCout) > 0 OR SUM(StockSansCout) > 0 THEN 1 ELSE 0 END AS BIT) AS AnalysePartielle, " &
                 "       ISNULL(SUM(VenteSansCout), 0) AS ProduitsVendusSansCout, " &
                 "       ISNULL(SUM(StockSansCout), 0) AS ProduitsStockSansCout, " &
+                "       ISNULL(SUM(VenteSansCout), 0) AS NbVentesSansCout, " &
+                "       ISNULL(SUM(StockSansCout), 0) AS NbProduitsSansCout, " &
                 "       CASE " &
                 "           WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) < 0 THEN 'CRITIQUE / PERTE' " &
                 "           WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) = 0 THEN 'POINT MORT' " &
-                "           WHEN (ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0) < 10 THEN 'FAIBLE RENTABILITÉ' " &
-                "           WHEN (ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0) BETWEEN 10 AND 25 THEN 'PROGRÈS' " &
+                "           WHEN ISNULL(SUM(Benefice), 0) * 100.0 / NULLIF(ISNULL(SUM(ChiffreAffaires), 0), 0) < 10 THEN 'FAIBLE RENTABILITÉ' " &
+                "           WHEN ISNULL(SUM(Benefice), 0) * 100.0 / NULLIF(ISNULL(SUM(ChiffreAffaires), 0), 0) BETWEEN 10 AND 25 THEN 'PROGRÈS' " &
                 "           ELSE 'BONNE RENTABILITÉ' " &
                 "       END AS Evaluation " &
                 "FROM AnalyseProduit " &

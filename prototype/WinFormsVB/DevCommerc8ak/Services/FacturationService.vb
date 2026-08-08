@@ -41,6 +41,7 @@ Namespace DevCommerc8ak
             Dim repo As New LigneFactureVenteRepository(_dal)
             Dim quantiteMontant As Decimal = If(quantiteFacturee.HasValue, quantiteFacturee.Value, quantite)
             Dim montantLigne As Decimal = (quantiteMontant * prixUnitaire) - montantRemise
+            Dim coutUnitaireBase As Decimal? = ObtenirCoutUnitaireBaseVente(produitId)
             Dim ligne As New LigneFactureVente With {
                 .FactureVenteId = factureVenteId,
                 .ProduitId = produitId,
@@ -50,9 +51,28 @@ Namespace DevCommerc8ak
                 .PrixUnitaire = prixUnitaire,
                 .MontantRemise = montantRemise,
                 .MontantLigne = montantLigne,
-                .QteSaisie = quantiteFacturee
+                .QteSaisie = quantiteFacturee,
+                .CoutUnitaireBaseVente = coutUnitaireBase
             }
             Return repo.Ajouter(ligne)
+        End Function
+
+        Private Function ObtenirCoutUnitaireBaseVente(produitId As Integer) As Decimal?
+            If produitId <= 0 Then
+                Return Nothing
+            End If
+
+            Dim sql As String = "SELECT PrixAchat, ConversionUnite FROM Produits WHERE ProduitId=@ProduitId"
+            Dim p As New List(Of SqlParameter) From {New SqlParameter("@ProduitId", produitId)}
+            Dim dt As DataTable = _dal.ExecuterTable(sql, CommandType.Text, p)
+            If dt Is Nothing OrElse dt.Rows.Count = 0 Then
+                Return Nothing
+            End If
+
+            Dim row As DataRow = dt.Rows(0)
+            Dim prixAchat As Decimal = If(row.IsNull("PrixAchat"), 0D, Convert.ToDecimal(row("PrixAchat")))
+            Dim conversion As Decimal = If(row.IsNull("ConversionUnite"), 0D, Convert.ToDecimal(row("ConversionUnite")))
+            Return CalculVenteService.CalculerCoutUnitaireBase(prixAchat, conversion)
         End Function
 
         ' Valide le paiement d'une facture.

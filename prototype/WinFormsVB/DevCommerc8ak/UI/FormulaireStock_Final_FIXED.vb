@@ -198,6 +198,7 @@ Namespace DevCommerc8ak
         Private _prochainTypeTemporaireId As Integer
         Private ReadOnly _prixManuelOverrides As Dictionary(Of String, Boolean)
         Private _isUpdatingPrixAutomatiques As Boolean
+        Private _miseAJourCoefficientDepuisPrix As Boolean
         Private _rapportEntreesPrintRowIndex As Integer
         Private _rapportEntreesPrintPageIndex As Integer
         Private _rapportEntreesTable As DataTable
@@ -1364,7 +1365,7 @@ Namespace DevCommerc8ak
             End If
 
             Dim typesCourants As List(Of TypeVenteProduitDTO) = ConstruireTypesPersonnalisesFusionnesPourProduit(produitId)
-            Using frm As New FormulaireTypesVenteProduit(produitId, LirePrixAchatEntreeEnCdf(), LireDecimal(txtNbUniteParBase.Text), False, typesCourants)
+            Using frm As New FormulaireTypesVenteProduit(produitId, LirePrixAchatEntreeEnCdf(), LireDecimal(txtNbUniteParBase.Text), False, typesCourants, Nothing, cmbUniteBase.Text, ObtenirUniteSecondaireEntree())
                 If frm.ShowDialog(Me) = DialogResult.OK AndAlso frm.TypeVenteResultat IsNot Nothing Then
                     Dim typeResultat As TypeVenteProduitDTO = ClonerTypePersonnalise(frm.TypeVenteResultat)
                     If typeResultat.TypeVenteProduitId = 0 Then
@@ -1395,6 +1396,7 @@ Namespace DevCommerc8ak
                 .ProduitId = source.ProduitId,
                 .Nom = source.Nom,
                 .QuantiteEquivalent = source.QuantiteEquivalent,
+                .TypeUniteEquivalent = source.TypeUniteEquivalent,
                 .ModePrix = source.ModePrix,
                 .Coefficient = source.Coefficient,
                 .PrixVente = source.PrixVente,
@@ -1474,7 +1476,7 @@ Namespace DevCommerc8ak
             End If
 
             Dim typesCourants As List(Of TypeVenteProduitDTO) = ConstruireTypesPersonnalisesFusionnesPourProduit(produitId)
-            Using frm As New FormulaireTypesVenteProduit(produitId, LirePrixAchatEntreeEnCdf(), LireDecimal(txtNbUniteParBase.Text), False, typesCourants, typeCourant)
+            Using frm As New FormulaireTypesVenteProduit(produitId, LirePrixAchatEntreeEnCdf(), LireDecimal(txtNbUniteParBase.Text), False, typesCourants, typeCourant, cmbUniteBase.Text, ObtenirUniteSecondaireEntree())
                 If frm.ShowDialog(Me) = DialogResult.OK AndAlso frm.TypeVenteResultat IsNot Nothing Then
                     AjouterOuRemplacerTypePersonnaliseTemporaire(produitId, frm.TypeVenteResultat)
                 End If
@@ -2057,6 +2059,10 @@ Namespace DevCommerc8ak
         'End Sub
 
         Private Sub CoefficientInputChange(sender As Object, e As EventArgs)
+            If Not _miseAJourCoefficientDepuisPrix Then
+                _prixManuelOverrides.Remove("txtPrixGros")
+                _prixManuelOverrides.Remove("txtPrixDemi")
+            End If
             If String.IsNullOrWhiteSpace(txtCoefficientInput.Text) Then
                 _coefficientCalcule = 0D
                 lblTypeCoefficient.Text = ""
@@ -2078,6 +2084,11 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub CoefficientDetailChange(sender As Object, e As EventArgs)
+            If Not _miseAJourCoefficientDepuisPrix Then
+                _prixManuelOverrides.Remove("txtPrixQuart")
+                _prixManuelOverrides.Remove("txtPrixPiece")
+                _prixManuelOverrides.Remove("txtPrixDouzaine")
+            End If
             If String.IsNullOrWhiteSpace(txtCoefficientDetail.Text) Then
                 _coefficientDetailCalcule = 0D
                 lblMargeDetailCalculee.Text = ""
@@ -2105,6 +2116,55 @@ Namespace DevCommerc8ak
             End If
 
             _prixManuelOverrides(txt.Name) = Not String.IsNullOrWhiteSpace(txt.Text) AndAlso txt.Text.Trim() <> "-"
+            If _prixManuelOverrides(txt.Name) Then
+                RecalculerCoefficientDepuisPrixManuel(txt)
+            End If
+        End Sub
+
+        Private Sub RecalculerCoefficientDepuisPrixManuel(zone As TextBox)
+            If zone Is Nothing Then Return
+
+            Dim prixAchatVal As Decimal = LirePrixAchatEntreeEnCdf()
+            Dim nbUnites As Decimal = LireDecimal(txtNbUniteParBase.Text)
+            Dim prixManuel As Decimal = LireDecimal(zone.Text)
+            If prixAchatVal <= 0D OrElse prixManuel <= 0D Then Return
+
+            Dim coefficient As Decimal = 0D
+            If String.Equals(zone.Name, "txtPrixGros", StringComparison.OrdinalIgnoreCase) Then
+                coefficient = CalculVenteService.CalculerCoefficientDepuisPrix(prixAchatVal, prixManuel)
+                AppliquerCoefficientDepuisPrix(txtCoefficientInput, lblTypeCoefficient, lblMargeCalculee, coefficient)
+            ElseIf String.Equals(zone.Name, "txtPrixDemi", StringComparison.OrdinalIgnoreCase) Then
+                coefficient = CalculVenteService.CalculerCoefficientDepuisPrix(prixAchatVal, prixManuel * 2D)
+                AppliquerCoefficientDepuisPrix(txtCoefficientInput, lblTypeCoefficient, lblMargeCalculee, coefficient)
+            ElseIf nbUnites > 0D Then
+                Dim quantiteType As Decimal = 1D
+                If String.Equals(zone.Name, "txtPrixQuart", StringComparison.OrdinalIgnoreCase) Then
+                    quantiteType = Math.Max(1D, Decimal.Floor(nbUnites / 4D))
+                ElseIf String.Equals(zone.Name, "txtPrixDouzaine", StringComparison.OrdinalIgnoreCase) Then
+                    quantiteType = 12D
+                End If
+
+                Dim prixReferenceDetail As Decimal = (prixManuel / quantiteType) * nbUnites
+                coefficient = CalculVenteService.CalculerCoefficientDepuisPrix(prixAchatVal, prixReferenceDetail)
+                AppliquerCoefficientDepuisPrix(txtCoefficientDetail, Nothing, lblMargeDetailCalculee, coefficient)
+            End If
+        End Sub
+
+        Private Sub AppliquerCoefficientDepuisPrix(zoneCoefficient As TextBox, labelCoefficient As Label, labelPourcentage As Label, coefficient As Decimal)
+            If zoneCoefficient Is Nothing OrElse coefficient <= 0D Then Return
+            Dim pourcentage As Decimal = CalculVenteService.CalculerPourcentageDepuisCoefficient(coefficient)
+            _miseAJourCoefficientDepuisPrix = True
+            Try
+                zoneCoefficient.Text = coefficient.ToString("N2")
+                If labelCoefficient IsNot Nothing Then
+                    labelCoefficient.Text = "Coefficient " & coefficient.ToString("N2")
+                End If
+                If labelPourcentage IsNot Nothing Then
+                    labelPourcentage.Text = pourcentage.ToString("N2") & " %"
+                End If
+            Finally
+                _miseAJourCoefficientDepuisPrix = False
+            End Try
         End Sub
 
         Private Sub ReinitialiserOverridesPrixVente()
@@ -2251,6 +2311,7 @@ Namespace DevCommerc8ak
             If grille.Columns.Contains("ModePrix") Then grille.Columns("ModePrix").Visible = False
             If grille.Columns.Contains("Nom") Then grille.Columns("Nom").HeaderText = "Nom"
             If grille.Columns.Contains("QuantiteEquivalent") Then grille.Columns("QuantiteEquivalent").HeaderText = "Qté équiv."
+            If grille.Columns.Contains("TypeUniteEquivalent") Then grille.Columns("TypeUniteEquivalent").HeaderText = "Unité"
             If grille.Columns.Contains("TypePrixAffichage") Then grille.Columns("TypePrixAffichage").HeaderText = "Coefficient / mode"
             If grille.Columns.Contains("PrixVente") Then grille.Columns("PrixVente").HeaderText = "Prix vente"
             If grille.Columns.Contains("Actif") Then grille.Columns("Actif").HeaderText = "Actif"

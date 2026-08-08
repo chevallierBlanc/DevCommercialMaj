@@ -8,6 +8,7 @@ Namespace DevCommerc8ak
         Public Property TypeVenteProduitId As Integer?
         Public Property Nom As String
         Public Property QuantiteEquivalent As Decimal
+        Public Property TypeUniteEquivalent As String = "SECONDAIRE"
         Public Property ModePrix As String
         Public Property Coefficient As Decimal
         Public Property PrixVente As Decimal

@@ -9,6 +9,7 @@ Namespace DevCommerc8ak
         Public Property ProduitId As Integer
         Public Property Nom As String
         Public Property QuantiteEquivalent As Decimal
+        Public Property TypeUniteEquivalent As String = "SECONDAIRE"
         Public Property ModePrix As String
         Public Property Coefficient As Decimal?
         Public Property PrixVente As Decimal
@@ -34,6 +35,15 @@ Namespace DevCommerc8ak
         Public ReadOnly Property NomAffichage As String
             Get
                 Return Nom
+            End Get
+        End Property
+
+        Public ReadOnly Property UniteEquivalentAffichage As String
+            Get
+                If String.Equals(TypeUniteEquivalent, "PRINCIPALE", StringComparison.OrdinalIgnoreCase) Then
+                    Return "Unité principale"
+                End If
+                Return "Unité secondaire"
             End Get
         End Property
     End Class

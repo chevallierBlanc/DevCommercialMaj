@@ -16,5 +16,6 @@ Namespace DevCommerc8ak
         Public Property Quantite As Decimal
         Public Property PrixUnitaire As Decimal
         Public Property MontantLigne As Decimal
+        Public Property CoutUnitaireBaseVente As Decimal?
     End Class
 End Namespace

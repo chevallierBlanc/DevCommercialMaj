@@ -449,6 +449,8 @@ Namespace DevCommerc8ak
             chartCategories.Series(0).IsValueShownAsLabel = False
             chartCategories.Series(0).LegendText = String.Empty
             chartCategories.Series(0).ToolTip = "#VALX : #PERCENT{P1}"
+            chartCategories.ChartAreas(0).Position = New ElementPosition(4, 4, 92, 92)
+            chartCategories.ChartAreas(0).InnerPlotPosition = New ElementPosition(8, 6, 84, 88)
             ConfigurerGrilleLegendeCategories()
         End Sub
 
@@ -692,7 +694,7 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            Using frm As New FormulaireTypesVenteProduit(_produitId, LireDecimal(txtPrixAchat.Text), LireDecimal(txtConversion.Text))
+            Using frm As New FormulaireTypesVenteProduit(_produitId, LireDecimal(txtPrixAchat.Text), LireDecimal(txtConversion.Text), True, Nothing, Nothing, cmbUnitePrincipale.Text, cmbUniteSecondaire.Text)
                 frm.ShowDialog(Me)
             End Using
 

@@ -879,7 +879,7 @@ Namespace DevCommerc8ak
             lblBeneficeNetRealise.Text = _courantBeneficeNetRealise.ToString("N0") & " FC"
             lblCoutStockRestant.Text = _courantCoutStockRestant.ToString("N0") & " FC"
             lblProjectionBeneficeRestant.Text = _courantProjectionBeneficeRestant.ToString("N0") & " FC"
-            lblMargeBeneficiairePourcentage.Text = _courantMargeBeneficiairePourcentage.ToString("N1") & "%"
+            lblMargeBeneficiairePourcentage.Text = _courantMargeBeneficiairePourcentage.ToString("N2") & "%"
 
             If _courantValeurStockEntree >= _cibleValeurStockEntree AndAlso
                _courantCoutMarchandisesVendues >= _cibleCoutMarchandisesVendues AndAlso

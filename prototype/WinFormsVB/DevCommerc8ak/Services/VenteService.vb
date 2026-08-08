@@ -16,6 +16,13 @@ Namespace DevCommerc8ak
             _dal = New DAL(cs)
         End Sub
 
+        Private Sub AssurerSchemaVente()
+            Dim sql As String =
+                "IF COL_LENGTH('dbo.LignesFactureVente', 'CoutUnitaireBaseVente') IS NULL " &
+                "BEGIN ALTER TABLE dbo.LignesFactureVente ADD CoutUnitaireBaseVente DECIMAL(18,4) NULL END"
+            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+        End Sub
+
         Public Function ListerVentesJour(dateRef As Date) As DataTable
             Return ListerVentesParPeriode(dateRef.Date, dateRef.Date.AddDays(1))
         End Function
@@ -93,24 +100,23 @@ Namespace DevCommerc8ak
         End Function
 
         Public Function ListerVentesParPeriode(dateDebut As DateTime, dateFin As DateTime) As DataTable
+            AssurerSchemaVente()
             Dim sql As String = "" &
                 "WITH CoutPieceProduit AS (" &
-                "    SELECT se.ProduitId, " &
+                "    SELECT p.ProduitId, " &
                 "           CASE " &
-                "               WHEN ISNULL(p.ConversionUnite, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0) " &
-                "               ELSE SUM(ISNULL(se.QuantiteBase, 0) * ISNULL(se.PrixAchat, 0) / NULLIF(NULLIF(ISNULL(p.ConversionUnite, 0), 0), 0)) / NULLIF(SUM(CASE WHEN ISNULL(se.PrixAchat, 0) > 0 THEN ISNULL(se.QuantiteBase, 0) ELSE 0 END), 0) " &
+                "               WHEN ISNULL(p.PrixAchat, 0) <= 0 THEN NULL " &
+                "               WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0) " &
+                "               ELSE ISNULL(p.PrixAchat, 0) " &
                 "           END AS CoutPiece " &
-                "    FROM StockEntree se " &
-                "    INNER JOIN Produits p ON p.ProduitId = se.ProduitId " &
-                "    WHERE se.DateEntree < @DateFin " &
-                "    GROUP BY se.ProduitId, p.PrixAchat, p.ConversionUnite" &
+                "    FROM Produits p " &
                 ") " &
                 "SELECT MAX(f.CreeLe) AS DateVente, " &
                 "p.Libelle AS Produit, " &
-                "CAST(MAX(ISNULL(cp.CoutPiece, 0)) AS BIGINT) AS CoutUnitaireBase, " &
+                "CAST(MAX(ISNULL(COALESCE(l.CoutUnitaireBaseVente, cp.CoutPiece), 0)) AS BIGINT) AS CoutUnitaireBase, " &
                 "CAST(SUM(ISNULL(l.Quantite, 0)) AS BIGINT) AS QuantiteVenduePieces, " &
                 "CAST(SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS BIGINT) AS MontantGenere, " &
-                "CAST(SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0)) - (ISNULL(l.Quantite, 0) * ISNULL(cp.CoutPiece, 0))) AS BIGINT) AS Benefice " &
+                "CAST(SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0)) - (ISNULL(l.Quantite, 0) * ISNULL(COALESCE(l.CoutUnitaireBaseVente, cp.CoutPiece), 0))) AS BIGINT) AS Benefice " &
                 "FROM LignesFactureVente l " &
                 "INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
                 "INNER JOIN Produits p ON p.ProduitId = l.ProduitId " &
