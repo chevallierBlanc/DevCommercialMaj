@@ -34,8 +34,9 @@ Namespace DevCommerc8ak
                 "TypeVenteProduitId INT IDENTITY(1,1) PRIMARY KEY, " &
                 "ProduitId INT NOT NULL, " &
                 "Nom NVARCHAR(100) NOT NULL, " &
-                "QuantiteEquivalent DECIMAL(18,2) NOT NULL, " &
+                "QuantiteEquivalent DECIMAL(18,4) NOT NULL, " &
                 "TypeUniteEquivalent NVARCHAR(20) NULL, " &
+                "TypeQuantiteEquivalent NVARCHAR(20) NULL, " &
                 "ModePrix NVARCHAR(20) NOT NULL, " &
                 "Coefficient DECIMAL(18,4) NULL, " &
                 "PrixVente DECIMAL(18,2) NOT NULL, " &
@@ -49,13 +50,15 @@ Namespace DevCommerc8ak
                 "CREATE UNIQUE INDEX UX_TypesVenteProduit_ProduitNomActif ON dbo.TypesVenteProduit (ProduitId, Nom) WHERE Actif = 1 " &
                 "END " &
                 "IF COL_LENGTH('dbo.TypesVenteProduit', 'TypeUniteEquivalent') IS NULL " &
-                "BEGIN ALTER TABLE dbo.TypesVenteProduit ADD TypeUniteEquivalent NVARCHAR(20) NULL END"
+                "BEGIN ALTER TABLE dbo.TypesVenteProduit ADD TypeUniteEquivalent NVARCHAR(20) NULL END " &
+                "IF COL_LENGTH('dbo.TypesVenteProduit', 'TypeQuantiteEquivalent') IS NULL " &
+                "BEGIN ALTER TABLE dbo.TypesVenteProduit ADD TypeQuantiteEquivalent NVARCHAR(20) NULL END"
             _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
         End Sub
 
         Public Function ListerParProduit(produitId As Integer, actifSeulement As Boolean) As List(Of TypeVenteProduitDTO)
             Dim sql As String =
-                "SELECT TypeVenteProduitId, ProduitId, Nom, QuantiteEquivalent, ISNULL(TypeUniteEquivalent, 'SECONDAIRE') AS TypeUniteEquivalent, ModePrix, Coefficient, PrixVente, Actif, CreeLe, ModifieLe, ModifiePar " &
+                "SELECT TypeVenteProduitId, ProduitId, Nom, QuantiteEquivalent, ISNULL(TypeUniteEquivalent, 'SECONDAIRE') AS TypeUniteEquivalent, ISNULL(TypeQuantiteEquivalent, ISNULL(TypeUniteEquivalent, 'SECONDAIRE')) AS TypeQuantiteEquivalent, ModePrix, Coefficient, PrixVente, Actif, CreeLe, ModifieLe, ModifiePar " &
                 "FROM TypesVenteProduit WHERE ProduitId = @ProduitId " &
                 If(actifSeulement, "AND Actif = 1 ", String.Empty) &
                 "ORDER BY Actif DESC, Nom"
@@ -72,14 +75,15 @@ Namespace DevCommerc8ak
 
         Public Function Ajouter(dto As TypeVenteProduitDTO) As Integer
             Dim sql As String =
-                "INSERT INTO TypesVenteProduit (ProduitId, Nom, QuantiteEquivalent, TypeUniteEquivalent, ModePrix, Coefficient, PrixVente, Actif, ModifiePar) " &
-                "VALUES (@ProduitId, @Nom, @QuantiteEquivalent, @TypeUniteEquivalent, @ModePrix, @Coefficient, @PrixVente, @Actif, @ModifiePar); " &
+                "INSERT INTO TypesVenteProduit (ProduitId, Nom, QuantiteEquivalent, TypeUniteEquivalent, TypeQuantiteEquivalent, ModePrix, Coefficient, PrixVente, Actif, ModifiePar) " &
+                "VALUES (@ProduitId, @Nom, @QuantiteEquivalent, @TypeUniteEquivalent, @TypeQuantiteEquivalent, @ModePrix, @Coefficient, @PrixVente, @Actif, @ModifiePar); " &
                 "SELECT CAST(SCOPE_IDENTITY() AS INT);"
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@ProduitId", dto.ProduitId),
                 New SqlParameter("@Nom", dto.Nom.Trim()),
                 New SqlParameter("@QuantiteEquivalent", dto.QuantiteEquivalent),
-                New SqlParameter("@TypeUniteEquivalent", NormaliserTypeUnite(dto.TypeUniteEquivalent)),
+                New SqlParameter("@TypeUniteEquivalent", NormaliserTypeUnite(ObtenirTypeQuantite(dto))),
+                New SqlParameter("@TypeQuantiteEquivalent", NormaliserTypeUnite(ObtenirTypeQuantite(dto))),
                 New SqlParameter("@ModePrix", dto.ModePrix.Trim().ToUpperInvariant()),
                 New SqlParameter("@Coefficient", If(dto.Coefficient.HasValue, CType(dto.Coefficient.Value, Object), DBNull.Value)),
                 New SqlParameter("@PrixVente", dto.PrixVente),
@@ -91,14 +95,15 @@ Namespace DevCommerc8ak
 
         Public Function MettreAJour(dto As TypeVenteProduitDTO) As Integer
             Dim sql As String =
-                "UPDATE TypesVenteProduit SET Nom=@Nom, QuantiteEquivalent=@QuantiteEquivalent, TypeUniteEquivalent=@TypeUniteEquivalent, ModePrix=@ModePrix, Coefficient=@Coefficient, " &
+                "UPDATE TypesVenteProduit SET Nom=@Nom, QuantiteEquivalent=@QuantiteEquivalent, TypeUniteEquivalent=@TypeUniteEquivalent, TypeQuantiteEquivalent=@TypeQuantiteEquivalent, ModePrix=@ModePrix, Coefficient=@Coefficient, " &
                 "PrixVente=@PrixVente, Actif=@Actif, ModifieLe=GETDATE(), ModifiePar=@ModifiePar " &
                 "WHERE TypeVenteProduitId=@TypeVenteProduitId"
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@TypeVenteProduitId", dto.TypeVenteProduitId),
                 New SqlParameter("@Nom", dto.Nom.Trim()),
                 New SqlParameter("@QuantiteEquivalent", dto.QuantiteEquivalent),
-                New SqlParameter("@TypeUniteEquivalent", NormaliserTypeUnite(dto.TypeUniteEquivalent)),
+                New SqlParameter("@TypeUniteEquivalent", NormaliserTypeUnite(ObtenirTypeQuantite(dto))),
+                New SqlParameter("@TypeQuantiteEquivalent", NormaliserTypeUnite(ObtenirTypeQuantite(dto))),
                 New SqlParameter("@ModePrix", dto.ModePrix.Trim().ToUpperInvariant()),
                 New SqlParameter("@Coefficient", If(dto.Coefficient.HasValue, CType(dto.Coefficient.Value, Object), DBNull.Value)),
                 New SqlParameter("@PrixVente", dto.PrixVente),
@@ -126,6 +131,7 @@ Namespace DevCommerc8ak
                 .Nom = Convert.ToString(row("Nom")),
                 .QuantiteEquivalent = Convert.ToDecimal(row("QuantiteEquivalent")),
                 .TypeUniteEquivalent = NormaliserTypeUnite(Convert.ToString(row("TypeUniteEquivalent"))),
+                .TypeQuantiteEquivalent = NormaliserTypeUnite(Convert.ToString(row("TypeQuantiteEquivalent"))),
                 .ModePrix = Convert.ToString(row("ModePrix")),
                 .PrixVente = Convert.ToDecimal(row("PrixVente")),
                 .Actif = Convert.ToBoolean(row("Actif")),
@@ -150,11 +156,13 @@ Namespace DevCommerc8ak
         End Function
 
         Private Shared Function NormaliserTypeUnite(typeUnite As String) As String
-            If String.Equals(typeUnite, "PRINCIPALE", StringComparison.OrdinalIgnoreCase) Then
-                Return "PRINCIPALE"
-            End If
+            Return StockUnitConversionService.NormaliserTypeQuantiteEquivalent(typeUnite)
+        End Function
 
-            Return "SECONDAIRE"
+        Private Shared Function ObtenirTypeQuantite(dto As TypeVenteProduitDTO) As String
+            If dto Is Nothing Then Return "SECONDAIRE"
+            If Not String.IsNullOrWhiteSpace(dto.TypeQuantiteEquivalent) Then Return dto.TypeQuantiteEquivalent
+            Return dto.TypeUniteEquivalent
         End Function
     End Class
 End Namespace

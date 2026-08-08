@@ -9,15 +9,11 @@ Namespace DevCommerc8ak
         End Sub
 
         Public Shared Function CalculerCoutUnitaireBase(prixAchat As Decimal, conversionUnite As Decimal) As Decimal?
-            If prixAchat <= 0D Then
-                Return Nothing
-            End If
+            Return StockUnitConversionService.CalculerCoutUnitaireStock(prixAchat, conversionUnite, "UNITE", 0D)
+        End Function
 
-            If conversionUnite > 0D Then
-                Return Math.Round(prixAchat / conversionUnite, 4)
-            End If
-
-            Return Math.Round(prixAchat, 4)
+        Public Shared Function CalculerCoutUnitaireBase(prixAchat As Decimal, conversionUnite As Decimal, typeGestionStock As String, contenuUnitePrincipale As Decimal) As Decimal?
+            Return StockUnitConversionService.CalculerCoutUnitaireStock(prixAchat, conversionUnite, typeGestionStock, contenuUnitePrincipale)
         End Function
 
         Public Shared Function CalculerMargeBeneficiaire(benefice As Decimal, chiffreAffaires As Decimal) As Decimal
@@ -34,12 +30,11 @@ Namespace DevCommerc8ak
                 Return 0D
             End If
 
-            If String.Equals(typeUniteEquivalent, "PRINCIPALE", StringComparison.OrdinalIgnoreCase) Then
-                Dim conversion As Decimal = If(conversionUnite > 0D, conversionUnite, 1D)
-                Return quantite * conversion
-            End If
+            Return StockUnitConversionService.CalculerQuantiteBaseTypeVente(quantite, typeUniteEquivalent, conversionUnite, 0D, 1D)
+        End Function
 
-            Return quantite
+        Public Shared Function CalculerQuantiteBaseTypeVente(quantiteEquivalent As Decimal, typeUniteEquivalent As String, conversionUnite As Decimal, contenuUnitePrincipale As Decimal, contenuUniteSecondaire As Decimal) As Decimal
+            Return StockUnitConversionService.CalculerQuantiteBaseTypeVente(quantiteEquivalent, typeUniteEquivalent, conversionUnite, contenuUnitePrincipale, contenuUniteSecondaire)
         End Function
 
         Public Shared Function CalculerCoefficientDepuisPrix(prixReference As Decimal, prixVente As Decimal) As Decimal

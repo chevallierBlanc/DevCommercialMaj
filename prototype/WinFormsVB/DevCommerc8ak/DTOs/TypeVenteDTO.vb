@@ -9,6 +9,7 @@ Namespace DevCommerc8ak
         Public Property Nom As String
         Public Property QuantiteEquivalent As Decimal
         Public Property TypeUniteEquivalent As String = "SECONDAIRE"
+        Public Property TypeQuantiteEquivalent As String
         Public Property ModePrix As String
         Public Property Coefficient As Decimal
         Public Property PrixVente As Decimal

@@ -36,6 +36,7 @@ Namespace DevCommerc8ak
                     .Nom = "gros",
                     .QuantiteEquivalent = nb,
                     .TypeUniteEquivalent = "SECONDAIRE",
+                    .TypeQuantiteEquivalent = "SECONDAIRE",
                     .ModePrix = "COEFFICIENT",
                     .Coefficient = coeffGros,
                     .PrixVente = prixGros,
@@ -49,6 +50,7 @@ Namespace DevCommerc8ak
                     .Nom = "demi",
                     .QuantiteEquivalent = Math.Max(1D, Decimal.Floor(nb / 2D)),
                     .TypeUniteEquivalent = "SECONDAIRE",
+                    .TypeQuantiteEquivalent = "SECONDAIRE",
                     .ModePrix = "COEFFICIENT",
                     .Coefficient = coeffGros,
                     .PrixVente = prixDemi,
@@ -62,6 +64,7 @@ Namespace DevCommerc8ak
                     .Nom = "quart",
                     .QuantiteEquivalent = Math.Max(1D, Decimal.Floor(nb / 4D)),
                     .TypeUniteEquivalent = "SECONDAIRE",
+                    .TypeQuantiteEquivalent = "SECONDAIRE",
                     .ModePrix = "COEFFICIENT",
                     .Coefficient = coeffDetail,
                     .PrixVente = prixQuart,
@@ -75,6 +78,7 @@ Namespace DevCommerc8ak
                     .Nom = "piece",
                     .QuantiteEquivalent = 1D,
                     .TypeUniteEquivalent = "SECONDAIRE",
+                    .TypeQuantiteEquivalent = "SECONDAIRE",
                     .ModePrix = "COEFFICIENT",
                     .Coefficient = coeffDetail,
                     .PrixVente = prixPiece,
@@ -88,6 +92,7 @@ Namespace DevCommerc8ak
                     .Nom = "douzaine",
                     .QuantiteEquivalent = 12D,
                     .TypeUniteEquivalent = "SECONDAIRE",
+                    .TypeQuantiteEquivalent = "SECONDAIRE",
                     .ModePrix = "COEFFICIENT",
                     .Coefficient = coeffDetail,
                     .PrixVente = prixDouzaine,
@@ -101,6 +106,7 @@ Namespace DevCommerc8ak
                     .Nom = "speciale",
                     .QuantiteEquivalent = 1D,
                     .TypeUniteEquivalent = "SECONDAIRE",
+                    .TypeQuantiteEquivalent = "SECONDAIRE",
                     .ModePrix = "COEFFICIENT",
                     .Coefficient = CalculerCoefficient(prixAchat, prixSpecial),
                     .PrixVente = prixSpecial,
@@ -111,6 +117,7 @@ Namespace DevCommerc8ak
                     .Nom = "promo",
                     .QuantiteEquivalent = 1D,
                     .TypeUniteEquivalent = "SECONDAIRE",
+                    .TypeQuantiteEquivalent = "SECONDAIRE",
                     .ModePrix = "COEFFICIENT",
                     .Coefficient = CalculerCoefficient(prixAchat, prixSpecial),
                     .PrixVente = prixSpecial,
@@ -135,7 +142,9 @@ Namespace DevCommerc8ak
                                                         venteDemi As Boolean,
                                                         venteDetail As Boolean,
                                                         venteDouzaine As Boolean,
-                                                        Optional typesPersonnalisesOverrides As IEnumerable(Of TypeVenteProduitDTO) = Nothing) As List(Of TypeVenteDTO)
+                                                        Optional typesPersonnalisesOverrides As IEnumerable(Of TypeVenteProduitDTO) = Nothing,
+                                                        Optional contenuUnitePrincipale As Decimal = 0D,
+                                                        Optional contenuUniteSecondaire As Decimal = 0D) As List(Of TypeVenteDTO)
             Dim liste As List(Of TypeVenteDTO) = ConstruireTypesVente(nbUniteParBase, prixAchat, prixGros, prixDemi, prixPiece, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine)
             If produitId <= 0 Then
                 Return liste
@@ -159,9 +168,11 @@ Namespace DevCommerc8ak
                 Dim prixVente As Decimal = item.PrixVente
                 Dim coefficient As Decimal = If(item.Coefficient.HasValue, item.Coefficient.Value, 0D)
                 Dim nb As Decimal = If(nbUniteParBase > 0D, nbUniteParBase, 1D)
-                Dim quantiteBaseType As Decimal = CalculVenteService.CalculerQuantiteBaseTypeVente(item.QuantiteEquivalent, item.TypeUniteEquivalent, nb)
+                Dim typeQuantite As String = If(String.IsNullOrWhiteSpace(item.TypeQuantiteEquivalent), item.TypeUniteEquivalent, item.TypeQuantiteEquivalent)
+                Dim contenuPrincipal As Decimal = If(contenuUnitePrincipale > 0D, contenuUnitePrincipale, nb)
+                Dim quantiteBaseType As Decimal = CalculVenteService.CalculerQuantiteBaseTypeVente(item.QuantiteEquivalent, typeQuantite, nb, contenuPrincipal, contenuUniteSecondaire)
                 If String.Equals(item.ModePrix, "COEFFICIENT", StringComparison.OrdinalIgnoreCase) AndAlso coefficient > 0D Then
-                    Dim coutEquivalent As Decimal = prixAchat * (quantiteBaseType / nb)
+                    Dim coutEquivalent As Decimal = prixAchat * (quantiteBaseType / contenuPrincipal)
                     If coutEquivalent > 0D Then
                         prixVente = Math.Round(coutEquivalent * coefficient, 2)
                     End If
@@ -171,7 +182,8 @@ Namespace DevCommerc8ak
                     .TypeVenteProduitId = item.TypeVenteProduitId,
                     .Nom = item.Nom,
                     .QuantiteEquivalent = quantiteBaseType,
-                    .TypeUniteEquivalent = item.TypeUniteEquivalent,
+                    .TypeUniteEquivalent = typeQuantite,
+                    .TypeQuantiteEquivalent = typeQuantite,
                     .ModePrix = item.ModePrix,
                     .Coefficient = coefficient,
                     .PrixVente = prixVente,

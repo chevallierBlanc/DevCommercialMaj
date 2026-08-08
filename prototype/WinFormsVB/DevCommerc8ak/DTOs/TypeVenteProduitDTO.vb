@@ -10,6 +10,7 @@ Namespace DevCommerc8ak
         Public Property Nom As String
         Public Property QuantiteEquivalent As Decimal
         Public Property TypeUniteEquivalent As String = "SECONDAIRE"
+        Public Property TypeQuantiteEquivalent As String
         Public Property ModePrix As String
         Public Property Coefficient As Decimal?
         Public Property PrixVente As Decimal
@@ -40,8 +41,12 @@ Namespace DevCommerc8ak
 
         Public ReadOnly Property UniteEquivalentAffichage As String
             Get
-                If String.Equals(TypeUniteEquivalent, "PRINCIPALE", StringComparison.OrdinalIgnoreCase) Then
+                Dim typeAffichage As String = If(String.IsNullOrWhiteSpace(TypeQuantiteEquivalent), TypeUniteEquivalent, TypeQuantiteEquivalent)
+                If String.Equals(typeAffichage, "PRINCIPALE", StringComparison.OrdinalIgnoreCase) Then
                     Return "Unité principale"
+                End If
+                If String.Equals(typeAffichage, "MESURE", StringComparison.OrdinalIgnoreCase) Then
+                    Return "Unité de mesure"
                 End If
                 Return "Unité secondaire"
             End Get

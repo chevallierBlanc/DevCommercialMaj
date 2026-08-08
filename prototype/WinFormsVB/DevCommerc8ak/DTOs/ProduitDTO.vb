@@ -27,6 +27,10 @@ Namespace DevCommerc8ak
         Public Property UnitePrincipale As String
         Public Property UniteSecondaire As String
         Public Property ConversionUnite As Decimal
+        Public Property TypeGestionStock As String = "UNITE"
+        Public Property UniteMesureStock As String = "PIECE"
+        Public Property ContenuUnitePrincipale As Decimal
+        Public Property ContenuUniteSecondaire As Decimal?
         Public Property EstActif As Boolean
         Public Property VenteDetail As Boolean
         Public Property VenteDemi As Boolean

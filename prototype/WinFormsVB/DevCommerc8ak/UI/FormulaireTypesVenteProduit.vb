@@ -16,6 +16,7 @@ Namespace DevCommerc8ak
         Private ReadOnly _conversionUnite As Decimal
         Private ReadOnly _unitePrincipale As String
         Private ReadOnly _uniteSecondaire As String
+        Private ReadOnly _uniteMesureStock As String
         Private ReadOnly _service As TypeVenteProduitService
         Private ReadOnly _modeDirectBDD As Boolean
         Private ReadOnly _typesTemporaires As List(Of TypeVenteProduitDTO)
@@ -63,12 +64,14 @@ Namespace DevCommerc8ak
                        Optional typesTemporaires As List(Of TypeVenteProduitDTO) = Nothing,
                        Optional typeInitial As TypeVenteProduitDTO = Nothing,
                        Optional unitePrincipale As String = Nothing,
-                       Optional uniteSecondaire As String = Nothing)
+                       Optional uniteSecondaire As String = Nothing,
+                       Optional uniteMesureStock As String = Nothing)
             _produitId = produitId
             _prixAchat = prixAchat
             _conversionUnite = If(conversionUnite > 0D, conversionUnite, 1D)
             _unitePrincipale = If(String.IsNullOrWhiteSpace(unitePrincipale), "Unité principale", unitePrincipale.Trim())
             _uniteSecondaire = If(String.IsNullOrWhiteSpace(uniteSecondaire), "Unité secondaire", uniteSecondaire.Trim())
+            _uniteMesureStock = If(String.IsNullOrWhiteSpace(uniteMesureStock), "Unité de mesure", uniteMesureStock.Trim())
             _service = New TypeVenteProduitService()
             _modeDirectBDD = modeDirectBDD
             _typesTemporaires = If(typesTemporaires, New List(Of TypeVenteProduitDTO)())
@@ -94,6 +97,7 @@ Namespace DevCommerc8ak
             cmbUniteEquivalent = New ComboBox() With {.Left = 390, .Top = 36, .Width = 140, .DropDownStyle = ComboBoxStyle.DropDownList}
             cmbUniteEquivalent.Items.Add(New UniteOption("PRINCIPALE", _unitePrincipale))
             cmbUniteEquivalent.Items.Add(New UniteOption("SECONDAIRE", _uniteSecondaire))
+            cmbUniteEquivalent.Items.Add(New UniteOption("MESURE", _uniteMesureStock))
             cmbUniteEquivalent.SelectedIndex = 1
             Dim lblMode As New Label() With {.Text = "Mode prix", .Left = 550, .Top = 16, .AutoSize = True}
             cmbModePrix = New ComboBox() With {.Left = 550, .Top = 36, .Width = 110, .DropDownStyle = ComboBoxStyle.DropDownList}
@@ -191,7 +195,7 @@ Namespace DevCommerc8ak
             _typeSelectionneId = item.TypeVenteProduitId
             txtNom.Text = item.Nom
             txtQuantiteEquivalent.Text = item.QuantiteEquivalent.ToString("N2")
-            SelectionnerTypeUnite(item.TypeUniteEquivalent)
+            SelectionnerTypeUnite(If(String.IsNullOrWhiteSpace(item.TypeQuantiteEquivalent), item.TypeUniteEquivalent, item.TypeQuantiteEquivalent))
             cmbModePrix.SelectedItem = item.ModePrix.ToUpperInvariant()
             txtCoefficient.Enabled = String.Equals(item.ModePrix, "COEFFICIENT", StringComparison.OrdinalIgnoreCase)
             txtCoefficient.Text = If(item.Coefficient.HasValue, item.Coefficient.Value.ToString("N4"), String.Empty)
@@ -284,7 +288,7 @@ Namespace DevCommerc8ak
         End Function
 
         Private Sub SelectionnerTypeUnite(typeUnite As String)
-            Dim cible As String = If(String.Equals(typeUnite, "PRINCIPALE", StringComparison.OrdinalIgnoreCase), "PRINCIPALE", "SECONDAIRE")
+            Dim cible As String = StockUnitConversionService.NormaliserTypeQuantiteEquivalent(typeUnite)
             For i As Integer = 0 To cmbUniteEquivalent.Items.Count - 1
                 Dim optionUnite As UniteOption = TryCast(cmbUniteEquivalent.Items(i), UniteOption)
                 If optionUnite IsNot Nothing AndAlso String.Equals(optionUnite.TypeUnite, cible, StringComparison.OrdinalIgnoreCase) Then
@@ -326,6 +330,7 @@ Namespace DevCommerc8ak
                 .Nom = nom,
                 .QuantiteEquivalent = quantiteEquivalent,
                 .TypeUniteEquivalent = ObtenirTypeUniteSelectionne(),
+                .TypeQuantiteEquivalent = ObtenirTypeUniteSelectionne(),
                 .ModePrix = modePrix,
                 .Coefficient = coefficient,
                 .PrixVente = prixVente,

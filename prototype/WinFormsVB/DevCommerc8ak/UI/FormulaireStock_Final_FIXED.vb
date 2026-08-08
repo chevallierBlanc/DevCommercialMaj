@@ -1397,6 +1397,7 @@ Namespace DevCommerc8ak
                 .Nom = source.Nom,
                 .QuantiteEquivalent = source.QuantiteEquivalent,
                 .TypeUniteEquivalent = source.TypeUniteEquivalent,
+                .TypeQuantiteEquivalent = source.TypeQuantiteEquivalent,
                 .ModePrix = source.ModePrix,
                 .Coefficient = source.Coefficient,
                 .PrixVente = source.PrixVente,

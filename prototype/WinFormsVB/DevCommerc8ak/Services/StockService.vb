@@ -604,7 +604,10 @@ Namespace DevCommerc8ak
         End Function
 
         Private Function ObtenirInfosProduit(produitId As Integer) As DataRow
-            Dim sql As String = "SELECT ProduitId, Libelle, CategorieId, UnitePrincipale, UniteSecondaire, ConversionUnite, PrixAchat, PrixDetail, PrixGros " &
+            Dim sql As String = "SELECT ProduitId, Libelle, CategorieId, UnitePrincipale, UniteSecondaire, ConversionUnite, " &
+                                "ISNULL(TypeGestionStock,'UNITE') AS TypeGestionStock, ISNULL(UniteMesureStock,'PIECE') AS UniteMesureStock, " &
+                                "ISNULL(ContenuUnitePrincipale, ISNULL(ConversionUnite,1)) AS ContenuUnitePrincipale, ContenuUniteSecondaire, " &
+                                "PrixAchat, PrixDetail, PrixGros " &
                                 "FROM Produits WHERE ProduitId=@id"
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@id", produitId)}
             Dim dt As DataTable = _dal.ExecuterTable(sql, CommandType.Text, p)
@@ -637,9 +640,6 @@ Namespace DevCommerc8ak
             If Not info.IsNull("PrixAchat") Then
                 prixAchat = Convert.ToDecimal(info("PrixAchat"))
             End If
-            If prixAchat <= 0D AndAlso Not info.IsNull("PrixGros") Then
-                prixAchat = Convert.ToDecimal(info("PrixGros"))
-            End If
             Return prixAchat
         End Function
 
@@ -647,6 +647,26 @@ Namespace DevCommerc8ak
             Dim uniteBase As String = If(info.IsNull("UnitePrincipale"), "", Convert.ToString(info("UnitePrincipale")))
             Dim uniteSecondaire As String = If(info.IsNull("UniteSecondaire"), "", Convert.ToString(info("UniteSecondaire")))
             Dim conversion As Decimal = If(info.IsNull("ConversionUnite"), 0D, Convert.ToDecimal(info("ConversionUnite")))
+            Dim typeGestion As String = If(info.Table.Columns.Contains("TypeGestionStock") AndAlso Not info.IsNull("TypeGestionStock"), Convert.ToString(info("TypeGestionStock")), "UNITE")
+            Dim uniteMesure As String = If(info.Table.Columns.Contains("UniteMesureStock") AndAlso Not info.IsNull("UniteMesureStock"), Convert.ToString(info("UniteMesureStock")), "")
+            Dim contenuPrincipal As Decimal = If(info.Table.Columns.Contains("ContenuUnitePrincipale") AndAlso Not info.IsNull("ContenuUnitePrincipale"), Convert.ToDecimal(info("ContenuUnitePrincipale")), conversion)
+            Dim contenuSecondaire As Decimal = If(info.Table.Columns.Contains("ContenuUniteSecondaire") AndAlso Not info.IsNull("ContenuUniteSecondaire"), Convert.ToDecimal(info("ContenuUniteSecondaire")), 0D)
+
+            Dim typeNormalise As String = StockUnitConversionService.NormaliserTypeGestionStock(typeGestion)
+            If typeNormalise = "POIDS" OrElse typeNormalise = "VOLUME" Then
+                If uniteBase <> "" AndAlso String.Equals(unite, uniteBase, StringComparison.OrdinalIgnoreCase) Then
+                    Dim contenu As Decimal = If(contenuPrincipal > 0D, contenuPrincipal, If(conversion > 0D, conversion, 1D))
+                    Return quantite * contenu
+                End If
+                If uniteSecondaire <> "" AndAlso String.Equals(unite, uniteSecondaire, StringComparison.OrdinalIgnoreCase) Then
+                    Dim contenu As Decimal = If(contenuSecondaire > 0D, contenuSecondaire, 1D)
+                    Return quantite * contenu
+                End If
+                If uniteMesure <> "" AndAlso String.Equals(unite, uniteMesure, StringComparison.OrdinalIgnoreCase) Then
+                    Return quantite
+                End If
+            End If
+
             If conversion > 0D Then
                 If uniteBase <> "" AndAlso String.Equals(unite, uniteBase, StringComparison.OrdinalIgnoreCase) Then
                     Return quantite * conversion

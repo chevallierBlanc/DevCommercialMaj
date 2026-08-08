@@ -445,11 +445,15 @@ Namespace DevCommerc8ak
             Dim colUnitePrincipale As New DataGridViewTextBoxColumn() With {.DataPropertyName = "UnitePrincipale", .HeaderText = "UnitePrincipale", .Width = 120, .Visible = False, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleCenter}}
             Dim colUniteSecondaire As New DataGridViewTextBoxColumn() With {.DataPropertyName = "UniteSecondaire", .HeaderText = "UniteSecondaire", .Width = 80, .Visible = False}
             Dim colConversionUnite As New DataGridViewTextBoxColumn() With {.DataPropertyName = "ConversionUnite", .HeaderText = "ConversionUnite", .Width = 150, .Visible = False}
+            Dim colTypeGestionStock As New DataGridViewTextBoxColumn() With {.DataPropertyName = "TypeGestionStock", .HeaderText = "TypeGestionStock", .Width = 80, .Visible = False}
+            Dim colUniteMesureStock As New DataGridViewTextBoxColumn() With {.DataPropertyName = "UniteMesureStock", .HeaderText = "UniteMesureStock", .Width = 80, .Visible = False}
+            Dim colContenuUnitePrincipale As New DataGridViewTextBoxColumn() With {.DataPropertyName = "ContenuUnitePrincipale", .HeaderText = "ContenuUnitePrincipale", .Width = 80, .Visible = False}
+            Dim colContenuUniteSecondaire As New DataGridViewTextBoxColumn() With {.DataPropertyName = "ContenuUniteSecondaire", .HeaderText = "ContenuUniteSecondaire", .Width = 80, .Visible = False}
             Dim colVenteDetail As New DataGridViewTextBoxColumn() With {.DataPropertyName = "VenteDetail", .HeaderText = "VenteDetail", .Width = 80, .Visible = False}
             Dim colSVenteDemi As New DataGridViewTextBoxColumn() With {.DataPropertyName = "VenteDemi", .HeaderText = "VenteDemi", .Width = 80, .Visible = False}
             Dim colVenteDouzaine As New DataGridViewTextBoxColumn() With {.DataPropertyName = "VenteDouzaine", .HeaderText = "VenteDouzaine", .Width = 80, .Visible = False}
             Dim colVenteGros As New DataGridViewTextBoxColumn() With {.DataPropertyName = "VenteGros", .HeaderText = "VenteGros", .Width = 80, .Visible = False}
-            gridProduits.Columns.AddRange(New DataGridViewColumn() {colProduitId, colCodeBarres, colLibelle, colPrixDetail, colPrixAchat, colPrixDemi, colPrixQuart, colPrixDouzaine, colPrixGros, colPrixSpecial, colCoefficientGros, colQuantiteStock, colSeuilCritique, colDateExpiration, colCategorieId, colNomCategorie, colEstActif, colUnitePrincipale, colUniteSecondaire, colConversionUnite, colVenteDetail, colSVenteDemi, colVenteDouzaine, colVenteGros})
+            gridProduits.Columns.AddRange(New DataGridViewColumn() {colProduitId, colCodeBarres, colLibelle, colPrixDetail, colPrixAchat, colPrixDemi, colPrixQuart, colPrixDouzaine, colPrixGros, colPrixSpecial, colCoefficientGros, colQuantiteStock, colSeuilCritique, colDateExpiration, colCategorieId, colNomCategorie, colEstActif, colUnitePrincipale, colUniteSecondaire, colConversionUnite, colTypeGestionStock, colUniteMesureStock, colContenuUnitePrincipale, colContenuUniteSecondaire, colVenteDetail, colSVenteDemi, colVenteDouzaine, colVenteGros})
 
 
         End Sub
@@ -603,6 +607,8 @@ Namespace DevCommerc8ak
             Dim prixQuart As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "PrixQuart"))
             Dim prixDouzaine As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "PrixDouzaine"))
             Dim prixSpecial As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "PrixSpecial"))
+            Dim contenuUnitePrincipale As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "ContenuUnitePrincipale"))
+            Dim contenuUniteSecondaire As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "ContenuUniteSecondaire"))
             Dim venteDetail As Boolean = SafeBoolean(CellValueByProperty(gridProduits.CurrentRow, "VenteDetail"))
             Dim venteDemi As Boolean = SafeBoolean(CellValueByProperty(gridProduits.CurrentRow, "VenteDemi"))
             Dim venteDouzaine As Boolean = SafeBoolean(CellValueByProperty(gridProduits.CurrentRow, "VenteDouzaine"))
@@ -610,7 +616,7 @@ Namespace DevCommerc8ak
             Dim typesPersonnalisesActifs As List(Of TypeVenteProduitDTO) = _typeVenteProduitService.ListerParProduit(produitId, True)
 
 
-            _typesVenteCourants = _typeVenteService.ConstruireTypesVentePourProduit(produitId, nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine, typesPersonnalisesActifs)
+            _typesVenteCourants = _typeVenteService.ConstruireTypesVentePourProduit(produitId, nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine, typesPersonnalisesActifs, contenuUnitePrincipale, contenuUniteSecondaire)
             cmbUnite.DataSource = Nothing
             cmbUnite.DisplayMember = "NomAffichage"
             cmbUnite.ValueMember = "Nom"

@@ -68,6 +68,9 @@ Namespace DevCommerc8ak
                         Return
                     End If
 
+                    SchemaMigrationService.ApplyPendingMigrations()
+                    _log.Info("Startup", "Program", "Migrations de schéma appliquées ou déjà à jour.")
+
                     If Not AssurerCompteAdministrateurInitial() Then
                         ExitThread()
                         Return

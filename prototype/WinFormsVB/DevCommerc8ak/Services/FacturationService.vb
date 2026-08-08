@@ -62,7 +62,7 @@ Namespace DevCommerc8ak
                 Return Nothing
             End If
 
-            Dim sql As String = "SELECT PrixAchat, ConversionUnite FROM Produits WHERE ProduitId=@ProduitId"
+            Dim sql As String = "SELECT PrixAchat, ConversionUnite, ISNULL(TypeGestionStock,'UNITE') AS TypeGestionStock, ISNULL(ContenuUnitePrincipale, ISNULL(ConversionUnite,1)) AS ContenuUnitePrincipale FROM Produits WHERE ProduitId=@ProduitId"
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@ProduitId", produitId)}
             Dim dt As DataTable = _dal.ExecuterTable(sql, CommandType.Text, p)
             If dt Is Nothing OrElse dt.Rows.Count = 0 Then
@@ -72,7 +72,9 @@ Namespace DevCommerc8ak
             Dim row As DataRow = dt.Rows(0)
             Dim prixAchat As Decimal = If(row.IsNull("PrixAchat"), 0D, Convert.ToDecimal(row("PrixAchat")))
             Dim conversion As Decimal = If(row.IsNull("ConversionUnite"), 0D, Convert.ToDecimal(row("ConversionUnite")))
-            Return CalculVenteService.CalculerCoutUnitaireBase(prixAchat, conversion)
+            Dim typeGestion As String = If(row.IsNull("TypeGestionStock"), "UNITE", Convert.ToString(row("TypeGestionStock")))
+            Dim contenuPrincipal As Decimal = If(row.IsNull("ContenuUnitePrincipale"), conversion, Convert.ToDecimal(row("ContenuUnitePrincipale")))
+            Return CalculVenteService.CalculerCoutUnitaireBase(prixAchat, conversion, typeGestion, contenuPrincipal)
         End Function
 
         ' Valide le paiement d'une facture.

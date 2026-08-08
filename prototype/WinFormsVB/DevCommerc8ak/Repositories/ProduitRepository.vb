@@ -52,8 +52,8 @@ Namespace DevCommerc8ak
                 modifierPar = "SYSTEM"
             End If
 
-            Dim sql As String = "INSERT INTO Produits (CodeBarres, Libelle, PrixDetail, PrixAchat, PrixDemi, PrixQuart, PrixDouzaine, PrixGros, PrixSpecial, CoefficientGros, SeuilCritique, DateExpiration, CategorieId, UnitePrincipale, UniteSecondaire, ConversionUnite, EstActif, VenteDetail, VenteDemi, VenteDouzaine, VenteGros, ModifierPar) " &
-                                "VALUES (@CodeBarres, @Libelle, @PrixDetail, @PrixAchat, @PrixDemi, @PrixQuart, @PrixDouzaine, @PrixGros, @PrixSpecial, @CoefficientGros, @SeuilCritique, @DateExpiration, @CategorieId, @UnitePrincipale, @UniteSecondaire, @ConversionUnite, @EstActif, @VenteDetail, @VenteDemi, @VenteDouzaine, @VenteGros, @ModifierPar); " &
+            Dim sql As String = "INSERT INTO Produits (CodeBarres, Libelle, PrixDetail, PrixAchat, PrixDemi, PrixQuart, PrixDouzaine, PrixGros, PrixSpecial, CoefficientGros, SeuilCritique, DateExpiration, CategorieId, UnitePrincipale, UniteSecondaire, ConversionUnite, TypeGestionStock, UniteMesureStock, ContenuUnitePrincipale, ContenuUniteSecondaire, EstActif, VenteDetail, VenteDemi, VenteDouzaine, VenteGros, ModifierPar) " &
+                                "VALUES (@CodeBarres, @Libelle, @PrixDetail, @PrixAchat, @PrixDemi, @PrixQuart, @PrixDouzaine, @PrixGros, @PrixSpecial, @CoefficientGros, @SeuilCritique, @DateExpiration, @CategorieId, @UnitePrincipale, @UniteSecondaire, @ConversionUnite, @TypeGestionStock, @UniteMesureStock, @ContenuUnitePrincipale, @ContenuUniteSecondaire, @EstActif, @VenteDetail, @VenteDemi, @VenteDouzaine, @VenteGros, @ModifierPar); " &
                                 "SELECT CAST(SCOPE_IDENTITY() AS INT);"
 
             Dim p As New List(Of SqlParameter) From {
@@ -73,6 +73,10 @@ Namespace DevCommerc8ak
                 New SqlParameter("@UnitePrincipale", If(produit.UnitePrincipale, CType(DBNull.Value, Object))),
                 New SqlParameter("@UniteSecondaire", If(produit.UniteSecondaire, CType(DBNull.Value, Object))),
                 New SqlParameter("@ConversionUnite", produit.ConversionUnite),
+                New SqlParameter("@TypeGestionStock", NormaliserTypeGestionStock(produit.TypeGestionStock)),
+                New SqlParameter("@UniteMesureStock", If(String.IsNullOrWhiteSpace(produit.UniteMesureStock), CType(DBNull.Value, Object), produit.UniteMesureStock.Trim().ToUpperInvariant())),
+                New SqlParameter("@ContenuUnitePrincipale", ObtenirContenuPrincipal(produit)),
+                New SqlParameter("@ContenuUniteSecondaire", If(produit.ContenuUniteSecondaire.HasValue AndAlso produit.ContenuUniteSecondaire.Value > 0D, CType(produit.ContenuUniteSecondaire.Value, Object), DBNull.Value)),
                 New SqlParameter("@EstActif", produit.EstActif),
                 New SqlParameter("@VenteDetail", produit.VenteDetail),
                 New SqlParameter("@VenteDemi", produit.VenteDemi),
@@ -89,7 +93,7 @@ Namespace DevCommerc8ak
         Public Function Lister() As List(Of ProduitDTO)
             Dim sql As String = "SELECT p.ProduitId, p.CodeBarres, p.Libelle, p.PrixDetail, p.PrixAchat, p.PrixDemi, p.PrixQuart, p.PrixDouzaine, p.PrixGros, p.PrixSpecial, p.CoefficientGros, " &
                                 "ISNULL(s.QuantiteStock,0) AS QuantiteStock, p.SeuilCritique, p.DateExpiration, p.CategorieId, ISNULL(cat.NomCategorie, '') AS NomCategorie, p.EstActif, p.UnitePrincipale, p.UniteSecondaire, p.ConversionUnite, " &
-                                "p.VenteDetail, p.VenteDemi, p.VenteDouzaine, p.VenteGros " &
+                                "p.VenteDetail, p.VenteDemi, p.VenteDouzaine, p.VenteGros, ISNULL(p.TypeGestionStock,'UNITE') AS TypeGestionStock, ISNULL(p.UniteMesureStock,'PIECE') AS UniteMesureStock, ISNULL(p.ContenuUnitePrincipale, ISNULL(p.ConversionUnite,1)) AS ContenuUnitePrincipale, p.ContenuUniteSecondaire " &
                                 "FROM Produits p LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId " &
                                 "LEFT JOIN CategoriesProduits cat ON cat.CategorieId = p.CategorieId"
             Dim dt As DataTable = _dal.ExecuterTable(sql, CommandType.Text, Nothing)
@@ -105,8 +109,8 @@ Namespace DevCommerc8ak
         ' Retourne la liste des produits sous forme de DataTable pour filtrage local.
         Public Function ListerTable() As DataTable
             Dim sql As String = "SELECT p.ProduitId, p.CodeBarres, p.Libelle, p.PrixDetail, p.PrixAchat, p.PrixDemi, p.PrixQuart, p.PrixDouzaine, p.PrixGros, p.PrixSpecial, p.CoefficientGros, " &
-                                " cast (ISNULL(s.QuantiteStock,0) as int) AS QuantiteStock, p.SeuilCritique, p.DateExpiration, p.CategorieId, ISNULL(cat.NomCategorie, '') AS NomCategorie, p.EstActif, p.UnitePrincipale, p.UniteSecondaire, p.ConversionUnite, " &
-                                "p.VenteDetail, p.VenteDemi, p.VenteDouzaine, p.VenteGros " &
+                                "ISNULL(s.QuantiteStock,0) AS QuantiteStock, p.SeuilCritique, p.DateExpiration, p.CategorieId, ISNULL(cat.NomCategorie, '') AS NomCategorie, p.EstActif, p.UnitePrincipale, p.UniteSecondaire, p.ConversionUnite, " &
+                                "p.VenteDetail, p.VenteDemi, p.VenteDouzaine, p.VenteGros, ISNULL(p.TypeGestionStock,'UNITE') AS TypeGestionStock, ISNULL(p.UniteMesureStock,'PIECE') AS UniteMesureStock, ISNULL(p.ContenuUnitePrincipale, ISNULL(p.ConversionUnite,1)) AS ContenuUnitePrincipale, p.ContenuUniteSecondaire " &
                                 "FROM Produits p LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId " &
                                 "LEFT JOIN CategoriesProduits cat ON cat.CategorieId = p.CategorieId"
             Return _dal.ExecuterTable(sql, CommandType.Text, Nothing)
@@ -163,7 +167,7 @@ Namespace DevCommerc8ak
         Public Function Rechercher(texte As String) As List(Of ProduitDTO)
             Dim sql As String = "SELECT p.ProduitId, p.CodeBarres, p.Libelle, p.PrixDetail, p.PrixAchat, p.PrixDemi, p.PrixQuart, p.PrixDouzaine, p.PrixGros, p.PrixSpecial, p.CoefficientGros, " &
                                 "ISNULL(s.QuantiteStock,0) AS QuantiteStock, p.SeuilCritique, p.DateExpiration, p.CategorieId, ISNULL(cat.NomCategorie, '') AS NomCategorie, p.EstActif, p.UnitePrincipale, p.UniteSecondaire, p.ConversionUnite, " &
-                                "p.VenteDetail, p.VenteDemi, p.VenteDouzaine, p.VenteGros " &
+                                "p.VenteDetail, p.VenteDemi, p.VenteDouzaine, p.VenteGros, ISNULL(p.TypeGestionStock,'UNITE') AS TypeGestionStock, ISNULL(p.UniteMesureStock,'PIECE') AS UniteMesureStock, ISNULL(p.ContenuUnitePrincipale, ISNULL(p.ConversionUnite,1)) AS ContenuUnitePrincipale, p.ContenuUniteSecondaire " &
                                 "FROM Produits p LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId " &
                                 "LEFT JOIN CategoriesProduits cat ON cat.CategorieId = p.CategorieId " &
                                 "WHERE p.CodeBarres LIKE @q OR p.Libelle LIKE @q"
@@ -180,7 +184,7 @@ Namespace DevCommerc8ak
         Public Function ObtenirParId(produitId As Integer) As ProduitDTO
             Dim sql As String = "SELECT p.ProduitId, p.CodeBarres, p.Libelle, p.PrixDetail, p.PrixAchat, p.PrixDemi, p.PrixQuart, p.PrixDouzaine, p.PrixGros, p.PrixSpecial, p.CoefficientGros, " &
                                 "ISNULL(s.QuantiteStock,0) AS QuantiteStock, p.SeuilCritique, p.DateExpiration, p.CategorieId, ISNULL(cat.NomCategorie, '') AS NomCategorie, p.EstActif, p.UnitePrincipale, p.UniteSecondaire, p.ConversionUnite, " &
-                                "p.VenteDetail, p.VenteDemi, p.VenteDouzaine, p.VenteGros " &
+                                "p.VenteDetail, p.VenteDemi, p.VenteDouzaine, p.VenteGros, ISNULL(p.TypeGestionStock,'UNITE') AS TypeGestionStock, ISNULL(p.UniteMesureStock,'PIECE') AS UniteMesureStock, ISNULL(p.ContenuUnitePrincipale, ISNULL(p.ConversionUnite,1)) AS ContenuUnitePrincipale, p.ContenuUniteSecondaire " &
                                 "FROM Produits p LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId LEFT JOIN CategoriesProduits cat ON cat.CategorieId = p.CategorieId WHERE p.ProduitId = @ProduitId"
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@ProduitId", produitId)}
             Dim dt As DataTable = _dal.ExecuterTable(sql, CommandType.Text, p)
@@ -218,7 +222,7 @@ Namespace DevCommerc8ak
             End If
 
             Dim sql As String = "UPDATE Produits SET CodeBarres=@CodeBarres, Libelle=@Libelle, PrixDetail=@PrixDetail, PrixAchat=@PrixAchat, PrixDemi=@PrixDemi, PrixQuart=@PrixQuart, PrixDouzaine=@PrixDouzaine, PrixGros=@PrixGros, PrixSpecial=@PrixSpecial, CoefficientGros=@CoefficientGros, " &
-                                "SeuilCritique=@SeuilCritique, DateExpiration=@DateExpiration, CategorieId=@CategorieId, UnitePrincipale=@UnitePrincipale, UniteSecondaire=@UniteSecondaire, ConversionUnite=@ConversionUnite, EstActif=@EstActif, " &
+                                "SeuilCritique=@SeuilCritique, DateExpiration=@DateExpiration, CategorieId=@CategorieId, UnitePrincipale=@UnitePrincipale, UniteSecondaire=@UniteSecondaire, ConversionUnite=@ConversionUnite, TypeGestionStock=@TypeGestionStock, UniteMesureStock=@UniteMesureStock, ContenuUnitePrincipale=@ContenuUnitePrincipale, ContenuUniteSecondaire=@ContenuUniteSecondaire, EstActif=@EstActif, " &
                                 "VenteDetail=@VenteDetail, VenteDemi=@VenteDemi, VenteDouzaine=@VenteDouzaine, VenteGros=@VenteGros, ModifierPar=@ModifierPar, ModifieLe=GETDATE() " &
                                 "WHERE ProduitId=@ProduitId"
             Dim p As New List(Of SqlParameter) From {
@@ -238,6 +242,10 @@ Namespace DevCommerc8ak
                 New SqlParameter("@UnitePrincipale", If(produit.UnitePrincipale, CType(DBNull.Value, Object))),
                 New SqlParameter("@UniteSecondaire", If(produit.UniteSecondaire, CType(DBNull.Value, Object))),
                 New SqlParameter("@ConversionUnite", produit.ConversionUnite),
+                New SqlParameter("@TypeGestionStock", NormaliserTypeGestionStock(produit.TypeGestionStock)),
+                New SqlParameter("@UniteMesureStock", If(String.IsNullOrWhiteSpace(produit.UniteMesureStock), CType(DBNull.Value, Object), produit.UniteMesureStock.Trim().ToUpperInvariant())),
+                New SqlParameter("@ContenuUnitePrincipale", ObtenirContenuPrincipal(produit)),
+                New SqlParameter("@ContenuUniteSecondaire", If(produit.ContenuUniteSecondaire.HasValue AndAlso produit.ContenuUniteSecondaire.Value > 0D, CType(produit.ContenuUniteSecondaire.Value, Object), DBNull.Value)),
                 New SqlParameter("@EstActif", produit.EstActif),
                 New SqlParameter("@VenteDetail", produit.VenteDetail),
                 New SqlParameter("@VenteDemi", produit.VenteDemi),
@@ -458,6 +466,10 @@ Namespace DevCommerc8ak
                 .UnitePrincipale = If(row.IsNull("UnitePrincipale"), Nothing, Convert.ToString(row("UnitePrincipale"))),
                 .UniteSecondaire = If(row.IsNull("UniteSecondaire"), Nothing, Convert.ToString(row("UniteSecondaire"))),
                 .ConversionUnite = Convert.ToDecimal(row("ConversionUnite")),
+                .TypeGestionStock = If(row.Table.Columns.Contains("TypeGestionStock") AndAlso Not row.IsNull("TypeGestionStock"), NormaliserTypeGestionStock(Convert.ToString(row("TypeGestionStock"))), "UNITE"),
+                .UniteMesureStock = If(row.Table.Columns.Contains("UniteMesureStock") AndAlso Not row.IsNull("UniteMesureStock"), Convert.ToString(row("UniteMesureStock")), "PIECE"),
+                .ContenuUnitePrincipale = If(row.Table.Columns.Contains("ContenuUnitePrincipale") AndAlso Not row.IsNull("ContenuUnitePrincipale"), Convert.ToDecimal(row("ContenuUnitePrincipale")), If(row.IsNull("ConversionUnite"), 1D, Convert.ToDecimal(row("ConversionUnite")))),
+                .ContenuUniteSecondaire = If(row.Table.Columns.Contains("ContenuUniteSecondaire") AndAlso Not row.IsNull("ContenuUniteSecondaire"), CType(Convert.ToDecimal(row("ContenuUniteSecondaire")), Decimal?), CType(Nothing, Decimal?)),
                 .EstActif = Convert.ToBoolean(row("EstActif")),
                 .VenteDetail = Convert.ToBoolean(row("VenteDetail")),
                 .VenteDemi = Convert.ToBoolean(row("VenteDemi")),
@@ -472,6 +484,20 @@ Namespace DevCommerc8ak
             End If
 
             Return dto
+        End Function
+
+        Private Shared Function NormaliserTypeGestionStock(typeGestion As String) As String
+            Return StockUnitConversionService.NormaliserTypeGestionStock(typeGestion)
+        End Function
+
+        Private Shared Function ObtenirContenuPrincipal(produit As Produit) As Decimal
+            If produit IsNot Nothing AndAlso produit.ContenuUnitePrincipale > 0D Then
+                Return produit.ContenuUnitePrincipale
+            End If
+            If produit IsNot Nothing AndAlso produit.ConversionUnite > 0D Then
+                Return produit.ConversionUnite
+            End If
+            Return 1D
         End Function
     End Class
 End Namespace
