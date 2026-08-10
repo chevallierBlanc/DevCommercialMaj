@@ -144,7 +144,6 @@ Namespace DevCommerc8ak
             AddHandler btnImprimerHistorique.Click, AddressOf ImprimerInventaireHistorique
             AddHandler gridInventairesHistoriques.SelectionChanged, AddressOf GridInventairesHistoriques_SelectionChanged
             AddHandler gridInventaire.CellEndEdit, AddressOf GridInventaire_CellEndEdit
-            AddHandler gridInventaire.CellValidating, AddressOf GridInventaire_CellValidating
             AddHandler gridInventaire.CellContentClick, AddressOf GridInventaire_CellContentClick
             AddHandler gridInventaire.CellFormatting, AddressOf GridInventaire_CellFormatting
             AddHandler gridInventaire.DataBindingComplete, AddressOf GridInventaire_DataBindingComplete
@@ -1269,8 +1268,8 @@ Namespace DevCommerc8ak
                     Dim produit As String = If(row.IsNull("NomProduit"), "", Convert.ToString(row("NomProduit")))
                     Dim theoValeur As Decimal = If(row.IsNull("StockTheorique"), 0D, Convert.ToDecimal(row("StockTheorique")))
                     Dim theo As String = FormaterQuantiteLigne(row, theoValeur)
-                    Dim phys As String = If(row.IsNull("StockPhysique"), "N/C", FormaterQuantiteLigne(row, Convert.ToDecimal(row("StockPhysique"))))
-                    Dim ecart As String = If(row.IsNull("Ecart"), "N/C", FormaterQuantiteLigne(row, Convert.ToDecimal(row("Ecart"))))
+                    Dim phys As String = FormaterQuantiteNullable(row, "StockPhysique")
+                    Dim ecart As String = FormaterQuantiteNullable(row, "Ecart")
                     Dim statut As String = If(row.IsNull("Statut"), "", Convert.ToString(row("Statut")))
                     lignes.Add(produit & " | Theo:" & theo & " | Phys:" & phys & " | Ecart:" & ecart & " | " & statut)
                 Next
@@ -1353,16 +1352,8 @@ Namespace DevCommerc8ak
                     e.Graphics.DrawLine(rowPen, 30, y + 16, 790, y + 16)
                     e.Graphics.DrawString(Convert.ToString(row("NomProduit")), fontBloc, Brushes.Black, colProduit, y)
                     e.Graphics.DrawString(FormaterQuantiteLigne(row, Convert.ToDecimal(If(row.IsNull("StockTheorique"), 0D, row("StockTheorique")))), fontBloc, Brushes.Black, colTheorique, y)
-                    If row.IsNull("StockPhysique") Then
-                        e.Graphics.DrawString("N/C", fontBloc, Brushes.Black, colPhysique, y)
-                    Else
-                        e.Graphics.DrawString(FormaterQuantiteLigne(row, Convert.ToDecimal(row("StockPhysique"))), fontBloc, Brushes.Black, colPhysique, y)
-                    End If
-                    If row.IsNull("Ecart") Then
-                        e.Graphics.DrawString("N/C", fontBloc, Brushes.Black, colEcart, y)
-                    Else
-                        e.Graphics.DrawString(FormaterQuantiteLigne(row, Convert.ToDecimal(row("Ecart"))), fontBloc, Brushes.Black, colEcart, y)
-                    End If
+                    e.Graphics.DrawString(FormaterQuantiteNullable(row, "StockPhysique"), fontBloc, Brushes.Black, colPhysique, y)
+                    e.Graphics.DrawString(FormaterQuantiteNullable(row, "Ecart"), fontBloc, Brushes.Black, colEcart, y)
                     e.Graphics.DrawString(Convert.ToString(row("Statut")), fontBloc, Brushes.Black, colStatut, y)
                     e.Graphics.DrawString(If(row.IsNull("Motif"), "", Convert.ToString(row("Motif"))), fontBloc, Brushes.Black, colMotif, y)
                     y += 24
@@ -1408,11 +1399,17 @@ Namespace DevCommerc8ak
         Private Sub GridInventaire_CellEndEdit(sender As Object, e As DataGridViewCellEventArgs)
             If _chargementEnCours OrElse _inventaireTable Is Nothing Then Return
             If e.RowIndex < 0 OrElse e.RowIndex >= gridInventaire.Rows.Count Then Return
-            If gridInventaire.Columns(e.ColumnIndex).Name <> "StockPhysique" AndAlso gridInventaire.Columns(e.ColumnIndex).Name <> "Motif" Then Return
+            Dim nomColonne As String = gridInventaire.Columns(e.ColumnIndex).Name
+            If nomColonne <> "StockPhysique" AndAlso nomColonne <> "Motif" Then Return
 
             Dim rowView As DataRowView = TryCast(gridInventaire.Rows(e.RowIndex).DataBoundItem, DataRowView)
             If rowView Is Nothing Then Return
             Dim row As DataRow = rowView.Row
+            If nomColonne = "Motif" Then
+                ActualiserResumeInventaire()
+                Return
+            End If
+
             MettreAJourStatutLigne(row, e.ColumnIndex)
             ActualiserResumeInventaire()
         End Sub
@@ -1439,8 +1436,9 @@ Namespace DevCommerc8ak
                 Dim produitId As Integer = Convert.ToInt32(row("ProduitId"))
                 Dim stockTheorique As Decimal = LireDecimalTable(row, "StockTheorique")
                 Dim quantiteInitiale As Decimal? = Nothing
-                If Not row.IsNull("StockPhysique") Then
-                    quantiteInitiale = Convert.ToDecimal(row("StockPhysique"))
+                Dim stockPhysiqueInitial As Decimal
+                If TryLireDecimalMetier(row, "StockPhysique", stockPhysiqueInitial) Then
+                    quantiteInitiale = stockPhysiqueInitial
                 End If
 
                 Using frm As New FormulaireComptagePhysiqueProduit(produitId, stockTheorique, quantiteInitiale)
@@ -1471,8 +1469,8 @@ Namespace DevCommerc8ak
         Private Sub MettreAJourStatutLigne(row As DataRow, colonneIndex As Integer)
             If row Is Nothing Then Return
             Dim stockTheo As Decimal = If(row.IsNull("StockTheorique"), 0D, Convert.ToDecimal(row("StockTheorique")))
-            Dim textePhysique As String = If(row.IsNull("StockPhysique"), "", Convert.ToString(row("StockPhysique")))
-            Dim stockPhysiqueNull As Boolean = String.IsNullOrWhiteSpace(textePhysique)
+            Dim stockPhysique As Decimal
+            Dim stockPhysiqueNull As Boolean = Not TryLireDecimalMetier(row, "StockPhysique", stockPhysique)
 
             If stockPhysiqueNull Then
                 row("StockPhysique") = DBNull.Value
@@ -1483,7 +1481,6 @@ Namespace DevCommerc8ak
                     row("DateComptage") = DBNull.Value
                 End If
             Else
-                Dim stockPhysique As Decimal = LireDecimalTexte(textePhysique)
                 row("StockPhysique") = stockPhysique
                 Dim ecart As Decimal = stockPhysique - stockTheo
                 row("Ecart") = ecart
@@ -1550,6 +1547,14 @@ Namespace DevCommerc8ak
             Return FormatageGlobal.FormatQuantitePhysique(valeur) & " " & uniteReference
         End Function
 
+        Private Function FormaterQuantiteNullable(row As DataRow, colonne As String) As String
+            Dim valeur As Decimal
+            If Not TryLireDecimalMetier(row, colonne, valeur) Then
+                Return "N/C"
+            End If
+            Return FormaterQuantiteLigne(row, valeur)
+        End Function
+
         Private Function FormaterStockDepuisDataRow(row As DataRow, quantiteBase As Decimal) As String
             Return FormatageGlobal.FormatStockSelonGestion(
                 quantiteBase,
@@ -1595,15 +1600,35 @@ Namespace DevCommerc8ak
             Return Convert.ToDecimal(row(colonne))
         End Function
 
-        Private Sub GridInventaire_CellValidating(sender As Object, e As DataGridViewCellValidatingEventArgs)
-            If gridInventaire.Columns(e.ColumnIndex).Name <> "StockPhysique" Then Return
-            Dim txt As String = If(e.FormattedValue Is Nothing, "", e.FormattedValue.ToString().Trim())
-            If String.IsNullOrWhiteSpace(txt) Then Return
-            Dim d As Decimal
-            If Not Decimal.TryParse(txt, d) AndAlso Not Decimal.TryParse(txt.Replace(",", "."), Globalization.NumberStyles.Any, Globalization.CultureInfo.InvariantCulture, d) Then
-                MessageBox.Show("Valeur de stock physique invalide.")
-                e.Cancel = True
+        Private Function TryLireDecimalMetier(row As DataRow, colonne As String, ByRef valeur As Decimal) As Boolean
+            valeur = 0D
+            If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains(colonne) OrElse row.IsNull(colonne) Then
+                Return False
             End If
+
+            Dim brut As Object = row(colonne)
+            If brut Is Nothing OrElse brut Is DBNull.Value Then
+                Return False
+            End If
+            If TypeOf brut Is Decimal OrElse TypeOf brut Is Integer OrElse TypeOf brut Is Long OrElse TypeOf brut Is Short OrElse TypeOf brut Is Byte Then
+                valeur = Convert.ToDecimal(brut)
+                Return True
+            End If
+
+            Dim texte As String = Convert.ToString(brut).Trim()
+            If String.IsNullOrWhiteSpace(texte) OrElse String.Equals(texte, "N/C", StringComparison.OrdinalIgnoreCase) Then
+                Return False
+            End If
+            If texte.IndexOf(" "c) >= 0 Then
+                Return False
+            End If
+
+            Return Decimal.TryParse(texte, valeur) OrElse Decimal.TryParse(texte.Replace(",", "."), Globalization.NumberStyles.Any, Globalization.CultureInfo.InvariantCulture, valeur)
+        End Function
+
+        Private Sub GridInventaire_CellValidating(sender As Object, e As DataGridViewCellValidatingEventArgs)
+            ' Le comptage physique est saisi dans FormulaireComptagePhysiqueProduit.
+            ' La grille affiche des textes formatés ("N/C", "1398 Piece") qui ne doivent pas être parsés ici.
         End Sub
 
         Private Sub GridInventaire_DataError(sender As Object, e As DataGridViewDataErrorEventArgs)
