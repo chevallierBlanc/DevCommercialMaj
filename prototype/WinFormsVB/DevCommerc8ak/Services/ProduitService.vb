@@ -93,5 +93,9 @@ Namespace DevCommerc8ak
         Public Function KpiProduits() As DataTable
             Return _repo.KpiProduits()
         End Function
+
+        Public Function ExisteParLibelle(libelle As String, Optional produitIdExclu As Integer? = Nothing) As Boolean
+            Return _repo.ExisteParLibelle(libelle, produitIdExclu)
+        End Function
     End Class
 End Namespace

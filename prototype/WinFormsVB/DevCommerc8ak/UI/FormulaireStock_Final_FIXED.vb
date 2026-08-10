@@ -204,6 +204,7 @@ Namespace DevCommerc8ak
         Private _isUpdatingPrixAutomatiques As Boolean
         Private _miseAJourCoefficientDepuisPrix As Boolean
         Private _isSavingEntree As Boolean
+        Private _stockActuelEntreeBase As Decimal
         Private _rapportEntreesPrintRowIndex As Integer
         Private _rapportEntreesPrintPageIndex As Integer
         Private _rapportEntreesTable As DataTable
@@ -711,6 +712,7 @@ Namespace DevCommerc8ak
             AddHandler cmbProduitExistant.SelectionChangeCommitted, AddressOf SelectionnerProduitExistant
             AddHandler cmbProduitExistant.Leave, AddressOf SelectionnerProduitExistant
             AddHandler txtNomProduit.TextChanged, AddressOf GenererReferenceAutomatique
+            AddHandler txtNomProduit.Leave, AddressOf VerifierDoublonNomProduit
             AddHandler cmbCategorie.SelectedIndexChanged, AddressOf GenererReferenceAutomatique
             AddHandler txtNbUniteParBase.TextChanged, AddressOf RecalculerStock
             AddHandler cmbTypeGestionStockEntree.SelectedIndexChanged, AddressOf ModeGestionStockEntreeChange
@@ -1254,6 +1256,7 @@ Namespace DevCommerc8ak
                 txtNomProduit.Text = ""
                 cmbCategorie.Text = ""
                 txtReference.Text = ""
+                _stockActuelEntreeBase = 0D
                 lblStockActuel.Text = "Stock actuel: 0"
                 lblStockActuelPiece.Text = "Equivalent: 0 pièce"
                 lblStockApres.Text = "Stock après: 0"
@@ -1292,6 +1295,32 @@ Namespace DevCommerc8ak
             txtReference.Text = GenererReferenceUnique(nom, cmbCategorie.Text.Trim())
         End Sub
 
+        Private Sub VerifierDoublonNomProduit(sender As Object, e As EventArgs)
+            ProduitNouveauExisteDeja(True)
+        End Sub
+
+        Private Function ProduitNouveauExisteDeja(afficherMessage As Boolean) As Boolean
+            If chkProduitExistant.Checked Then Return False
+
+            Dim nom As String = txtNomProduit.Text.Trim()
+            If nom = String.Empty Then Return False
+
+            Dim service As ProduitService = ObtenirService()
+            If Not service.ExisteParLibelle(nom) Then Return False
+
+            If afficherMessage Then
+                MessageBox.Show(
+                    "Un produit portant ce nom existe déjà." & Environment.NewLine &
+                    "Sélectionnez-le dans « Produit existant » ou saisissez un autre nom.",
+                    "Produit existant",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning)
+                txtNomProduit.Focus()
+            End If
+
+            Return True
+        End Function
+
         Private Sub ChargerProduitSelection(sender As Object, e As EventArgs)
             If _isFilteringProduits Then
                 Return
@@ -1303,6 +1332,7 @@ Namespace DevCommerc8ak
             Dim row As DataRowView = TryCast(cmbProduitExistant.SelectedItem, DataRowView)
             If row Is Nothing Then Return
             Dim r As DataRow = row.Row
+            _stockActuelEntreeBase = LireDecimalTable(r, "QuantiteStock")
             txtNomProduit.Text = Convert.ToString(row("Libelle"))
             If Not r.IsNull("CategorieId") AndAlso cmbCategorie.DataSource IsNot Nothing Then
                 cmbCategorie.SelectedValue = Convert.ToInt32(row("CategorieId"))
@@ -1358,8 +1388,9 @@ Namespace DevCommerc8ak
             If cmbProduitExistant.SelectedValue IsNot Nothing AndAlso Not TypeOf cmbProduitExistant.SelectedValue Is DataRowView Then
                 Dim produitId As Integer = Convert.ToInt32(cmbProduitExistant.SelectedValue)
                 Dim service As StockService = ObtenirStockService()
-	                Dim stockPieces As Decimal = service.ObtenirStockActuelProduit(produitId)
-	                Dim nb As Decimal = LireDecimal(txtNbUniteParBase.Text)
+                Dim stockPieces As Decimal = service.ObtenirStockActuelProduit(produitId)
+                _stockActuelEntreeBase = stockPieces
+                Dim nb As Decimal = LireDecimal(txtNbUniteParBase.Text)
                 Dim uniteBase As String = If(cmbUniteBase.Text.Trim() = "", "base", cmbUniteBase.Text.Trim())
                 Dim uniteSecondaire As String = ObtenirUniteSecondaireEntree()
                 If EstGestionMesureEntree() Then
@@ -1369,8 +1400,8 @@ Namespace DevCommerc8ak
                     lblStockActuel.Text = "Stock actuel: " & FormaterStockLisible(stockPieces, nb, uniteBase, uniteSecondaire)
                     lblStockActuelPiece.Text = "Equivalent: " & stockPieces.ToString("N0") & " " & uniteSecondaire
                 End If
-	            End If
-	        End Sub
+            End If
+        End Sub
 
         Private Function ObtenirUniteSecondaireEntree() As String
             If EstGestionMesureEntree() Then
@@ -2130,7 +2161,7 @@ Namespace DevCommerc8ak
             Dim nb As Decimal = LireDecimal(txtNbUniteParBase.Text)
             Dim quantiteEntree As Decimal = LireDecimal(txtQuantiteEntree.Text)
             Dim quantiteSecondaire As Decimal = LireDecimal(txtQuantiteSecondaireEntree.Text)
-            Dim stockActuelPieces As Decimal = ExtraireDecimal(lblStockActuelPiece.Text)
+            Dim stockActuelPieces As Decimal = _stockActuelEntreeBase
             Dim totalPiecesEntree As Decimal = CalculerQuantiteBaseEntree(quantiteEntree, quantiteSecondaire, nb)
             Dim stockApresPieces As Decimal = stockActuelPieces + totalPiecesEntree
             Dim uniteBase As String = If(cmbUniteBase.Text.Trim() = "", "base", cmbUniteBase.Text.Trim())
@@ -2173,31 +2204,17 @@ Namespace DevCommerc8ak
 
         Private Function FormaterStockLisible(stockBase As Decimal, conversion As Decimal, unitePrincipale As String, uniteSecondaire As String) As String
             If EstGestionMesureEntree() Then
-                Dim contenuPrincipal As Decimal = LireContenuUnitePrincipaleEntree()
-                If contenuPrincipal <= 0D Then
-                    Return stockBase.ToString("N2") & " " & uniteSecondaire
-                End If
-
-                Dim quantitePrincipaleCalculee As Decimal = Decimal.Floor(stockBase / contenuPrincipal)
-                Dim resteCalcule As Decimal = stockBase - (quantitePrincipaleCalculee * contenuPrincipal)
                 Dim contenuSecondaire As Decimal? = LireContenuUniteSecondaireEntree()
-
-	                If contenuSecondaire.HasValue AndAlso contenuSecondaire.Value > 0D Then
-	                    Dim uniteSecondairePhysique As String = ObtenirUniteSecondaireProduitSelectionne()
-	                    Dim quantiteSecondaireCalculee As Decimal = Decimal.Floor(resteCalcule / contenuSecondaire.Value)
-	                    Dim resteMesure As Decimal = resteCalcule - (quantiteSecondaireCalculee * contenuSecondaire.Value)
-	                    Dim morceaux As New List(Of String)()
-	                    If quantitePrincipaleCalculee > 0D Then morceaux.Add(quantitePrincipaleCalculee.ToString("N0") & " " & unitePrincipale)
-	                    If Not String.IsNullOrWhiteSpace(uniteSecondairePhysique) Then morceaux.Add(quantiteSecondaireCalculee.ToString("N0") & " " & uniteSecondairePhysique)
-	                    If resteMesure > 0D OrElse morceaux.Count = 0 Then morceaux.Add(FormatageGlobal.FormatQuantitePhysique(resteMesure) & " " & uniteSecondaire)
-	                    Return String.Join(" + ", morceaux)
-	                End If
-
-                If resteCalcule > 0D Then
-                    Return quantitePrincipaleCalculee.ToString("N0") & " " & unitePrincipale & " + " & resteCalcule.ToString("N2").TrimEnd("0"c).TrimEnd(","c).TrimEnd("."c) & " " & uniteSecondaire
-                End If
-
-                Return quantitePrincipaleCalculee.ToString("N0") & " " & unitePrincipale
+                Dim decomposition As String = FormatageGlobal.DecomposerStockMesure(
+                    stockBase,
+                    conversion,
+                    unitePrincipale,
+                    ObtenirUniteSecondaireProduitSelectionne(),
+                    uniteSecondaire,
+                    LireContenuUnitePrincipaleEntree(),
+                    If(contenuSecondaire.HasValue, contenuSecondaire.Value, 0D))
+                If decomposition <> String.Empty Then Return decomposition
+                Return FormatageGlobal.FormatQuantitePhysique(stockBase) & " " & uniteSecondaire
             End If
 
             If conversion <= 0D Then
@@ -2630,6 +2647,9 @@ Namespace DevCommerc8ak
                         txtNomProduit.Focus()
                         Return
                     End If
+                    If ProduitNouveauExisteDeja(True) Then
+                        Return
+                    End If
                     If txtReference.Text.Trim() = "" Then
                         txtReference.Text = GenererReferenceUnique(nom, cmbCategorie.Text.Trim())
                     End If
@@ -2644,7 +2664,7 @@ Namespace DevCommerc8ak
                     Dim prixPieceVal As Decimal = LireDecimal(txtPrixPiece.Text.Replace("-", "0"))
                     Dim prixDouzaineVal As Decimal = LireDecimal(txtPrixDouzaine.Text.Replace("-", "0"))
 
-	                    Dim produit As New Produit With {
+                    Dim produit As New Produit With {
                         .CodeBarres = txtReference.Text.Trim(),
                         .Libelle = nom,
                         .PrixAchat = prixAchatVal1,
@@ -2657,25 +2677,25 @@ Namespace DevCommerc8ak
                         .CoefficientGros = _coefficientCalcule,
                         .SeuilCritique = 0D,
                         .DateExpiration = Nothing,
-	                        .CategorieId = ObtenirCategorieSelectionneId(),
-	                        .UnitePrincipale = cmbUniteBase.Text,
-	                        .UniteSecondaire = "Piece",
-	                        .ConversionUnite = If(LireDecimal(txtNbUniteParBase.Text) > 0D, LireDecimal(txtNbUniteParBase.Text), LireContenuUnitePrincipaleEntree()),
-	                        .TypeGestionStock = TypeGestionStockEntree(),
-	                        .UniteMesureStock = If(EstGestionMesureEntree(), UniteMesureStockEntree(), "PIECE"),
-	                        .ContenuUnitePrincipale = LireContenuUnitePrincipaleEntree(),
-	                        .ContenuUniteSecondaire = LireContenuUniteSecondaireEntree(),
-	                        .EstActif = True,
+                        .CategorieId = ObtenirCategorieSelectionneId(),
+                        .UnitePrincipale = cmbUniteBase.Text,
+                        .UniteSecondaire = "Piece",
+                        .ConversionUnite = If(LireDecimal(txtNbUniteParBase.Text) > 0D, LireDecimal(txtNbUniteParBase.Text), LireContenuUnitePrincipaleEntree()),
+                        .TypeGestionStock = TypeGestionStockEntree(),
+                        .UniteMesureStock = If(EstGestionMesureEntree(), UniteMesureStockEntree(), "PIECE"),
+                        .ContenuUnitePrincipale = LireContenuUnitePrincipaleEntree(),
+                        .ContenuUniteSecondaire = LireContenuUniteSecondaireEntree(),
+                        .EstActif = True,
                         .VenteDetail = chkPiece.Checked,
                         .VenteDemi = chkDemi.Checked,
                         .VenteDouzaine = chkDouzaine.Checked,
                         .VenteGros = chkGros.Checked
                     }
                     Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
-	                    Dim dal As New DAL(cs)
-	                    Dim serviceProduit As New ProduitService(New ProduitRepository(dal))
-	                    produitId = serviceProduit.Ajouter(produit)
-	                    produitNouvellementCree = True
+                    Dim dal As New DAL(cs)
+                    Dim serviceProduit As New ProduitService(New ProduitRepository(dal))
+                    produitId = serviceProduit.Ajouter(produit)
+                    produitNouvellementCree = True
                 End If
 
                 _isSavingEntree = True
@@ -2684,7 +2704,26 @@ Namespace DevCommerc8ak
                 End If
 
                 Dim service As StockService = ObtenirStockService()
+                Dim contenuSecondaireDebug As Decimal? = LireContenuUniteSecondaireEntree()
+                Dim stockAvant As Decimal = service.ObtenirStockActuelProduit(produitId)
+                Dim stockApresAttendu As Decimal = stockAvant + qte
+                Debug.WriteLine(String.Format(Globalization.CultureInfo.InvariantCulture,
+                                              "[StockEntree] AVANT EnregistrerEntree Produit={0}; Mode={1}; StockAvant={2}; QteEntree={3}; ContenuPrincipal={4}; BonusSecondaire={5}; ContenuSecondaire={6}; StockAjoute={7}; StockApres={8}",
+                                              produitId,
+                                              TypeGestionStockEntree(),
+                                              stockAvant,
+                                              quantitePrincipale,
+                                              LireContenuUnitePrincipaleEntree(),
+                                              quantiteSecondaire,
+                                              If(contenuSecondaireDebug.HasValue, contenuSecondaireDebug.Value, 0D),
+                                              qte,
+                                              stockApresAttendu))
                 service.EnregistrerEntree(produitId, qte, ObtenirUniteSecondaireEntree(), txtReference.Text.Trim(), txtObservationEntree.Text.Trim(), SessionUtilisateur.UtilisateurId, prixAchatVal)
+                Dim stockReluApresSauvegarde As Decimal = service.ObtenirStockActuelProduit(produitId)
+                _stockActuelEntreeBase = stockReluApresSauvegarde
+                Debug.WriteLine(String.Format(Globalization.CultureInfo.InvariantCulture,
+                                              "[StockEntree] Stock réellement relu BDD après sauvegarde = {0}",
+                                              stockReluApresSauvegarde))
                 If etaitProduitExistant Then
                     EnregistrerTypesPersonnalisesTemporaires(produitId)
                 End If

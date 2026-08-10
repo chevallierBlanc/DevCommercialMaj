@@ -322,6 +322,30 @@ Namespace DevCommerc8ak
             Return _dal.ExecuterNonRequete(sql, CommandType.Text, p)
         End Function
 
+        Public Function ExisteParLibelle(libelle As String, Optional produitIdExclu As Integer? = Nothing) As Boolean
+            If String.IsNullOrWhiteSpace(libelle) Then
+                Return False
+            End If
+
+            Dim sql As String = "SELECT TOP 1 1 FROM Produits " &
+                                "WHERE " & ExpressionLibelleNormalisee("Libelle") & " = " & ExpressionLibelleNormalisee("@Libelle") & " " &
+                                "AND (@ProduitIdExclu IS NULL OR ProduitId <> @ProduitIdExclu)"
+            Dim p As New List(Of SqlParameter) From {
+                New SqlParameter("@Libelle", libelle),
+                New SqlParameter("@ProduitIdExclu", If(produitIdExclu.HasValue, CType(produitIdExclu.Value, Object), DBNull.Value))
+            }
+            Dim resultat As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
+            Return resultat IsNot Nothing AndAlso resultat IsNot DBNull.Value
+        End Function
+
+        Private Shared Function ExpressionLibelleNormalisee(expression As String) As String
+            Dim resultat As String = "UPPER(LTRIM(RTRIM(" & expression & ")))"
+            For i As Integer = 1 To 8
+                resultat = "REPLACE(" & resultat & ", '  ', ' ')"
+            Next
+            Return resultat
+        End Function
+
         ' Historique detaille des prix pour impression et filtrage.
         Public Function ListerHistoriquePrixTable(produitId As Integer?, dateDebut As Date?, dateFin As Date?) As DataTable
             AssurerColonnes()

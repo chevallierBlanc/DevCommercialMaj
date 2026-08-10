@@ -37,6 +37,45 @@ Namespace DevCommerc8ak
             Return FormatNombre(cartons) & " " & unitePrincipale & " + " & FormatNombre(pieces) & " " & uniteSeconde
         End Function
 
+        Public Function DecomposerStockMesure(stockReel As Decimal,
+                                              conversionUnite As Decimal,
+                                              unitePrincipale As String,
+                                              uniteSecondaire As String,
+                                              uniteMesureStock As String,
+                                              contenuUnitePrincipale As Decimal,
+                                              Optional contenuUniteSecondaire As Decimal = 0D) As String
+            Dim unitePrincipaleAffichee As String = If(String.IsNullOrWhiteSpace(unitePrincipale), "unité", unitePrincipale.Trim())
+            Dim uniteSecondaireAffichee As String = If(String.IsNullOrWhiteSpace(uniteSecondaire), String.Empty, uniteSecondaire.Trim())
+            Dim uniteMesureAffichee As String = If(String.IsNullOrWhiteSpace(uniteMesureStock), "mesure", uniteMesureStock.Trim())
+            Dim contenuPrincipal As Decimal = contenuUnitePrincipale
+            If contenuPrincipal <= 0D Then contenuPrincipal = conversionUnite
+            If contenuPrincipal <= 0D Then Return String.Empty
+
+            Dim quantitePrincipale As Decimal = Decimal.Floor(stockReel / contenuPrincipal)
+            Dim resteMesure As Decimal = stockReel - (quantitePrincipale * contenuPrincipal)
+
+            If contenuUniteSecondaire > 0D AndAlso uniteSecondaireAffichee <> String.Empty Then
+                Dim quantiteSecondaire As Decimal = Decimal.Floor(resteMesure / contenuUniteSecondaire)
+                Dim restePhysique As Decimal = resteMesure - (quantiteSecondaire * contenuUniteSecondaire)
+                Dim decomposition As String = FormatNombre(quantitePrincipale) & " " & unitePrincipaleAffichee & " + " & FormatNombre(quantiteSecondaire) & " " & uniteSecondaireAffichee
+                If restePhysique > 0D Then
+                    decomposition &= " + " & FormatQuantitePhysique(restePhysique) & " " & uniteMesureAffichee
+                End If
+                Return decomposition
+            End If
+
+            If resteMesure <= 0D Then
+                If quantitePrincipale <= 0D Then Return String.Empty
+                Return FormatNombre(quantitePrincipale) & " " & unitePrincipaleAffichee
+            End If
+
+            If quantitePrincipale <= 0D Then
+                Return FormatQuantitePhysique(resteMesure) & " " & uniteMesureAffichee
+            End If
+
+            Return FormatNombre(quantitePrincipale) & " " & unitePrincipaleAffichee & " + " & FormatQuantitePhysique(resteMesure) & " " & uniteMesureAffichee
+        End Function
+
         Public Function FormatStockSelonGestion(stockReel As Decimal,
                                                 conversionUnite As Decimal,
                                                 unitePrincipale As String,
@@ -46,41 +85,11 @@ Namespace DevCommerc8ak
                                                 contenuUnitePrincipale As Decimal,
                                                 Optional contenuUniteSecondaire As Decimal = 0D) As String
             If StockUnitConversionService.EstGestionMesuree(typeGestionStock) Then
-                Dim unitePrincipaleAffichee As String = If(String.IsNullOrWhiteSpace(unitePrincipale), "unité", unitePrincipale.Trim())
-                Dim uniteSecondaireAffichee As String = If(String.IsNullOrWhiteSpace(uniteSecondaire), String.Empty, uniteSecondaire.Trim())
                 Dim uniteMesureAffichee As String = If(String.IsNullOrWhiteSpace(uniteMesureStock), "mesure", uniteMesureStock.Trim())
-                Dim contenuPrincipal As Decimal = contenuUnitePrincipale
-                If contenuPrincipal <= 0D Then contenuPrincipal = conversionUnite
                 Dim stockPhysique As String = FormatQuantitePhysique(stockReel) & " " & uniteMesureAffichee
-
-                If contenuPrincipal <= 0D Then
-                    Return stockPhysique
-                End If
-
-                Dim quantitePrincipale As Decimal = Decimal.Floor(stockReel / contenuPrincipal)
-                Dim resteMesure As Decimal = stockReel - (quantitePrincipale * contenuPrincipal)
-
-                If contenuUniteSecondaire > 0D AndAlso uniteSecondaireAffichee <> String.Empty Then
-                    Dim quantiteSecondaire As Decimal = Decimal.Floor(resteMesure / contenuUniteSecondaire)
-                    Dim restePhysique As Decimal = resteMesure - (quantiteSecondaire * contenuUniteSecondaire)
-                    Dim decomposition As String = FormatNombre(quantitePrincipale) & " " & unitePrincipaleAffichee & " + " & FormatNombre(quantiteSecondaire) & " " & uniteSecondaireAffichee
-                    If restePhysique > 0D Then
-                        decomposition &= " + " & FormatQuantitePhysique(restePhysique) & " " & uniteMesureAffichee
-                    End If
-
-                    Return stockPhysique & " = " & decomposition
-                End If
-
-                If resteMesure <= 0D Then
-                    If quantitePrincipale <= 0D Then Return stockPhysique
-                    Return stockPhysique & " = " & FormatNombre(quantitePrincipale) & " " & unitePrincipaleAffichee
-                End If
-
-                If quantitePrincipale <= 0D Then
-                    Return stockPhysique
-                End If
-
-                Return stockPhysique & " = " & FormatNombre(quantitePrincipale) & " " & unitePrincipaleAffichee & " + " & FormatQuantitePhysique(resteMesure) & " " & uniteMesureAffichee
+                Dim decomposition As String = DecomposerStockMesure(stockReel, conversionUnite, unitePrincipale, uniteSecondaire, uniteMesureStock, contenuUnitePrincipale, contenuUniteSecondaire)
+                If decomposition = String.Empty Then Return stockPhysique
+                Return stockPhysique & " = " & decomposition
             End If
 
             Return FormatStockAvecEquivalence(stockReel, conversionUnite, unitePrincipale, uniteSecondaire)
