@@ -48,6 +48,52 @@ Namespace DevCommerc8ak
             Return quantite * contenuSecondaire
         End Function
 
+        Public Shared Function CalculerQuantiteBaseTypeStandard(typeVente As String,
+                                                                conversionUnite As Decimal,
+                                                                typeGestionStock As String,
+                                                                contenuUnitePrincipale As Decimal,
+                                                                contenuUniteSecondaire As Decimal) As Decimal?
+            Dim typeNormalise As String = If(typeVente, String.Empty).Trim().ToUpperInvariant()
+            Dim conversion As Decimal = If(conversionUnite > 0D, conversionUnite, 1D)
+
+            If EstGestionMesuree(typeGestionStock) Then
+                Dim contenuPrincipal As Decimal = If(contenuUnitePrincipale > 0D, contenuUnitePrincipale, conversion)
+                If contenuPrincipal <= 0D Then Return Nothing
+
+                Select Case typeNormalise
+                    Case "GROS"
+                        Return contenuPrincipal
+                    Case "DEMI"
+                        Return contenuPrincipal / 2D
+                    Case "QUART"
+                        Return contenuPrincipal / 4D
+                    Case "PIECE", "PIÈCE", "DETAIL", "DÉTAIL"
+                        If contenuUniteSecondaire > 0D Then Return contenuUniteSecondaire
+                        Return Nothing
+                    Case "DOUZAINE"
+                        If contenuUniteSecondaire > 0D Then Return 12D * contenuUniteSecondaire
+                        Return Nothing
+                End Select
+
+                Return Nothing
+            End If
+
+            Select Case typeNormalise
+                Case "GROS"
+                    Return conversion
+                Case "DEMI"
+                    Return Math.Max(1D, Decimal.Floor(conversion / 2D))
+                Case "QUART"
+                    Return Math.Max(1D, Decimal.Floor(conversion / 4D))
+                Case "PIECE", "PIÈCE", "DETAIL", "DÉTAIL"
+                    Return 1D
+                Case "DOUZAINE"
+                    Return 12D
+            End Select
+
+            Return Nothing
+        End Function
+
         Public Shared Function CalculerCoutUnitaireStock(prixAchat As Decimal,
                                                          conversionUnite As Decimal,
                                                          typeGestionStock As String,

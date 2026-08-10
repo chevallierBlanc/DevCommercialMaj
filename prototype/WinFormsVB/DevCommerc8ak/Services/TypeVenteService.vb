@@ -25,16 +25,26 @@ Namespace DevCommerc8ak
                                              venteGros As Boolean,
                                              venteDemi As Boolean,
                                              venteDetail As Boolean,
-                                             venteDouzaine As Boolean) As List(Of TypeVenteDTO)
+                                             venteDouzaine As Boolean,
+                                             Optional typeGestionStock As String = "UNITE",
+                                             Optional contenuUnitePrincipale As Decimal = 0D,
+                                             Optional contenuUniteSecondaire As Decimal = 0D,
+                                             Optional uniteSecondaire As String = "") As List(Of TypeVenteDTO)
             Dim liste As New List(Of TypeVenteDTO)()
             Dim nb As Decimal = If(nbUniteParBase > 0D, nbUniteParBase, 1D)
             Dim coeffGros As Decimal = CalculerCoefficient(prixAchat, prixGros)
             Dim coeffDetail As Decimal = CalculerCoefficient(prixAchat, prixPiece * nb)
+            Dim libelleDetail As String = If(StockUnitConversionService.EstGestionMesuree(typeGestionStock) AndAlso Not String.IsNullOrWhiteSpace(uniteSecondaire), uniteSecondaire.Trim(), Nothing)
+            Dim quantiteGros As Decimal? = StockUnitConversionService.CalculerQuantiteBaseTypeStandard("GROS", nb, typeGestionStock, contenuUnitePrincipale, contenuUniteSecondaire)
+            Dim quantiteDemi As Decimal? = StockUnitConversionService.CalculerQuantiteBaseTypeStandard("DEMI", nb, typeGestionStock, contenuUnitePrincipale, contenuUniteSecondaire)
+            Dim quantiteQuart As Decimal? = StockUnitConversionService.CalculerQuantiteBaseTypeStandard("QUART", nb, typeGestionStock, contenuUnitePrincipale, contenuUniteSecondaire)
+            Dim quantiteDetail As Decimal? = StockUnitConversionService.CalculerQuantiteBaseTypeStandard("DETAIL", nb, typeGestionStock, contenuUnitePrincipale, contenuUniteSecondaire)
+            Dim quantiteDouzaine As Decimal? = StockUnitConversionService.CalculerQuantiteBaseTypeStandard("DOUZAINE", nb, typeGestionStock, contenuUnitePrincipale, contenuUniteSecondaire)
 
-            If venteGros AndAlso prixGros > 0D Then
+            If venteGros AndAlso prixGros > 0D AndAlso quantiteGros.HasValue Then
                 liste.Add(New TypeVenteDTO With {
                     .Nom = "gros",
-                    .QuantiteEquivalent = nb,
+                    .QuantiteEquivalent = quantiteGros.Value,
                     .TypeUniteEquivalent = "SECONDAIRE",
                     .TypeQuantiteEquivalent = "SECONDAIRE",
                     .ModePrix = "COEFFICIENT",
@@ -45,10 +55,10 @@ Namespace DevCommerc8ak
                 })
             End If
 
-            If venteDemi AndAlso prixDemi > 0D Then
+            If venteDemi AndAlso prixDemi > 0D AndAlso quantiteDemi.HasValue Then
                 liste.Add(New TypeVenteDTO With {
                     .Nom = "demi",
-                    .QuantiteEquivalent = Math.Max(1D, Decimal.Floor(nb / 2D)),
+                    .QuantiteEquivalent = quantiteDemi.Value,
                     .TypeUniteEquivalent = "SECONDAIRE",
                     .TypeQuantiteEquivalent = "SECONDAIRE",
                     .ModePrix = "COEFFICIENT",
@@ -59,10 +69,10 @@ Namespace DevCommerc8ak
                 })
             End If
 
-            If prixQuart > 0D Then
+            If prixQuart > 0D AndAlso quantiteQuart.HasValue Then
                 liste.Add(New TypeVenteDTO With {
                     .Nom = "quart",
-                    .QuantiteEquivalent = Math.Max(1D, Decimal.Floor(nb / 4D)),
+                    .QuantiteEquivalent = quantiteQuart.Value,
                     .TypeUniteEquivalent = "SECONDAIRE",
                     .TypeQuantiteEquivalent = "SECONDAIRE",
                     .ModePrix = "COEFFICIENT",
@@ -73,24 +83,25 @@ Namespace DevCommerc8ak
                 })
             End If
 
-            If venteDetail AndAlso prixPiece > 0D Then
+            If venteDetail AndAlso prixPiece > 0D AndAlso quantiteDetail.HasValue Then
                 liste.Add(New TypeVenteDTO With {
                     .Nom = "piece",
-                    .QuantiteEquivalent = 1D,
+                    .QuantiteEquivalent = quantiteDetail.Value,
                     .TypeUniteEquivalent = "SECONDAIRE",
                     .TypeQuantiteEquivalent = "SECONDAIRE",
                     .ModePrix = "COEFFICIENT",
                     .Coefficient = coeffDetail,
                     .PrixVente = prixPiece,
                     .Actif = True,
-                    .EstPersonnalise = False
+                    .EstPersonnalise = False,
+                    .LibelleAffichage = libelleDetail
                 })
             End If
 
-            If venteDouzaine AndAlso prixDouzaine > 0D Then
+            If venteDouzaine AndAlso prixDouzaine > 0D AndAlso quantiteDouzaine.HasValue Then
                 liste.Add(New TypeVenteDTO With {
                     .Nom = "douzaine",
-                    .QuantiteEquivalent = 12D,
+                    .QuantiteEquivalent = quantiteDouzaine.Value,
                     .TypeUniteEquivalent = "SECONDAIRE",
                     .TypeQuantiteEquivalent = "SECONDAIRE",
                     .ModePrix = "COEFFICIENT",
@@ -101,10 +112,10 @@ Namespace DevCommerc8ak
                 })
             End If
 
-            If prixSpecial > 0D Then
+            If prixSpecial > 0D AndAlso quantiteDetail.HasValue Then
                 liste.Add(New TypeVenteDTO With {
                     .Nom = "speciale",
-                    .QuantiteEquivalent = 1D,
+                    .QuantiteEquivalent = quantiteDetail.Value,
                     .TypeUniteEquivalent = "SECONDAIRE",
                     .TypeQuantiteEquivalent = "SECONDAIRE",
                     .ModePrix = "COEFFICIENT",
@@ -115,7 +126,7 @@ Namespace DevCommerc8ak
                 })
                 liste.Add(New TypeVenteDTO With {
                     .Nom = "promo",
-                    .QuantiteEquivalent = 1D,
+                    .QuantiteEquivalent = quantiteDetail.Value,
                     .TypeUniteEquivalent = "SECONDAIRE",
                     .TypeQuantiteEquivalent = "SECONDAIRE",
                     .ModePrix = "COEFFICIENT",
@@ -144,8 +155,10 @@ Namespace DevCommerc8ak
                                                         venteDouzaine As Boolean,
                                                         Optional typesPersonnalisesOverrides As IEnumerable(Of TypeVenteProduitDTO) = Nothing,
                                                         Optional contenuUnitePrincipale As Decimal = 0D,
-                                                        Optional contenuUniteSecondaire As Decimal = 0D) As List(Of TypeVenteDTO)
-            Dim liste As List(Of TypeVenteDTO) = ConstruireTypesVente(nbUniteParBase, prixAchat, prixGros, prixDemi, prixPiece, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine)
+                                                        Optional contenuUniteSecondaire As Decimal = 0D,
+                                                        Optional typeGestionStock As String = "UNITE",
+                                                        Optional uniteSecondaire As String = "") As List(Of TypeVenteDTO)
+            Dim liste As List(Of TypeVenteDTO) = ConstruireTypesVente(nbUniteParBase, prixAchat, prixGros, prixDemi, prixPiece, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine, typeGestionStock, contenuUnitePrincipale, contenuUniteSecondaire, uniteSecondaire)
             If produitId <= 0 Then
                 Return liste
             End If

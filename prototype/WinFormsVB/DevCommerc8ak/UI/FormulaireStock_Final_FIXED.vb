@@ -1358,13 +1358,19 @@ Namespace DevCommerc8ak
             If cmbProduitExistant.SelectedValue IsNot Nothing AndAlso Not TypeOf cmbProduitExistant.SelectedValue Is DataRowView Then
                 Dim produitId As Integer = Convert.ToInt32(cmbProduitExistant.SelectedValue)
                 Dim service As StockService = ObtenirStockService()
-                Dim stockPieces As Decimal = service.ObtenirStockActuelProduit(produitId)
-                Dim nb As Decimal = LireDecimal(txtNbUniteParBase.Text)
+	                Dim stockPieces As Decimal = service.ObtenirStockActuelProduit(produitId)
+	                Dim nb As Decimal = LireDecimal(txtNbUniteParBase.Text)
                 Dim uniteBase As String = If(cmbUniteBase.Text.Trim() = "", "base", cmbUniteBase.Text.Trim())
-                lblStockActuel.Text = "Stock actuel: " & FormaterStockLisible(stockPieces, nb, uniteBase, ObtenirUniteSecondaireEntree())
-                lblStockActuelPiece.Text = If(EstGestionMesureEntree(), "Equivalent physique: ", "Equivalent: ") & stockPieces.ToString(If(EstGestionMesureEntree(), "N2", "N0")) & " " & ObtenirUniteSecondaireEntree()
-            End If
-        End Sub
+                Dim uniteSecondaire As String = ObtenirUniteSecondaireEntree()
+                If EstGestionMesureEntree() Then
+                    lblStockActuel.Text = "Stock actuel: " & FormatageGlobal.FormatQuantitePhysique(stockPieces) & " " & uniteSecondaire
+                    lblStockActuelPiece.Text = "Equivalent: " & FormaterStockLisible(stockPieces, nb, uniteBase, uniteSecondaire)
+                Else
+                    lblStockActuel.Text = "Stock actuel: " & FormaterStockLisible(stockPieces, nb, uniteBase, uniteSecondaire)
+                    lblStockActuelPiece.Text = "Equivalent: " & stockPieces.ToString("N0") & " " & uniteSecondaire
+                End If
+	            End If
+	        End Sub
 
         Private Function ObtenirUniteSecondaireEntree() As String
             If EstGestionMesureEntree() Then
@@ -1956,17 +1962,21 @@ Namespace DevCommerc8ak
                 Dim prixAchat As Decimal = Convert.ToDecimal(If(r.IsNull("PrixAchat"), "", Convert.ToDecimal(row("PrixAchat")).ToString()))
                 Dim prixGros As Decimal = Convert.ToDecimal(If(r.IsNull("PrixGros"), "", Convert.ToDecimal(row("PrixGros")).ToString()))
                 Dim prixDemi As Decimal = Convert.ToDecimal(If(r.IsNull("PrixDemi"), "", Convert.ToDecimal(row("PrixDemi")).ToString()))
-                Dim prixDetail As Decimal = Convert.ToDecimal(If(r.IsNull("PrixDetail"), "", Convert.ToDecimal(row("PrixDetail")).ToString()))
-                Dim prixQuart As Decimal = Convert.ToDecimal(If(r.IsNull("PrixQuart"), "", Convert.ToDecimal(row("PrixQuart")).ToString()))
-                Dim prixDouzaine As Decimal = Convert.ToDecimal(If(r.IsNull("PrixDouzaine"), "", Convert.ToDecimal(row("PrixDouzaine")).ToString()))
-                Dim prixSpecial As Decimal = Convert.ToDecimal(If(r.IsNull("PrixSpecial"), "", Convert.ToDecimal(row("PrixSpecial")).ToString()))
+	                Dim prixDetail As Decimal = Convert.ToDecimal(If(r.IsNull("PrixDetail"), "", Convert.ToDecimal(row("PrixDetail")).ToString()))
+	                Dim prixQuart As Decimal = Convert.ToDecimal(If(r.IsNull("PrixQuart"), "", Convert.ToDecimal(row("PrixQuart")).ToString()))
+	                Dim prixDouzaine As Decimal = Convert.ToDecimal(If(r.IsNull("PrixDouzaine"), "", Convert.ToDecimal(row("PrixDouzaine")).ToString()))
+	                Dim prixSpecial As Decimal = Convert.ToDecimal(If(r.IsNull("PrixSpecial"), "", Convert.ToDecimal(row("PrixSpecial")).ToString()))
+	                Dim contenuUnitePrincipale As Decimal = LireDecimalTable(r, "ContenuUnitePrincipale")
+	                Dim contenuUniteSecondaire As Decimal = LireDecimalTable(r, "ContenuUniteSecondaire")
+	                Dim typeGestion As String = LireTexteCellule(r, "TypeGestionStock")
+	                Dim uniteSecondaire As String = LireTexteCellule(r, "UniteSecondaire")
 
-                Dim venteDetail As Boolean = If(IsDBNull(row("VenteDetail")), False, Convert.ToInt32(row("VenteDetail")) = 1)
-                Dim venteDemi As Boolean = If(IsDBNull(row("VenteDemi")), False, Convert.ToDecimal(row("VenteDemi")) = 1)
-                Dim venteDouzaine As Boolean = If(IsDBNull(row("VenteDouzaine")), False, Convert.ToDecimal(row("VenteDouzaine")) = 1)
-                Dim venteGros As Boolean = If(IsDBNull(row("VenteGros")), False, Convert.ToDecimal(row("VenteGros")) = 1)
+	                Dim venteDetail As Boolean = If(IsDBNull(row("VenteDetail")), False, Convert.ToInt32(row("VenteDetail")) = 1)
+	                Dim venteDemi As Boolean = If(IsDBNull(row("VenteDemi")), False, Convert.ToDecimal(row("VenteDemi")) = 1)
+	                Dim venteDouzaine As Boolean = If(IsDBNull(row("VenteDouzaine")), False, Convert.ToDecimal(row("VenteDouzaine")) = 1)
+	                Dim venteGros As Boolean = If(IsDBNull(row("VenteGros")), False, Convert.ToDecimal(row("VenteGros")) = 1)
 
-                _typesVenteCourants = _typeVenteService.ConstruireTypesVentePourProduit(produitId, nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine)
+	                _typesVenteCourants = _typeVenteService.ConstruireTypesVentePourProduit(produitId, nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine, Nothing, contenuUnitePrincipale, contenuUniteSecondaire, typeGestion, uniteSecondaire)
                 cmbTypeVente.DataSource = Nothing
                 cmbTypeVente.DisplayMember = "NomAffichage"
                 cmbTypeVente.ValueMember = "Nom"
@@ -2088,6 +2098,7 @@ Namespace DevCommerc8ak
                 Dim typeGestion As String = LireTexteCellule(r, "TypeGestionStock")
                 Dim uniteMesure As String = LireTexteCellule(r, "UniteMesureStock")
                 Dim contenuPrincipal As Decimal = LireDecimalTable(r, "ContenuUnitePrincipale")
+                Dim contenuSecondaire As Decimal = LireDecimalTable(r, "ContenuUniteSecondaire")
                 Dim reserve As Decimal = 0D
                 For Each ligne As PanierLigne In _panier
                     If ligne.ProduitId = produitId Then
@@ -2095,8 +2106,8 @@ Namespace DevCommerc8ak
                     End If
                 Next
                 Dim restant As Decimal = Math.Max(0D, stock - reserve)
-                lblStock.Text = "Stock: " & FormatageGlobal.FormatStockSelonGestion(stock, nbUnites, uniteBase, uniteSecondaire, typeGestion, uniteMesure, contenuPrincipal) &
-                    " | Restant: " & FormatageGlobal.FormatStockSelonGestion(restant, nbUnites, uniteBase, uniteSecondaire, typeGestion, uniteMesure, contenuPrincipal)
+                lblStock.Text = "Stock: " & FormatageGlobal.FormatStockSelonGestion(stock, nbUnites, uniteBase, uniteSecondaire, typeGestion, uniteMesure, contenuPrincipal, contenuSecondaire) &
+                    " | Restant: " & FormatageGlobal.FormatStockSelonGestion(restant, nbUnites, uniteBase, uniteSecondaire, typeGestion, uniteMesure, contenuPrincipal, contenuSecondaire)
             End If
         End Sub
 
@@ -2133,10 +2144,19 @@ Namespace DevCommerc8ak
             Dim formatQuantite As String = If(EstGestionMesureEntree(), "N2", "N0")
             Dim libelleEquivalent As String = If(EstGestionMesureEntree(), "Equivalent physique: ", "Equivalent: ")
 
-            lblStockActuel.Text = "Stock actuel: " & FormaterStockLisible(stockActuelPieces, nb, uniteBase, uniteSecondaire)
-            lblStockActuelPiece.Text = libelleEquivalent & stockActuelPieces.ToString(formatQuantite) & " " & uniteSecondaire
-            lblStockApres.Text = "Stock après: " & FormaterStockLisible(stockApresPieces, nb, uniteBase, uniteSecondaire)
-            lblStockApresPiece.Text = "Après: " & stockApresPieces.ToString(formatQuantite) & " " & uniteSecondaire & " (" & quantiteEntree.ToString("N0") & " " & uniteBase & " + " & quantiteSecondaire.ToString(formatQuantite) & " " & uniteComplement & ")"
+            Dim stockActuelLisible As String = FormaterStockLisible(stockActuelPieces, nb, uniteBase, uniteSecondaire)
+            Dim stockApresLisible As String = FormaterStockLisible(stockApresPieces, nb, uniteBase, uniteSecondaire)
+            If EstGestionMesureEntree() Then
+                lblStockActuel.Text = "Stock actuel: " & FormatageGlobal.FormatQuantitePhysique(stockActuelPieces) & " " & uniteSecondaire
+                lblStockActuelPiece.Text = "Equivalent: " & stockActuelLisible
+                lblStockApres.Text = "Stock après: " & FormatageGlobal.FormatQuantitePhysique(stockApresPieces) & " " & uniteSecondaire
+                lblStockApresPiece.Text = "Après: " & FormatageGlobal.FormatQuantitePhysique(stockApresPieces) & " " & uniteSecondaire & " (" & stockApresLisible & ")"
+            Else
+                lblStockActuel.Text = "Stock actuel: " & stockActuelLisible
+                lblStockActuelPiece.Text = libelleEquivalent & stockActuelPieces.ToString(formatQuantite) & " " & uniteSecondaire
+                lblStockApres.Text = "Stock après: " & stockApresLisible
+                lblStockApresPiece.Text = "Après: " & stockApresPieces.ToString(formatQuantite) & " " & uniteSecondaire & " (" & quantiteEntree.ToString("N0") & " " & uniteBase & " + " & quantiteSecondaire.ToString(formatQuantite) & " " & uniteComplement & ")"
+            End If
             RafraichirTypesVente()
         End Sub
 
@@ -2162,16 +2182,16 @@ Namespace DevCommerc8ak
                 Dim resteCalcule As Decimal = stockBase - (quantitePrincipaleCalculee * contenuPrincipal)
                 Dim contenuSecondaire As Decimal? = LireContenuUniteSecondaireEntree()
 
-                If contenuSecondaire.HasValue AndAlso contenuSecondaire.Value > 0D Then
-                    Dim uniteSecondairePhysique As String = ObtenirUniteSecondaireProduitSelectionne()
-                    Dim quantiteSecondaireCalculee As Decimal = Decimal.Floor(resteCalcule / contenuSecondaire.Value)
-                    Dim resteMesure As Decimal = resteCalcule - (quantiteSecondaireCalculee * contenuSecondaire.Value)
-                    Dim morceaux As New List(Of String)()
-                    If quantitePrincipaleCalculee > 0D Then morceaux.Add(quantitePrincipaleCalculee.ToString("N0") & " " & unitePrincipale)
-                    If quantiteSecondaireCalculee > 0D AndAlso Not String.IsNullOrWhiteSpace(uniteSecondairePhysique) Then morceaux.Add(quantiteSecondaireCalculee.ToString("N0") & " " & uniteSecondairePhysique)
-                    If resteMesure > 0D OrElse morceaux.Count = 0 Then morceaux.Add(resteMesure.ToString("N2").TrimEnd("0"c).TrimEnd(","c).TrimEnd("."c) & " " & uniteSecondaire)
-                    Return String.Join(" + ", morceaux)
-                End If
+	                If contenuSecondaire.HasValue AndAlso contenuSecondaire.Value > 0D Then
+	                    Dim uniteSecondairePhysique As String = ObtenirUniteSecondaireProduitSelectionne()
+	                    Dim quantiteSecondaireCalculee As Decimal = Decimal.Floor(resteCalcule / contenuSecondaire.Value)
+	                    Dim resteMesure As Decimal = resteCalcule - (quantiteSecondaireCalculee * contenuSecondaire.Value)
+	                    Dim morceaux As New List(Of String)()
+	                    If quantitePrincipaleCalculee > 0D Then morceaux.Add(quantitePrincipaleCalculee.ToString("N0") & " " & unitePrincipale)
+	                    If Not String.IsNullOrWhiteSpace(uniteSecondairePhysique) Then morceaux.Add(quantiteSecondaireCalculee.ToString("N0") & " " & uniteSecondairePhysique)
+	                    If resteMesure > 0D OrElse morceaux.Count = 0 Then morceaux.Add(FormatageGlobal.FormatQuantitePhysique(resteMesure) & " " & uniteSecondaire)
+	                    Return String.Join(" + ", morceaux)
+	                End If
 
                 If resteCalcule > 0D Then
                     Return quantitePrincipaleCalculee.ToString("N0") & " " & unitePrincipale & " + " & resteCalcule.ToString("N2").TrimEnd("0"c).TrimEnd(","c).TrimEnd("."c) & " " & uniteSecondaire
@@ -2481,7 +2501,9 @@ Namespace DevCommerc8ak
                 chkDouzaine.Checked,
                 typesPersonnalisesActifs,
                 LireContenuUnitePrincipaleEntree(),
-                If(contenuSecondaire.HasValue, contenuSecondaire.Value, 0D))
+                If(contenuSecondaire.HasValue, contenuSecondaire.Value, 0D),
+                TypeGestionStockEntree(),
+                ObtenirUniteSecondaireEntree())
             gridTypesVente.DataSource = Nothing
             gridTypesVente.DataSource = liste
             ConfigurerGrilleTypesVenteAffichage(gridTypesVente)

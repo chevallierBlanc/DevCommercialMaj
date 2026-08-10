@@ -15,9 +15,14 @@ Namespace DevCommerc8ak
         Public Property PrixVente As Decimal
         Public Property Actif As Boolean
         Public Property EstPersonnalise As Boolean
+        Public Property LibelleAffichage As String
 
         Public ReadOnly Property NomAffichage As String
             Get
+                If Not String.IsNullOrWhiteSpace(LibelleAffichage) Then
+                    Return LibelleAffichage
+                End If
+
                 Return Nom
             End Get
         End Property

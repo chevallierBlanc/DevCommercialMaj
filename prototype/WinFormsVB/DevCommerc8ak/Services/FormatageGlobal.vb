@@ -43,9 +43,11 @@ Namespace DevCommerc8ak
                                                 uniteSecondaire As String,
                                                 typeGestionStock As String,
                                                 uniteMesureStock As String,
-                                                contenuUnitePrincipale As Decimal) As String
+                                                contenuUnitePrincipale As Decimal,
+                                                Optional contenuUniteSecondaire As Decimal = 0D) As String
             If StockUnitConversionService.EstGestionMesuree(typeGestionStock) Then
                 Dim unitePrincipaleAffichee As String = If(String.IsNullOrWhiteSpace(unitePrincipale), "unité", unitePrincipale.Trim())
+                Dim uniteSecondaireAffichee As String = If(String.IsNullOrWhiteSpace(uniteSecondaire), String.Empty, uniteSecondaire.Trim())
                 Dim uniteMesureAffichee As String = If(String.IsNullOrWhiteSpace(uniteMesureStock), "mesure", uniteMesureStock.Trim())
                 Dim contenuPrincipal As Decimal = contenuUnitePrincipale
                 If contenuPrincipal <= 0D Then contenuPrincipal = conversionUnite
@@ -57,6 +59,17 @@ Namespace DevCommerc8ak
 
                 Dim quantitePrincipale As Decimal = Decimal.Floor(stockReel / contenuPrincipal)
                 Dim resteMesure As Decimal = stockReel - (quantitePrincipale * contenuPrincipal)
+
+                If contenuUniteSecondaire > 0D AndAlso uniteSecondaireAffichee <> String.Empty Then
+                    Dim quantiteSecondaire As Decimal = Decimal.Floor(resteMesure / contenuUniteSecondaire)
+                    Dim restePhysique As Decimal = resteMesure - (quantiteSecondaire * contenuUniteSecondaire)
+                    Dim decomposition As String = FormatNombre(quantitePrincipale) & " " & unitePrincipaleAffichee & " + " & FormatNombre(quantiteSecondaire) & " " & uniteSecondaireAffichee
+                    If restePhysique > 0D Then
+                        decomposition &= " + " & FormatQuantitePhysique(restePhysique) & " " & uniteMesureAffichee
+                    End If
+
+                    Return stockPhysique & " = " & decomposition
+                End If
 
                 If resteMesure <= 0D Then
                     If quantitePrincipale <= 0D Then Return stockPhysique

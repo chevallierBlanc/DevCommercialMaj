@@ -609,6 +609,8 @@ Namespace DevCommerc8ak
             Dim prixSpecial As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "PrixSpecial"))
             Dim contenuUnitePrincipale As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "ContenuUnitePrincipale"))
             Dim contenuUniteSecondaire As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "ContenuUniteSecondaire"))
+            Dim typeGestion As String = SafeString(CellValueByProperty(gridProduits.CurrentRow, "TypeGestionStock"))
+            Dim uniteSecondaire As String = SafeString(CellValueByProperty(gridProduits.CurrentRow, "UniteSecondaire"))
             Dim venteDetail As Boolean = SafeBoolean(CellValueByProperty(gridProduits.CurrentRow, "VenteDetail"))
             Dim venteDemi As Boolean = SafeBoolean(CellValueByProperty(gridProduits.CurrentRow, "VenteDemi"))
             Dim venteDouzaine As Boolean = SafeBoolean(CellValueByProperty(gridProduits.CurrentRow, "VenteDouzaine"))
@@ -616,7 +618,7 @@ Namespace DevCommerc8ak
             Dim typesPersonnalisesActifs As List(Of TypeVenteProduitDTO) = _typeVenteProduitService.ListerParProduit(produitId, True)
 
 
-            _typesVenteCourants = _typeVenteService.ConstruireTypesVentePourProduit(produitId, nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine, typesPersonnalisesActifs, contenuUnitePrincipale, contenuUniteSecondaire)
+            _typesVenteCourants = _typeVenteService.ConstruireTypesVentePourProduit(produitId, nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine, typesPersonnalisesActifs, contenuUnitePrincipale, contenuUniteSecondaire, typeGestion, uniteSecondaire)
             cmbUnite.DataSource = Nothing
             cmbUnite.DisplayMember = "NomAffichage"
             cmbUnite.ValueMember = "Nom"
@@ -801,6 +803,7 @@ Namespace DevCommerc8ak
             Dim typeGestion As String = SafeString(CellValueByProperty(gridProduits.CurrentRow, "TypeGestionStock"))
             Dim uniteMesure As String = SafeString(CellValueByProperty(gridProduits.CurrentRow, "UniteMesureStock"))
             Dim contenuPrincipal As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "ContenuUnitePrincipale"))
+            Dim contenuSecondaire As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "ContenuUniteSecondaire"))
             Dim reserve As Decimal = 0D
             For Each ligne As PanierLigne In _panier
                 If ligne.ProduitId = produitId Then
@@ -808,8 +811,8 @@ Namespace DevCommerc8ak
                 End If
             Next
             Dim restant As Decimal = Math.Max(0D, stock - reserve)
-            lblStock.Text = "Stock: " & FormatageGlobal.FormatStockSelonGestion(stock, nbUnites, uniteBase, uniteSecondaire, typeGestion, uniteMesure, contenuPrincipal) &
-                " | Restant: " & FormatageGlobal.FormatStockSelonGestion(restant, nbUnites, uniteBase, uniteSecondaire, typeGestion, uniteMesure, contenuPrincipal)
+            lblStock.Text = "Stock: " & FormatageGlobal.FormatStockSelonGestion(stock, nbUnites, uniteBase, uniteSecondaire, typeGestion, uniteMesure, contenuPrincipal, contenuSecondaire) &
+                " | Restant: " & FormatageGlobal.FormatStockSelonGestion(restant, nbUnites, uniteBase, uniteSecondaire, typeGestion, uniteMesure, contenuPrincipal, contenuSecondaire)
         End Sub
 
         Private Sub AjouterAuPanier(sender As Object, e As EventArgs) '"""#### Nouvelle logique tres bon
