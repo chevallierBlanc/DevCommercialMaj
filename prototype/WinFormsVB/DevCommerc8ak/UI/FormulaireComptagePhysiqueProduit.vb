@@ -215,7 +215,8 @@ Namespace DevCommerc8ak
                 PreRemplirDepuisQuantite()
                 RecalculerComptage()
             Catch ex As Exception
-                (New ProductionLogService()).Error("FormulaireComptagePhysiqueProduit", "Chargement", "Erreur chargement produit comptage.", ex)
+                Dim log As New ProductionLogService()
+                log.Error("FormulaireComptagePhysiqueProduit", "Chargement", "Erreur chargement produit comptage.", ex)
                 MessageBox.Show("Impossible de charger le produit à compter.", "Comptage", MessageBoxButtons.OK, MessageBoxIcon.Error)
                 Me.DialogResult = DialogResult.Cancel
             End Try

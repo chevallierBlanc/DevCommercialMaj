@@ -1462,7 +1462,8 @@ Namespace DevCommerc8ak
                     gridInventaire.Invalidate()
                 End Using
             Catch ex As Exception
-                (New ProductionLogService()).Error("FrmInventaireIntelligent", "OuvrirComptagePhysique", "Erreur ouverture comptage physique.", ex)
+                Dim log As New ProductionLogService()
+                log.Error("FrmInventaireIntelligent", "OuvrirComptagePhysique", "Erreur ouverture comptage physique.", ex)
                 MessageBox.Show("Impossible d'ouvrir le comptage physique du produit.", "Inventaire", MessageBoxButtons.OK, MessageBoxIcon.Error)
             End Try
         End Sub
