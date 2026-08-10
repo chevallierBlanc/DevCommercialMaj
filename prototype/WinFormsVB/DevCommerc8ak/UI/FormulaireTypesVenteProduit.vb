@@ -85,7 +85,7 @@ Namespace DevCommerc8ak
             Me.BackColor = Color.FromArgb(245, 247, 250)
 
             Dim layout As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 2, .Padding = New Padding(12)}
-            layout.RowStyles.Add(New RowStyle(SizeType.Absolute, 180))
+            layout.RowStyles.Add(New RowStyle(SizeType.Absolute, 215))
             layout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
 
             Dim panelEdition As New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.White, .Padding = New Padding(12)}
@@ -113,9 +113,9 @@ Namespace DevCommerc8ak
             chkActif.Left = 150
             chkActif.Top = 104
             lblAide = New Label() With {.Left = 250, .Top = 92, .Width = 540, .Height = 40, .AutoSize = False, .ForeColor = Color.FromArgb(41, 128, 185)}
-            btnNouveau = New Button() With {.Text = "Nouveau", .Left = 10, .Top = 118, .Width = 110, .Height = 34, .BackColor = Color.FromArgb(52, 73, 94), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
-            btnEnregistrer = New Button() With {.Text = "Enregistrer", .Left = 130, .Top = 118, .Width = 120, .Height = 34, .BackColor = Color.FromArgb(39, 174, 96), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
-            btnChangerEtat = New Button() With {.Text = "Désactiver", .Left = 260, .Top = 118, .Width = 120, .Height = 34, .BackColor = Color.FromArgb(192, 57, 43), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            btnNouveau = New Button() With {.Text = "Nouveau", .Left = 10, .Top = 150, .Width = 110, .Height = 34, .BackColor = Color.FromArgb(52, 73, 94), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            btnEnregistrer = New Button() With {.Text = "Enregistrer", .Left = 135, .Top = 150, .Width = 120, .Height = 34, .BackColor = Color.FromArgb(39, 174, 96), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            btnChangerEtat = New Button() With {.Text = "Désactiver", .Left = 270, .Top = 150, .Width = 120, .Height = 34, .BackColor = Color.FromArgb(192, 57, 43), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             btnNouveau.FlatAppearance.BorderSize = 0
             btnEnregistrer.FlatAppearance.BorderSize = 0
             btnChangerEtat.FlatAppearance.BorderSize = 0

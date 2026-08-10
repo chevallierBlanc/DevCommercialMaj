@@ -156,7 +156,7 @@ Namespace DevCommerc8ak
             ' --- TAB PRODUITS : STRUCTURE ---
             Dim mainTableProduits As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 5, .Padding = New Padding(10)}
             mainTableProduits.RowStyles.Add(New RowStyle(SizeType.Absolute, 60))  ' Barre Recherche/Actions
-            mainTableProduits.RowStyles.Add(New RowStyle(SizeType.Absolute, 260)) ' Cartes Edition
+            mainTableProduits.RowStyles.Add(New RowStyle(SizeType.Absolute, 285)) ' Cartes Edition
             mainTableProduits.RowStyles.Add(New RowStyle(SizeType.Absolute, 130)) ' Types personnalisés
             mainTableProduits.RowStyles.Add(New RowStyle(SizeType.Percent, 100))  ' Grille
             mainTableProduits.RowStyles.Add(New RowStyle(SizeType.Absolute, 40))  ' Pagination
@@ -192,13 +192,13 @@ Namespace DevCommerc8ak
 
             ' Carte 2: Unités
             Dim cardUnites As Panel = CreateCard("Unités & Conversion")
-            cmbUnitePrincipale = CreateComboField(cardUnites, "Unité Principale", 20, 45, 280)
-            cmbUniteSecondaire = CreateComboField(cardUnites, "Unité Secondaire", 20, 105, 160)
-            txtConversion = CreateField(cardUnites, "Taux Conv.", 190, 105, 110)
-            cmbTypeGestionStock = CreateComboField(cardUnites, "Mode stock", 20, 165, 120)
-            cmbUniteMesureStock = CreateComboField(cardUnites, "Mesure", 150, 165, 70)
-            txtContenuUnitePrincipale = CreateField(cardUnites, "Contenu princ.", 20, 225, 120)
-            txtContenuUniteSecondaire = CreateField(cardUnites, "Contenu second.", 155, 225, 120)
+            cmbUnitePrincipale = CreateComboField(cardUnites, "Unité Principale", 20, 45, 130)
+            cmbUniteSecondaire = CreateComboField(cardUnites, "Unité Secondaire", 170, 45, 130)
+            txtConversion = CreateField(cardUnites, "Taux Conv.", 20, 105, 110)
+            cmbTypeGestionStock = CreateComboField(cardUnites, "Mode stock", 150, 105, 90)
+            cmbUniteMesureStock = CreateComboField(cardUnites, "Mesure", 250, 105, 60)
+            txtContenuUnitePrincipale = CreateField(cardUnites, "Contenu princ.", 20, 170, 120)
+            txtContenuUniteSecondaire = CreateField(cardUnites, "Contenu second.", 170, 170, 120)
             cmbUnitePrincipale.Items.AddRange({"Carton", "Sac", "Paquet", "Farde", "Plateau", "Seau", "Bidon", "Bouteille", "Boîte", "Pièce"})
             cmbUniteSecondaire.Items.AddRange({"Pièce", "Sachet", "Paquet", "Farde", "Bidon", "Bouteille", "Boîte"})
             cmbTypeGestionStock.Items.AddRange({"UNITE", "MESURE"})
@@ -259,7 +259,7 @@ Namespace DevCommerc8ak
             btnPageSuivante = CreateStyledButton(">", Color.LightGray, 40, 30)
             lblPagination = New Label() With {.Text = "Page 1/1", .Font = FontLabel, .Margin = New Padding(10, 8, 10, 0), .AutoSize = True}
             btnPagePrecedente = CreateStyledButton("<", Color.LightGray, 40, 30)
-            flowPager.Controls.AddRange({btnPageSuivante, lblPagination, btnPagePrecedente})
+            flowPager.Controls.AddRange({btnPagePrecedente, lblPagination, btnPageSuivante})
 
             mainTableProduits.Controls.Add(flowHeader, 0, 0)
             mainTableProduits.Controls.Add(tableEdition, 0, 1)
@@ -625,6 +625,8 @@ Namespace DevCommerc8ak
             Dim nbPages As Integer = Math.Max(1, CInt(Math.Ceiling(total / TaillePageProduits)))
             If _pageCourante > nbPages Then _pageCourante = nbPages
             lblPagination.Text = "Page " & _pageCourante.ToString() & "/" & nbPages.ToString()
+            btnPagePrecedente.Enabled = _pageCourante > 1
+            btnPageSuivante.Enabled = _pageCourante < nbPages
 
             Dim dtPage As DataTable = _produitsTable.Clone()
             Dim debut As Integer = (_pageCourante - 1) * TaillePageProduits

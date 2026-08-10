@@ -283,13 +283,13 @@ Namespace DevCommerc8ak
             Dim mainTableEntree As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 3, .Padding = New Padding(5)}
             mainTableEntree.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50))
             mainTableEntree.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50))
-            mainTableEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 220)) ' Infos Produit / Unité/ Card produit
+            mainTableEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 240)) ' Infos Produit / Unité/ Card produit
             mainTableEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 220)) 'Card Finance / Prix
-            mainTableEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 60)) ' Options / Autres
+            mainTableEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 110)) ' Options / Autres
             ' mainTableEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 80))  ' Bouton
 
             ' Card 1: Produit
-            Dim cardProduit As Panel = CreateCard(600, 180, "INFORMATIONS PRODUIT")
+            Dim cardProduit As Panel = CreateCard(600, 220, "INFORMATIONS PRODUIT")
             chkProduitExistant = New CheckBox() With {.Text = "Produit existant", .Left = 20, .Top = 45, .AutoSize = True, .Checked = True}
             cmbProduitExistant = New ComboBox() With {.Left = 160, .Top = 42, .Width = 250, .DropDownStyle = ComboBoxStyle.DropDown}
             cmbProduitExistant.AutoCompleteMode = AutoCompleteMode.SuggestAppend
@@ -306,7 +306,7 @@ Namespace DevCommerc8ak
             ' layoutEntree.Controls.Add(cardProduit)
 
             ' Card 2: Unite
-            Dim cardUnite As Panel = CreateCard(600, 220, "UNITÉ & CONVERSION")
+            Dim cardUnite As Panel = CreateCard(600, 235, "UNITÉ & CONVERSION")
             cmbUniteBase = New ComboBox() With {.Left = 160, .Top = 45, .Width = 150, .DropDownStyle = ComboBoxStyle.DropDownList}
             cmbUniteBase.Items.AddRange(New Object() {"Carton", "Sac", "Paquet", "Farde", "Plateau", "Seau", "Bidon", "Bouteille", "Boîte", "Pièce"})
             txtNbUniteParBase = New TextBox() With {.Left = 160, .Top = 75, .Width = 100}
@@ -391,16 +391,17 @@ Namespace DevCommerc8ak
             ' layoutEntree.Controls.Add(cardPrix)
 
             ' Card 5: Validation
-            Dim cardValidation As Panel = CreateCard(1220, 100, "VALIDATION")
+            Dim cardValidation As Panel = CreateCard(1220, 105, "VALIDATION")
             dtpDateEntree = New DateTimePicker() With {.Left = 150, .Top = 45, .Width = 150}
-            txtObservationEntree = New TextBox() With {.Left = 450, .Top = 45, .Width = 400}
+            txtObservationEntree = New TextBox() With {.Left = 450, .Top = 45, .Width = 360, .Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right}
             btnEnregistrerEntree = New Button() With {
                 .Text = "ENREGISTRER L'ENTRÉE",
                 .Left = 900, .Top = 35,
                 .Width = 280, .Height = 45,
                 .BackColor = ColorAccent,
                 .ForeColor = Color.White,
-                .FlatStyle = FlatStyle.Flat
+                .FlatStyle = FlatStyle.Flat,
+                .Anchor = AnchorStyles.Top Or AnchorStyles.Right
             }
 
             cardValidation.Controls.AddRange(New Control() {
@@ -2118,39 +2119,39 @@ Namespace DevCommerc8ak
                     Return stockBase.ToString("N2") & " " & uniteSecondaire
                 End If
 
-                Dim quantitePrincipale As Decimal = Decimal.Floor(stockBase / contenuPrincipal)
-                Dim reste As Decimal = stockBase - (quantitePrincipale * contenuPrincipal)
+                Dim quantitePrincipaleCalculee As Decimal = Decimal.Floor(stockBase / contenuPrincipal)
+                Dim resteCalcule As Decimal = stockBase - (quantitePrincipaleCalculee * contenuPrincipal)
                 Dim contenuSecondaire As Decimal? = LireContenuUniteSecondaireEntree()
 
                 If contenuSecondaire.HasValue AndAlso contenuSecondaire.Value > 0D Then
                     Dim uniteSecondairePhysique As String = ObtenirUniteSecondaireProduitSelectionne()
-                    Dim quantiteSecondaire As Decimal = Decimal.Floor(reste / contenuSecondaire.Value)
-                    Dim resteMesure As Decimal = reste - (quantiteSecondaire * contenuSecondaire.Value)
+                    Dim quantiteSecondaireCalculee As Decimal = Decimal.Floor(resteCalcule / contenuSecondaire.Value)
+                    Dim resteMesure As Decimal = resteCalcule - (quantiteSecondaireCalculee * contenuSecondaire.Value)
                     Dim morceaux As New List(Of String)()
-                    If quantitePrincipale > 0D Then morceaux.Add(quantitePrincipale.ToString("N0") & " " & unitePrincipale)
-                    If quantiteSecondaire > 0D AndAlso Not String.IsNullOrWhiteSpace(uniteSecondairePhysique) Then morceaux.Add(quantiteSecondaire.ToString("N0") & " " & uniteSecondairePhysique)
+                    If quantitePrincipaleCalculee > 0D Then morceaux.Add(quantitePrincipaleCalculee.ToString("N0") & " " & unitePrincipale)
+                    If quantiteSecondaireCalculee > 0D AndAlso Not String.IsNullOrWhiteSpace(uniteSecondairePhysique) Then morceaux.Add(quantiteSecondaireCalculee.ToString("N0") & " " & uniteSecondairePhysique)
                     If resteMesure > 0D OrElse morceaux.Count = 0 Then morceaux.Add(resteMesure.ToString("N2").TrimEnd("0"c).TrimEnd(","c).TrimEnd("."c) & " " & uniteSecondaire)
                     Return String.Join(" + ", morceaux)
                 End If
 
-                If reste > 0D Then
-                    Return quantitePrincipale.ToString("N0") & " " & unitePrincipale & " + " & reste.ToString("N2").TrimEnd("0"c).TrimEnd(","c).TrimEnd("."c) & " " & uniteSecondaire
+                If resteCalcule > 0D Then
+                    Return quantitePrincipaleCalculee.ToString("N0") & " " & unitePrincipale & " + " & resteCalcule.ToString("N2").TrimEnd("0"c).TrimEnd(","c).TrimEnd("."c) & " " & uniteSecondaire
                 End If
 
-                Return quantitePrincipale.ToString("N0") & " " & unitePrincipale
+                Return quantitePrincipaleCalculee.ToString("N0") & " " & unitePrincipale
             End If
 
             If conversion <= 0D Then
                 Return stockBase.ToString("N0") & " " & uniteSecondaire
             End If
 
-            Dim quantitePrincipale As Decimal = Decimal.Floor(stockBase / conversion)
-            Dim reste As Decimal = stockBase - (quantitePrincipale * conversion)
-            If reste > 0D Then
-                Return quantitePrincipale.ToString("N0") & " " & unitePrincipale & " + " & reste.ToString("N0") & " " & uniteSecondaire
+            Dim quantitePrincipaleUnite As Decimal = Decimal.Floor(stockBase / conversion)
+            Dim resteUnite As Decimal = stockBase - (quantitePrincipaleUnite * conversion)
+            If resteUnite > 0D Then
+                Return quantitePrincipaleUnite.ToString("N0") & " " & unitePrincipale & " + " & resteUnite.ToString("N0") & " " & uniteSecondaire
             End If
 
-            Return quantitePrincipale.ToString("N0") & " " & unitePrincipale
+            Return quantitePrincipaleUnite.ToString("N0") & " " & unitePrincipale
         End Function
 
         Private Function ObtenirUniteSecondaireProduitSelectionne() As String
