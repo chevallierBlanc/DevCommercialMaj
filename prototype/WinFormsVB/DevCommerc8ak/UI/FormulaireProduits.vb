@@ -485,7 +485,7 @@ Namespace DevCommerc8ak
             grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "CodeBarres", .HeaderText = "Code Barres", .Width = 120})
             grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "QuantiteStock", .HeaderText = "Stock", .Width = 80})
             grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "UnitePrincipale", .HeaderText = "Unité", .Width = 80})
-            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "UniteSecondaire", .HeaderText = "Unité 2", .Width = 80})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "UniteSecondaireAffichage", .HeaderText = "Unité 2", .Width = 80})
             grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixAchat", .HeaderText = "P. Achat", .Width = 90})
             grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixGros", .HeaderText = "P. Gros", .Width = 90})
             grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixDetail", .HeaderText = "P. Détail", .Width = 90})
@@ -570,6 +570,9 @@ Namespace DevCommerc8ak
                 If Not _produitsTable.Columns.Contains("MargePourcent") Then
                     _produitsTable.Columns.Add("MargePourcent", GetType(Decimal))
                 End If
+                If Not _produitsTable.Columns.Contains("UniteSecondaireAffichage") Then
+                    _produitsTable.Columns.Add("UniteSecondaireAffichage", GetType(String))
+                End If
 
                 For Each row As DataRow In _produitsTable.Rows
                     Dim prixAchat As Decimal = Convert.ToDecimal(row("PrixAchat"))
@@ -579,6 +582,13 @@ Namespace DevCommerc8ak
                         marge = Math.Round(((prixGros / prixAchat) - 1D) * 100D, 2)
                     End If
                     row("MargePourcent") = marge
+
+                    Dim typeGestion As String = If(row.Table.Columns.Contains("TypeGestionStock") AndAlso Not row.IsNull("TypeGestionStock"), Convert.ToString(row("TypeGestionStock")).Trim(), String.Empty)
+                    If StockUnitConversionService.EstGestionMesuree(typeGestion) Then
+                        row("UniteSecondaireAffichage") = If(row.Table.Columns.Contains("UniteMesureStock") AndAlso Not row.IsNull("UniteMesureStock"), Convert.ToString(row("UniteMesureStock")).Trim(), String.Empty)
+                    Else
+                        row("UniteSecondaireAffichage") = If(row.Table.Columns.Contains("UniteSecondaire") AndAlso Not row.IsNull("UniteSecondaire"), Convert.ToString(row("UniteSecondaire")).Trim(), String.Empty)
+                    End If
                 Next
 
                 _produitsView = New DataView(_produitsTable)

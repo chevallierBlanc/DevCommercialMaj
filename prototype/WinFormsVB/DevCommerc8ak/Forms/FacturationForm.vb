@@ -662,6 +662,14 @@ Namespace DevCommerc8ak
             Return 0
         End Function
 
+        Private Function SafeString(value As Object) As String
+            If value Is Nothing OrElse value Is DBNull.Value Then
+                Return String.Empty
+            End If
+
+            Return Convert.ToString(value).Trim()
+        End Function
+
         Private Function CellValueByProperty(row As DataGridViewRow, propertyName As String) As Object
             If row Is Nothing OrElse row.DataGridView Is Nothing OrElse String.IsNullOrWhiteSpace(propertyName) Then
                 Return Nothing
@@ -710,9 +718,9 @@ Namespace DevCommerc8ak
             Dim prix As Decimal = PrixSelonUnite()
             txtPrixUnitaire.Text = prix.ToString("N0")
             If typeChoisi Is Nothing Then
-                lblEquivalent.Text = "Equivalent: 0 pièce / unité"
+                lblEquivalent.Text = "Equivalent: 0 " & ObtenirUniteReferenceCourante() & " / unité"
             Else
-                lblEquivalent.Text = "Equivalent: " & typeChoisi.QuantiteEquivalent.ToString("N0") & " pièces / unité"
+                lblEquivalent.Text = "Equivalent: " & FormaterQuantiteReferenceCourante(typeChoisi.QuantiteEquivalent) & " " & ObtenirUniteReferenceCourante() & " / unité"
             End If
             MiseAJourIndicateursQuantite(Nothing, EventArgs.Empty)
         End Sub
@@ -739,30 +747,60 @@ Namespace DevCommerc8ak
             Return TryCast(cmbUnite.SelectedItem, TypeVenteDTO)
         End Function
 
+        Private Function ProduitCourantEstMesure() As Boolean
+            If gridProduits.CurrentRow Is Nothing Then Return False
+            Return StockUnitConversionService.EstGestionMesuree(SafeString(CellValueByProperty(gridProduits.CurrentRow, "TypeGestionStock")))
+        End Function
+
+        Private Function ObtenirUniteReferenceCourante() As String
+            If gridProduits.CurrentRow Is Nothing Then Return "pièce"
+
+            If ProduitCourantEstMesure() Then
+                Dim uniteMesure As String = SafeString(CellValueByProperty(gridProduits.CurrentRow, "UniteMesureStock"))
+                If uniteMesure <> String.Empty Then Return uniteMesure
+                Return "mesure"
+            End If
+
+            Dim uniteSecondaire As String = SafeString(CellValueByProperty(gridProduits.CurrentRow, "UniteSecondaire"))
+            If uniteSecondaire <> String.Empty Then Return uniteSecondaire
+            Return "pièce"
+        End Function
+
+        Private Function FormaterQuantiteReferenceCourante(valeur As Decimal) As String
+            If ProduitCourantEstMesure() Then
+                Return FormatageGlobal.FormatQuantitePhysique(valeur)
+            End If
+
+            Return valeur.ToString("N0")
+        End Function
+
         Private Sub MiseAJourIndicateursQuantite(sender As Object, e As EventArgs)
             Dim qte As Decimal
             If Not Decimal.TryParse(txtQuantite.Text.Trim(), qte) OrElse qte <= 0D Then
-                lblTotalReel.Text = "Total réel: 0 pièce"
+                lblTotalReel.Text = "Total réel: 0 " & ObtenirUniteReferenceCourante()
                 Return
             End If
 
             Dim typeChoisi As TypeVenteDTO = ObtenirTypeVenteSelectionne()
             If typeChoisi Is Nothing Then
-                lblTotalReel.Text = "Total réel: 0 pièce"
+                lblTotalReel.Text = "Total réel: 0 " & ObtenirUniteReferenceCourante()
                 Return
             End If
 
             Dim quantiteReelle As Decimal = qte * typeChoisi.QuantiteEquivalent
-            lblTotalReel.Text = "Total réel: " & quantiteReelle.ToString("N0") & " pièces"
+            lblTotalReel.Text = "Total réel: " & FormaterQuantiteReferenceCourante(quantiteReelle) & " " & ObtenirUniteReferenceCourante()
         End Sub
 
         Private Sub MettreAJourAffichageStockProduit()
             If gridProduits.CurrentRow Is Nothing Then Return
-            Dim produitId As Integer = Convert.ToInt32(gridProduits.CurrentRow.Cells(0).Value)
-            Dim stock As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(11).Value)
-            Dim nbUnites As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(19).Value)
-            Dim uniteBase As String = Convert.ToString(gridProduits.CurrentRow.Cells(17).Value)
-            Dim uniteSecondaire As String = Convert.ToString(gridProduits.CurrentRow.Cells(18).Value)
+            Dim produitId As Integer = SafeInteger(CellValueByProperty(gridProduits.CurrentRow, "ProduitId"))
+            Dim stock As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "QuantiteStock"))
+            Dim nbUnites As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "ConversionUnite"))
+            Dim uniteBase As String = SafeString(CellValueByProperty(gridProduits.CurrentRow, "UnitePrincipale"))
+            Dim uniteSecondaire As String = SafeString(CellValueByProperty(gridProduits.CurrentRow, "UniteSecondaire"))
+            Dim typeGestion As String = SafeString(CellValueByProperty(gridProduits.CurrentRow, "TypeGestionStock"))
+            Dim uniteMesure As String = SafeString(CellValueByProperty(gridProduits.CurrentRow, "UniteMesureStock"))
+            Dim contenuPrincipal As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "ContenuUnitePrincipale"))
             Dim reserve As Decimal = 0D
             For Each ligne As PanierLigne In _panier
                 If ligne.ProduitId = produitId Then
@@ -770,8 +808,8 @@ Namespace DevCommerc8ak
                 End If
             Next
             Dim restant As Decimal = Math.Max(0D, stock - reserve)
-            lblStock.Text = "Stock: " & _typeVenteService.FormaterStock(stock, nbUnites, If(uniteBase = "", "base", uniteBase), If(uniteSecondaire = "", "pièce", uniteSecondaire)) &
-                " | Restant: " & _typeVenteService.FormaterStock(restant, nbUnites, If(uniteBase = "", "base", uniteBase), If(uniteSecondaire = "", "pièce", uniteSecondaire))
+            lblStock.Text = "Stock: " & FormatageGlobal.FormatStockSelonGestion(stock, nbUnites, uniteBase, uniteSecondaire, typeGestion, uniteMesure, contenuPrincipal) &
+                " | Restant: " & FormatageGlobal.FormatStockSelonGestion(restant, nbUnites, uniteBase, uniteSecondaire, typeGestion, uniteMesure, contenuPrincipal)
         End Sub
 
         Private Sub AjouterAuPanier(sender As Object, e As EventArgs) '"""#### Nouvelle logique tres bon

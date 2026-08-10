@@ -17,6 +17,13 @@ Namespace DevCommerc8ak
             Return valeur.ToString("N0") & " %"
         End Function
 
+        Public Function FormatQuantitePhysique(valeur As Decimal) As String
+            Dim texte As String = valeur.ToString("N2")
+            texte = texte.TrimEnd("0"c).TrimEnd(","c).TrimEnd("."c)
+            If texte = String.Empty Then Return "0"
+            Return texte
+        End Function
+
         Public Function FormatStockAvecEquivalence(stockReel As Decimal, conversionUnite As Decimal, uniteBase As String, uniteSecondaire As String) As String
             Dim unitePrincipale As String = If(String.IsNullOrWhiteSpace(uniteBase), "base", uniteBase.Trim())
             Dim uniteSeconde As String = If(String.IsNullOrWhiteSpace(uniteSecondaire), "pièce", uniteSecondaire.Trim())
@@ -28,6 +35,42 @@ Namespace DevCommerc8ak
             Dim cartons As Decimal = Decimal.Floor(stockReel / conversionUnite)
             Dim pieces As Decimal = stockReel - (cartons * conversionUnite)
             Return FormatNombre(cartons) & " " & unitePrincipale & " + " & FormatNombre(pieces) & " " & uniteSeconde
+        End Function
+
+        Public Function FormatStockSelonGestion(stockReel As Decimal,
+                                                conversionUnite As Decimal,
+                                                unitePrincipale As String,
+                                                uniteSecondaire As String,
+                                                typeGestionStock As String,
+                                                uniteMesureStock As String,
+                                                contenuUnitePrincipale As Decimal) As String
+            If StockUnitConversionService.EstGestionMesuree(typeGestionStock) Then
+                Dim unitePrincipaleAffichee As String = If(String.IsNullOrWhiteSpace(unitePrincipale), "unité", unitePrincipale.Trim())
+                Dim uniteMesureAffichee As String = If(String.IsNullOrWhiteSpace(uniteMesureStock), "mesure", uniteMesureStock.Trim())
+                Dim contenuPrincipal As Decimal = contenuUnitePrincipale
+                If contenuPrincipal <= 0D Then contenuPrincipal = conversionUnite
+                Dim stockPhysique As String = FormatQuantitePhysique(stockReel) & " " & uniteMesureAffichee
+
+                If contenuPrincipal <= 0D Then
+                    Return stockPhysique
+                End If
+
+                Dim quantitePrincipale As Decimal = Decimal.Floor(stockReel / contenuPrincipal)
+                Dim resteMesure As Decimal = stockReel - (quantitePrincipale * contenuPrincipal)
+
+                If resteMesure <= 0D Then
+                    If quantitePrincipale <= 0D Then Return stockPhysique
+                    Return stockPhysique & " = " & FormatNombre(quantitePrincipale) & " " & unitePrincipaleAffichee
+                End If
+
+                If quantitePrincipale <= 0D Then
+                    Return stockPhysique
+                End If
+
+                Return stockPhysique & " = " & FormatNombre(quantitePrincipale) & " " & unitePrincipaleAffichee & " + " & FormatQuantitePhysique(resteMesure) & " " & uniteMesureAffichee
+            End If
+
+            Return FormatStockAvecEquivalence(stockReel, conversionUnite, unitePrincipale, uniteSecondaire)
         End Function
     End Module
 End Namespace
