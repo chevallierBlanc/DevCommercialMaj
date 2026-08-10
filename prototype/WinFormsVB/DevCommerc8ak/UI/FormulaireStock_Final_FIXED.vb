@@ -276,8 +276,8 @@ Namespace DevCommerc8ak
 
             ' --- TAB ENTREE DESIGN ---
             Dim layoutEntree As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .Padding = New Padding(10), .ColumnCount = 1, .RowCount = 2}
-            layoutEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 520)) ' Infos Produit / Unité/ Card produit
-            layoutEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 80)) 'Card Finance / Prix
+            layoutEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 590)) ' Cartes Stock Entrée incluant Validation
+            layoutEntree.RowStyles.Add(New RowStyle(SizeType.Percent, 100)) ' Grille Informations Produit
             'tabEntree.Controls.Add(layoutEntree)
 
             Dim mainTableEntree As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 3, .Padding = New Padding(5)}

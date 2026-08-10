@@ -331,8 +331,8 @@ Namespace DevCommerc8ak
             tableCharts.SetRowSpan(gridProduitVedette, 2)
             tableCharts.Controls.Add(chartTopProduits, 1, 0)
             Dim panelCategories As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 1}
-            panelCategories.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 45))
             panelCategories.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 55))
+            panelCategories.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 45))
             panelCategories.Controls.Add(chartCategories, 0, 0)
             panelCategories.Controls.Add(gridLegendeCategories, 1, 0)
             tableCharts.Controls.Add(panelCategories, 1, 1)
@@ -516,7 +516,8 @@ Namespace DevCommerc8ak
 
         Private Sub ConfigurerGrilleLegendeCategories()
             gridLegendeCategories.Columns.Clear()
-            gridLegendeCategories.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "Couleur", .HeaderText = "", .Width = 35})
+            gridLegendeCategories.RowTemplate.Height = 28
+            gridLegendeCategories.Columns.Add(New DataGridViewImageColumn() With {.Name = "Couleur", .DataPropertyName = "CouleurImage", .HeaderText = "", .Width = 35, .ImageLayout = DataGridViewImageCellLayout.Normal})
             gridLegendeCategories.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "Categorie", .DataPropertyName = "Categorie", .HeaderText = "Catégorie", .Width = 180})
             gridLegendeCategories.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "Valeur", .DataPropertyName = "Valeur", .HeaderText = "Qté", .Width = 70})
             gridLegendeCategories.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "Pourcentage", .DataPropertyName = "Pourcentage", .HeaderText = "%", .Width = 70})
@@ -1134,14 +1135,7 @@ Namespace DevCommerc8ak
                 End If
 
                 gridProduitVedette.DataSource = dtVedette
-                If gridProduitVedette.Columns.Contains("Mois") Then
-                    gridProduitVedette.Columns("Mois").Visible = False
-                End If
-                If gridProduitVedette.Columns.Contains("NomMois") Then
-                    gridProduitVedette.Columns("NomMois").DisplayIndex = 0
-                    gridProduitVedette.Columns("NomMois").HeaderText = "Mois"
-                    gridProduitVedette.Columns("NomMois").Width = 120
-                End If
+                ConfigurerGrilleProduitVedetteDashboard()
                 AlimenterChart(chartTopProduits, dtTop, "Libelle", "QuantiteVendue")
                 AlimenterChartCategories(dtCategories)
 
@@ -1157,6 +1151,31 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
+        Private Sub ConfigurerGrilleProduitVedetteDashboard()
+            If gridProduitVedette Is Nothing Then Return
+            gridProduitVedette.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+
+            If gridProduitVedette.Columns.Contains("Mois") Then
+                gridProduitVedette.Columns("Mois").Visible = False
+            End If
+
+            ConfigurerColonneDashboard("NomMois", "Mois", 22.0F, 80, 0)
+            ConfigurerColonneDashboard("Libelle", "Produit / Libellé", 38.0F, 140, 1)
+            ConfigurerColonneDashboard("QuantiteVendue", "Quantité", 15.0F, 70, 2)
+            ConfigurerColonneDashboard("Recette", "Recette", 25.0F, 100, 3)
+            ConfigurerColonneDashboard("TotalRecette", "Recette", 25.0F, 100, 3)
+            ConfigurerColonneDashboard("Montant", "Recette", 25.0F, 100, 3)
+        End Sub
+
+        Private Sub ConfigurerColonneDashboard(nomColonne As String, entete As String, poids As Single, largeurMin As Integer, ordre As Integer)
+            If Not gridProduitVedette.Columns.Contains(nomColonne) Then Return
+            Dim col As DataGridViewColumn = gridProduitVedette.Columns(nomColonne)
+            col.HeaderText = entete
+            col.FillWeight = poids
+            col.MinimumWidth = largeurMin
+            col.DisplayIndex = Math.Min(ordre, gridProduitVedette.Columns.Count - 1)
+        End Sub
+
         Private Sub AlimenterChart(chart As Chart, dt As DataTable, colX As String, colY As String)
             chart.Series(0).Points.Clear()
             For Each row As DataRow In dt.Rows
@@ -1167,6 +1186,7 @@ Namespace DevCommerc8ak
         Private Sub AlimenterChartCategories(dt As DataTable)
             chartCategories.Series(0).Points.Clear()
             Dim legende As New DataTable()
+            legende.Columns.Add("CouleurImage", GetType(Image))
             legende.Columns.Add("Categorie", GetType(String))
             legende.Columns.Add("Valeur", GetType(String))
             legende.Columns.Add("Pourcentage", GetType(String))
@@ -1213,25 +1233,32 @@ Namespace DevCommerc8ak
                 point.ToolTip = categorie & " : " & valeur.ToString("N0") & " (" & pourcentage.ToString("N2") & " %)"
 
                 Dim ligne As DataRow = legende.NewRow()
+                Dim couleurPoint As Color = chartCategories.Series(0).Points(index).Color
+                ligne("CouleurImage") = CreerImageCouleurLegende(couleurPoint)
                 ligne("Categorie") = categorie
                 ligne("Valeur") = valeur.ToString("N0")
                 ligne("Pourcentage") = pourcentage.ToString("N2") & " %"
-                ligne("CouleurArgb") = couleur.ToArgb()
+                ligne("CouleurArgb") = couleurPoint.ToArgb()
                 legende.Rows.Add(ligne)
                 index += 1
             Next
 
             gridLegendeCategories.DataSource = legende
-            For Each grilleRow As DataGridViewRow In gridLegendeCategories.Rows
-                If grilleRow.IsNewRow OrElse grilleRow.DataBoundItem Is Nothing Then Continue For
-                Dim view As DataRowView = TryCast(grilleRow.DataBoundItem, DataRowView)
-                If view Is Nothing OrElse view.Row.IsNull("CouleurArgb") Then Continue For
-                Dim couleur As Color = Color.FromArgb(Convert.ToInt32(view("CouleurArgb")))
-                grilleRow.Cells("Couleur").Style.BackColor = couleur
-                grilleRow.Cells("Couleur").Style.SelectionBackColor = couleur
-                grilleRow.Cells("Couleur").Style.SelectionForeColor = couleur
-            Next
         End Sub
+
+        Private Function CreerImageCouleurLegende(couleur As Color) As Image
+            Dim image As New Bitmap(18, 18)
+            Using g As Graphics = Graphics.FromImage(image)
+                g.Clear(Color.Transparent)
+                Using b As New SolidBrush(couleur)
+                    g.FillRectangle(b, 2, 2, 14, 14)
+                End Using
+                Using p As New Pen(Color.FromArgb(180, 180, 180))
+                    g.DrawRectangle(p, 2, 2, 14, 14)
+                End Using
+            End Using
+            Return image
+        End Function
 
         Private Sub ImprimerListeProduits(sender As Object, e As EventArgs)
             If _produitsView Is Nothing Then
