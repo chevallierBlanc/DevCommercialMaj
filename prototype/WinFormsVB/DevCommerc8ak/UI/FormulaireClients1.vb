@@ -342,12 +342,12 @@ Namespace DevCommerc8ak
 
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
-                Dim sql As String = "SELECT TOP 10 p.Libelle, SUM(l.Quantite) AS Quantite " &
+                Dim sql As String = "SELECT TOP 10 p.Libelle, SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) AS Quantite " &
                                     "FROM LignesFactureVente l " &
                                     "JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
                                     "JOIN Produits p ON p.ProduitId = l.ProduitId " &
                                     "WHERE f.ClientId=@id AND f.CreeLe >= DATEADD(DAY,-30,GETDATE()) AND f.Statut='PAYEE' " &
-                                    "GROUP BY p.Libelle ORDER BY SUM(l.Quantite) DESC"
+                                    "GROUP BY p.Libelle ORDER BY SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) DESC"
 
                 ' Note: Utilisation de paramètres SQL selon votre structure originale
                 Dim p As New List(Of System.Data.SqlClient.SqlParameter) From {

@@ -955,12 +955,12 @@ Namespace DevCommerc8ak
                 "    WHERE s.ProduitId = @ProduitId" &
                 "), Ventes AS (" &
                 "    SELECT " &
-                "        ISNULL(SUM(ISNULL(l.Quantite,0)),0) AS TotalVentes, " &
-                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'GROS' THEN ISNULL(l.Quantite,0) ELSE 0 END),0) AS TotalGros, " &
-                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'DEMI' THEN ISNULL(l.Quantite,0) ELSE 0 END),0) AS TotalDemi, " &
-                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'QUART' THEN ISNULL(l.Quantite,0) ELSE 0 END),0) AS TotalQuart, " &
-                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) IN ('PIECE','UNITE') THEN ISNULL(l.Quantite,0) ELSE 0 END),0) AS TotalPiece, " &
-                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'DOUZAINE' THEN ISNULL(l.Quantite,0) ELSE 0 END),0) AS TotalDouzaine, " &
+                "        ISNULL(SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite,0))),0) AS TotalVentes, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'GROS' THEN ISNULL(l.QuantiteBase, ISNULL(l.Quantite,0)) ELSE 0 END),0) AS TotalGros, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'DEMI' THEN ISNULL(l.QuantiteBase, ISNULL(l.Quantite,0)) ELSE 0 END),0) AS TotalDemi, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'QUART' THEN ISNULL(l.QuantiteBase, ISNULL(l.Quantite,0)) ELSE 0 END),0) AS TotalQuart, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) IN ('PIECE','UNITE') THEN ISNULL(l.QuantiteBase, ISNULL(l.Quantite,0)) ELSE 0 END),0) AS TotalPiece, " &
+                "        ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'DOUZAINE' THEN ISNULL(l.QuantiteBase, ISNULL(l.Quantite,0)) ELSE 0 END),0) AS TotalDouzaine, " &
                 "        ISNULL(SUM(ISNULL(l.MontantLigne,0)),0) AS MontantVentes " &
                 "    FROM LignesFactureVente l " &
                 "    INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
@@ -1017,10 +1017,10 @@ Namespace DevCommerc8ak
                 "       mv.TotalEntreesMouvements, " &
                 "       mv.TotalSortiesMouvements, " &
                 "       s.StockReelRestant, " &
-                "       CASE WHEN ISNULL(p.ConversionUnite,0) > 0 THEN FLOOR(s.StockReelRestant / p.ConversionUnite) ELSE 0 END AS StockRestantCartons, " &
-                "       CASE WHEN ISNULL(p.ConversionUnite,0) > 0 THEN s.StockReelRestant - (FLOOR(s.StockReelRestant / p.ConversionUnite) * p.ConversionUnite) ELSE s.StockReelRestant END AS StockRestantPieces, " &
-                "       CASE WHEN ISNULL(p.ConversionUnite,0) > 0 THEN FLOOR(v.TotalVentes / p.ConversionUnite) ELSE 0 END AS TotalVenteCartons, " &
-                "       CASE WHEN ISNULL(p.ConversionUnite,0) > 0 THEN v.TotalVentes - (FLOOR(v.TotalVentes / p.ConversionUnite) * p.ConversionUnite) ELSE v.TotalVentes END AS ResteVentePieces, " &
+                "       CASE WHEN UPPER(ISNULL(p.TypeGestionStock,'UNITE')) IN ('MESURE','POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale,0) > 0 THEN FLOOR(s.StockReelRestant / p.ContenuUnitePrincipale) WHEN ISNULL(p.ConversionUnite,0) > 0 THEN FLOOR(s.StockReelRestant / p.ConversionUnite) ELSE 0 END AS StockRestantCartons, " &
+                "       CASE WHEN UPPER(ISNULL(p.TypeGestionStock,'UNITE')) IN ('MESURE','POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale,0) > 0 THEN s.StockReelRestant - (FLOOR(s.StockReelRestant / p.ContenuUnitePrincipale) * p.ContenuUnitePrincipale) WHEN ISNULL(p.ConversionUnite,0) > 0 THEN s.StockReelRestant - (FLOOR(s.StockReelRestant / p.ConversionUnite) * p.ConversionUnite) ELSE s.StockReelRestant END AS StockRestantPieces, " &
+                "       CASE WHEN UPPER(ISNULL(p.TypeGestionStock,'UNITE')) IN ('MESURE','POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale,0) > 0 THEN FLOOR(v.TotalVentes / p.ContenuUnitePrincipale) WHEN ISNULL(p.ConversionUnite,0) > 0 THEN FLOOR(v.TotalVentes / p.ConversionUnite) ELSE 0 END AS TotalVenteCartons, " &
+                "       CASE WHEN UPPER(ISNULL(p.TypeGestionStock,'UNITE')) IN ('MESURE','POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale,0) > 0 THEN v.TotalVentes - (FLOOR(v.TotalVentes / p.ContenuUnitePrincipale) * p.ContenuUnitePrincipale) WHEN ISNULL(p.ConversionUnite,0) > 0 THEN v.TotalVentes - (FLOOR(v.TotalVentes / p.ConversionUnite) * p.ConversionUnite) ELSE v.TotalVentes END AS ResteVentePieces, " &
                 "       v.MontantVentes + m.MontantManuel AS MontantTotalGenere " &
                 "FROM Produits p " &
                 "CROSS JOIN Entrees e " &

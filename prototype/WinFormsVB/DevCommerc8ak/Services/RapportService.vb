@@ -121,10 +121,10 @@ Namespace DevCommerc8ak
                 "Ventes AS " &
                 "( " &
                 "    SELECT l.ProduitId, " &
-                "           SUM(ISNULL(l.Quantite, 0)) AS QuantiteVenduePieces, " &
+                "           SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) AS QuantiteVenduePieces, " &
                 "           SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS ChiffreAffaires, " &
-                "           SUM(CASE WHEN COALESCE(l.CoutUnitaireBaseVente, cp.CoutMoyenPiece) IS NOT NULL THEN ISNULL(l.Quantite, 0) * COALESCE(l.CoutUnitaireBaseVente, cp.CoutMoyenPiece) ELSE 0 END) AS CoutMarchandisesVendues, " &
-                "           SUM(CASE WHEN COALESCE(l.CoutUnitaireBaseVente, cp.CoutMoyenPiece) IS NULL AND ISNULL(l.Quantite, 0) > 0 THEN 1 ELSE 0 END) AS NbVentesSansCout " &
+                "           SUM(CASE WHEN COALESCE(l.CoutUnitaireBaseVente, cp.CoutMoyenPiece) IS NOT NULL THEN ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0)) * COALESCE(l.CoutUnitaireBaseVente, cp.CoutMoyenPiece) ELSE 0 END) AS CoutMarchandisesVendues, " &
+                "           SUM(CASE WHEN COALESCE(l.CoutUnitaireBaseVente, cp.CoutMoyenPiece) IS NULL AND ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0)) > 0 THEN 1 ELSE 0 END) AS NbVentesSansCout " &
                 "    FROM LignesFactureVente l " &
                 "    INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
                 "    LEFT JOIN CoutProduit cp ON cp.ProduitId = l.ProduitId " &
@@ -457,7 +457,7 @@ Namespace DevCommerc8ak
             Dim sql As String = "SELECT CAST(CASE WHEN (ISNULL(s.Stock,0)+ISNULL(v.Vendu,0))=0 THEN 0 ELSE " &
                                 "1.0 * ISNULL(v.Vendu,0) / NULLIF((ISNULL(s.Stock,0)+ISNULL(v.Vendu,0)), 0) END AS DECIMAL(18,4)) " &
                                 "FROM (SELECT SUM(QuantiteStock) AS Stock FROM vStockProduit) s " &
-                                "CROSS JOIN (SELECT SUM(l.Quantite) AS Vendu FROM LignesFactureVente l JOIN FacturesVente f ON f.FactureVenteId=l.FactureVenteId WHERE f.Statut='PAYEE') v"
+                                "CROSS JOIN (SELECT SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) AS Vendu FROM LignesFactureVente l JOIN FacturesVente f ON f.FactureVenteId=l.FactureVenteId WHERE f.Statut='PAYEE') v"
             Dim v As Object = _dal.ExecuterScalaire(sql, CommandType.Text, Nothing)
             Return Convert.ToDecimal(v)
         End Function
@@ -492,12 +492,12 @@ Namespace DevCommerc8ak
 
         ' Rapport produits les plus vendus.
         Public Function ProduitsPlusVendus(dateDebut As Date, dateFin As Date) As DataTable
-            Dim sql As String = "SELECT TOP 20 p.Libelle, ISNULL(CAST(SUM(ISNULL(l.Quantite,0)) AS BIGINT),0) AS Quantite " &
+            Dim sql As String = "SELECT TOP 20 p.Libelle, ISNULL(CAST(SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) AS DECIMAL(18,3)),0) AS Quantite " &
                                 "FROM LignesFactureVente l " &
                                 "JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
                                 "JOIN Produits p ON p.ProduitId = l.ProduitId " &
                                 "WHERE f.CreeLe BETWEEN @d1 AND @d2 AND f.Statut='PAYEE' " &
-                                "GROUP BY p.Libelle ORDER BY SUM(l.Quantite) DESC"
+                                "GROUP BY p.Libelle ORDER BY SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) DESC"
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@d1", dateDebut),
                 New SqlParameter("@d2", dateFin)

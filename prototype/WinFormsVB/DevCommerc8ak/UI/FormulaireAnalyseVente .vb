@@ -736,7 +736,7 @@ Namespace DevCommerc8ak
                     Dim dateVente As String = If(row.IsNull("DateVente"), "", Convert.ToDateTime(row("DateVente")).ToString("dd/MM/yyyy HH:mm"))
                     Dim produit As String = LireTexte(row, "Produit")
                     Dim prix As String = LireCoutDetailTexte(row)
-                    Dim qte As String = Convert.ToDecimal(If(row.IsNull("QuantiteVenduePieces"), 0D, row("QuantiteVenduePieces"))).ToString("N0")
+                    Dim qte As String = FormaterQuantiteVente(row)
                     Dim montant As String = Convert.ToDecimal(If(row.IsNull("MontantGenere"), 0D, row("MontantGenere"))).ToString("N0")
                     Dim benefice As String = Convert.ToDecimal(If(row.IsNull("Benefice"), 0D, row("Benefice"))).ToString("N0")
                     lignes.Add(dateVente & " | " & produit & " | Coût:" & prix & " | Qte:" & qte & " | Mnt:" & montant & " | Bénéf:" & benefice)
@@ -837,7 +837,7 @@ Namespace DevCommerc8ak
                     e.Graphics.DrawString(If(row.IsNull("DateVente"), "", Convert.ToDateTime(row("DateVente")).ToString("dd/MM/yyyy HH:mm")), fontBloc, Brushes.Black, colDate, y)
                     e.Graphics.DrawString(LireTexte(row, "Produit"), fontBloc, Brushes.Black, colProduit, y)
                     e.Graphics.DrawString(LireCoutDetailTexte(row), fontBloc, Brushes.Black, colPrix, y)
-                    e.Graphics.DrawString(Convert.ToDecimal(If(row.IsNull("QuantiteVenduePieces"), 0D, row("QuantiteVenduePieces"))).ToString("N0"), fontBloc, Brushes.Black, colQte, y)
+                    e.Graphics.DrawString(FormaterQuantiteVente(row), fontBloc, Brushes.Black, colQte, y)
                     e.Graphics.DrawString(Convert.ToDecimal(If(row.IsNull("MontantGenere"), 0D, row("MontantGenere"))).ToString("N0"), fontBloc, Brushes.Black, colMontant, y)
                     e.Graphics.DrawString(Convert.ToDecimal(If(row.IsNull("Benefice"), 0D, row("Benefice"))).ToString("N0"), fontBloc, Brushes.Black, colBenefice, y)
                     y += 24
@@ -1078,9 +1078,10 @@ Namespace DevCommerc8ak
             ConfigurerColonne(gridDetailVentes, "DateVente", "Date vente", 150, "dd/MM/yyyy HH:mm")
             ConfigurerColonne(gridDetailVentes, "Produit", "Produit", 240)
             ConfigurerColonne(gridDetailVentes, "CoutUnitaireBase", "Coût unitaire base (FC)", 170, "N0")
-            ConfigurerColonne(gridDetailVentes, "QuantiteVenduePieces", "Quantité vendue (pièces)", 150, "N0")
+            ConfigurerColonne(gridDetailVentes, "QuantiteVenduePieces", "Quantité vendue", 150)
             ConfigurerColonne(gridDetailVentes, "MontantGenere", "Montant généré (FC)", 170, "N0")
             ConfigurerColonne(gridDetailVentes, "Benefice", "Bénéfice (FC)", 140, "N0")
+            MasquerColonnesTechniques(gridDetailVentes)
         End Sub
 
         Private Sub ConfigurerColonne(grid As DataGridView, nom As String, titre As String, largeur As Integer, Optional format As String = Nothing)
@@ -1112,6 +1113,12 @@ Namespace DevCommerc8ak
                 End If
                 If valeur <= 0D Then
                     e.Value = "Non renseigné"
+                    e.FormattingApplied = True
+                End If
+            ElseIf String.Equals(gridDetailVentes.Columns(e.ColumnIndex).Name, "QuantiteVenduePieces", StringComparison.OrdinalIgnoreCase) Then
+                Dim rowView As DataRowView = TryCast(gridDetailVentes.Rows(e.RowIndex).DataBoundItem, DataRowView)
+                If rowView IsNot Nothing Then
+                    e.Value = FormaterQuantiteVente(rowView.Row)
                     e.FormattingApplied = True
                 End If
             End If
@@ -1179,6 +1186,23 @@ Namespace DevCommerc8ak
             Return Convert.ToDecimal(row(colonne))
         End Function
 
+        Private Shared Function FormaterQuantiteVente(row As DataRow) As String
+            Dim quantite As Decimal = LireDecimal(row, "QuantiteVenduePieces")
+            Dim unite As String = ObtenirUniteReference(row)
+            Return FormatageGlobal.FormatQuantitePhysique(quantite) & " " & unite
+        End Function
+
+        Private Shared Function ObtenirUniteReference(row As DataRow) As String
+            Dim typeGestion As String = StockUnitConversionService.NormaliserTypeGestionStock(LireTexte(row, "TypeGestionStock"))
+            If StockUnitConversionService.EstGestionMesuree(typeGestion) Then
+                Dim uniteMesure As String = LireTexte(row, "UniteMesureStock")
+                Return If(String.IsNullOrWhiteSpace(uniteMesure), "mesure", uniteMesure)
+            End If
+
+            Dim uniteSecondaire As String = LireTexte(row, "UniteSecondaire")
+            Return If(String.IsNullOrWhiteSpace(uniteSecondaire), "unités", uniteSecondaire)
+        End Function
+
         Private Shared Function LireTexte(row As DataRow, colonne As String) As String
             If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains(colonne) OrElse row.IsNull(colonne) Then
                 Return String.Empty
@@ -1199,6 +1223,24 @@ Namespace DevCommerc8ak
             End If
             Return Convert.ToInt32(row(colonne))
         End Function
+
+        Private Shared Sub MasquerColonnesTechniques(grid As DataGridView)
+            Dim colonnesTechniques As String() = {
+                "TypeGestionStock",
+                "UnitePrincipale",
+                "UniteSecondaire",
+                "UniteMesureStock",
+                "ContenuUnitePrincipale",
+                "ContenuUniteSecondaire",
+                "ConversionUnite"
+            }
+
+            For Each nom As String In colonnesTechniques
+                If grid.Columns.Contains(nom) Then
+                    grid.Columns(nom).Visible = False
+                End If
+            Next
+        End Sub
 
         Private Shared Function LireCoutDetailTexte(row As DataRow) As String
             Dim cout As Decimal = LireDecimal(row, "CoutUnitaireBase")

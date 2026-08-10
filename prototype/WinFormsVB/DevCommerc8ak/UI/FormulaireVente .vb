@@ -349,6 +349,7 @@ Namespace DevCommerc8ak
             gridVentes.Dock = DockStyle.Fill
             gridVentes.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
             gridVentes.ScrollBars = ScrollBars.Both
+            AddHandler gridVentes.CellFormatting, AddressOf GridQuantites_CellFormatting
 
             pnlVentesContent.Controls.Add(pnlFiltresVentesCard, 0, 0)
             pnlVentesContent.Controls.Add(gridVentes, 0, 2)
@@ -420,7 +421,7 @@ Namespace DevCommerc8ak
             btnExporterPdfStock.FlatAppearance.BorderSize = 0
 
             lblResumeStock = New Label() With {
-                .Text = "Stock global: 0 | Sorties ventes: 0 | Sorties manuelles: 0",
+                .Text = "Stock base cumulé: 0 | Sorties ventes: 0 | Sorties manuelles: 0",
                 .Font = New Font("Segoe UI", 10, FontStyle.Bold),
                 .ForeColor = ColorPrimary,
                 .Dock = DockStyle.Fill,
@@ -438,6 +439,7 @@ Namespace DevCommerc8ak
             gridStock.Dock = DockStyle.Fill
             gridStock.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
             gridStock.ScrollBars = ScrollBars.Both
+            AddHandler gridStock.CellFormatting, AddressOf GridQuantites_CellFormatting
 
             pnlStockContent.Controls.Add(pnlStockCard, 0, 0)
             pnlStockContent.Controls.Add(gridStock, 0, 1)
@@ -742,7 +744,7 @@ Namespace DevCommerc8ak
 
             lblResumeVentes.Text = "CA: " & FormatageGlobal.FormatMontant(totalMontant) &
                 " | Benefice: " & FormatageGlobal.FormatMontant(totalBenefice) &
-                " | Quantite: " & FormatageGlobal.FormatNombre(totalQuantite)
+                " | Quantité base cumulée: " & FormatageGlobal.FormatNombre(totalQuantite)
         End Sub
 
         Private Sub MettreAJourResumeStock(dt As DataTable)
@@ -758,7 +760,7 @@ Namespace DevCommerc8ak
                 Next
             End If
 
-            lblResumeStock.Text = "Stock global: " & FormatageGlobal.FormatNombre(stockGlobal) &
+            lblResumeStock.Text = "Stock base cumulé: " & FormatageGlobal.FormatNombre(stockGlobal) &
                 " | Sorties ventes: " & FormatageGlobal.FormatNombre(sortiesVentes) &
                 " | Sorties manuelles: " & FormatageGlobal.FormatNombre(sortiesManuelles)
         End Sub
@@ -838,10 +840,11 @@ Namespace DevCommerc8ak
 
             ConfigurerColonne(gridVentes, "DateVente", "Date", 120, "dd/MM/yyyy")
             ConfigurerColonne(gridVentes, "Produit", "Produit", 220)
-            ConfigurerColonne(gridVentes, "PrixAchatCarton", "Prix achat carton", 130, "N0")
-            ConfigurerColonne(gridVentes, "QuantiteVenduePieces", "Qté vendue (P)", 130, "N0")
+            ConfigurerColonne(gridVentes, "CoutUnitaireBase", "Coût unitaire base", 130, "N0")
+            ConfigurerColonne(gridVentes, "QuantiteVenduePieces", "Qté vendue", 130)
             ConfigurerColonne(gridVentes, "MontantGenere", "Montant", 130, "N0")
             ConfigurerColonne(gridVentes, "Benefice", "Bénéfice", 130, "N0")
+            MasquerColonnesTechniques(gridVentes)
         End Sub
 
         Private Sub ConfigurerGrilleStock()
@@ -852,16 +855,17 @@ Namespace DevCommerc8ak
             End If
             ConfigurerColonne(gridStock, "Produit", "Produit", 220)
             ConfigurerColonne(gridStock, "ConversionUnite", "Conversion", 90, "N0")
-            ConfigurerColonne(gridStock, "StockActuelPieces", "Stock actuel (pièces)", 120, "N0")
-            ConfigurerColonne(gridStock, "StockActuelCartons", "Stock actuel (cartons)", 120, "N0")
-            ConfigurerColonne(gridStock, "QuantiteVenduePieces", "Ventes (pièces)", 110, "N0")
-            ConfigurerColonne(gridStock, "QuantiteVendueCartons", "Ventes (cartons)", 110, "N0")
-            ConfigurerColonne(gridStock, "QuantiteSortieManuellePieces", "Sorties manuelles (pièces)", 130, "N0")
-            ConfigurerColonne(gridStock, "QuantiteSortieManuelleCartons", "Sorties manuelles (cartons)", 130, "N0")
-            ConfigurerColonne(gridStock, "SortiesTotalesPieces", "Sorties totales (pièces)", 120, "N0")
-            ConfigurerColonne(gridStock, "SortiesTotalesCartons", "Sorties totales (cartons)", 120, "N0")
-            ConfigurerColonne(gridStock, "RestantPieces", "Restant (pièces)", 110, "N0")
-            ConfigurerColonne(gridStock, "RestantCartons", "Restant (cartons)", 110, "N0")
+            ConfigurerColonne(gridStock, "StockActuelPieces", "Stock actuel", 160)
+            ConfigurerColonne(gridStock, "StockActuelCartons", "Stock présenté", 130)
+            ConfigurerColonne(gridStock, "QuantiteVenduePieces", "Ventes", 130)
+            ConfigurerColonne(gridStock, "QuantiteVendueCartons", "Ventes présentées", 130)
+            ConfigurerColonne(gridStock, "QuantiteSortieManuellePieces", "Sorties manuelles", 150)
+            ConfigurerColonne(gridStock, "QuantiteSortieManuelleCartons", "Sorties présentées", 140)
+            ConfigurerColonne(gridStock, "SortiesTotalesPieces", "Sorties totales", 140)
+            ConfigurerColonne(gridStock, "SortiesTotalesCartons", "Total présenté", 130)
+            ConfigurerColonne(gridStock, "RestantPieces", "Restant", 160)
+            ConfigurerColonne(gridStock, "RestantCartons", "Restant présenté", 140)
+            MasquerColonnesTechniques(gridStock)
         End Sub
 
         Private Sub ConfigurerGrilleDepenses()
@@ -977,14 +981,14 @@ Namespace DevCommerc8ak
             lignes.Add("Année : " & Convert.ToString(cmbAnnee.SelectedItem))
             lignes.Add("Résumé : " & lblResumeVentes.Text)
             lignes.Add("------------------------------------------------------------")
-            lignes.Add("Date | Produit | Prix achat carton | Qté vendue (P) | Montant | Bénéfice")
+            lignes.Add("Date | Produit | Coût unitaire base | Quantité vendue | Montant | Bénéfice")
             lignes.Add("------------------------------------------------------------")
 
             For Each row As DataRow In dt.Rows
                 Dim dateVente As String = If(dt.Columns.Contains("DateVente") AndAlso Not row.IsNull("DateVente"), Convert.ToDateTime(row("DateVente")).ToString("dd/MM/yyyy HH:mm"), "")
                 Dim produit As String = If(dt.Columns.Contains("Produit") AndAlso Not row.IsNull("Produit"), Convert.ToString(row("Produit")), "")
-                Dim qte As String = If(dt.Columns.Contains("QuantiteVenduePieces") AndAlso Not row.IsNull("QuantiteVenduePieces"), Convert.ToDecimal(row("QuantiteVenduePieces")).ToString("N0"), "0")
-                Dim prixAchat As String = If(dt.Columns.Contains("PrixAchatCarton") AndAlso Not row.IsNull("PrixAchatCarton"), Convert.ToDecimal(row("PrixAchatCarton")).ToString("N0"), "0")
+                Dim qte As String = FormaterQuantiteBase(row, "QuantiteVenduePieces", False)
+                Dim prixAchat As String = If(dt.Columns.Contains("CoutUnitaireBase") AndAlso Not row.IsNull("CoutUnitaireBase"), Convert.ToDecimal(row("CoutUnitaireBase")).ToString("N0"), "0")
                 Dim montant As String = If(dt.Columns.Contains("MontantGenere") AndAlso Not row.IsNull("MontantGenere"), FormatageGlobal.FormatMontant(Convert.ToDecimal(row("MontantGenere"))), "0 FC")
                 Dim benefice As String = If(dt.Columns.Contains("Benefice") AndAlso Not row.IsNull("Benefice"), FormatageGlobal.FormatMontant(Convert.ToDecimal(row("Benefice"))), "0 FC")
                 lignes.Add(dateVente & " | " & produit & " | " & prixAchat & " | " & qte & " | " & montant & " | " & benefice)
@@ -998,16 +1002,16 @@ Namespace DevCommerc8ak
             lignes.Add("RAPPORT STOCK")
             lignes.Add("Résumé : " & lblResumeStock.Text)
             lignes.Add("------------------------------------------------------------")
-            lignes.Add("Produit | Stock P | Stock C | Ventes P | Sorties P | Restant P")
+            lignes.Add("Produit | Stock actuel | Présentation | Ventes | Sorties | Restant")
             lignes.Add("------------------------------------------------------------")
 
             For Each row As DataRow In dt.Rows
                 Dim produit As String = If(dt.Columns.Contains("Produit") AndAlso Not row.IsNull("Produit"), Convert.ToString(row("Produit")), "")
-                Dim stockPieces As String = If(dt.Columns.Contains("StockActuelPieces") AndAlso Not row.IsNull("StockActuelPieces"), Convert.ToDecimal(row("StockActuelPieces")).ToString("N0"), "0")
-                Dim stockCartons As String = If(dt.Columns.Contains("StockActuelCartons") AndAlso Not row.IsNull("StockActuelCartons"), Convert.ToDecimal(row("StockActuelCartons")).ToString("N0"), "0")
-                Dim ventes As String = If(dt.Columns.Contains("QuantiteVenduePieces") AndAlso Not row.IsNull("QuantiteVenduePieces"), Convert.ToDecimal(row("QuantiteVenduePieces")).ToString("N0"), "0")
-                Dim sorties As String = If(dt.Columns.Contains("QuantiteSortieManuellePieces") AndAlso Not row.IsNull("QuantiteSortieManuellePieces"), Convert.ToDecimal(row("QuantiteSortieManuellePieces")).ToString("N0"), "0")
-                Dim restant As String = If(dt.Columns.Contains("RestantPieces") AndAlso Not row.IsNull("RestantPieces"), Convert.ToDecimal(row("RestantPieces")).ToString("N0"), "0")
+                Dim stockPieces As String = FormaterQuantiteBase(row, "StockActuelPieces", True)
+                Dim stockCartons As String = FormaterPresentationPrincipale(row, "StockActuelCartons")
+                Dim ventes As String = FormaterQuantiteBase(row, "QuantiteVenduePieces", False)
+                Dim sorties As String = FormaterQuantiteBase(row, "QuantiteSortieManuellePieces", False)
+                Dim restant As String = FormaterQuantiteBase(row, "RestantPieces", True)
                 lignes.Add(produit & " | " & stockPieces & " | " & stockCartons & " | " & ventes & " | " & sorties & " | " & restant)
             Next
 
@@ -1075,8 +1079,8 @@ Namespace DevCommerc8ak
                 e.Graphics.DrawString("Lignes : " & data.Rows.Count.ToString("N0"), sousTitreFont, pinceauGris, droiteX + 12, y + 60)
                 y += 104
 
-                Dim colonnes As String() = {"DateVente", "Produit", "PrixAchatCarton", "QuantiteVenduePieces", "MontantGenere", "Benefice"}
-                Dim titres As String() = {"Date", "Produit", "Prix achat carton", "Qté vendue (P)", "Montant", "Bénéfice"}
+                Dim colonnes As String() = {"DateVente", "Produit", "CoutUnitaireBase", "QuantiteVenduePieces", "MontantGenere", "Benefice"}
+                Dim titres As String() = {"Date", "Produit", "Coût base", "Qté vendue", "Montant", "Bénéfice"}
                 Dim largeurs As Integer() = {
                     CInt(largeur * 0.16),
                     CInt(largeur * 0.27),
@@ -1118,6 +1122,8 @@ Namespace DevCommerc8ak
                                     valeur = Convert.ToDateTime(row(colonnes(i))).ToString("dd/MM/yyyy HH:mm")
                                 Case "Produit"
                                     valeur = Convert.ToString(row(colonnes(i)))
+                                Case "QuantiteVenduePieces"
+                                    valeur = FormaterQuantiteBase(row, colonnes(i), False)
                                 Case Else
                                     valeur = Convert.ToDecimal(row(colonnes(i))).ToString("N0")
                             End Select
@@ -1203,7 +1209,7 @@ Namespace DevCommerc8ak
                 y += 104
 
                 Dim colonnes As String() = {"Produit", "StockActuelPieces", "StockActuelCartons", "QuantiteVenduePieces", "QuantiteSortieManuellePieces", "RestantPieces"}
-                Dim titres As String() = {"Produit", "Stock P", "Stock C", "Ventes P", "Sorties P", "Restant P"}
+                Dim titres As String() = {"Produit", "Stock", "Prés.", "Ventes", "Sorties", "Restant"}
                 Dim largeurs As Integer() = {
                     CInt(largeur * 0.32),
                     CInt(largeur * 0.12),
@@ -1242,6 +1248,14 @@ Namespace DevCommerc8ak
                         If Not row.IsNull(colonnes(i)) Then
                             If String.Equals(colonnes(i), "Produit", StringComparison.OrdinalIgnoreCase) Then
                                 valeur = Convert.ToString(row(colonnes(i)))
+                            ElseIf String.Equals(colonnes(i), "StockActuelPieces", StringComparison.OrdinalIgnoreCase) OrElse
+                                   String.Equals(colonnes(i), "RestantPieces", StringComparison.OrdinalIgnoreCase) Then
+                                valeur = FormaterQuantiteBase(row, colonnes(i), True)
+                            ElseIf String.Equals(colonnes(i), "StockActuelCartons", StringComparison.OrdinalIgnoreCase) Then
+                                valeur = FormaterPresentationPrincipale(row, colonnes(i))
+                            ElseIf String.Equals(colonnes(i), "QuantiteVenduePieces", StringComparison.OrdinalIgnoreCase) OrElse
+                                   String.Equals(colonnes(i), "QuantiteSortieManuellePieces", StringComparison.OrdinalIgnoreCase) Then
+                                valeur = FormaterQuantiteBase(row, colonnes(i), False)
                             Else
                                 valeur = Convert.ToDecimal(row(colonnes(i))).ToString("N0")
                             End If
@@ -1472,6 +1486,93 @@ Namespace DevCommerc8ak
                 End Using
             End If
         End Sub
+
+        Private Sub GridQuantites_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs)
+            Dim grid As DataGridView = TryCast(sender, DataGridView)
+            If grid Is Nothing OrElse e.RowIndex < 0 OrElse e.ColumnIndex < 0 Then
+                Return
+            End If
+
+            Dim rowView As DataRowView = TryCast(grid.Rows(e.RowIndex).DataBoundItem, DataRowView)
+            If rowView Is Nothing Then
+                Return
+            End If
+
+            Dim nomColonne As String = grid.Columns(e.ColumnIndex).Name
+            Select Case nomColonne
+                Case "QuantiteVenduePieces", "QuantiteSortieManuellePieces", "SortiesTotalesPieces"
+                    e.Value = FormaterQuantiteBase(rowView.Row, nomColonne, False)
+                    e.FormattingApplied = True
+                Case "StockActuelPieces", "RestantPieces"
+                    e.Value = FormaterQuantiteBase(rowView.Row, nomColonne, True)
+                    e.FormattingApplied = True
+                Case "StockActuelCartons", "QuantiteVendueCartons", "QuantiteSortieManuelleCartons", "SortiesTotalesCartons", "RestantCartons"
+                    e.Value = FormaterPresentationPrincipale(rowView.Row, nomColonne)
+                    e.FormattingApplied = True
+            End Select
+        End Sub
+
+        Private Shared Sub MasquerColonnesTechniques(grid As DataGridView)
+            Dim colonnesTechniques As String() = {
+                "TypeGestionStock",
+                "UnitePrincipale",
+                "UniteSecondaire",
+                "UniteMesureStock",
+                "ContenuUnitePrincipale",
+                "ContenuUniteSecondaire",
+                "ConversionUnite"
+            }
+
+            For Each nom As String In colonnesTechniques
+                If grid.Columns.Contains(nom) Then
+                    grid.Columns(nom).Visible = False
+                End If
+            Next
+        End Sub
+
+        Private Shared Function FormaterQuantiteBase(row As DataRow, colonne As String, decomposer As Boolean) As String
+            Dim valeur As Decimal = LireDecimal(row, colonne)
+            If decomposer Then
+                Return FormatageGlobal.FormatStockSelonGestion(
+                    valeur,
+                    LireDecimal(row, "ConversionUnite"),
+                    LireTexte(row, "UnitePrincipale"),
+                    LireTexte(row, "UniteSecondaire"),
+                    LireTexte(row, "TypeGestionStock"),
+                    LireTexte(row, "UniteMesureStock"),
+                    LireDecimal(row, "ContenuUnitePrincipale"),
+                    LireDecimal(row, "ContenuUniteSecondaire"))
+            End If
+
+            Return FormatageGlobal.FormatQuantitePhysique(valeur) & " " & ObtenirUniteReference(row)
+        End Function
+
+        Private Shared Function FormaterPresentationPrincipale(row As DataRow, colonne As String) As String
+            Dim valeur As Decimal = LireDecimal(row, colonne)
+            Dim unite As String = LireTexte(row, "UnitePrincipale")
+            If String.IsNullOrWhiteSpace(unite) Then
+                unite = "unités"
+            End If
+            Return FormatageGlobal.FormatQuantitePhysique(valeur) & " " & unite
+        End Function
+
+        Private Shared Function ObtenirUniteReference(row As DataRow) As String
+            Dim typeGestion As String = StockUnitConversionService.NormaliserTypeGestionStock(LireTexte(row, "TypeGestionStock"))
+            If StockUnitConversionService.EstGestionMesuree(typeGestion) Then
+                Dim uniteMesure As String = LireTexte(row, "UniteMesureStock")
+                Return If(String.IsNullOrWhiteSpace(uniteMesure), "mesure", uniteMesure)
+            End If
+
+            Dim uniteSecondaire As String = LireTexte(row, "UniteSecondaire")
+            Return If(String.IsNullOrWhiteSpace(uniteSecondaire), "unités", uniteSecondaire)
+        End Function
+
+        Private Shared Function LireTexte(row As DataRow, colonne As String) As String
+            If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains(colonne) OrElse row.IsNull(colonne) Then
+                Return String.Empty
+            End If
+            Return Convert.ToString(row(colonne))
+        End Function
 
         Private Shared Function LireDecimal(row As DataRow, colonne As String) As Decimal
             If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains(colonne) OrElse row.IsNull(colonne) Then

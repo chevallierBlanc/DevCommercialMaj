@@ -398,12 +398,12 @@ Namespace DevCommerc8ak
 
         Public Function TopProduitsVendus(annee As Integer) As DataTable
             Dim sql As String = "" &
-                "SELECT TOP 10 p.Libelle, SUM(l.Quantite) AS QuantiteVendue, SUM(l.MontantLigne) AS Recette " &
+                "SELECT TOP 10 p.Libelle, SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) AS QuantiteVendue, SUM(l.MontantLigne) AS Recette " &
                 "FROM LignesFactureVente l " &
                 "JOIN FacturesVente f ON f.FactureVenteId=l.FactureVenteId " &
                 "JOIN Produits p ON p.ProduitId=l.ProduitId " &
                 "WHERE f.Statut='PAYEE' AND YEAR(f.CreeLe)=@Annee " &
-                "GROUP BY p.Libelle ORDER BY SUM(l.Quantite) DESC"
+                "GROUP BY p.Libelle ORDER BY SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) DESC"
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@Annee", annee)
             }
@@ -413,8 +413,8 @@ Namespace DevCommerc8ak
         Public Function ProduitPlusVenduParMois(annee As Integer) As DataTable
             Dim sql As String = "" &
                 "WITH Rangs AS (" &
-                "SELECT MONTH(f.CreeLe) AS Mois, p.Libelle, SUM(l.Quantite) AS QuantiteVendue, SUM(l.MontantLigne) AS Recette, " &
-                "ROW_NUMBER() OVER(PARTITION BY MONTH(f.CreeLe) ORDER BY SUM(l.Quantite) DESC) AS Rang " &
+                "SELECT MONTH(f.CreeLe) AS Mois, p.Libelle, SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) AS QuantiteVendue, SUM(l.MontantLigne) AS Recette, " &
+                "ROW_NUMBER() OVER(PARTITION BY MONTH(f.CreeLe) ORDER BY SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) DESC) AS Rang " &
                 "FROM LignesFactureVente l " &
                 "JOIN FacturesVente f ON f.FactureVenteId=l.FactureVenteId " &
                 "JOIN Produits p ON p.ProduitId=l.ProduitId " &

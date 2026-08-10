@@ -40,16 +40,19 @@ Namespace DevCommerc8ak
         Public Function ListerStockResume() As DataTable
             Dim sql As String = "" &
                 "SELECT p.ProduitId, p.Libelle AS Produit, ISNULL(p.ConversionUnite, 1) AS ConversionUnite, " &
+                "ISNULL(p.UnitePrincipale, '') AS UnitePrincipale, ISNULL(p.UniteSecondaire, '') AS UniteSecondaire, " &
+                "ISNULL(p.TypeGestionStock, 'UNITE') AS TypeGestionStock, ISNULL(p.UniteMesureStock, 'PIECE') AS UniteMesureStock, " &
+                "ISNULL(p.ContenuUnitePrincipale, ISNULL(p.ConversionUnite, 1)) AS ContenuUnitePrincipale, ISNULL(p.ContenuUniteSecondaire, 0) AS ContenuUniteSecondaire, " &
                 "ISNULL(s.QuantiteStock, 0) AS StockActuelPieces, " &
-                "CASE WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN CONVERT(decimal(18,0), FLOOR(ISNULL(s.QuantiteStock,0) / p.ConversionUnite)) ELSE 0 END AS StockActuelCartons, " &
+                "CASE WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale, 0) > 0 THEN CONVERT(decimal(18,3), FLOOR(ISNULL(s.QuantiteStock,0) / p.ContenuUnitePrincipale)) WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN CONVERT(decimal(18,3), FLOOR(ISNULL(s.QuantiteStock,0) / p.ConversionUnite)) ELSE 0 END AS StockActuelCartons, " &
                 "ISNULL(vs.TotalVenduPieces, 0) AS QuantiteVenduePieces, " &
-                "CASE WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN CONVERT(decimal(18,0), FLOOR(ISNULL(vs.TotalVenduPieces,0) / p.ConversionUnite)) ELSE 0 END AS QuantiteVendueCartons, " &
+                "CASE WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale, 0) > 0 THEN CONVERT(decimal(18,3), FLOOR(ISNULL(vs.TotalVenduPieces,0) / p.ContenuUnitePrincipale)) WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN CONVERT(decimal(18,3), FLOOR(ISNULL(vs.TotalVenduPieces,0) / p.ConversionUnite)) ELSE 0 END AS QuantiteVendueCartons, " &
                 "ISNULL(ms.TotalSortiePieces, 0) AS QuantiteSortieManuellePieces, " &
-                "CASE WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN CONVERT(decimal(18,0), FLOOR(ISNULL(ms.TotalSortiePieces,0) / p.ConversionUnite)) ELSE 0 END AS QuantiteSortieManuelleCartons, " &
+                "CASE WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale, 0) > 0 THEN CONVERT(decimal(18,3), FLOOR(ISNULL(ms.TotalSortiePieces,0) / p.ContenuUnitePrincipale)) WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN CONVERT(decimal(18,3), FLOOR(ISNULL(ms.TotalSortiePieces,0) / p.ConversionUnite)) ELSE 0 END AS QuantiteSortieManuelleCartons, " &
                 "ISNULL(vs.TotalVenduPieces, 0) + ISNULL(ms.TotalSortiePieces, 0) AS SortiesTotalesPieces, " &
-                "CASE WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN CONVERT(decimal(18,0), FLOOR((ISNULL(vs.TotalVenduPieces,0) + ISNULL(ms.TotalSortiePieces,0)) / p.ConversionUnite)) ELSE 0 END AS SortiesTotalesCartons, " &
+                "CASE WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale, 0) > 0 THEN CONVERT(decimal(18,3), FLOOR((ISNULL(vs.TotalVenduPieces,0) + ISNULL(ms.TotalSortiePieces,0)) / p.ContenuUnitePrincipale)) WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN CONVERT(decimal(18,3), FLOOR((ISNULL(vs.TotalVenduPieces,0) + ISNULL(ms.TotalSortiePieces,0)) / p.ConversionUnite)) ELSE 0 END AS SortiesTotalesCartons, " &
                 "ISNULL(s.QuantiteStock, 0) AS RestantPieces, " &
-                "CASE WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN CONVERT(decimal(18,0), FLOOR(ISNULL(s.QuantiteStock,0) / p.ConversionUnite)) ELSE 0 END AS RestantCartons " &
+                "CASE WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale, 0) > 0 THEN CONVERT(decimal(18,3), FLOOR(ISNULL(s.QuantiteStock,0) / p.ContenuUnitePrincipale)) WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN CONVERT(decimal(18,3), FLOOR(ISNULL(s.QuantiteStock,0) / p.ConversionUnite)) ELSE 0 END AS RestantCartons " &
                 "FROM Produits p " &
                 "LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId " &
                 "LEFT JOIN (SELECT l.ProduitId, ISNULL(SUM(l.QuantiteBase), 0) AS TotalVenduPieces " &
@@ -114,17 +117,21 @@ Namespace DevCommerc8ak
                 ") " &
                 "SELECT MAX(f.CreeLe) AS DateVente, " &
                 "p.Libelle AS Produit, " &
+                "ISNULL(p.UnitePrincipale, '') AS UnitePrincipale, ISNULL(p.UniteSecondaire, '') AS UniteSecondaire, " &
+                "ISNULL(p.TypeGestionStock, 'UNITE') AS TypeGestionStock, ISNULL(p.UniteMesureStock, 'PIECE') AS UniteMesureStock, " &
+                "ISNULL(p.ContenuUnitePrincipale, ISNULL(p.ConversionUnite, 1)) AS ContenuUnitePrincipale, ISNULL(p.ContenuUniteSecondaire, 0) AS ContenuUniteSecondaire, " &
+                "ISNULL(p.ConversionUnite, 1) AS ConversionUnite, " &
                 "CAST(MAX(ISNULL(COALESCE(l.CoutUnitaireBaseVente, cp.CoutPiece), 0)) AS BIGINT) AS CoutUnitaireBase, " &
-                "CAST(SUM(ISNULL(l.Quantite, 0)) AS BIGINT) AS QuantiteVenduePieces, " &
+                "CAST(SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) AS DECIMAL(18,3)) AS QuantiteVenduePieces, " &
                 "CAST(SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS BIGINT) AS MontantGenere, " &
-                "CAST(SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0)) - (ISNULL(l.Quantite, 0) * ISNULL(COALESCE(l.CoutUnitaireBaseVente, cp.CoutPiece), 0))) AS BIGINT) AS Benefice " &
+                "CAST(SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0)) - (ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0)) * ISNULL(COALESCE(l.CoutUnitaireBaseVente, cp.CoutPiece), 0))) AS BIGINT) AS Benefice " &
                 "FROM LignesFactureVente l " &
                 "INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
                 "INNER JOIN Produits p ON p.ProduitId = l.ProduitId " &
                 "LEFT JOIN CoutPieceProduit cp ON cp.ProduitId = p.ProduitId " &
                 "WHERE f.Statut = 'PAYEE' " &
                 "AND f.CreeLe >= @DateDebut AND f.CreeLe < @DateFin " &
-                "GROUP BY p.ProduitId, p.Libelle " &
+                "GROUP BY p.ProduitId, p.Libelle, p.UnitePrincipale, p.UniteSecondaire, p.TypeGestionStock, p.UniteMesureStock, p.ContenuUnitePrincipale, p.ContenuUniteSecondaire, p.ConversionUnite " &
                 "ORDER BY MAX(f.CreeLe) DESC, p.Libelle ASC"
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@DateDebut", dateDebut),
