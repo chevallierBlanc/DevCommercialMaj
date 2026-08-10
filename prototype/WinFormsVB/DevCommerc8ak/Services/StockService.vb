@@ -653,7 +653,7 @@ Namespace DevCommerc8ak
             Dim contenuSecondaire As Decimal = If(info.Table.Columns.Contains("ContenuUniteSecondaire") AndAlso Not info.IsNull("ContenuUniteSecondaire"), Convert.ToDecimal(info("ContenuUniteSecondaire")), 0D)
 
             Dim typeNormalise As String = StockUnitConversionService.NormaliserTypeGestionStock(typeGestion)
-            If typeNormalise = "POIDS" OrElse typeNormalise = "VOLUME" Then
+            If StockUnitConversionService.EstGestionMesuree(typeNormalise) Then
                 If uniteBase <> "" AndAlso String.Equals(unite, uniteBase, StringComparison.OrdinalIgnoreCase) Then
                     Dim contenu As Decimal = If(contenuPrincipal > 0D, contenuPrincipal, If(conversion > 0D, conversion, 1D))
                     Return quantite * contenu

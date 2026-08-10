@@ -44,6 +44,10 @@ Namespace DevCommerc8ak
         Private ReadOnly cmbProduitExistant As ComboBox
         Private ReadOnly cmbUniteBase As ComboBox
         Private ReadOnly txtNbUniteParBase As TextBox
+        Private ReadOnly cmbTypeGestionStockEntree As ComboBox
+        Private ReadOnly cmbUniteMesureStockEntree As ComboBox
+        Private ReadOnly txtContenuUnitePrincipaleEntree As TextBox
+        Private ReadOnly txtContenuUniteSecondaireEntree As TextBox
         Private ReadOnly txtQuantiteEntree As TextBox
         Private ReadOnly txtQuantiteSecondaireEntree As TextBox
         Private ReadOnly lblStockActuel As Label
@@ -199,6 +203,7 @@ Namespace DevCommerc8ak
         Private ReadOnly _prixManuelOverrides As Dictionary(Of String, Boolean)
         Private _isUpdatingPrixAutomatiques As Boolean
         Private _miseAJourCoefficientDepuisPrix As Boolean
+        Private _isSavingEntree As Boolean
         Private _rapportEntreesPrintRowIndex As Integer
         Private _rapportEntreesPrintPageIndex As Integer
         Private _rapportEntreesTable As DataTable
@@ -278,7 +283,7 @@ Namespace DevCommerc8ak
             Dim mainTableEntree As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 3, .Padding = New Padding(5)}
             mainTableEntree.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50))
             mainTableEntree.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50))
-            mainTableEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 180)) ' Infos Produit / Unité/ Card produit
+            mainTableEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 220)) ' Infos Produit / Unité/ Card produit
             mainTableEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 220)) 'Card Finance / Prix
             mainTableEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 60)) ' Options / Autres
             ' mainTableEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 80))  ' Bouton
@@ -301,22 +306,34 @@ Namespace DevCommerc8ak
             ' layoutEntree.Controls.Add(cardProduit)
 
             ' Card 2: Unite
-            Dim cardUnite As Panel = CreateCard(600, 180, "UNITÉ & CONVERSION")
+            Dim cardUnite As Panel = CreateCard(600, 220, "UNITÉ & CONVERSION")
             cmbUniteBase = New ComboBox() With {.Left = 160, .Top = 45, .Width = 150, .DropDownStyle = ComboBoxStyle.DropDownList}
-            cmbUniteBase.Items.AddRange(New Object() {"Carton", "Sac", "Pack", "Paquet", "Bidon", "Sachet", "Kg", "Piece"})
+            cmbUniteBase.Items.AddRange(New Object() {"Carton", "Sac", "Paquet", "Farde", "Plateau", "Seau", "Bidon", "Bouteille", "Boîte", "Pièce"})
             txtNbUniteParBase = New TextBox() With {.Left = 160, .Top = 75, .Width = 100}
             txtQuantiteEntree = New TextBox() With {.Left = 160, .Top = 105, .Width = 100}
             txtQuantiteSecondaireEntree = New TextBox() With {.Left = 160, .Top = 135, .Width = 100}
-            lblStockActuel = New Label() With {.Left = 330, .Top = 45, .AutoSize = True, .ForeColor = ColorSecondary}
-            lblStockActuelPiece = New Label() With {.Left = 330, .Top = 65, .AutoSize = True}
-            lblStockApres = New Label() With {.Left = 330, .Top = 95, .AutoSize = True, .ForeColor = ColorAccent}
-            lblStockApresPiece = New Label() With {.Left = 330, .Top = 115, .AutoSize = True}
+            cmbTypeGestionStockEntree = New ComboBox() With {.Left = 430, .Top = 45, .Width = 120, .DropDownStyle = ComboBoxStyle.DropDownList}
+            cmbTypeGestionStockEntree.Items.AddRange(New Object() {"UNITE", "MESURE"})
+            cmbTypeGestionStockEntree.SelectedItem = "UNITE"
+            cmbUniteMesureStockEntree = New ComboBox() With {.Left = 430, .Top = 75, .Width = 120, .DropDownStyle = ComboBoxStyle.DropDownList}
+            cmbUniteMesureStockEntree.Items.AddRange(New Object() {"KG", "G", "L", "ML", "M", "CM"})
+            cmbUniteMesureStockEntree.SelectedItem = "KG"
+            txtContenuUnitePrincipaleEntree = New TextBox() With {.Left = 430, .Top = 105, .Width = 100}
+            txtContenuUniteSecondaireEntree = New TextBox() With {.Left = 430, .Top = 135, .Width = 100}
+            lblStockActuel = New Label() With {.Left = 20, .Top = 170, .AutoSize = True, .ForeColor = ColorSecondary}
+            lblStockActuelPiece = New Label() With {.Left = 20, .Top = 190, .AutoSize = True}
+            lblStockApres = New Label() With {.Left = 300, .Top = 170, .AutoSize = True, .ForeColor = ColorAccent}
+            lblStockApresPiece = New Label() With {.Left = 300, .Top = 190, .AutoSize = True}
             cardUnite.Controls.AddRange(New Control() {
                 New Label() With {.Text = "Unité base", .Left = 20, .Top = 48, .AutoSize = True},
                 New Label() With {.Text = "Nb unités/base", .Left = 20, .Top = 78, .AutoSize = True},
                 New Label() With {.Text = "Quantité entrée", .Left = 20, .Top = 108, .AutoSize = True},
                 New Label() With {.Text = "Qté secondaire bonus", .Left = 20, .Top = 138, .AutoSize = True},
-                cmbUniteBase, txtNbUniteParBase, txtQuantiteEntree, txtQuantiteSecondaireEntree, lblStockActuel, lblStockActuelPiece, lblStockApres, lblStockApresPiece
+                New Label() With {.Text = "Mode stock", .Left = 330, .Top = 48, .AutoSize = True},
+                New Label() With {.Text = "Unité mesure", .Left = 330, .Top = 78, .AutoSize = True},
+                New Label() With {.Text = "Contenu principal", .Left = 330, .Top = 108, .AutoSize = True},
+                New Label() With {.Text = "Contenu secondaire", .Left = 330, .Top = 138, .AutoSize = True},
+                cmbUniteBase, txtNbUniteParBase, txtQuantiteEntree, txtQuantiteSecondaireEntree, cmbTypeGestionStockEntree, cmbUniteMesureStockEntree, txtContenuUnitePrincipaleEntree, txtContenuUniteSecondaireEntree, lblStockActuel, lblStockActuelPiece, lblStockApres, lblStockApresPiece
             })
             'layoutEntree.Controls.Add(cardUnite)
 
@@ -695,6 +712,10 @@ Namespace DevCommerc8ak
             AddHandler txtNomProduit.TextChanged, AddressOf GenererReferenceAutomatique
             AddHandler cmbCategorie.SelectedIndexChanged, AddressOf GenererReferenceAutomatique
             AddHandler txtNbUniteParBase.TextChanged, AddressOf RecalculerStock
+            AddHandler cmbTypeGestionStockEntree.SelectedIndexChanged, AddressOf ModeGestionStockEntreeChange
+            AddHandler cmbUniteMesureStockEntree.SelectedIndexChanged, AddressOf RecalculerStock
+            AddHandler txtContenuUnitePrincipaleEntree.TextChanged, AddressOf RecalculerStock
+            AddHandler txtContenuUniteSecondaireEntree.TextChanged, AddressOf RecalculerStock
             AddHandler txtQuantiteEntree.TextChanged, AddressOf RecalculerStock
             AddHandler txtQuantiteSecondaireEntree.TextChanged, AddressOf RecalculerStock
             AddHandler txtPrixAchat.TextChanged, AddressOf RecalculerPrixAuto
@@ -1274,6 +1295,9 @@ Namespace DevCommerc8ak
             If _isFilteringProduits Then
                 Return
             End If
+            If _isSavingEntree Then
+                Return
+            End If
             If cmbProduitExistant.SelectedValue Is Nothing Then Return
             Dim row As DataRowView = TryCast(cmbProduitExistant.SelectedItem, DataRowView)
             If row Is Nothing Then Return
@@ -1288,6 +1312,17 @@ Namespace DevCommerc8ak
 
             cmbUniteBase.Text = If(r.IsNull("UnitePrincipale"), "", Convert.ToString(row("UnitePrincipale")))
             txtNbUniteParBase.Text = If(r.IsNull("ConversionUnite"), "", Convert.ToDecimal(row("ConversionUnite")).ToString())
+            Dim typeGestion As String = LireTexteCellule(r, "TypeGestionStock").ToUpperInvariant()
+            If typeGestion = "MESURE" OrElse typeGestion = "POIDS" OrElse typeGestion = "VOLUME" Then
+                cmbTypeGestionStockEntree.SelectedItem = "MESURE"
+            Else
+                cmbTypeGestionStockEntree.SelectedItem = "UNITE"
+            End If
+            Dim uniteMesure As String = LireTexteCellule(r, "UniteMesureStock").ToUpperInvariant()
+            If String.IsNullOrWhiteSpace(uniteMesure) Then uniteMesure = "KG"
+            cmbUniteMesureStockEntree.Text = uniteMesure
+            txtContenuUnitePrincipaleEntree.Text = If(r.Table.Columns.Contains("ContenuUnitePrincipale") AndAlso Not r.IsNull("ContenuUnitePrincipale"), Convert.ToDecimal(r("ContenuUnitePrincipale")).ToString(), txtNbUniteParBase.Text)
+            txtContenuUniteSecondaireEntree.Text = If(r.Table.Columns.Contains("ContenuUniteSecondaire") AndAlso Not r.IsNull("ContenuUniteSecondaire"), Convert.ToDecimal(r("ContenuUniteSecondaire")).ToString(), String.Empty)
             txtPrixAchat.Text = If(r.IsNull("PrixAchat"), "", Convert.ToDecimal(row("PrixAchat")).ToString())
             cmbDevise.SelectedItem = "CDF"
             txtCoefficientInput.Text = If(r.IsNull("CoefficientGros"), "", Convert.ToDecimal(row("CoefficientGros")).ToString("N4"))
@@ -1309,6 +1344,7 @@ Namespace DevCommerc8ak
             chkDouzaine.Checked = Convert.ToBoolean(row("VenteDouzaine"))
 
             AfficherStockActuel()
+            ModeGestionStockEntreeChange(Nothing, EventArgs.Empty)
             ReinitialiserOverridesPrixVente()
             MettreAJourEquivalentPrixAchat()
             RecalculerStock(Nothing, EventArgs.Empty)
@@ -1325,11 +1361,15 @@ Namespace DevCommerc8ak
                 Dim nb As Decimal = LireDecimal(txtNbUniteParBase.Text)
                 Dim uniteBase As String = If(cmbUniteBase.Text.Trim() = "", "base", cmbUniteBase.Text.Trim())
                 lblStockActuel.Text = "Stock actuel: " & FormaterStockLisible(stockPieces, nb, uniteBase, ObtenirUniteSecondaireEntree())
-                lblStockActuelPiece.Text = "Equivalent: " & stockPieces.ToString("N0") & " " & ObtenirUniteSecondaireEntree()
+                lblStockActuelPiece.Text = If(EstGestionMesureEntree(), "Equivalent physique: ", "Equivalent: ") & stockPieces.ToString(If(EstGestionMesureEntree(), "N2", "N0")) & " " & ObtenirUniteSecondaireEntree()
             End If
         End Sub
 
         Private Function ObtenirUniteSecondaireEntree() As String
+            If EstGestionMesureEntree() Then
+                Return UniteMesureStockEntree()
+            End If
+
             Dim produitId As Integer = ObtenirProduitEntreeSelectionneId()
             Dim row As DataRow = If(produitId > 0, ObtenirProduitCourantDepuisListe(produitId), Nothing)
             If row IsNot Nothing AndAlso row.Table.Columns.Contains("UniteSecondaire") AndAlso Not row.IsNull("UniteSecondaire") Then
@@ -1341,6 +1381,53 @@ Namespace DevCommerc8ak
 
             Return "pièces"
         End Function
+
+        Private Function TypeGestionStockEntree() As String
+            Dim valeur As String = If(cmbTypeGestionStockEntree Is Nothing, "", Convert.ToString(cmbTypeGestionStockEntree.SelectedItem)).Trim().ToUpperInvariant()
+            If valeur = "MESURE" Then Return "MESURE"
+            Return "UNITE"
+        End Function
+
+        Private Function EstGestionMesureEntree() As Boolean
+            Return String.Equals(TypeGestionStockEntree(), "MESURE", StringComparison.OrdinalIgnoreCase)
+        End Function
+
+        Private Function UniteMesureStockEntree() As String
+            Dim unite As String = If(cmbUniteMesureStockEntree Is Nothing, "", Convert.ToString(cmbUniteMesureStockEntree.Text)).Trim().ToUpperInvariant()
+            If String.IsNullOrWhiteSpace(unite) Then Return "KG"
+            Return unite
+        End Function
+
+        Private Function LireContenuUnitePrincipaleEntree() As Decimal
+            If EstGestionMesureEntree() Then
+                Dim contenu As Decimal = LireDecimal(txtContenuUnitePrincipaleEntree.Text)
+                If contenu > 0D Then Return contenu
+            End If
+
+            Dim conversion As Decimal = LireDecimal(txtNbUniteParBase.Text)
+            If conversion > 0D Then Return conversion
+            Return 1D
+        End Function
+
+        Private Function LireContenuUniteSecondaireEntree() As Decimal?
+            If Not EstGestionMesureEntree() Then Return Nothing
+            Dim contenu As Decimal = LireDecimal(txtContenuUniteSecondaireEntree.Text)
+            If contenu > 0D Then Return contenu
+            Return Nothing
+        End Function
+
+        Private Sub ModeGestionStockEntreeChange(sender As Object, e As EventArgs)
+            Dim mesure As Boolean = EstGestionMesureEntree()
+            cmbUniteMesureStockEntree.Enabled = mesure
+            txtContenuUnitePrincipaleEntree.Enabled = mesure
+            txtContenuUniteSecondaireEntree.Enabled = mesure
+            If Not mesure Then
+                txtContenuUnitePrincipaleEntree.Text = txtNbUniteParBase.Text
+                txtContenuUniteSecondaireEntree.Clear()
+            End If
+            RecalculerStock(Nothing, EventArgs.Empty)
+            RafraichirTypesVente()
+        End Sub
 
         Private Function ObtenirService() As ProduitService
             Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
@@ -1365,7 +1452,7 @@ Namespace DevCommerc8ak
             End If
 
             Dim typesCourants As List(Of TypeVenteProduitDTO) = ConstruireTypesPersonnalisesFusionnesPourProduit(produitId)
-            Using frm As New FormulaireTypesVenteProduit(produitId, LirePrixAchatEntreeEnCdf(), LireDecimal(txtNbUniteParBase.Text), False, typesCourants, Nothing, cmbUniteBase.Text, ObtenirUniteSecondaireEntree())
+            Using frm As New FormulaireTypesVenteProduit(produitId, LirePrixAchatEntreeEnCdf(), LireDecimal(txtNbUniteParBase.Text), False, typesCourants, Nothing, cmbUniteBase.Text, ObtenirUniteSecondaireProduitSelectionne(), If(EstGestionMesureEntree(), UniteMesureStockEntree(), Nothing))
                 If frm.ShowDialog(Me) = DialogResult.OK AndAlso frm.TypeVenteResultat IsNot Nothing Then
                     Dim typeResultat As TypeVenteProduitDTO = ClonerTypePersonnalise(frm.TypeVenteResultat)
                     If typeResultat.TypeVenteProduitId = 0 Then
@@ -1477,7 +1564,7 @@ Namespace DevCommerc8ak
             End If
 
             Dim typesCourants As List(Of TypeVenteProduitDTO) = ConstruireTypesPersonnalisesFusionnesPourProduit(produitId)
-            Using frm As New FormulaireTypesVenteProduit(produitId, LirePrixAchatEntreeEnCdf(), LireDecimal(txtNbUniteParBase.Text), False, typesCourants, typeCourant, cmbUniteBase.Text, ObtenirUniteSecondaireEntree())
+            Using frm As New FormulaireTypesVenteProduit(produitId, LirePrixAchatEntreeEnCdf(), LireDecimal(txtNbUniteParBase.Text), False, typesCourants, typeCourant, cmbUniteBase.Text, ObtenirUniteSecondaireProduitSelectionne(), If(EstGestionMesureEntree(), UniteMesureStockEntree(), Nothing))
                 If frm.ShowDialog(Me) = DialogResult.OK AndAlso frm.TypeVenteResultat IsNot Nothing Then
                     AjouterOuRemplacerTypePersonnaliseTemporaire(produitId, frm.TypeVenteResultat)
                 End If
@@ -1709,7 +1796,11 @@ Namespace DevCommerc8ak
                 .CategorieId = If(row.Table.Columns.Contains("CategorieId") AndAlso Not row.IsNull("CategorieId"), Convert.ToInt32(row("CategorieId")), CType(Nothing, Integer?)),
                 .UnitePrincipale = If(String.IsNullOrWhiteSpace(cmbUniteBase.Text), LireTexteCellule(row, "UnitePrincipale"), cmbUniteBase.Text.Trim()),
                 .UniteSecondaire = LireTexteCellule(row, "UniteSecondaire"),
-                .ConversionUnite = If(conversionSaisie AndAlso LireDecimal(txtNbUniteParBase.Text) > 0D, LireDecimal(txtNbUniteParBase.Text), LireDecimalTable(row, "ConversionUnite")),
+                .ConversionUnite = If(conversionSaisie AndAlso LireDecimal(txtNbUniteParBase.Text) > 0D, LireDecimal(txtNbUniteParBase.Text), If(EstGestionMesureEntree(), LireContenuUnitePrincipaleEntree(), LireDecimalTable(row, "ConversionUnite"))),
+                .TypeGestionStock = TypeGestionStockEntree(),
+                .UniteMesureStock = If(EstGestionMesureEntree(), UniteMesureStockEntree(), "PIECE"),
+                .ContenuUnitePrincipale = LireContenuUnitePrincipaleEntree(),
+                .ContenuUniteSecondaire = LireContenuUniteSecondaireEntree(),
                 .EstActif = If(row.Table.Columns.Contains("EstActif") AndAlso Not row.IsNull("EstActif"), Convert.ToBoolean(row("EstActif")), True),
                 .VenteDetail = chkPiece.Checked,
                 .VenteDemi = chkDemi.Checked,
@@ -1993,20 +2084,62 @@ Namespace DevCommerc8ak
             Dim stockApresPieces As Decimal = stockActuelPieces + totalPiecesEntree
             Dim uniteBase As String = If(cmbUniteBase.Text.Trim() = "", "base", cmbUniteBase.Text.Trim())
             Dim uniteSecondaire As String = ObtenirUniteSecondaireEntree()
+            Dim contenuSecondaire As Decimal? = LireContenuUniteSecondaireEntree()
+            Dim uniteComplement As String = uniteSecondaire
+            If EstGestionMesureEntree() AndAlso contenuSecondaire.HasValue Then
+                Dim uniteSecondaireProduit As String = ObtenirUniteSecondaireProduitSelectionne()
+                If Not String.IsNullOrWhiteSpace(uniteSecondaireProduit) Then uniteComplement = uniteSecondaireProduit
+            End If
+            Dim formatQuantite As String = If(EstGestionMesureEntree(), "N2", "N0")
+            Dim libelleEquivalent As String = If(EstGestionMesureEntree(), "Equivalent physique: ", "Equivalent: ")
 
             lblStockActuel.Text = "Stock actuel: " & FormaterStockLisible(stockActuelPieces, nb, uniteBase, uniteSecondaire)
-            lblStockActuelPiece.Text = "Equivalent: " & stockActuelPieces.ToString("N0") & " " & uniteSecondaire
+            lblStockActuelPiece.Text = libelleEquivalent & stockActuelPieces.ToString(formatQuantite) & " " & uniteSecondaire
             lblStockApres.Text = "Stock après: " & FormaterStockLisible(stockApresPieces, nb, uniteBase, uniteSecondaire)
-            lblStockApresPiece.Text = "Après: " & stockApresPieces.ToString("N0") & " " & uniteSecondaire & " (" & quantiteEntree.ToString("N0") & " " & uniteBase & " + " & quantiteSecondaire.ToString("N0") & " " & uniteSecondaire & ")"
+            lblStockApresPiece.Text = "Après: " & stockApresPieces.ToString(formatQuantite) & " " & uniteSecondaire & " (" & quantiteEntree.ToString("N0") & " " & uniteBase & " + " & quantiteSecondaire.ToString(formatQuantite) & " " & uniteComplement & ")"
             RafraichirTypesVente()
         End Sub
 
         Private Function CalculerQuantiteBaseEntree(quantitePrincipale As Decimal, quantiteSecondaire As Decimal, conversion As Decimal) As Decimal
-            Dim conversionSecurisee As Decimal = If(conversion > 0D, conversion, 1D)
-            Return (Math.Max(0D, quantitePrincipale) * conversionSecurisee) + Math.Max(0D, quantiteSecondaire)
+            Dim contenuSecondaire As Decimal? = LireContenuUniteSecondaireEntree()
+            Return StockUnitConversionService.CalculerQuantiteEntreeNormalisee(
+                quantitePrincipale,
+                quantiteSecondaire,
+                conversion,
+                TypeGestionStockEntree(),
+                LireContenuUnitePrincipaleEntree(),
+                If(contenuSecondaire.HasValue, contenuSecondaire.Value, 0D))
         End Function
 
         Private Function FormaterStockLisible(stockBase As Decimal, conversion As Decimal, unitePrincipale As String, uniteSecondaire As String) As String
+            If EstGestionMesureEntree() Then
+                Dim contenuPrincipal As Decimal = LireContenuUnitePrincipaleEntree()
+                If contenuPrincipal <= 0D Then
+                    Return stockBase.ToString("N2") & " " & uniteSecondaire
+                End If
+
+                Dim quantitePrincipale As Decimal = Decimal.Floor(stockBase / contenuPrincipal)
+                Dim reste As Decimal = stockBase - (quantitePrincipale * contenuPrincipal)
+                Dim contenuSecondaire As Decimal? = LireContenuUniteSecondaireEntree()
+
+                If contenuSecondaire.HasValue AndAlso contenuSecondaire.Value > 0D Then
+                    Dim uniteSecondairePhysique As String = ObtenirUniteSecondaireProduitSelectionne()
+                    Dim quantiteSecondaire As Decimal = Decimal.Floor(reste / contenuSecondaire.Value)
+                    Dim resteMesure As Decimal = reste - (quantiteSecondaire * contenuSecondaire.Value)
+                    Dim morceaux As New List(Of String)()
+                    If quantitePrincipale > 0D Then morceaux.Add(quantitePrincipale.ToString("N0") & " " & unitePrincipale)
+                    If quantiteSecondaire > 0D AndAlso Not String.IsNullOrWhiteSpace(uniteSecondairePhysique) Then morceaux.Add(quantiteSecondaire.ToString("N0") & " " & uniteSecondairePhysique)
+                    If resteMesure > 0D OrElse morceaux.Count = 0 Then morceaux.Add(resteMesure.ToString("N2").TrimEnd("0"c).TrimEnd(","c).TrimEnd("."c) & " " & uniteSecondaire)
+                    Return String.Join(" + ", morceaux)
+                End If
+
+                If reste > 0D Then
+                    Return quantitePrincipale.ToString("N0") & " " & unitePrincipale & " + " & reste.ToString("N2").TrimEnd("0"c).TrimEnd(","c).TrimEnd("."c) & " " & uniteSecondaire
+                End If
+
+                Return quantitePrincipale.ToString("N0") & " " & unitePrincipale
+            End If
+
             If conversion <= 0D Then
                 Return stockBase.ToString("N0") & " " & uniteSecondaire
             End If
@@ -2018,6 +2151,16 @@ Namespace DevCommerc8ak
             End If
 
             Return quantitePrincipale.ToString("N0") & " " & unitePrincipale
+        End Function
+
+        Private Function ObtenirUniteSecondaireProduitSelectionne() As String
+            Dim produitId As Integer = ObtenirProduitEntreeSelectionneId()
+            Dim row As DataRow = If(produitId > 0, ObtenirProduitCourantDepuisListe(produitId), Nothing)
+            If row IsNot Nothing Then
+                Dim unite As String = LireTexteCellule(row, "UniteSecondaire")
+                If Not String.IsNullOrWhiteSpace(unite) Then Return unite
+            End If
+            Return String.Empty
         End Function
 
         'Private Sub RecalculerStockSortie(sender As Object, e As EventArgs)
@@ -2281,10 +2424,11 @@ Namespace DevCommerc8ak
         Private Sub RafraichirTypesVente()
             Dim produitId As Integer = ObtenirProduitEntreeSelectionneId()
             Dim typesPersonnalisesActifs As List(Of TypeVenteProduitDTO) = If(produitId > 0, ConstruireTypesPersonnalisesActifsPourProduit(produitId), New List(Of TypeVenteProduitDTO)())
+            Dim contenuSecondaire As Decimal? = LireContenuUniteSecondaireEntree()
             Dim liste As List(Of TypeVenteDTO) = _typeVenteService.ConstruireTypesVentePourProduit(
                 produitId,
                 LireDecimal(txtNbUniteParBase.Text),
-                LireDecimal(txtPrixAchat.Text),
+                LirePrixAchatEntreeEnCdf(),
                 LireDecimal(txtPrixGros.Text.Replace("-", "0")),
                 LireDecimal(txtPrixDemi.Text.Replace("-", "0")),
                 LireDecimal(txtPrixPiece.Text.Replace("-", "0")),
@@ -2295,7 +2439,9 @@ Namespace DevCommerc8ak
                 chkDemi.Checked,
                 chkPiece.Checked,
                 chkDouzaine.Checked,
-                typesPersonnalisesActifs)
+                typesPersonnalisesActifs,
+                LireContenuUnitePrincipaleEntree(),
+                If(contenuSecondaire.HasValue, contenuSecondaire.Value, 0D))
             gridTypesVente.DataSource = Nothing
             gridTypesVente.DataSource = liste
             ConfigurerGrilleTypesVenteAffichage(gridTypesVente)
@@ -2376,6 +2522,15 @@ Namespace DevCommerc8ak
                 Dim quantitePrincipale As Decimal = LireDecimal(txtQuantiteEntree.Text)
                 Dim quantiteSecondaire As Decimal = LireDecimal(txtQuantiteSecondaireEntree.Text)
                 Dim conversionEntree As Decimal = LireDecimal(txtNbUniteParBase.Text)
+                If LireContenuUnitePrincipaleEntree() <= 0D Then
+                    MessageBox.Show("Le contenu de l'unité principale doit être supérieur à zéro.")
+                    If EstGestionMesureEntree() Then
+                        txtContenuUnitePrincipaleEntree.Focus()
+                    Else
+                        txtNbUniteParBase.Focus()
+                    End If
+                    Return
+                End If
                 Dim qte As Decimal = CalculerQuantiteBaseEntree(quantitePrincipale, quantiteSecondaire, conversionEntree)
                 If qte <= 0D Then
                     MessageBox.Show("La quantité entrée doit être supérieure à zéro.")
@@ -2393,6 +2548,7 @@ Namespace DevCommerc8ak
                 Dim produitId As Integer
                 Dim etaitProduitExistant As Boolean = chkProduitExistant.Checked
                 Dim produitCapture As Produit = Nothing
+                Dim produitNouvellementCree As Boolean = False
                 If chkProduitExistant.Checked Then
                     If cmbProduitExistant.SelectedValue Is Nothing OrElse IsDBNull(cmbProduitExistant.SelectedValue) Then
                         MessageBox.Show("Selectionnez un produit.")
@@ -2401,6 +2557,10 @@ Namespace DevCommerc8ak
                     End If
                     produitId = Convert.ToInt32(cmbProduitExistant.SelectedValue)
                     produitCapture = ConstruireProduitMisAJourDepuisEntree(produitId)
+                    If produitCapture Is Nothing Then
+                        MessageBox.Show("Impossible de préparer les nouvelles valeurs du produit sélectionné.")
+                        Return
+                    End If
                 Else
                     Dim nom As String = txtNomProduit.Text.Trim()
                     If nom = "" Then
@@ -2411,7 +2571,7 @@ Namespace DevCommerc8ak
                     If txtReference.Text.Trim() = "" Then
                         txtReference.Text = GenererReferenceUnique(nom, cmbCategorie.Text.Trim())
                     End If
-                    If LireDecimal(txtNbUniteParBase.Text) <= 0D Then
+                    If Not EstGestionMesureEntree() AndAlso LireDecimal(txtNbUniteParBase.Text) <= 0D Then
                         MessageBox.Show("Le nombre d'unités par base doit être supérieur à zéro.")
                         Return
                     End If
@@ -2422,7 +2582,7 @@ Namespace DevCommerc8ak
                     Dim prixPieceVal As Decimal = LireDecimal(txtPrixPiece.Text.Replace("-", "0"))
                     Dim prixDouzaineVal As Decimal = LireDecimal(txtPrixDouzaine.Text.Replace("-", "0"))
 
-                    Dim produit As New Produit With {
+	                    Dim produit As New Produit With {
                         .CodeBarres = txtReference.Text.Trim(),
                         .Libelle = nom,
                         .PrixAchat = prixAchatVal1,
@@ -2435,34 +2595,48 @@ Namespace DevCommerc8ak
                         .CoefficientGros = _coefficientCalcule,
                         .SeuilCritique = 0D,
                         .DateExpiration = Nothing,
-                        .CategorieId = ObtenirCategorieSelectionneId(),
-                        .UnitePrincipale = cmbUniteBase.Text,
-                        .UniteSecondaire = "Piece",
-                        .ConversionUnite = LireDecimal(txtNbUniteParBase.Text),
-                        .EstActif = True,
+	                        .CategorieId = ObtenirCategorieSelectionneId(),
+	                        .UnitePrincipale = cmbUniteBase.Text,
+	                        .UniteSecondaire = "Piece",
+	                        .ConversionUnite = If(LireDecimal(txtNbUniteParBase.Text) > 0D, LireDecimal(txtNbUniteParBase.Text), LireContenuUnitePrincipaleEntree()),
+	                        .TypeGestionStock = TypeGestionStockEntree(),
+	                        .UniteMesureStock = If(EstGestionMesureEntree(), UniteMesureStockEntree(), "PIECE"),
+	                        .ContenuUnitePrincipale = LireContenuUnitePrincipaleEntree(),
+	                        .ContenuUniteSecondaire = LireContenuUniteSecondaireEntree(),
+	                        .EstActif = True,
                         .VenteDetail = chkPiece.Checked,
                         .VenteDemi = chkDemi.Checked,
                         .VenteDouzaine = chkDouzaine.Checked,
                         .VenteGros = chkGros.Checked
                     }
                     Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
-                    Dim dal As New DAL(cs)
-                    Dim serviceProduit As New ProduitService(New ProduitRepository(dal))
-                    produitId = serviceProduit.Ajouter(produit)
-                    ChargerProduits()
+	                    Dim dal As New DAL(cs)
+	                    Dim serviceProduit As New ProduitService(New ProduitRepository(dal))
+	                    produitId = serviceProduit.Ajouter(produit)
+	                    produitNouvellementCree = True
+                End If
+
+                _isSavingEntree = True
+                If etaitProduitExistant Then
+                    MettreAJourProduitExistantDepuisEntree(produitId, produitCapture)
+                End If
+
+                Dim service As StockService = ObtenirStockService()
+                service.EnregistrerEntree(produitId, qte, ObtenirUniteSecondaireEntree(), txtReference.Text.Trim(), txtObservationEntree.Text.Trim(), SessionUtilisateur.UtilisateurId, prixAchatVal)
+                If etaitProduitExistant Then
+                    EnregistrerTypesPersonnalisesTemporaires(produitId)
+                End If
+                _isSavingEntree = False
+
+                ChargerProduits()
+                If produitNouvellementCree Then
                     chkProduitExistant.Checked = True
                     cmbProduitExistant.SelectedValue = produitId
                 End If
-                Dim service As StockService = ObtenirStockService()
-                service.EnregistrerEntree(produitId, qte, ObtenirUniteSecondaireEntree(), txtReference.Text.Trim(), txtObservationEntree.Text.Trim(), SessionUtilisateur.UtilisateurId, prixAchatVal)
-                If chkProduitExistant.Checked Then
-                    MettreAJourProduitExistantDepuisEntree(produitId, produitCapture)
-                    EnregistrerTypesPersonnalisesTemporaires(produitId)
-                End If
-                ChargerProduits()
                 MessageBox.Show("Entrée stock enregistrée.")
                 NettoyerSaisieEntreeApresEnregistrement(produitId, etaitProduitExistant)
             Catch ex As Exception
+                _isSavingEntree = False
                 MessageBox.Show("Erreur entrée stock: " & ex.Message)
             End Try
         End Sub

@@ -9,9 +9,15 @@ Namespace DevCommerc8ak
         End Sub
 
         Public Shared Function NormaliserTypeGestionStock(typeGestion As String) As String
+            If String.Equals(typeGestion, "MESURE", StringComparison.OrdinalIgnoreCase) Then Return "MESURE"
             If String.Equals(typeGestion, "POIDS", StringComparison.OrdinalIgnoreCase) Then Return "POIDS"
             If String.Equals(typeGestion, "VOLUME", StringComparison.OrdinalIgnoreCase) Then Return "VOLUME"
             Return "UNITE"
+        End Function
+
+        Public Shared Function EstGestionMesuree(typeGestion As String) As Boolean
+            Dim typeNormalise As String = NormaliserTypeGestionStock(typeGestion)
+            Return typeNormalise = "MESURE" OrElse typeNormalise = "POIDS" OrElse typeNormalise = "VOLUME"
         End Function
 
         Public Shared Function NormaliserTypeQuantiteEquivalent(typeQuantite As String) As String
@@ -49,7 +55,7 @@ Namespace DevCommerc8ak
             If prixAchat <= 0D Then Return Nothing
 
             Dim typeNormalise As String = NormaliserTypeGestionStock(typeGestionStock)
-            If (typeNormalise = "POIDS" OrElse typeNormalise = "VOLUME") AndAlso contenuUnitePrincipale > 0D Then
+            If EstGestionMesuree(typeNormalise) AndAlso contenuUnitePrincipale > 0D Then
                 Return Math.Round(prixAchat / contenuUnitePrincipale, 4)
             End If
 
@@ -70,9 +76,10 @@ Namespace DevCommerc8ak
             Dim complement As Decimal = Math.Max(0D, quantiteSecondaireOuMesure)
             Dim typeNormalise As String = NormaliserTypeGestionStock(typeGestionStock)
 
-            If typeNormalise = "POIDS" OrElse typeNormalise = "VOLUME" Then
+            If EstGestionMesuree(typeNormalise) Then
                 Dim contenuPrincipal As Decimal = If(contenuUnitePrincipale > 0D, contenuUnitePrincipale, If(conversionUnite > 0D, conversionUnite, 1D))
-                Return (principale * contenuPrincipal) + complement
+                Dim complementMesure As Decimal = If(contenuUniteSecondaire > 0D, complement * contenuUniteSecondaire, complement)
+                Return (principale * contenuPrincipal) + complementMesure
             End If
 
             Dim conversion As Decimal = If(conversionUnite > 0D, conversionUnite, 1D)

@@ -71,7 +71,7 @@ Namespace DevCommerc8ak
             _conversionUnite = If(conversionUnite > 0D, conversionUnite, 1D)
             _unitePrincipale = If(String.IsNullOrWhiteSpace(unitePrincipale), "Unité principale", unitePrincipale.Trim())
             _uniteSecondaire = If(String.IsNullOrWhiteSpace(uniteSecondaire), "Unité secondaire", uniteSecondaire.Trim())
-            _uniteMesureStock = If(String.IsNullOrWhiteSpace(uniteMesureStock), "Unité de mesure", uniteMesureStock.Trim())
+            _uniteMesureStock = If(String.IsNullOrWhiteSpace(uniteMesureStock), String.Empty, uniteMesureStock.Trim())
             _service = New TypeVenteProduitService()
             _modeDirectBDD = modeDirectBDD
             _typesTemporaires = If(typesTemporaires, New List(Of TypeVenteProduitDTO)())
@@ -95,9 +95,11 @@ Namespace DevCommerc8ak
             txtQuantiteEquivalent = New TextBox() With {.Left = 250, .Top = 36, .Width = 120}
             Dim lblUnite As New Label() With {.Text = "Unité", .Left = 390, .Top = 16, .AutoSize = True}
             cmbUniteEquivalent = New ComboBox() With {.Left = 390, .Top = 36, .Width = 140, .DropDownStyle = ComboBoxStyle.DropDownList}
-            cmbUniteEquivalent.Items.Add(New UniteOption("PRINCIPALE", _unitePrincipale))
-            cmbUniteEquivalent.Items.Add(New UniteOption("SECONDAIRE", _uniteSecondaire))
-            cmbUniteEquivalent.Items.Add(New UniteOption("MESURE", _uniteMesureStock))
+            cmbUniteEquivalent.Items.Add(New UniteOption("PRINCIPALE", _unitePrincipale & " — unité principale"))
+            cmbUniteEquivalent.Items.Add(New UniteOption("SECONDAIRE", _uniteSecondaire & " — unité secondaire"))
+            If Not String.IsNullOrWhiteSpace(_uniteMesureStock) Then
+                cmbUniteEquivalent.Items.Add(New UniteOption("MESURE", _uniteMesureStock & " — unité de mesure"))
+            End If
             cmbUniteEquivalent.SelectedIndex = 1
             Dim lblMode As New Label() With {.Text = "Mode prix", .Left = 550, .Top = 16, .AutoSize = True}
             cmbModePrix = New ComboBox() With {.Left = 550, .Top = 36, .Width = 110, .DropDownStyle = ComboBoxStyle.DropDownList}

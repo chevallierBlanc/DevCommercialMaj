@@ -106,7 +106,7 @@ Namespace DevCommerc8ak
                 "    SELECT p.ProduitId, " &
                 "           CASE " &
                 "               WHEN ISNULL(p.PrixAchat, 0) <= 0 THEN NULL " &
-                "               WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ContenuUnitePrincipale, 0), 0) " &
+                "               WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ContenuUnitePrincipale, 0), 0) " &
                 "               WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0) " &
                 "               ELSE ISNULL(p.PrixAchat, 0) " &
                 "           END AS CoutPiece " &

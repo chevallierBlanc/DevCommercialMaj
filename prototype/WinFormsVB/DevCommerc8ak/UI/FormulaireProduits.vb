@@ -63,6 +63,10 @@ Namespace DevCommerc8ak
         Private ReadOnly cmbUnitePrincipale As ComboBox
         Private ReadOnly cmbUniteSecondaire As ComboBox
         Private ReadOnly txtConversion As TextBox
+        Private ReadOnly cmbTypeGestionStock As ComboBox
+        Private ReadOnly cmbUniteMesureStock As ComboBox
+        Private ReadOnly txtContenuUnitePrincipale As TextBox
+        Private ReadOnly txtContenuUniteSecondaire As TextBox
 
         Private ReadOnly txtPrixUnite As TextBox
         Private ReadOnly txtPrixAchat As TextBox
@@ -191,8 +195,16 @@ Namespace DevCommerc8ak
             cmbUnitePrincipale = CreateComboField(cardUnites, "Unité Principale", 20, 45, 280)
             cmbUniteSecondaire = CreateComboField(cardUnites, "Unité Secondaire", 20, 105, 160)
             txtConversion = CreateField(cardUnites, "Taux Conv.", 190, 105, 110)
-            cmbUnitePrincipale.Items.AddRange({"Carton", "Sac", "Paquet", "Pack", "Bidon", "Sachet"})
-            cmbUniteSecondaire.Items.AddRange({"Piece", "Demi", "Quart", "Douzaine"})
+            cmbTypeGestionStock = CreateComboField(cardUnites, "Mode stock", 20, 165, 120)
+            cmbUniteMesureStock = CreateComboField(cardUnites, "Mesure", 150, 165, 70)
+            txtContenuUnitePrincipale = CreateField(cardUnites, "Contenu princ.", 20, 225, 120)
+            txtContenuUniteSecondaire = CreateField(cardUnites, "Contenu second.", 155, 225, 120)
+            cmbUnitePrincipale.Items.AddRange({"Carton", "Sac", "Paquet", "Farde", "Plateau", "Seau", "Bidon", "Bouteille", "Boîte", "Pièce"})
+            cmbUniteSecondaire.Items.AddRange({"Pièce", "Sachet", "Paquet", "Farde", "Bidon", "Bouteille", "Boîte"})
+            cmbTypeGestionStock.Items.AddRange({"UNITE", "MESURE"})
+            cmbUniteMesureStock.Items.AddRange({"KG", "G", "L", "ML", "M", "CM"})
+            cmbTypeGestionStock.SelectedItem = "UNITE"
+            cmbUniteMesureStock.SelectedItem = "KG"
 
             ' Carte 3: Prix
             Dim cardPrix As Panel = CreateCard("Tarification")
@@ -343,6 +355,7 @@ Namespace DevCommerc8ak
             AddHandler btnImprimerHistorique.Click, AddressOf ImprimerHistoriquePrix
             AddHandler btnTypesPersonnalises.Click, AddressOf OuvrirTypesPersonnalises
             AddHandler txtRecherche.TextChanged, AddressOf Filtrer
+            AddHandler cmbTypeGestionStock.SelectedIndexChanged, AddressOf ModeGestionStockProduitChange
             AddHandler grid.SelectionChanged, AddressOf ChargerSelection
             AddHandler btnPagePrecedente.Click, AddressOf PagePrecedente
             AddHandler btnPageSuivante.Click, AddressOf PageSuivante
@@ -507,6 +520,7 @@ Namespace DevCommerc8ak
             gridLegendeCategories.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "Categorie", .DataPropertyName = "Categorie", .HeaderText = "Catégorie", .Width = 180})
             gridLegendeCategories.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "Valeur", .DataPropertyName = "Valeur", .HeaderText = "Qté", .Width = 70})
             gridLegendeCategories.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "Pourcentage", .DataPropertyName = "Pourcentage", .HeaderText = "%", .Width = 70})
+            gridLegendeCategories.Columns.Add(New DataGridViewTextBoxColumn() With {.Name = "CouleurArgb", .DataPropertyName = "CouleurArgb", .Visible = False})
         End Sub
 
         Private Sub ConfigurerGrilleTypesPersonnalises()
@@ -667,6 +681,11 @@ Namespace DevCommerc8ak
             txtMarge.Clear()
             cmbUnitePrincipale.SelectedIndex = -1
             cmbUniteSecondaire.SelectedIndex = -1
+            cmbTypeGestionStock.SelectedItem = "UNITE"
+            cmbUniteMesureStock.SelectedItem = "KG"
+            txtContenuUnitePrincipale.Clear()
+            txtContenuUniteSecondaire.Clear()
+            ModeGestionStockProduitChange(Nothing, EventArgs.Empty)
             chkActif.Checked = True
             chkVenteGros.Checked = False
             chkVenteUnite.Checked = False
@@ -694,11 +713,56 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            Using frm As New FormulaireTypesVenteProduit(_produitId, LireDecimal(txtPrixAchat.Text), LireDecimal(txtConversion.Text), True, Nothing, Nothing, cmbUnitePrincipale.Text, cmbUniteSecondaire.Text)
+            Using frm As New FormulaireTypesVenteProduit(_produitId, LireDecimal(txtPrixAchat.Text), LireDecimal(txtConversion.Text), True, Nothing, Nothing, cmbUnitePrincipale.Text, cmbUniteSecondaire.Text, If(EstGestionMesureProduit(), UniteMesureStockProduit(), Nothing))
                 frm.ShowDialog(Me)
             End Using
 
             ChargerTypesPersonnalisesProduit()
+        End Sub
+
+        Private Function TypeGestionStockProduit() As String
+            Dim valeur As String = Convert.ToString(cmbTypeGestionStock.SelectedItem).Trim().ToUpperInvariant()
+            If valeur = "MESURE" Then Return "MESURE"
+            Return "UNITE"
+        End Function
+
+        Private Function EstGestionMesureProduit() As Boolean
+            Return String.Equals(TypeGestionStockProduit(), "MESURE", StringComparison.OrdinalIgnoreCase)
+        End Function
+
+        Private Function UniteMesureStockProduit() As String
+            Dim unite As String = Convert.ToString(cmbUniteMesureStock.Text).Trim().ToUpperInvariant()
+            If String.IsNullOrWhiteSpace(unite) Then Return "KG"
+            Return unite
+        End Function
+
+        Private Function LireContenuUnitePrincipaleProduit() As Decimal
+            If EstGestionMesureProduit() Then
+                Dim contenu As Decimal = LireDecimal(txtContenuUnitePrincipale.Text)
+                If contenu > 0D Then Return contenu
+            End If
+
+            Dim conversion As Decimal = LireDecimal(txtConversion.Text)
+            If conversion > 0D Then Return conversion
+            Return 1D
+        End Function
+
+        Private Function LireContenuUniteSecondaireProduit() As Decimal?
+            If Not EstGestionMesureProduit() Then Return Nothing
+            Dim contenu As Decimal = LireDecimal(txtContenuUniteSecondaire.Text)
+            If contenu > 0D Then Return contenu
+            Return Nothing
+        End Function
+
+        Private Sub ModeGestionStockProduitChange(sender As Object, e As EventArgs)
+            Dim mesure As Boolean = EstGestionMesureProduit()
+            cmbUniteMesureStock.Enabled = mesure
+            txtContenuUnitePrincipale.Enabled = mesure
+            txtContenuUniteSecondaire.Enabled = mesure
+            If Not mesure Then
+                txtContenuUnitePrincipale.Text = txtConversion.Text
+                txtContenuUniteSecondaire.Clear()
+            End If
         End Sub
 
         Private Sub ChargerSelection(sender As Object, e As EventArgs)
@@ -718,6 +782,14 @@ Namespace DevCommerc8ak
             cmbUnitePrincipale.Text = If(r.IsNull("UnitePrincipale"), "", Convert.ToString(row("UnitePrincipale")))
             cmbUniteSecondaire.Text = If(r.IsNull("UniteSecondaire"), "", Convert.ToString(row("UniteSecondaire")))
             txtConversion.Text = LireDecimalRow(row, "ConversionUnite").ToString("N2")
+            Dim typeGestion As String = If(r.Table.Columns.Contains("TypeGestionStock") AndAlso Not r.IsNull("TypeGestionStock"), Convert.ToString(row("TypeGestionStock")).Trim().ToUpperInvariant(), "UNITE")
+            cmbTypeGestionStock.SelectedItem = If(typeGestion = "MESURE" OrElse typeGestion = "POIDS" OrElse typeGestion = "VOLUME", "MESURE", "UNITE")
+            Dim uniteMesure As String = If(r.Table.Columns.Contains("UniteMesureStock") AndAlso Not r.IsNull("UniteMesureStock"), Convert.ToString(row("UniteMesureStock")).Trim().ToUpperInvariant(), "KG")
+            If String.IsNullOrWhiteSpace(uniteMesure) Then uniteMesure = "KG"
+            cmbUniteMesureStock.Text = uniteMesure
+            txtContenuUnitePrincipale.Text = If(r.Table.Columns.Contains("ContenuUnitePrincipale") AndAlso Not r.IsNull("ContenuUnitePrincipale"), Convert.ToDecimal(row("ContenuUnitePrincipale")).ToString("N2"), txtConversion.Text)
+            txtContenuUniteSecondaire.Text = If(r.Table.Columns.Contains("ContenuUniteSecondaire") AndAlso Not r.IsNull("ContenuUniteSecondaire"), Convert.ToDecimal(row("ContenuUniteSecondaire")).ToString("N2"), String.Empty)
+            ModeGestionStockProduitChange(Nothing, EventArgs.Empty)
             txtPrixAchat.Text = LireDecimalRow(row, "PrixAchat").ToString("N2")
             txtCoeffGros.Text = LireDecimalRow(row, "CoefficientGros").ToString("N4")
             txtPrixGros.Text = LireDecimalRow(row, "PrixGros").ToString("N2")
@@ -768,7 +840,11 @@ Namespace DevCommerc8ak
                     .CategorieId = LireCategorieSelectionnee(),
                     .UnitePrincipale = If(cmbUnitePrincipale.Text.Trim() = "", Nothing, cmbUnitePrincipale.Text.Trim()),
                     .UniteSecondaire = If(cmbUniteSecondaire.Text.Trim() = "", Nothing, cmbUniteSecondaire.Text.Trim()),
-                    .ConversionUnite = LireDecimal(txtConversion.Text),
+                    .ConversionUnite = If(LireDecimal(txtConversion.Text) > 0D, LireDecimal(txtConversion.Text), LireContenuUnitePrincipaleProduit()),
+                    .TypeGestionStock = TypeGestionStockProduit(),
+                    .UniteMesureStock = If(EstGestionMesureProduit(), UniteMesureStockProduit(), "PIECE"),
+                    .ContenuUnitePrincipale = LireContenuUnitePrincipaleProduit(),
+                    .ContenuUniteSecondaire = LireContenuUniteSecondaireProduit(),
                     .EstActif = chkActif.Checked,
                     .VenteDetail = chkVenteUnite.Checked,
                     .VenteDemi = chkVenteDemi.Checked,
@@ -809,6 +885,14 @@ Namespace DevCommerc8ak
             End If
             If cmbUnitePrincipale.Text.Trim() = "" Then
                 MessageBox.Show("L'unité principale est obligatoire.")
+                Return False
+            End If
+            If LireContenuUnitePrincipaleProduit() <= 0D Then
+                MessageBox.Show(If(EstGestionMesureProduit(), "Le contenu de l'unité principale doit être supérieur à zéro.", "La conversion unité doit être supérieure à zéro."))
+                Return False
+            End If
+            If EstGestionMesureProduit() AndAlso String.IsNullOrWhiteSpace(UniteMesureStockProduit()) Then
+                MessageBox.Show("L'unité de mesure du stock est obligatoire.")
                 Return False
             End If
             Return True
@@ -1084,6 +1168,7 @@ Namespace DevCommerc8ak
             legende.Columns.Add("Categorie", GetType(String))
             legende.Columns.Add("Valeur", GetType(String))
             legende.Columns.Add("Pourcentage", GetType(String))
+            legende.Columns.Add("CouleurArgb", GetType(Integer))
 
             If dt Is Nothing Then
                 gridLegendeCategories.DataSource = legende
@@ -1098,27 +1183,51 @@ Namespace DevCommerc8ak
             Dim lignes As IEnumerable(Of DataRow) =
                 dt.AsEnumerable().OrderByDescending(Function(r) Convert.ToDecimal(r("NombreProduits")))
 
+            Dim palette As Color() = {
+                Color.FromArgb(41, 128, 185),
+                Color.FromArgb(39, 174, 96),
+                Color.FromArgb(243, 156, 18),
+                Color.FromArgb(192, 57, 43),
+                Color.FromArgb(142, 68, 173),
+                Color.FromArgb(22, 160, 133),
+                Color.FromArgb(211, 84, 0),
+                Color.FromArgb(52, 73, 94),
+                Color.FromArgb(127, 140, 141),
+                Color.FromArgb(46, 204, 113),
+                Color.FromArgb(52, 152, 219),
+                Color.FromArgb(155, 89, 182)
+            }
+            Dim index As Integer = 0
             For Each row As DataRow In lignes
                 Dim categorie As String = Convert.ToString(row("Categorie"))
+                If String.IsNullOrWhiteSpace(categorie) Then categorie = "Sans catégorie"
                 Dim valeur As Decimal = Convert.ToDecimal(row("NombreProduits"))
                 Dim pourcentage As Decimal = If(total > 0D, (valeur / total) * 100D, 0D)
                 Dim point As DataPoint = chartCategories.Series(0).Points(chartCategories.Series(0).Points.AddXY(categorie, valeur))
-                point.Label = String.Empty
+                Dim couleur As Color = palette(index Mod palette.Length)
+                point.Color = couleur
+                point.Label = If(index < 6 AndAlso pourcentage >= 4D, pourcentage.ToString("N1") & " %", String.Empty)
                 point.LegendText = String.Empty
+                point.ToolTip = categorie & " : " & valeur.ToString("N0") & " (" & pourcentage.ToString("N2") & " %)"
 
                 Dim ligne As DataRow = legende.NewRow()
                 ligne("Categorie") = categorie
                 ligne("Valeur") = valeur.ToString("N0")
                 ligne("Pourcentage") = pourcentage.ToString("N2") & " %"
+                ligne("CouleurArgb") = couleur.ToArgb()
                 legende.Rows.Add(ligne)
+                index += 1
             Next
 
             gridLegendeCategories.DataSource = legende
-            For i As Integer = 0 To Math.Min(gridLegendeCategories.Rows.Count, chartCategories.Series(0).Points.Count) - 1
-                Dim couleur As Color = chartCategories.Series(0).Points(i).Color
-                gridLegendeCategories.Rows(i).Cells("Couleur").Style.BackColor = couleur
-                gridLegendeCategories.Rows(i).Cells("Couleur").Style.SelectionBackColor = couleur
-                gridLegendeCategories.Rows(i).Cells("Couleur").Style.SelectionForeColor = couleur
+            For Each grilleRow As DataGridViewRow In gridLegendeCategories.Rows
+                If grilleRow.IsNewRow OrElse grilleRow.DataBoundItem Is Nothing Then Continue For
+                Dim view As DataRowView = TryCast(grilleRow.DataBoundItem, DataRowView)
+                If view Is Nothing OrElse view.Row.IsNull("CouleurArgb") Then Continue For
+                Dim couleur As Color = Color.FromArgb(Convert.ToInt32(view("CouleurArgb")))
+                grilleRow.Cells("Couleur").Style.BackColor = couleur
+                grilleRow.Cells("Couleur").Style.SelectionBackColor = couleur
+                grilleRow.Cells("Couleur").Style.SelectionForeColor = couleur
             Next
         End Sub
 
