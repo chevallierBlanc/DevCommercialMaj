@@ -123,11 +123,11 @@ Namespace DevCommerc8ak
                         End If
 
                         Dim lignes As New List(Of Tuple(Of Integer, Decimal))()
-                        Using cmdL As New SqlCommand("SELECT ProduitId, Quantite FROM LignesFactureVente WHERE FactureVenteId=@id", cn, tx)
+                        Using cmdL As New SqlCommand("SELECT ProduitId, ISNULL(QuantiteBase, Quantite) AS QuantiteBase FROM LignesFactureVente WHERE FactureVenteId=@id", cn, tx)
                             cmdL.Parameters.AddWithValue("@id", factureVenteId)
                             Using r As SqlDataReader = cmdL.ExecuteReader()
                                 While r.Read()
-                                    lignes.Add(New Tuple(Of Integer, Decimal)(Convert.ToInt32(r("ProduitId")), Convert.ToDecimal(r("Quantite"))))
+                                    lignes.Add(New Tuple(Of Integer, Decimal)(Convert.ToInt32(r("ProduitId")), Convert.ToDecimal(r("QuantiteBase"))))
                                 End While
                             End Using
                         End Using

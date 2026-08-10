@@ -71,7 +71,7 @@ Namespace DevCommerc8ak
         ' Liste des lignes d'une facture avec libelle produit.
         Public Function ListerDetailsParFacture(factureVenteId As Integer) As DataTable
             Dim sql As String = "" &
-                "SELECT l.LigneFactureVenteId, l.FactureVenteId, l.ProduitId, p.Libelle, cast((l.Quantite) as int) as Quantite, l.TypeVente, l.QuantiteBase, l.QuantiteSaisie, l.PrixUnitaire, l.MontantLigne, l.CoutUnitaireBaseVente, p.UnitePrincipale, p.UniteSecondaire " &
+                "SELECT l.LigneFactureVenteId, l.FactureVenteId, l.ProduitId, p.Libelle, CAST(ISNULL(l.Quantite, 0) AS DECIMAL(18,3)) AS Quantite, l.TypeVente, l.QuantiteBase, l.QuantiteSaisie, l.PrixUnitaire, l.MontantLigne, l.CoutUnitaireBaseVente, p.UnitePrincipale, p.UniteSecondaire, ISNULL(p.TypeGestionStock,'UNITE') AS TypeGestionStock, ISNULL(p.UniteMesureStock,'PIECE') AS UniteMesureStock, ISNULL(p.ContenuUnitePrincipale, ISNULL(p.ConversionUnite,1)) AS ContenuUnitePrincipale, ISNULL(p.ContenuUniteSecondaire,0) AS ContenuUniteSecondaire " &
                 "FROM LignesFactureVente l JOIN Produits p ON p.ProduitId = l.ProduitId WHERE l.FactureVenteId = @FactureVenteId"
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@FactureVenteId", factureVenteId)}
             Return _dal.ExecuterTable(sql, CommandType.Text, p)

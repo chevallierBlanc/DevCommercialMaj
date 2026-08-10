@@ -117,15 +117,15 @@ Namespace DevCommerc8ak
         End Function
 
 
-        Public Function ListerQteProduit(produitId As Integer) As Integer
+        Public Function ListerQteProduit(produitId As Integer) As Decimal
             Dim sql As String = "
-                                SELECT cast (ISNULL(s.QuantiteStock,0)as int) AS QuantiteStock
+                                SELECT CAST(ISNULL(s.QuantiteStock, 0) AS DECIMAL(18,3)) AS QuantiteStock
                                 FROM Produits p LEFT JOIN vStockProduit s ON s.ProduitId = p.ProduitId
 								where p.ProduitId=@ProduitId"
 
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@ProduitId", produitId)}
             Dim id As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
-            Return Convert.ToInt32(id)
+            Return Convert.ToDecimal(id)
         End Function
 
         ' Retourne la liste des tepes ventes et prix produits sous forme de DataTable pour filtrage local.
@@ -464,10 +464,10 @@ Namespace DevCommerc8ak
         Public Function KpiProduits() As DataTable
             Dim sql As String = "" &
                 "SELECT " &
-                "(SELECT TOP 1 p.Libelle FROM LignesFactureVente l JOIN FacturesVente f ON f.FactureVenteId=l.FactureVenteId JOIN Produits p ON p.ProduitId=l.ProduitId WHERE f.Statut='PAYEE' GROUP BY p.Libelle ORDER BY SUM(l.MontantLigne - (l.Quantite * CASE WHEN p.PrixAchat > 0 THEN p.PrixAchat ELSE 0 END)) DESC) AS ProduitPlusRentable, " &
+                "(SELECT TOP 1 p.Libelle FROM LignesFactureVente l JOIN FacturesVente f ON f.FactureVenteId=l.FactureVenteId JOIN Produits p ON p.ProduitId=l.ProduitId WHERE f.Statut='PAYEE' GROUP BY p.Libelle ORDER BY SUM(l.MontantLigne - (ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0)) * CASE WHEN p.PrixAchat <= 0 THEN 0 WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale, 0) > 0 THEN p.PrixAchat / NULLIF(p.ContenuUnitePrincipale, 0) WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN p.PrixAchat / NULLIF(p.ConversionUnite, 0) ELSE p.PrixAchat END)) DESC) AS ProduitPlusRentable, " &
                 "(SELECT ISNULL(SUM(l.MontantLigne),0) FROM LignesFactureVente l JOIN FacturesVente f ON f.FactureVenteId=l.FactureVenteId WHERE f.Statut='PAYEE') AS TotalRecettes, " &
                 "(SELECT COUNT(*) FROM Produits) AS NombreTotalProduits, " &
-                "(SELECT COUNT(*) FROM Produits p LEFT JOIN (SELECT ProduitId, SUM(Quantite) AS Qte FROM LignesFactureVente l JOIN FacturesVente f ON f.FactureVenteId=l.FactureVenteId WHERE f.Statut='PAYEE' GROUP BY ProduitId) v ON v.ProduitId=p.ProduitId WHERE ISNULL(v.Qte,0) > 0 AND ISNULL(v.Qte,0) <= 3) AS FaibleRotation, " &
+                "(SELECT COUNT(*) FROM Produits p LEFT JOIN (SELECT ProduitId, SUM(ISNULL(QuantiteBase, ISNULL(Quantite, 0))) AS Qte FROM LignesFactureVente l JOIN FacturesVente f ON f.FactureVenteId=l.FactureVenteId WHERE f.Statut='PAYEE' GROUP BY ProduitId) v ON v.ProduitId=p.ProduitId WHERE ISNULL(v.Qte,0) > 0 AND ISNULL(v.Qte,0) <= 3) AS FaibleRotation, " &
                 "(SELECT COUNT(*) FROM Produits p LEFT JOIN (SELECT DISTINCT ProduitId FROM LignesFactureVente l JOIN FacturesVente f ON f.FactureVenteId=l.FactureVenteId WHERE f.Statut='PAYEE' AND f.CreeLe >= DATEADD(DAY,-90,GETDATE())) v ON v.ProduitId=p.ProduitId WHERE v.ProduitId IS NULL) AS ProduitsDormants"
             Return _dal.ExecuterTable(sql, CommandType.Text, Nothing)
         End Function

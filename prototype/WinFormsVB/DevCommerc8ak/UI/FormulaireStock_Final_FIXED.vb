@@ -1908,7 +1908,7 @@ Namespace DevCommerc8ak
             Dim prix As Decimal = PrixSelonUnite()
             Dim quantiteEquivalent As Decimal = typeChoisi.QuantiteEquivalent
             Dim quantiteBase As Decimal = qte * quantiteEquivalent
-            Dim stock As Integer = service.AfficherQteProduitSelect(produitId)
+            Dim stock As Decimal = service.AfficherQteProduitSelect(produitId)
 
 
             MessageBox.Show(Convert.ToString(stock))
@@ -3186,14 +3186,25 @@ Namespace DevCommerc8ak
                     Dim totalDettesBoss As Decimal = LireDecimalTable(row, "TotalDettesBoss")
                     Dim totalSortiesHorsCaisse As Decimal = LireDecimalTable(row, "TotalSortiesHorsCaisse")
                     Dim stockReel As Decimal = LireDecimalTable(row, "StockReelRestant")
-                    Dim stockCartons As Decimal = LireDecimalTable(row, "StockRestantCartons")
-                    Dim stockPieces As Decimal = LireDecimalTable(row, "StockRestantPieces")
                     Dim VenteCarton As Decimal = LireDecimalTable(row, "TotalVenteCartons")
                     Dim VentePiece As Decimal = LireDecimalTable(row, "ResteVentePieces")
                     Dim montantTotalGenere As Decimal = LireDecimalTable(row, "MontantTotalGenere")
+                    Dim analyseMesuree As Boolean = StockUnitConversionService.EstGestionMesuree(If(row.Table.Columns.Contains("TypeGestionStock") AndAlso Not row.IsNull("TypeGestionStock"), Convert.ToString(row("TypeGestionStock")), "UNITE"))
+                    Dim libelleVentes As String = If(analyseMesuree,
+                        "Ventes commerciales: " & FormatageGlobal.FormatNombre(totalVentes),
+                        "Vente en cartons: " & FormatageGlobal.FormatNombre(VenteCarton) & "C + " & FormatageGlobal.FormatNombre(VentePiece) & "P")
+                    Dim stockLisible As String = FormatageGlobal.FormatStockSelonGestion(
+                        stockReel,
+                        LireDecimalTable(row, "ConversionUnite"),
+                        If(row.Table.Columns.Contains("UnitePrincipale") AndAlso Not row.IsNull("UnitePrincipale"), Convert.ToString(row("UnitePrincipale")), String.Empty),
+                        If(row.Table.Columns.Contains("UniteSecondaire") AndAlso Not row.IsNull("UniteSecondaire"), Convert.ToString(row("UniteSecondaire")), String.Empty),
+                        If(row.Table.Columns.Contains("TypeGestionStock") AndAlso Not row.IsNull("TypeGestionStock"), Convert.ToString(row("TypeGestionStock")), "UNITE"),
+                        If(row.Table.Columns.Contains("UniteMesureStock") AndAlso Not row.IsNull("UniteMesureStock"), Convert.ToString(row("UniteMesureStock")), String.Empty),
+                        LireDecimalTable(row, "ContenuUnitePrincipale"),
+                        LireDecimalTable(row, "ContenuUniteSecondaire"))
 
                     lblAnalyseSortieGros.Text = "Entrées: " & FormatageGlobal.FormatNombre(totalEntrees) & " | Ventes: " & FormatageGlobal.FormatNombre(totalVentes) & vbCrLf &
-                     "Vente en cartons" & FormatageGlobal.FormatNombre(VenteCarton) & "C+" & FormatageGlobal.FormatNombre(VentePiece) & "P" & vbCrLf
+                     libelleVentes & vbCrLf
                     lblAnalyseSortiePiece.Text = "Sorties manuelles: " & FormatageGlobal.FormatNombre(totalSortiesManuelles) & " | Pertes: " & FormatageGlobal.FormatNombre(totalPertes)
                     lblAnalyseRestantGros.Text = "Dons: " & FormatageGlobal.FormatNombre(totalDons) & " | Allocations: " & FormatageGlobal.FormatNombre(totalAllocations)
                     lblAnalyseRestantPiece.Text = "Dettes client: " & FormatageGlobal.FormatNombre(totalDettesClients) & " | Dettes boss: " & FormatageGlobal.FormatNombre(totalDettesBoss) & " | Hors caisse: " & FormatageGlobal.FormatNombre(totalSortiesHorsCaisse)
@@ -3202,15 +3213,14 @@ Namespace DevCommerc8ak
                         " Q:" & FormatageGlobal.FormatNombre(totalQuart) &
                         " P:" & FormatageGlobal.FormatNombre(totalPiece) &
                         " Dz:" & FormatageGlobal.FormatNombre(totalDouzaine) & vbCrLf &
-                        " | Stock réel: " & FormatageGlobal.FormatNombre(stockReel) & " P" &
-                        " | Stock: " & FormatageGlobal.FormatNombre(stockCartons) & "C+" & FormatageGlobal.FormatNombre(stockPieces) & "P" &
+                        " | Stock réel: " & stockLisible &
                         " | Mnt: " & FormatageGlobal.FormatMontant(montantTotalGenere)
                 Else
                     lblAnalyseSortieGros.Text = "Entrées: 0 | Ventes: 0"
                     lblAnalyseSortiePiece.Text = "Sorties manuelles: 0 | Pertes: 0"
                     lblAnalyseRestantGros.Text = "Dons: 0 | Allocations: 0"
                     lblAnalyseRestantPiece.Text = "Dettes client: 0 | Dettes boss: 0 | Hors caisse: 0"
-                    lblAnalyseRealisation.Text = "G:0 D:0 Q:0 P:0 Dz:0 | Stock réel: 0 P | Stock: 0C+0P | Mnt: 0 FC"
+                    lblAnalyseRealisation.Text = "G:0 D:0 Q:0 P:0 Dz:0 | Stock réel: 0 | Mnt: 0 FC"
                 End If
             Catch
             End Try
