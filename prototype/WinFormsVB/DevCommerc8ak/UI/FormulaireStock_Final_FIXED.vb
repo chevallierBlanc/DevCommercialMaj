@@ -276,7 +276,7 @@ Namespace DevCommerc8ak
 
             ' --- TAB ENTREE DESIGN ---
             Dim layoutEntree As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .Padding = New Padding(10), .ColumnCount = 1, .RowCount = 2}
-            layoutEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 590)) ' Cartes Stock Entrée incluant Validation
+            layoutEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 545)) ' Cartes Stock Entrée incluant Validation
             layoutEntree.RowStyles.Add(New RowStyle(SizeType.Percent, 100)) ' Grille Informations Produit
             'tabEntree.Controls.Add(layoutEntree)
 
@@ -285,7 +285,7 @@ Namespace DevCommerc8ak
             mainTableEntree.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50))
             mainTableEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 240)) ' Infos Produit / Unité/ Card produit
             mainTableEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 220)) 'Card Finance / Prix
-            mainTableEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 110)) ' Options / Autres
+            mainTableEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 85)) ' Validation compacte
             ' mainTableEntree.RowStyles.Add(New RowStyle(SizeType.Absolute, 80))  ' Bouton
 
             ' Card 1: Produit
@@ -391,13 +391,13 @@ Namespace DevCommerc8ak
             ' layoutEntree.Controls.Add(cardPrix)
 
             ' Card 5: Validation
-            Dim cardValidation As Panel = CreateCard(1220, 105, "VALIDATION")
-            dtpDateEntree = New DateTimePicker() With {.Left = 150, .Top = 45, .Width = 150}
-            txtObservationEntree = New TextBox() With {.Left = 450, .Top = 45, .Width = 360, .Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right}
+            Dim cardValidation As Panel = CreateCard(1220, 80, "VALIDATION")
+            dtpDateEntree = New DateTimePicker() With {.Left = 120, .Top = 42, .Width = 165}
+            txtObservationEntree = New TextBox() With {.Left = 405, .Top = 42, .Width = 360, .Anchor = AnchorStyles.Top Or AnchorStyles.Left}
             btnEnregistrerEntree = New Button() With {
                 .Text = "ENREGISTRER L'ENTRÉE",
-                .Left = 900, .Top = 35,
-                .Width = 280, .Height = 45,
+                .Left = 785, .Top = 36,
+                .Width = 250, .Height = 36,
                 .BackColor = ColorAccent,
                 .ForeColor = Color.White,
                 .FlatStyle = FlatStyle.Flat,
@@ -405,8 +405,8 @@ Namespace DevCommerc8ak
             }
 
             cardValidation.Controls.AddRange(New Control() {
-                New Label() With {.Text = "Date Entrée", .Left = 20, .Top = 48, .AutoSize = True},
-                New Label() With {.Text = "Observation", .Left = 330, .Top = 48, .AutoSize = True},
+                New Label() With {.Text = "Date Entrée", .Left = 20, .Top = 45, .AutoSize = True},
+                New Label() With {.Text = "Observation", .Left = 315, .Top = 45, .AutoSize = True},
                 dtpDateEntree, txtObservationEntree, btnEnregistrerEntree
             })
             'layoutEntree.Controls.Add(cardValidation)
