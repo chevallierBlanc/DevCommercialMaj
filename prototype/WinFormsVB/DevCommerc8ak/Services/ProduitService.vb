@@ -97,5 +97,9 @@ Namespace DevCommerc8ak
         Public Function ExisteParLibelle(libelle As String, Optional produitIdExclu As Integer? = Nothing) As Boolean
             Return _repo.ExisteParLibelle(libelle, produitIdExclu)
         End Function
+
+        Public Function ObtenirParId(produitId As Integer) As ProduitDTO
+            Return _repo.ObtenirParId(produitId)
+        End Function
     End Class
 End Namespace

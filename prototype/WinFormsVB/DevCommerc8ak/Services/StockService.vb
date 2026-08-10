@@ -998,6 +998,8 @@ Namespace DevCommerc8ak
                 "    WHERE ProduitId = @ProduitId " &
                 ") " &
                 "SELECT p.ProduitId, p.Libelle, p.ConversionUnite, p.UnitePrincipale, p.UniteSecondaire, " &
+                "       ISNULL(p.TypeGestionStock,'UNITE') AS TypeGestionStock, ISNULL(p.UniteMesureStock,'PIECE') AS UniteMesureStock, " &
+                "       ISNULL(p.ContenuUnitePrincipale, ISNULL(p.ConversionUnite,1)) AS ContenuUnitePrincipale, p.ContenuUniteSecondaire, " &
                 "       e.TotalEntrees, " &
                 "       v.TotalVentes, " &
                 "       m.TotalSortiesManuelles, " &

@@ -101,7 +101,9 @@ Namespace DevCommerc8ak
                 "       il.StockPhysique, il.Ecart, ISNULL(il.Statut, N'NON_COMPTE') AS Statut, " &
                 "       ISNULL(il.Motif, '') AS Motif, " &
                 "       CASE WHEN il.StockPhysique IS NULL THEN N'NON_COMPTÉ' ELSE N'COMPTÉ' END AS StatutComptage, " &
-                "       p.ConversionUnite, p.PrixAchat " &
+                "       il.DateComptage, p.UnitePrincipale, p.UniteSecondaire, p.ConversionUnite, " &
+                "       ISNULL(p.TypeGestionStock, 'UNITE') AS TypeGestionStock, ISNULL(p.UniteMesureStock, 'PIECE') AS UniteMesureStock, " &
+                "       ISNULL(p.ContenuUnitePrincipale, ISNULL(p.ConversionUnite, 1)) AS ContenuUnitePrincipale, p.ContenuUniteSecondaire, p.PrixAchat " &
                 "FROM InventaireLignes il " &
                 "INNER JOIN Produits p ON p.ProduitId = il.ProduitId " &
                 "LEFT JOIN CategoriesProduits cat ON cat.CategorieId = p.CategorieId " &
@@ -187,7 +189,11 @@ Namespace DevCommerc8ak
                 "           SUM(CASE WHEN UPPER(ISNULL(il.Statut, '')) = N'CONFORME' THEN 1 ELSE 0 END) AS NombreConformes, " &
                 "           SUM(CASE WHEN UPPER(ISNULL(il.Statut, '')) = N'MANQUE' THEN 1 ELSE 0 END) AS NombreManques, " &
                 "           SUM(CASE WHEN UPPER(ISNULL(il.Statut, '')) = N'SURPLUS' THEN 1 ELSE 0 END) AS NombreSurplus, " &
-                "           SUM(ABS(ISNULL(il.Ecart, 0)) * ISNULL(p.PrixAchat, 0)) AS ValeurEcarts " &
+                "           SUM(ABS(ISNULL(il.Ecart, 0)) * CASE " &
+                "               WHEN ISNULL(p.PrixAchat, 0) <= 0 THEN 0 " &
+                "               WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ContenuUnitePrincipale, 0), 0) " &
+                "               WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0) " &
+                "               ELSE ISNULL(p.PrixAchat, 0) END) AS ValeurEcarts " &
                 "    FROM InventaireLignes il " &
                 "    LEFT JOIN Produits p ON p.ProduitId = il.ProduitId " &
                 "    WHERE il.InventaireId = i.InventaireId " &

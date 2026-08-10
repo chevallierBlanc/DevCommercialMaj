@@ -24,6 +24,8 @@ Namespace DevCommerc8ak
         Public Property QuantiteStock As Decimal
         Public Property SeuilCritique As Decimal
         Public Property DateExpiration As Date?
+        Public Property CategorieId As Integer?
+        Public Property NomCategorie As String
         Public Property UnitePrincipale As String
         Public Property UniteSecondaire As String
         Public Property ConversionUnite As Decimal

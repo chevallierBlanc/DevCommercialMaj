@@ -487,6 +487,8 @@ Namespace DevCommerc8ak
                 .CoefficientGros = If(row.IsNull("CoefficientGros"), 0D, Convert.ToDecimal(row("CoefficientGros"))),
                 .QuantiteStock = Convert.ToDecimal(row("QuantiteStock")),
                 .SeuilCritique = Convert.ToDecimal(row("SeuilCritique")),
+                .CategorieId = If(row.Table.Columns.Contains("CategorieId") AndAlso Not row.IsNull("CategorieId"), CType(Convert.ToInt32(row("CategorieId")), Integer?), CType(Nothing, Integer?)),
+                .NomCategorie = If(row.Table.Columns.Contains("NomCategorie") AndAlso Not row.IsNull("NomCategorie"), Convert.ToString(row("NomCategorie")), String.Empty),
                 .UnitePrincipale = If(row.IsNull("UnitePrincipale"), Nothing, Convert.ToString(row("UnitePrincipale"))),
                 .UniteSecondaire = If(row.IsNull("UniteSecondaire"), Nothing, Convert.ToString(row("UniteSecondaire"))),
                 .ConversionUnite = Convert.ToDecimal(row("ConversionUnite")),
