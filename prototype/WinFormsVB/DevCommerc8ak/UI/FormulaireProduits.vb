@@ -462,6 +462,8 @@ Namespace DevCommerc8ak
             chartCategories.Series(0).IsValueShownAsLabel = False
             chartCategories.Series(0).LegendText = String.Empty
             chartCategories.Series(0).ToolTip = "#VALX : #PERCENT{P1}"
+            chartCategories.Series(0)("PieLabelStyle") = "Inside"
+            chartCategories.Series(0)("PieLineColor") = "Transparent"
             chartCategories.ChartAreas(0).Position = New ElementPosition(4, 4, 92, 92)
             chartCategories.ChartAreas(0).InnerPlotPosition = New ElementPosition(8, 6, 84, 88)
             ConfigurerGrilleLegendeCategories()
@@ -1238,7 +1240,8 @@ Namespace DevCommerc8ak
                 Dim point As DataPoint = chartCategories.Series(0).Points(chartCategories.Series(0).Points.AddXY(categorie, valeur))
                 Dim couleur As Color = palette(index Mod palette.Length)
                 point.Color = couleur
-                point.Label = If(index < 6 AndAlso pourcentage >= 4D, pourcentage.ToString("N1") & " %", String.Empty)
+                point.AxisLabel = String.Empty
+                point.Label = If(index < 5 AndAlso pourcentage >= 8D, pourcentage.ToString("N0") & "%", String.Empty)
                 point.LegendText = String.Empty
                 point.ToolTip = categorie & " : " & valeur.ToString("N0") & " (" & pourcentage.ToString("N2") & " %)"
 

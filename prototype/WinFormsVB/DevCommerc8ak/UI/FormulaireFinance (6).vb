@@ -1864,7 +1864,8 @@ Namespace DevCommerc8ak
                     Dim point As DataPoint = serie.Points(indexPoint)
                     point.Color = couleur
                     point.LegendText = item.Categorie
-                    point.Label = item.Categorie & Environment.NewLine & item.Montant.ToString("N0") & " " & item.Devise
+                    point.AxisLabel = String.Empty
+                    point.Label = If(item.Pourcentage >= 8D, item.Pourcentage.ToString("N0") & "%", String.Empty)
                     point.ToolTip = item.Categorie & " : " & item.Montant.ToString("N0") & " " & item.Devise & " (" & item.Pourcentage.ToString("N2") & "%)"
 
                     Dim rowIndex As Integer = gridLegendeDepenses.Rows.Add("", item.Categorie, item.Montant.ToString("N0"), item.Devise, item.Pourcentage.ToString("N2") & "%")
@@ -1903,11 +1904,10 @@ Namespace DevCommerc8ak
             serie.Legend = legend.Name
             serie.IsVisibleInLegend = False
             serie.IsValueShownAsLabel = True
-            serie.SmartLabelStyle.Enabled = True
-            serie.SmartLabelStyle.AllowOutsidePlotArea = LabelOutsidePlotAreaStyle.Yes
-            serie.SmartLabelStyle.CalloutLineColor = ColorTextSecondary
+            serie.SmartLabelStyle.Enabled = False
             serie.LabelForeColor = ColorTextPrimary
-            serie("PieLabelStyle") = "Outside"
+            serie("PieLabelStyle") = "Inside"
+            serie("PieLineColor") = "Transparent"
             chartArea.Area3DStyle.Enable3D = False
             Return serie
         End Function

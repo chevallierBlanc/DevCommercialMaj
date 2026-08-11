@@ -1121,7 +1121,7 @@ Namespace DevCommerc8ak
                 End If
 
                 For Each l As PanierLigne In _panier
-                    service.AjouterLigne(factureId, l.ProduitId, l.QuantiteBase, l.QuantiteEquivalente, l.Unite, l.PrixUnitaire, 0D, l.Quantite)
+                    service.AjouterLigne(factureId, l.ProduitId, l.Quantite, l.QuantiteBase, l.Unite, l.PrixUnitaire, 0D, l.Quantite)
                 Next
 
                 AppDataVersionService.Touch("FACTURES")
