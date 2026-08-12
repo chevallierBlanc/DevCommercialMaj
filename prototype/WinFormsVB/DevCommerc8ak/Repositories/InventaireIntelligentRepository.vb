@@ -113,6 +113,16 @@ Namespace DevCommerc8ak
             Return _dal.ExecuterTable(sql, CommandType.Text, p)
         End Function
 
+        Public Function ChargerStocksCourantsInventaire(inventaireId As Integer) As DataTable
+            Dim sql As String = "" &
+                "SELECT il.ProduitId, ISNULL(s.QuantiteStock, 0) AS StockCourant " &
+                "FROM InventaireLignes il " &
+                "LEFT JOIN vStockProduit s ON s.ProduitId = il.ProduitId " &
+                "WHERE il.InventaireId = @InventaireId"
+            Dim p As New List(Of SqlParameter) From {New SqlParameter("@InventaireId", inventaireId)}
+            Return _dal.ExecuterTable(sql, CommandType.Text, p)
+        End Function
+
         Public Function RemplacerLignesInventaire(inventaireId As Integer, lignes As DataTable) As Integer
             If lignes Is Nothing Then
                 Throw New Exception("Aucune ligne d'inventaire à enregistrer.")

@@ -26,6 +26,7 @@ Namespace DevCommerc8ak
         Private ReadOnly FontLabel As New Font("Segoe UI", 9.5F)
         Private ReadOnly FontButton As New Font("Segoe UI", 9.5F, FontStyle.Bold)
         Private ReadOnly FontValue As New Font("Segoe UI", 13, FontStyle.Bold)
+        Private ReadOnly FontTotal As New Font("Segoe UI", 18, FontStyle.Bold)
 
         Private ReadOnly _produitId As Integer
         Private ReadOnly _stockTheoriqueBase As Decimal
@@ -142,15 +143,19 @@ Namespace DevCommerc8ak
             AddHandler txtMesureLibre.TextChanged, AddressOf Quantites_TextChanged
             body.Controls.Add(saisie, 0, 0)
 
-            Dim resume As New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.FromArgb(248, 250, 252), .Padding = New Padding(14)}
-            lblTotal = New Label() With {.Text = "Total compté : -", .Font = FontValue, .ForeColor = ColorPrimary, .AutoSize = False, .Dock = DockStyle.Top, .Height = 34}
-            lblEquivalent = New Label() With {.Text = "Equivalent : -", .Font = FontLabel, .ForeColor = ColorSecondary, .AutoSize = False, .Dock = DockStyle.Top, .Height = 30}
-            lblEcart = New Label() With {.Text = "Écart : -", .Font = FontValue, .ForeColor = ColorPrimary, .AutoSize = False, .Dock = DockStyle.Top, .Height = 34}
-            lblResultat = New Label() With {.Text = "Résultat : -", .Font = FontSection, .ForeColor = ColorSecondary, .AutoSize = False, .Dock = DockStyle.Top, .Height = 34}
-            resume.Controls.Add(lblResultat)
-            resume.Controls.Add(lblEcart)
-            resume.Controls.Add(lblEquivalent)
-            resume.Controls.Add(lblTotal)
+            Dim resume As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .BackColor = Color.FromArgb(248, 250, 252), .Padding = New Padding(14), .ColumnCount = 1, .RowCount = 4}
+            resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 64))
+            resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 28))
+            resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 34))
+            resume.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+            lblTotal = New Label() With {.Text = "TOTAL COMPTÉ" & Environment.NewLine & "-", .Font = FontTotal, .ForeColor = ColorPrimary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
+            lblEquivalent = New Label() With {.Text = "Répartition : -", .Font = FontLabel, .ForeColor = ColorSecondary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
+            lblEcart = New Label() With {.Text = "Écart : -", .Font = FontValue, .ForeColor = ColorPrimary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
+            lblResultat = New Label() With {.Text = "Résultat : -", .Font = FontSection, .ForeColor = ColorSecondary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
+            resume.Controls.Add(lblTotal, 0, 0)
+            resume.Controls.Add(lblEquivalent, 0, 1)
+            resume.Controls.Add(lblEcart, 0, 2)
+            resume.Controls.Add(lblResultat, 0, 3)
             body.Controls.Add(resume, 0, 1)
             layout.Controls.Add(body, 0, 2)
 
@@ -229,7 +234,7 @@ Namespace DevCommerc8ak
             lblCode.Text = If(String.IsNullOrWhiteSpace(_produit.CodeBarres), "-", _produit.CodeBarres)
             lblCategorie.Text = If(String.IsNullOrWhiteSpace(_produit.NomCategorie), "-", _produit.NomCategorie)
             lblMode.Text = mode
-            lblStockTheorique.Text = FormatageGlobal.FormatQuantitePhysique(_stockTheoriqueBase) & " " & uniteReference & " (" & FormaterStock(_stockTheoriqueBase) & ")"
+            lblStockTheorique.Text = FormaterResumeStock(_stockTheoriqueBase, uniteReference)
 
             lblPrincipale.Text = QuantiteLabel(UnitePrincipale(), "Quantité principale")
             If StockUnitConversionService.EstGestionMesuree(mode) Then
@@ -316,8 +321,8 @@ Namespace DevCommerc8ak
             RepresentationLisible = FormaterStock(QuantitePhysiqueBase)
 
             Dim uniteReference As String = ObtenirUniteReference()
-            lblTotal.Text = "Total compté : " & FormatageGlobal.FormatQuantitePhysique(QuantitePhysiqueBase) & " " & uniteReference
-            lblEquivalent.Text = "Equivalent : " & RepresentationLisible
+            lblTotal.Text = "TOTAL COMPTÉ" & Environment.NewLine & FormatageGlobal.FormatQuantitePhysique(QuantitePhysiqueBase) & " " & uniteReference
+            lblEquivalent.Text = "Répartition : " & ObtenirRepartitionSeule(QuantitePhysiqueBase, uniteReference)
             lblEcart.Text = "Écart : " & If(EcartBase > 0D, "+", "") & FormatageGlobal.FormatQuantitePhysique(EcartBase) & " " & uniteReference
             lblResultat.Text = "Résultat : " & StatutComptage
             lblResultat.ForeColor = If(StatutComptage = "CONFORME", ColorSuccess, If(StatutComptage = "MANQUE", ColorDanger, ColorWarning))
@@ -325,8 +330,8 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub AfficherErreurSaisie()
-            lblTotal.Text = "Total compté : saisie invalide"
-            lblEquivalent.Text = "Equivalent : -"
+            lblTotal.Text = "TOTAL COMPTÉ" & Environment.NewLine & "Saisie invalide"
+            lblEquivalent.Text = "Répartition : -"
             lblEcart.Text = "Écart : -"
             lblResultat.Text = "Résultat : -"
             lblResultat.ForeColor = ColorDanger
@@ -391,6 +396,21 @@ Namespace DevCommerc8ak
                 _produit.UniteMesureStock,
                 _produit.ContenuUnitePrincipale,
                 If(_produit.ContenuUniteSecondaire.HasValue, _produit.ContenuUniteSecondaire.Value, 0D))
+        End Function
+
+        Private Function FormaterResumeStock(quantiteBase As Decimal, uniteReference As String) As String
+            Dim quantite As String = FormatageGlobal.FormatQuantitePhysique(quantiteBase) & " " & uniteReference
+            Return quantite & " | Répartition : " & ObtenirRepartitionSeule(quantiteBase, uniteReference)
+        End Function
+
+        Private Function ObtenirRepartitionSeule(quantiteBase As Decimal, uniteReference As String) As String
+            Dim quantite As String = FormatageGlobal.FormatQuantitePhysique(quantiteBase) & " " & uniteReference
+            Dim stockFormate As String = FormaterStock(quantiteBase)
+            Dim prefix As String = quantite & " = "
+            If stockFormate.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) Then
+                Return stockFormate.Substring(prefix.Length)
+            End If
+            Return stockFormate
         End Function
     End Class
 End Namespace

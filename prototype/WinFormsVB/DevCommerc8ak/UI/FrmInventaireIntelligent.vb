@@ -779,6 +779,7 @@ Namespace DevCommerc8ak
                 If _inventaireTable Is Nothing Then
                     _inventaireTable = New DataTable()
                 End If
+                ActualiserStocksTheoriquesCourants()
                 _inventaireView = _inventaireTable.DefaultView
                 gridInventaire.DataSource = _inventaireView
                 ConfigurerGrilleInventaire()
@@ -1177,6 +1178,7 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
+                ActualiserStocksTheoriquesCourants()
                 Dim mouvements As Integer = _stockService.AppliquerAjustementsInventaire(_inventaireId, _referenceInventaire, _inventaireTable, SessionUtilisateur.UtilisateurId)
                 MessageBox.Show("Inventaire validé et ajusté. " & mouvements.ToString() & " mouvement(s) créé(s).")
                 ChargerInventaireDepuisBase(_inventaireId)
@@ -1434,7 +1436,7 @@ Namespace DevCommerc8ak
 
             Try
                 Dim produitId As Integer = Convert.ToInt32(row("ProduitId"))
-                Dim stockTheorique As Decimal = LireDecimalTable(row, "StockTheorique")
+                Dim stockTheorique As Decimal = ActualiserStockTheoriqueCourant(row)
                 Dim quantiteInitiale As Decimal? = Nothing
                 Dim stockPhysiqueInitial As Decimal
                 If TryLireDecimalMetier(row, "StockPhysique", stockPhysiqueInitial) Then
@@ -1464,6 +1466,66 @@ Namespace DevCommerc8ak
                 log.Error("FrmInventaireIntelligent", "OuvrirComptagePhysique", "Erreur ouverture comptage physique.", ex)
                 MessageBox.Show("Impossible d'ouvrir le comptage physique du produit.", "Inventaire", MessageBoxButtons.OK, MessageBoxIcon.Error)
             End Try
+        End Sub
+
+        Private Sub ActualiserStocksTheoriquesCourants()
+            If _inventaireTable Is Nothing Then Return
+            If String.Equals(_inventaireStatut, "VALIDÉ", StringComparison.OrdinalIgnoreCase) OrElse
+               String.Equals(_inventaireStatut, "ANNULÉ", StringComparison.OrdinalIgnoreCase) Then Return
+
+            Dim stocksCourants As New Dictionary(Of Integer, Decimal)()
+            If _inventaireId > 0 Then
+                Dim dtStocks As DataTable = _repo.ChargerStocksCourantsInventaire(_inventaireId)
+                If dtStocks IsNot Nothing Then
+                    For Each stockRow As DataRow In dtStocks.Rows
+                        If stockRow Is Nothing OrElse stockRow.IsNull("ProduitId") Then Continue For
+                        Dim produitIdStock As Integer = Convert.ToInt32(stockRow("ProduitId"))
+                        stocksCourants(produitIdStock) = If(stockRow.IsNull("StockCourant"), 0D, Convert.ToDecimal(stockRow("StockCourant")))
+                    Next
+                End If
+            End If
+
+            For Each row As DataRow In _inventaireTable.Rows
+                If row Is Nothing OrElse row.RowState = DataRowState.Deleted Then Continue For
+                If row.Table Is Nothing OrElse Not row.Table.Columns.Contains("ProduitId") OrElse row.IsNull("ProduitId") Then Continue For
+
+                Dim produitId As Integer = Convert.ToInt32(row("ProduitId"))
+                Dim stockCourant As Decimal
+                If stocksCourants.TryGetValue(produitId, stockCourant) Then
+                    AppliquerStockTheoriqueCourant(row, stockCourant)
+                Else
+                    ActualiserStockTheoriqueCourant(row)
+                End If
+            Next
+        End Sub
+
+        Private Function ActualiserStockTheoriqueCourant(row As DataRow) As Decimal
+            If row Is Nothing OrElse row.Table Is Nothing OrElse Not row.Table.Columns.Contains("ProduitId") OrElse row.IsNull("ProduitId") Then
+                Return 0D
+            End If
+
+            Dim produitId As Integer = Convert.ToInt32(row("ProduitId"))
+            Dim stockCourant As Decimal = _stockService.ObtenirStockActuelProduit(produitId)
+            AppliquerStockTheoriqueCourant(row, stockCourant)
+            Return stockCourant
+        End Function
+
+        Private Sub AppliquerStockTheoriqueCourant(row As DataRow, stockCourant As Decimal)
+            If row Is Nothing OrElse row.Table Is Nothing Then Return
+            If row.Table.Columns.Contains("StockTheorique") Then
+                row("StockTheorique") = stockCourant
+            End If
+
+            Dim stockPhysique As Decimal
+            If TryLireDecimalMetier(row, "StockPhysique", stockPhysique) Then
+                Dim ecart As Decimal = stockPhysique - stockCourant
+                If row.Table.Columns.Contains("Ecart") Then
+                    row("Ecart") = ecart
+                End If
+                If row.Table.Columns.Contains("Statut") Then
+                    row("Statut") = If(ecart = 0D, "CONFORME", If(ecart < 0D, "MANQUE", "SURPLUS"))
+                End If
+            End If
         End Sub
 
         Private Sub MettreAJourStatutLigne(row As DataRow, colonneIndex As Integer)
