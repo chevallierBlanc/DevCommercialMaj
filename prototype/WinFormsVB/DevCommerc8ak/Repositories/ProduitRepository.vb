@@ -315,6 +315,222 @@ Namespace DevCommerc8ak
             Return rows
         End Function
 
+        Public Function MettreAJourAvecMigrationUniteVersMesure(produit As Produit, ancienStockBase As Decimal, nouveauStockBase As Decimal, effectuePar As Integer) As Integer
+            AssurerColonnes()
+
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    Try
+                        Dim ancienPrixAchat As Decimal = 0D
+                        Dim ancienPrixDetail As Decimal = 0D
+                        Dim ancienPrixDemi As Decimal = 0D
+                        Dim ancienPrixQuart As Decimal = 0D
+                        Dim ancienPrixDouzaine As Decimal = 0D
+                        Dim ancienPrixGros As Decimal = 0D
+                        Dim ancienPrixSpecial As Decimal = 0D
+                        Dim ancienTypeGestion As String = "UNITE"
+                        Dim ancienneConversionUnite As Decimal = 1D
+
+                        Using cmdOld As New SqlCommand("SELECT PrixAchat, PrixDetail, PrixDemi, PrixQuart, PrixDouzaine, PrixGros, PrixSpecial, ISNULL(TypeGestionStock,'UNITE') AS TypeGestionStock, ISNULL(ConversionUnite, 1) AS ConversionUnite FROM Produits WITH (UPDLOCK, HOLDLOCK) WHERE ProduitId=@ProduitId", cn, tx)
+                            cmdOld.Parameters.AddWithValue("@ProduitId", produit.ProduitId)
+                            Using r As SqlDataReader = cmdOld.ExecuteReader()
+                                If Not r.Read() Then
+                                    Throw New Exception("Produit introuvable.")
+                                End If
+                                ancienPrixAchat = If(r.IsDBNull(r.GetOrdinal("PrixAchat")), 0D, Convert.ToDecimal(r("PrixAchat")))
+                                ancienPrixDetail = If(r.IsDBNull(r.GetOrdinal("PrixDetail")), 0D, Convert.ToDecimal(r("PrixDetail")))
+                                ancienPrixDemi = If(r.IsDBNull(r.GetOrdinal("PrixDemi")), 0D, Convert.ToDecimal(r("PrixDemi")))
+                                ancienPrixQuart = If(r.IsDBNull(r.GetOrdinal("PrixQuart")), 0D, Convert.ToDecimal(r("PrixQuart")))
+                                ancienPrixDouzaine = If(r.IsDBNull(r.GetOrdinal("PrixDouzaine")), 0D, Convert.ToDecimal(r("PrixDouzaine")))
+                                ancienPrixGros = If(r.IsDBNull(r.GetOrdinal("PrixGros")), 0D, Convert.ToDecimal(r("PrixGros")))
+                                ancienPrixSpecial = If(r.IsDBNull(r.GetOrdinal("PrixSpecial")), 0D, Convert.ToDecimal(r("PrixSpecial")))
+                                ancienTypeGestion = StockUnitConversionService.NormaliserTypeGestionStock(Convert.ToString(r("TypeGestionStock")))
+                                ancienneConversionUnite = If(r.IsDBNull(r.GetOrdinal("ConversionUnite")), 1D, Convert.ToDecimal(r("ConversionUnite")))
+                            End Using
+                        End Using
+
+                        If Not String.Equals(ancienTypeGestion, "UNITE", StringComparison.OrdinalIgnoreCase) OrElse
+                           Not StockUnitConversionService.EstGestionMesuree(produit.TypeGestionStock) Then
+                            Throw New Exception("La migration de stock demandée n'est autorisée que de UNITE vers MESURE.")
+                        End If
+
+                        Dim stockCourantBase As Decimal = ObtenirStockCourantTransaction(produit.ProduitId, cn, tx)
+                        Dim conversionCourante As Decimal = If(ancienneConversionUnite > 0D, ancienneConversionUnite, 1D)
+                        ancienStockBase = stockCourantBase
+                        nouveauStockBase = (stockCourantBase / conversionCourante) * ObtenirContenuPrincipal(produit)
+
+                        Dim rows As Integer = MettreAJourProduitTransaction(produit, cn, tx)
+                        Dim delta As Decimal = nouveauStockBase - ancienStockBase
+                        If delta <> 0D Then
+                            AjouterAjustementMigrationStock(produit, ancienStockBase, nouveauStockBase, delta, effectuePar, cn, tx)
+                        End If
+
+                        InsererHistoriquePrixSiNecessaire(
+                            produit,
+                            ancienPrixAchat,
+                            ancienPrixDetail,
+                            ancienPrixDemi,
+                            ancienPrixQuart,
+                            ancienPrixDouzaine,
+                            ancienPrixGros,
+                            ancienPrixSpecial,
+                            cn,
+                            tx)
+
+                        tx.Commit()
+                        Return rows
+                    Catch
+                        tx.Rollback()
+                        Throw
+                    End Try
+                End Using
+            End Using
+        End Function
+
+        Private Function ObtenirStockCourantTransaction(produitId As Integer, cn As SqlConnection, tx As SqlTransaction) As Decimal
+            Using cmd As New SqlCommand("SELECT ISNULL(QuantiteStock, 0) FROM vStockProduit WITH (UPDLOCK, HOLDLOCK) WHERE ProduitId=@ProduitId", cn, tx)
+                cmd.Parameters.AddWithValue("@ProduitId", produitId)
+                Dim valeur As Object = cmd.ExecuteScalar()
+                If valeur Is Nothing OrElse valeur Is DBNull.Value Then Return 0D
+                Return Convert.ToDecimal(valeur)
+            End Using
+        End Function
+
+        Private Function MettreAJourProduitTransaction(produit As Produit, cn As SqlConnection, tx As SqlTransaction) As Integer
+            Dim sql As String = "UPDATE Produits SET CodeBarres=@CodeBarres, Libelle=@Libelle, PrixDetail=@PrixDetail, PrixAchat=@PrixAchat, PrixDemi=@PrixDemi, PrixQuart=@PrixQuart, PrixDouzaine=@PrixDouzaine, PrixGros=@PrixGros, PrixSpecial=@PrixSpecial, CoefficientGros=@CoefficientGros, " &
+                                "SeuilCritique=@SeuilCritique, DateExpiration=@DateExpiration, CategorieId=@CategorieId, UnitePrincipale=@UnitePrincipale, UniteSecondaire=@UniteSecondaire, ConversionUnite=@ConversionUnite, TypeGestionStock=@TypeGestionStock, UniteMesureStock=@UniteMesureStock, ContenuUnitePrincipale=@ContenuUnitePrincipale, ContenuUniteSecondaire=@ContenuUniteSecondaire, EstActif=@EstActif, " &
+                                "VenteDetail=@VenteDetail, VenteDemi=@VenteDemi, VenteDouzaine=@VenteDouzaine, VenteGros=@VenteGros, ModifierPar=@ModifierPar, ModifieLe=GETDATE() " &
+                                "WHERE ProduitId=@ProduitId"
+
+            Using cmd As New SqlCommand(sql, cn, tx)
+                AjouterParametresProduit(cmd, produit)
+                Return cmd.ExecuteNonQuery()
+            End Using
+        End Function
+
+        Private Sub AjouterParametresProduit(cmd As SqlCommand, produit As Produit)
+            Dim modifierPar As String = ObtenirNomUtilisateurModification()
+            If String.IsNullOrWhiteSpace(modifierPar) Then modifierPar = "SYSTEM"
+
+            cmd.Parameters.AddWithValue("@CodeBarres", If(String.IsNullOrWhiteSpace(produit.CodeBarres), CType(DBNull.Value, Object), produit.CodeBarres.Trim()))
+            cmd.Parameters.AddWithValue("@Libelle", produit.Libelle)
+            cmd.Parameters.AddWithValue("@PrixDetail", produit.PrixDetail)
+            cmd.Parameters.AddWithValue("@PrixAchat", produit.PrixAchat)
+            cmd.Parameters.AddWithValue("@PrixDemi", produit.PrixDemi)
+            cmd.Parameters.AddWithValue("@PrixQuart", produit.PrixQuart)
+            cmd.Parameters.AddWithValue("@PrixDouzaine", produit.PrixDouzaine)
+            cmd.Parameters.AddWithValue("@PrixGros", produit.PrixGros)
+            cmd.Parameters.AddWithValue("@PrixSpecial", produit.PrixSpecial)
+            cmd.Parameters.AddWithValue("@CoefficientGros", produit.CoefficientGros)
+            cmd.Parameters.AddWithValue("@SeuilCritique", produit.SeuilCritique)
+            cmd.Parameters.AddWithValue("@DateExpiration", If(produit.DateExpiration.HasValue, CType(produit.DateExpiration.Value, Object), DBNull.Value))
+            cmd.Parameters.AddWithValue("@CategorieId", If(produit.CategorieId.HasValue, CType(produit.CategorieId.Value, Object), DBNull.Value))
+            cmd.Parameters.AddWithValue("@UnitePrincipale", If(produit.UnitePrincipale, CType(DBNull.Value, Object)))
+            cmd.Parameters.AddWithValue("@UniteSecondaire", If(produit.UniteSecondaire, CType(DBNull.Value, Object)))
+            cmd.Parameters.AddWithValue("@ConversionUnite", produit.ConversionUnite)
+            cmd.Parameters.AddWithValue("@TypeGestionStock", NormaliserTypeGestionStock(produit.TypeGestionStock))
+            cmd.Parameters.AddWithValue("@UniteMesureStock", If(String.IsNullOrWhiteSpace(produit.UniteMesureStock), CType(DBNull.Value, Object), produit.UniteMesureStock.Trim().ToUpperInvariant()))
+            cmd.Parameters.AddWithValue("@ContenuUnitePrincipale", ObtenirContenuPrincipal(produit))
+            cmd.Parameters.AddWithValue("@ContenuUniteSecondaire", If(produit.ContenuUniteSecondaire.HasValue AndAlso produit.ContenuUniteSecondaire.Value > 0D, CType(produit.ContenuUniteSecondaire.Value, Object), DBNull.Value))
+            cmd.Parameters.AddWithValue("@EstActif", produit.EstActif)
+            cmd.Parameters.AddWithValue("@VenteDetail", produit.VenteDetail)
+            cmd.Parameters.AddWithValue("@VenteDemi", produit.VenteDemi)
+            cmd.Parameters.AddWithValue("@VenteDouzaine", produit.VenteDouzaine)
+            cmd.Parameters.AddWithValue("@VenteGros", produit.VenteGros)
+            cmd.Parameters.AddWithValue("@ProduitId", produit.ProduitId)
+            cmd.Parameters.AddWithValue("@ModifierPar", modifierPar)
+        End Sub
+
+        Private Sub AjouterAjustementMigrationStock(produit As Produit, ancienStockBase As Decimal, nouveauStockBase As Decimal, delta As Decimal, effectuePar As Integer, cn As SqlConnection, tx As SqlTransaction)
+            Dim reference As String = "MIG-UM-" & DateTime.Now.ToString("yyyyMMddHHmmssfff")
+            Dim observation As String = "Migration stock UNITE vers MESURE. Ancien=" & ancienStockBase.ToString(Globalization.CultureInfo.InvariantCulture) & ", Nouveau=" & nouveauStockBase.ToString(Globalization.CultureInfo.InvariantCulture)
+
+            If delta > 0D Then
+                Using cmdEntree As New SqlCommand("INSERT INTO StockEntree (IdStock, ProduitId, QuantiteSaisie, Unite, QuantiteBase, PrixAchat, Devise, Taux, DateEntree, FournisseurId, CreePar) VALUES (@IdStock, @ProduitId, @QuantiteSaisie, @Unite, @QuantiteBase, @PrixAchat, @Devise, @Taux, GETDATE(), NULL, @CreePar)", cn, tx)
+                    cmdEntree.Parameters.AddWithValue("@IdStock", reference)
+                    cmdEntree.Parameters.AddWithValue("@ProduitId", produit.ProduitId)
+                    cmdEntree.Parameters.AddWithValue("@QuantiteSaisie", delta)
+                    cmdEntree.Parameters.AddWithValue("@Unite", If(String.IsNullOrWhiteSpace(produit.UniteMesureStock), "base", produit.UniteMesureStock))
+                    cmdEntree.Parameters.AddWithValue("@QuantiteBase", delta)
+                    cmdEntree.Parameters.AddWithValue("@PrixAchat", produit.PrixAchat)
+                    cmdEntree.Parameters.AddWithValue("@Devise", "CDF")
+                    cmdEntree.Parameters.AddWithValue("@Taux", 0D)
+                    cmdEntree.Parameters.AddWithValue("@CreePar", effectuePar)
+                    cmdEntree.ExecuteNonQuery()
+                End Using
+            Else
+                Using cmdSortie As New SqlCommand("INSERT INTO StockSortie (ProduitId, QuantiteSaisie, Unite, QuantiteBase, DateSortie, Source, RefSource, CreePar, NumeroSortie, StatutPaiement, MontantLigne, MontantPaye, ResteAPayer, Observation) VALUES (@ProduitId, @QuantiteSaisie, @Unite, @QuantiteBase, GETDATE(), @Source, @RefSource, @CreePar, @NumeroSortie, @StatutPaiement, 0, 0, 0, @Observation)", cn, tx)
+                    cmdSortie.Parameters.AddWithValue("@ProduitId", produit.ProduitId)
+                    cmdSortie.Parameters.AddWithValue("@QuantiteSaisie", Math.Abs(delta))
+                    cmdSortie.Parameters.AddWithValue("@Unite", If(String.IsNullOrWhiteSpace(produit.UniteMesureStock), "base", produit.UniteMesureStock))
+                    cmdSortie.Parameters.AddWithValue("@QuantiteBase", Math.Abs(delta))
+                    cmdSortie.Parameters.AddWithValue("@Source", "MIGRATION_UNITE_MESURE")
+                    cmdSortie.Parameters.AddWithValue("@RefSource", reference)
+                    cmdSortie.Parameters.AddWithValue("@CreePar", effectuePar)
+                    cmdSortie.Parameters.AddWithValue("@NumeroSortie", reference)
+                    cmdSortie.Parameters.AddWithValue("@StatutPaiement", "GRATUIT")
+                    cmdSortie.Parameters.AddWithValue("@Observation", observation)
+                    cmdSortie.ExecuteNonQuery()
+                End Using
+            End If
+
+            Using cmdMouvement As New SqlCommand("INSERT INTO MouvementsStock (NumeroMouvement, ProduitId, TypeMouvement, Quantite, QuantiteBase, Unite, StockAvant, StockApres, Reference, Observation, EffectuePar, ModifierPar) VALUES (@NumeroMouvement, @ProduitId, @TypeMouvement, @Quantite, @QuantiteBase, @Unite, @StockAvant, @StockApres, @Reference, @Observation, @EffectuePar, @ModifierPar)", cn, tx)
+                cmdMouvement.Parameters.AddWithValue("@NumeroMouvement", reference)
+                cmdMouvement.Parameters.AddWithValue("@ProduitId", produit.ProduitId)
+                cmdMouvement.Parameters.AddWithValue("@TypeMouvement", "MIGRATION_UNITE_MESURE")
+                cmdMouvement.Parameters.AddWithValue("@Quantite", Math.Abs(delta))
+                cmdMouvement.Parameters.AddWithValue("@QuantiteBase", Math.Abs(delta))
+                cmdMouvement.Parameters.AddWithValue("@Unite", If(String.IsNullOrWhiteSpace(produit.UniteMesureStock), "base", produit.UniteMesureStock))
+                cmdMouvement.Parameters.AddWithValue("@StockAvant", ancienStockBase)
+                cmdMouvement.Parameters.AddWithValue("@StockApres", nouveauStockBase)
+                cmdMouvement.Parameters.AddWithValue("@Reference", reference)
+                cmdMouvement.Parameters.AddWithValue("@Observation", observation)
+                cmdMouvement.Parameters.AddWithValue("@EffectuePar", effectuePar)
+                cmdMouvement.Parameters.AddWithValue("@ModifierPar", ObtenirNomUtilisateurModification())
+                cmdMouvement.ExecuteNonQuery()
+            End Using
+        End Sub
+
+        Private Sub InsererHistoriquePrixSiNecessaire(produit As Produit,
+                                                       ancienPrixAchat As Decimal,
+                                                       ancienPrixDetail As Decimal,
+                                                       ancienPrixDemi As Decimal,
+                                                       ancienPrixQuart As Decimal,
+                                                       ancienPrixDouzaine As Decimal,
+                                                       ancienPrixGros As Decimal,
+                                                       ancienPrixSpecial As Decimal,
+                                                       cn As SqlConnection,
+                                                       tx As SqlTransaction)
+            If ancienPrixAchat = produit.PrixAchat AndAlso
+               ancienPrixDetail = produit.PrixDetail AndAlso
+               ancienPrixDemi = produit.PrixDemi AndAlso
+               ancienPrixQuart = produit.PrixQuart AndAlso
+               ancienPrixDouzaine = produit.PrixDouzaine AndAlso
+               ancienPrixGros = produit.PrixGros AndAlso
+               ancienPrixSpecial = produit.PrixSpecial Then Return
+
+            Using cmdHist As New SqlCommand("INSERT INTO HistoriquePrixProduits (ProduitId, AncienPrixAchat, NouveauPrixAchat, AncienPrixDetail, NouveauPrixDetail, AncienPrixDemi, NouveauPrixDemi, AncienPrixQuart, NouveauPrixQuart, AncienPrixDouzaine, NouveauPrixDouzaine, AncienPrixGros, NouveauPrixGros, AncienPrixSpecial, NouveauPrixSpecial, ModifiePar, ModifieLe, IdStock) VALUES (@ProduitId, @AncienPrixAchat, @NouveauPrixAchat, @AncienPrixDetail, @NouveauPrixDetail, @AncienPrixDemi, @NouveauPrixDemi, @AncienPrixQuart, @NouveauPrixQuart, @AncienPrixDouzaine, @NouveauPrixDouzaine, @AncienPrixGros, @NouveauPrixGros, @AncienPrixSpecial, @NouveauPrixSpecial, 1, GETDATE(), @IdStock)", cn, tx)
+                cmdHist.Parameters.AddWithValue("@ProduitId", produit.ProduitId)
+                cmdHist.Parameters.AddWithValue("@AncienPrixAchat", ancienPrixAchat)
+                cmdHist.Parameters.AddWithValue("@NouveauPrixAchat", produit.PrixAchat)
+                cmdHist.Parameters.AddWithValue("@AncienPrixDetail", ancienPrixDetail)
+                cmdHist.Parameters.AddWithValue("@NouveauPrixDetail", produit.PrixDetail)
+                cmdHist.Parameters.AddWithValue("@AncienPrixDemi", ancienPrixDemi)
+                cmdHist.Parameters.AddWithValue("@NouveauPrixDemi", produit.PrixDemi)
+                cmdHist.Parameters.AddWithValue("@AncienPrixQuart", ancienPrixQuart)
+                cmdHist.Parameters.AddWithValue("@NouveauPrixQuart", produit.PrixQuart)
+                cmdHist.Parameters.AddWithValue("@AncienPrixDouzaine", ancienPrixDouzaine)
+                cmdHist.Parameters.AddWithValue("@NouveauPrixDouzaine", produit.PrixDouzaine)
+                cmdHist.Parameters.AddWithValue("@AncienPrixGros", ancienPrixGros)
+                cmdHist.Parameters.AddWithValue("@NouveauPrixGros", produit.PrixGros)
+                cmdHist.Parameters.AddWithValue("@AncienPrixSpecial", ancienPrixSpecial)
+                cmdHist.Parameters.AddWithValue("@NouveauPrixSpecial", produit.PrixSpecial)
+                cmdHist.Parameters.AddWithValue("@IdStock", DBNull.Value)
+                cmdHist.ExecuteNonQuery()
+            End Using
+        End Sub
+
         ' Supprime un produit.
         Public Function Supprimer(produitId As Integer) As Integer
             Dim sql As String = "DELETE FROM Produits WHERE ProduitId = @ProduitId"

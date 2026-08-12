@@ -61,6 +61,18 @@ Namespace DevCommerc8ak
             Return resultat
         End Function
 
+        Public Function MettreAJourAvecMigrationUniteVersMesure(produit As Produit, ancienStockBase As Decimal, nouveauStockBase As Decimal, effectuePar As Integer) As Integer
+            Dim resultat As Integer = _repo.MettreAJourAvecMigrationUniteVersMesure(produit, ancienStockBase, nouveauStockBase, effectuePar)
+            If resultat > 0 Then
+                AuditActionService.Enregistrer("Produits", "Migration stock UNITE vers MESURE", "Produit " & produit.Libelle & " converti en stock mesuré.")
+                AppEvents.OnProduitModifie()
+                AppEvents.OnStockModifie()
+                AppEvents.OnAnalyseVenteModifiee()
+                AppEvents.OnDataChanged()
+            End If
+            Return resultat
+        End Function
+
         ' Supprime un produit.
         Public Function Supprimer(produitId As Integer) As Integer
             Dim resultat As Integer = _repo.Supprimer(produitId)

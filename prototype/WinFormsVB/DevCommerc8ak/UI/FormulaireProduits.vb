@@ -67,6 +67,11 @@ Namespace DevCommerc8ak
         Private ReadOnly cmbUniteMesureStock As ComboBox
         Private ReadOnly txtContenuUnitePrincipale As TextBox
         Private ReadOnly txtContenuUniteSecondaire As TextBox
+        Private _typeGestionStockOriginal As String = "UNITE"
+        Private _conversionUniteOriginale As Decimal = 1D
+        Private _quantiteBaseOriginale As Decimal = 0D
+        Private _unitePrincipaleOriginale As String = String.Empty
+        Private _uniteSecondaireOriginale As String = String.Empty
 
         Private ReadOnly txtPrixUnite As TextBox
         Private ReadOnly txtPrixAchat As TextBox
@@ -798,6 +803,11 @@ Namespace DevCommerc8ak
             cmbUniteSecondaire.Text = If(r.IsNull("UniteSecondaire"), "", Convert.ToString(row("UniteSecondaire")))
             txtConversion.Text = LireDecimalRow(row, "ConversionUnite").ToString("N2")
             Dim typeGestion As String = If(r.Table.Columns.Contains("TypeGestionStock") AndAlso Not r.IsNull("TypeGestionStock"), Convert.ToString(row("TypeGestionStock")).Trim().ToUpperInvariant(), "UNITE")
+            _typeGestionStockOriginal = StockUnitConversionService.NormaliserTypeGestionStock(typeGestion)
+            _conversionUniteOriginale = Math.Max(1D, LireDecimalRow(row, "ConversionUnite"))
+            _quantiteBaseOriginale = LireDecimalRow(row, "QuantiteStock")
+            _unitePrincipaleOriginale = cmbUnitePrincipale.Text.Trim()
+            _uniteSecondaireOriginale = cmbUniteSecondaire.Text.Trim()
             cmbTypeGestionStock.SelectedItem = If(typeGestion = "MESURE" OrElse typeGestion = "POIDS" OrElse typeGestion = "VOLUME", "MESURE", "UNITE")
             Dim uniteMesure As String = If(r.Table.Columns.Contains("UniteMesureStock") AndAlso Not r.IsNull("UniteMesureStock"), Convert.ToString(row("UniteMesureStock")).Trim().ToUpperInvariant(), "KG")
             If String.IsNullOrWhiteSpace(uniteMesure) Then uniteMesure = "KG"
@@ -867,7 +877,13 @@ Namespace DevCommerc8ak
                     .VenteGros = chkVenteGros.Checked
                 }
 
-                service.MettreAJour(produit)
+                If DoitMigrerStockUniteVersMesure(produit) Then
+                    Dim nouvelleQuantiteBase As Decimal = CalculerNouvelleQuantiteBaseMesure(produit)
+                    If Not ConfirmerMigrationStockUniteVersMesure(produit, nouvelleQuantiteBase) Then Return
+                    service.MettreAJourAvecMigrationUniteVersMesure(produit, _quantiteBaseOriginale, nouvelleQuantiteBase, SessionUtilisateur.UtilisateurId)
+                Else
+                    service.MettreAJour(produit)
+                End If
                 MessageBox.Show("Produit modifié.")
                 ChargerDonnees(sender, e)
             Catch ex As Exception
@@ -911,6 +927,54 @@ Namespace DevCommerc8ak
                 Return False
             End If
             Return True
+        End Function
+
+        Private Function DoitMigrerStockUniteVersMesure(produit As Produit) As Boolean
+            If produit Is Nothing Then Return False
+            Return String.Equals(_typeGestionStockOriginal, "UNITE", StringComparison.OrdinalIgnoreCase) AndAlso
+                   StockUnitConversionService.EstGestionMesuree(produit.TypeGestionStock)
+        End Function
+
+        Private Function CalculerNouvelleQuantiteBaseMesure(produit As Produit) As Decimal
+            Dim ancienneConversion As Decimal = If(_conversionUniteOriginale > 0D, _conversionUniteOriginale, 1D)
+            Dim ancienNombreUnitesPrincipales As Decimal = _quantiteBaseOriginale / ancienneConversion
+            Return ancienNombreUnitesPrincipales * produit.ContenuUnitePrincipale
+        End Function
+
+        Private Function ConfirmerMigrationStockUniteVersMesure(produit As Produit, nouvelleQuantiteBase As Decimal) As Boolean
+            If String.IsNullOrWhiteSpace(produit.UniteMesureStock) OrElse produit.ContenuUnitePrincipale <= 0D Then
+                MessageBox.Show("L'unité de mesure et le contenu de l'unité principale sont obligatoires pour convertir ce stock en mode MESURE.", "Conversion stock", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return False
+            End If
+            If Not String.IsNullOrWhiteSpace(produit.UniteSecondaire) AndAlso
+               (Not produit.ContenuUniteSecondaire.HasValue OrElse produit.ContenuUniteSecondaire.Value <= 0D) Then
+                MessageBox.Show("Le contenu de l'unité secondaire doit être supérieur à zéro pour convertir ce stock en mode MESURE.", "Conversion stock", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return False
+            End If
+
+            Dim ancienneConversion As Decimal = If(_conversionUniteOriginale > 0D, _conversionUniteOriginale, 1D)
+            Dim ancienNombreUnitesPrincipales As Decimal = _quantiteBaseOriginale / ancienneConversion
+            Dim unitePrincipale As String = If(String.IsNullOrWhiteSpace(produit.UnitePrincipale), _unitePrincipaleOriginale, produit.UnitePrincipale)
+            Dim message As String =
+                "Ce produit possède actuellement " & FormatageGlobal.FormatQuantitePhysique(ancienNombreUnitesPrincipales) & " " & unitePrincipale & " en stock." &
+                Environment.NewLine &
+                "1 " & unitePrincipale & " = " & FormatageGlobal.FormatQuantitePhysique(produit.ContenuUnitePrincipale) & " " & produit.UniteMesureStock & "." &
+                Environment.NewLine & Environment.NewLine &
+                "Le stock sera converti en :" &
+                Environment.NewLine &
+                FormatageGlobal.FormatStockSelonGestion(
+                    nouvelleQuantiteBase,
+                    produit.ConversionUnite,
+                    produit.UnitePrincipale,
+                    produit.UniteSecondaire,
+                    produit.TypeGestionStock,
+                    produit.UniteMesureStock,
+                    produit.ContenuUnitePrincipale,
+                    If(produit.ContenuUniteSecondaire.HasValue, produit.ContenuUniteSecondaire.Value, 0D)) &
+                Environment.NewLine & Environment.NewLine &
+                "Continuer ?"
+
+            Return MessageBox.Show(message, "Conversion du stock UNITE vers MESURE", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) = DialogResult.Yes
         End Function
 
         Private Function LireDecimal(texte As String) As Decimal
