@@ -63,8 +63,8 @@ Namespace DevCommerc8ak
 
             Me.Text = "Comptage physique"
             Me.StartPosition = FormStartPosition.CenterParent
-            Me.Size = New Size(680, 560)
-            Me.MinimumSize = New Size(620, 520)
+            Me.Size = New Size(700, 680)
+            Me.MinimumSize = New Size(640, 640)
             Me.BackColor = ColorBg
             Me.Font = FontLabel
             Me.FormBorderStyle = FormBorderStyle.FixedDialog
@@ -119,8 +119,8 @@ Namespace DevCommerc8ak
             layout.Controls.Add(info, 0, 1)
 
             Dim body As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .BackColor = ColorCard, .ColumnCount = 1, .RowCount = 2, .Padding = New Padding(14), .Margin = New Padding(0, 0, 0, 10)}
-            body.RowStyles.Add(New RowStyle(SizeType.Absolute, 150))
-            body.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+            body.RowStyles.Add(New RowStyle(SizeType.Absolute, 126))
+            body.RowStyles.Add(New RowStyle(SizeType.Absolute, 172))
 
             Dim saisie As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 4}
             saisie.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 210))
@@ -143,11 +143,11 @@ Namespace DevCommerc8ak
             AddHandler txtMesureLibre.TextChanged, AddressOf Quantites_TextChanged
             body.Controls.Add(saisie, 0, 0)
 
-            Dim resume As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .BackColor = Color.FromArgb(248, 250, 252), .Padding = New Padding(14), .ColumnCount = 1, .RowCount = 4}
-            resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 64))
+            Dim resume As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .BackColor = Color.FromArgb(248, 250, 252), .Padding = New Padding(14), .ColumnCount = 1, .RowCount = 4, .MinimumSize = New Size(0, 150)}
+            resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 52))
             resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 28))
-            resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 34))
-            resume.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+            resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 32))
+            resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 32))
             lblTotal = New Label() With {.Text = "TOTAL COMPTÉ" & Environment.NewLine & "-", .Font = FontTotal, .ForeColor = ColorPrimary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
             lblEquivalent = New Label() With {.Text = "Répartition : -", .Font = FontLabel, .ForeColor = ColorSecondary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
             lblEcart = New Label() With {.Text = "Écart : -", .Font = FontValue, .ForeColor = ColorPrimary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
