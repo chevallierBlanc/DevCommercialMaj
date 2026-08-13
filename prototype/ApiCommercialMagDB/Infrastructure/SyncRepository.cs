@@ -7,6 +7,8 @@ public sealed class SyncRepository(DbConnectionFactory factory)
 {
     public async Task<SyncResult> SaveStockSortieAsync(StockSortieSyncRequest request, CancellationToken ct = default)
     {
+        ValidateStockSortieRequest(request);
+
         if (request.Lignes.Count == 0)
         {
             return new SyncResult(0, 0, "Aucune ligne fournie.");
@@ -28,8 +30,15 @@ public sealed class SyncRepository(DbConnectionFactory factory)
                     continue;
                 }
 
+                var stockAvant = await ReadStockDisponibleAsync(cn, tx, line.ProduitId, ct);
+                if (stockAvant < line.QuantiteBase)
+                {
+                    throw new InvalidOperationException($"Stock insuffisant pour le produit {line.ProduitId}. Disponible={stockAvant}; demandé={line.QuantiteBase}.");
+                }
+
+                var stockApres = stockAvant - line.QuantiteBase;
                 await InsertStockSortieAsync(cn, tx, request, line, ct);
-                await InsertMouvementAsync(cn, tx, request, line, ct);
+                await InsertMouvementAsync(cn, tx, request, line, stockAvant, stockApres, ct);
                 inserted++;
             }
 
@@ -41,6 +50,74 @@ public sealed class SyncRepository(DbConnectionFactory factory)
             await tx.RollbackAsync(ct);
             throw new InvalidOperationException("Echec de synchronisation StockSortie: " + ex.Message, ex);
         }
+    }
+
+    private static void ValidateStockSortieRequest(StockSortieSyncRequest request)
+    {
+        if (request is null)
+        {
+            throw new ArgumentNullException(nameof(request));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.NumeroSortie))
+        {
+            throw new InvalidOperationException("Le numéro de sortie est obligatoire.");
+        }
+
+        foreach (var line in request.Lignes)
+        {
+            if (line.ProduitId <= 0)
+            {
+                throw new InvalidOperationException("Produit invalide dans la sortie stock.");
+            }
+
+            if (line.QuantiteSaisie <= 0m)
+            {
+                throw new InvalidOperationException($"Quantité commerciale invalide pour le produit {line.ProduitId}.");
+            }
+
+            if (line.QuantiteBase <= 0m)
+            {
+                throw new InvalidOperationException($"Quantité physique de référence invalide pour le produit {line.ProduitId}.");
+            }
+        }
+    }
+
+    private static async Task<decimal> ReadStockDisponibleAsync(SqlConnection cn, SqlTransaction tx, int produitId, CancellationToken ct)
+    {
+        const string sql = """
+            SELECT ISNULL(e.TotalEntree, 0) - ISNULL(s.TotalSortie, 0) - ISNULL(p.TotalPerte, 0) AS StockDisponible
+            FROM Produits pr WITH (UPDLOCK, HOLDLOCK)
+            LEFT JOIN (
+                SELECT ProduitId, SUM(ISNULL(QuantiteBase, 0)) AS TotalEntree
+                FROM StockEntree WITH (UPDLOCK, HOLDLOCK)
+                WHERE ProduitId = @ProduitId
+                GROUP BY ProduitId
+            ) e ON e.ProduitId = pr.ProduitId
+            LEFT JOIN (
+                SELECT ProduitId, SUM(ISNULL(QuantiteBase, 0)) AS TotalSortie
+                FROM StockSortie WITH (UPDLOCK, HOLDLOCK)
+                WHERE ProduitId = @ProduitId
+                GROUP BY ProduitId
+            ) s ON s.ProduitId = pr.ProduitId
+            LEFT JOIN (
+                SELECT ProduitId, SUM(ISNULL(QuantiteBase, 0)) AS TotalPerte
+                FROM StockPerte WITH (UPDLOCK, HOLDLOCK)
+                WHERE ProduitId = @ProduitId
+                GROUP BY ProduitId
+            ) p ON p.ProduitId = pr.ProduitId
+            WHERE pr.ProduitId = @ProduitId
+            """;
+
+        await using var cmd = new SqlCommand(sql, cn, tx);
+        cmd.Parameters.AddWithValue("@ProduitId", produitId);
+        var result = await cmd.ExecuteScalarAsync(ct);
+        if (result is null || result == DBNull.Value)
+        {
+            throw new InvalidOperationException($"Produit introuvable: {produitId}.");
+        }
+
+        return Convert.ToDecimal(result);
     }
 
     public async Task<SyncResult> SaveDepenseAsync(DepenseSyncRequest request, CancellationToken ct = default)
@@ -138,7 +215,7 @@ public sealed class SyncRepository(DbConnectionFactory factory)
         await cmd.ExecuteNonQueryAsync(ct);
     }
 
-    private static async Task InsertMouvementAsync(SqlConnection cn, SqlTransaction tx, StockSortieSyncRequest request, StockSortieSyncLine line, CancellationToken ct)
+    private static async Task InsertMouvementAsync(SqlConnection cn, SqlTransaction tx, StockSortieSyncRequest request, StockSortieSyncLine line, decimal stockAvant, decimal stockApres, CancellationToken ct)
     {
         const string sql = """
             IF NOT EXISTS (
@@ -152,7 +229,7 @@ public sealed class SyncRepository(DbConnectionFactory factory)
                 INSERT INTO MouvementsStock
                     (ProduitId, TypeMouvement, Quantite, QuantiteBase, Unite, StockAvant, StockApres, Reference, Observation, TypePerte, EffectuePar, NumeroMouvement)
                 VALUES
-                    (@ProduitId, 'SORTIE_MANUELLE', @Quantite, @QuantiteBase, @Unite, 0, 0, @Reference, @Observation, NULL, @EffectuePar, @NumeroMouvement)
+                    (@ProduitId, 'SORTIE_MANUELLE', @Quantite, @QuantiteBase, @Unite, @StockAvant, @StockApres, @Reference, @Observation, NULL, @EffectuePar, @NumeroMouvement)
             END
             """;
         await using var cmd = new SqlCommand(sql, cn, tx);
@@ -165,6 +242,8 @@ public sealed class SyncRepository(DbConnectionFactory factory)
         cmd.Parameters.AddWithValue("@Quantite", line.QuantiteSaisie);
         cmd.Parameters.AddWithValue("@QuantiteBase", line.QuantiteBase);
         cmd.Parameters.AddWithValue("@Unite", DbNullIfNull(line.Unite));
+        cmd.Parameters.AddWithValue("@StockAvant", stockAvant);
+        cmd.Parameters.AddWithValue("@StockApres", stockApres);
         cmd.Parameters.AddWithValue("@Reference", request.NumeroSortie);
         cmd.Parameters.AddWithValue("@Observation", DbNullIfNull(string.IsNullOrWhiteSpace(line.Observation) ? request.Observation : line.Observation));
         cmd.Parameters.AddWithValue("@EffectuePar", DbNullIfNull(request.CreePar));
