@@ -64,7 +64,8 @@ Namespace DevCommerc8ak
                     .BackupFolder = LireString(racine, "BackupFolder", ObtenirDossierParDefaut()),
                     .BackupBeforeExit = LireBool(racine, "BackupBeforeExit", LireBoolAppSetting("BackupBeforeExit", True))
                 }
-            Catch
+            Catch ex As Exception
+                _log.Warn("BackupService", "ChargerParametres", "Paramètres de sauvegarde illisibles. Utilisation des valeurs par défaut. " & ex.Message)
                 Return CreerParametresParDefaut()
             End Try
         End Function
@@ -185,7 +186,8 @@ Namespace DevCommerc8ak
                 End Using
                 File.Delete(fichierTest)
                 Return True
-            Catch
+            Catch ex As Exception
+                _log.Warn("BackupService", "PeutEcrireDansDossier", "Dossier de sauvegarde non accessible : " & If(dossier, String.Empty) & " | " & ex.Message)
                 Return False
             End Try
         End Function
