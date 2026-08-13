@@ -341,12 +341,12 @@ Namespace DevCommerc8ak
             Dim p As New List(Of SqlParameter)()
 
             If dateDebut.HasValue Then
-                sql &= "AND CAST(CreeLe AS DATE) >= @DateDebut "
+                sql &= "AND CreeLe >= @DateDebut "
                 p.Add(New SqlParameter("@DateDebut", dateDebut.Value.Date))
             End If
             If dateFin.HasValue Then
-                sql &= "AND CAST(CreeLe AS DATE) <= @DateFin "
-                p.Add(New SqlParameter("@DateFin", dateFin.Value.Date))
+                sql &= "AND CreeLe < @DateFinExclusive "
+                p.Add(New SqlParameter("@DateFinExclusive", dateFin.Value.Date.AddDays(1)))
             End If
             If Not String.IsNullOrWhiteSpace(utilisateur) Then
                 sql &= "AND ISNULL(Utilisateur,'') LIKE @Utilisateur "
