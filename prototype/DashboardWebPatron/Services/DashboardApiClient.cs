@@ -199,7 +199,7 @@ public sealed class DashboardApiClient
             return null;
         }
         var raw = await response.Content.ReadAsStringAsync(ct);
-        TraceAnalyse($"ANALYSE_HTTP path={path} status={(int)response.StatusCode} raw={raw}");
+        TraceAnalyse($"ANALYSE_HTTP path={path} status={(int)response.StatusCode}");
 
         response.EnsureSuccessStatusCode();
 
@@ -385,7 +385,7 @@ public sealed class DashboardApiClient
 
             using var response = await _http.PostAsJsonAsync("api/auth/login", login, ct);
             var raw = await response.Content.ReadAsStringAsync(ct);
-            TraceAuth($"AUTH_LOGIN_HTTP status={(int)response.StatusCode} raw={raw}");
+            TraceAuth($"AUTH_LOGIN_HTTP status={(int)response.StatusCode}");
             if (!response.IsSuccessStatusCode)
             {
                 TraceAuth($"AUTH_LOGIN_FAILED status={(int)response.StatusCode}");
@@ -441,7 +441,7 @@ public sealed class DashboardApiClient
 
             using var response = await _http.PostAsJsonAsync("api/auth/refresh", request, ct);
             var raw = await response.Content.ReadAsStringAsync(ct);
-            TraceAuth($"AUTH_REFRESH_HTTP status={(int)response.StatusCode} raw={raw}");
+            TraceAuth($"AUTH_REFRESH_HTTP status={(int)response.StatusCode}");
             if (!response.IsSuccessStatusCode)
             {
                 TraceAuth($"AUTH_REFRESH_FAILED status={(int)response.StatusCode}");
@@ -494,7 +494,7 @@ public sealed class DashboardApiClient
         }
 
         var raw = await response.Content.ReadAsStringAsync(ct);
-        TraceAuth($"AUTH_401 path={path} raw={raw}");
+        TraceAuth($"AUTH_401 path={path}");
         response.Dispose();
 
         _configuredAccessTokenRejected = true;
