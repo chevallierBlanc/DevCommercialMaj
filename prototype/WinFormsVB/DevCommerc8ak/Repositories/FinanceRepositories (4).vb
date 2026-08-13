@@ -28,7 +28,8 @@ Namespace DevCommerc8ak.Finance
         End Sub
 
         Public Function GetAll() As DataTable
-            Return _dal.ExecuterTable("SELECT * FROM CategoriesDepenses ORDER BY Libelle", CommandType.Text, Nothing)
+            Dim sql As String = "SELECT Id, Libelle, Description, IsSystem FROM CategoriesDepenses ORDER BY Libelle"
+            Return _dal.ExecuterTable(sql, CommandType.Text, Nothing)
         End Function
     End Class
 
@@ -68,7 +69,11 @@ Namespace DevCommerc8ak.Finance
         End Function
 
         Public Function GetAll() As DataTable
-            Return _dal.ExecuterTable("SELECT * FROM Depenses ORDER BY CreatedAt DESC", CommandType.Text, Nothing)
+            Dim sql As String =
+                "SELECT Id, DateDepense, Categorie, Description, Montant, Devise, Source, TypeDepense, CreePar, CreatedAt " &
+                "FROM Depenses " &
+                "ORDER BY CreatedAt DESC"
+            Return _dal.ExecuterTable(sql, CommandType.Text, Nothing)
         End Function
 
         Public Function GetHistorique(annee As Integer, Optional mois As Integer = 0) As DataTable
@@ -152,7 +157,11 @@ Namespace DevCommerc8ak.Finance
         End Function
 
         Public Function GetHistorique() As DataTable
-            Return _dal.ExecuterTable("SELECT * FROM Banque ORDER BY CreatedAt DESC", CommandType.Text, Nothing)
+            Dim sql As String =
+                "SELECT Id, DateOperation, TypeOperation, Montant, Devise, Description, Reference, CreatedAt " &
+                "FROM Banque " &
+                "ORDER BY CreatedAt DESC"
+            Return _dal.ExecuterTable(sql, CommandType.Text, Nothing)
         End Function
     End Class
 
