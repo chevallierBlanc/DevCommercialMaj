@@ -95,6 +95,7 @@ Namespace DevCommerc8ak
             If utilisateurId <= 0 Then Throw New ArgumentException("Utilisateur invalide.")
             If String.IsNullOrWhiteSpace(nomUtilisateur) Then Throw New ArgumentException("Nom utilisateur obligatoire.")
             If String.IsNullOrWhiteSpace(nomRole) Then Throw New ArgumentException("Role obligatoire.")
+            VerifierProtectionSuperAdmin(utilisateurId, New List(Of String) From {nomRole}, estActif)
 
             Dim roleId As Integer = _roleRepo.ObtenirIdParNom(nomRole)
             Dim hash As Byte() = Nothing
@@ -114,6 +115,7 @@ Namespace DevCommerc8ak
             Dim nomsRoles As New List(Of String)(roles)
             If nomsRoles.Count = 0 Then Throw New ArgumentException("Au moins un rôle est obligatoire.")
             If String.IsNullOrWhiteSpace(rolePrincipal) Then Throw New ArgumentException("Rôle principal obligatoire.")
+            VerifierProtectionSuperAdmin(utilisateurId, nomsRoles, estActif)
 
             Dim roleIds As New List(Of Integer)()
             For Each nomRole As String In nomsRoles
@@ -130,9 +132,37 @@ Namespace DevCommerc8ak
 
         ' Met a jour mot de passe.
         Public Sub ReinitialiserMotDePasse(utilisateurId As Integer, nouveauMotDePasse As String)
+            VerifierProtectionSuperAdmin(utilisateurId, Nothing, True)
             Dim sel As Byte() = GenererSel()
             Dim hash As Byte() = HashMotDePasse(nouveauMotDePasse, sel)
             _utilisateurRepo.MettreAJourMotDePasse(utilisateurId, hash, sel)
+        End Sub
+
+        Private Sub VerifierProtectionSuperAdmin(utilisateurId As Integer, rolesDemandes As IEnumerable(Of String), estActif As Boolean)
+            If utilisateurId <= 0 Then Return
+            If Not _utilisateurRepo.EstDansRole(utilisateurId, "SUPERADMIN") Then Return
+
+            Dim sessionSuperAdmin As Boolean = String.Equals(SessionUtilisateur.Role, "SUPERADMIN", StringComparison.OrdinalIgnoreCase)
+            If Not sessionSuperAdmin Then
+                Throw New InvalidOperationException("Le compte SUPERADMIN ne peut être modifié que par un SUPERADMIN.")
+            End If
+
+            If Not estActif Then
+                Throw New InvalidOperationException("Le compte SUPERADMIN ne peut pas être désactivé.")
+            End If
+
+            If rolesDemandes IsNot Nothing Then
+                Dim conserveSuperAdmin As Boolean = False
+                For Each role As String In rolesDemandes
+                    If String.Equals(role, "SUPERADMIN", StringComparison.OrdinalIgnoreCase) Then
+                        conserveSuperAdmin = True
+                        Exit For
+                    End If
+                Next
+                If Not conserveSuperAdmin Then
+                    Throw New InvalidOperationException("Le rôle SUPERADMIN ne peut pas être retiré du compte système.")
+                End If
+            End If
         End Sub
 
         Private Function GenererSel() As Byte()

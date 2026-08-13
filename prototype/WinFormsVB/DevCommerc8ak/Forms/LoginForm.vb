@@ -400,32 +400,16 @@ Namespace DevCommerc8ak
                 Dim sessionRepo As New SessionRepository(dal)
                 Dim service As New UtilisateurService(utilisateurRepo, roleRepo, sessionRepo)
 
-                roleRepo.AssurerRole("ADMIN")
+                roleRepo.AssurerRole("SUPERADMIN")
 
-                Dim motDePasse As String = Interaction.InputBox(
-                    "Aucun compte n'existe. Saisissez le mot de passe du premier administrateur.",
-                    "Création du compte admin",
-                    "")
-                If String.IsNullOrWhiteSpace(motDePasse) Then
-                    MessageBox.Show("La création du compte administrateur est obligatoire au premier démarrage.")
-                    Me.DialogResult = DialogResult.Cancel
-                    Me.Close()
-                    Return
-                End If
-
-                Dim confirmation As String = Interaction.InputBox(
-                    "Confirmez le mot de passe du premier administrateur.",
-                    "Création du compte admin",
-                    "")
-                If motDePasse <> confirmation Then
-                    MessageBox.Show("La confirmation ne correspond pas. Le compte administrateur n'a pas été créé.")
-                    Me.DialogResult = DialogResult.Cancel
-                    Me.Close()
-                    Return
-                End If
-
-                service.CreerUtilisateur("admin", motDePasse, "ADMIN")
-                MessageBox.Show("Compte administrateur initial créé. Utilisez l'utilisateur 'admin'.")
+                Using bootstrap As New FormulaireBootstrapSuperAdmin(service)
+                    If bootstrap.ShowDialog(Me) <> DialogResult.OK Then
+                        MessageBox.Show("La création du compte SUPERADMIN initial est obligatoire au premier démarrage.")
+                        Me.DialogResult = DialogResult.Cancel
+                        Me.Close()
+                        Return
+                    End If
+                End Using
             Catch ex As Exception
                 Dim log As New ProductionLogService()
                 log.Error("LoginForm", "InitialiserCompteAdminSiNecessaire", "Erreur lors de l'initialisation du compte administrateur.", ex)

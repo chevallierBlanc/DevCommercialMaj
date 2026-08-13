@@ -134,9 +134,14 @@ Namespace DevCommerc8ak
 
                     Dim roleRepo As New RoleRepository(dal)
                     roleRepo.AssurerRole("ADMIN")
+                    roleRepo.AssurerRole("SUPERADMIN")
 
-                    If AdminExiste(dal) Then
-                        _log.Info("InitAdmin", "Program", "Un compte administrateur existe déjà.")
+                    If UtilisateurActifExiste(dal) Then
+                        If Not SuperAdminExiste(dal) Then
+                            _log.Warn("InitAdmin", "Program", "Aucun SUPERADMIN actif détecté. Démarrage conservé pour compatibilité avec les comptes existants.")
+                        Else
+                            _log.Info("InitAdmin", "Program", "Un compte SUPERADMIN actif existe déjà.")
+                        End If
                         Return True
                     End If
 
@@ -144,14 +149,18 @@ Namespace DevCommerc8ak
                     Dim sessionRepo As New SessionRepository(dal)
                     Dim service As New UtilisateurService(utilisateurRepo, roleRepo, sessionRepo)
 
-                    service.CreerUtilisateur("admin", "ADMIN", "ADMIN")
-                    _log.Info("InitAdmin", "Program", "Compte administrateur initial créé automatiquement: admin.")
-                    MessageBox.Show("Aucun administrateur n'existait. Le compte initial a été créé." & Environment.NewLine &
-                                    "Utilisateur : admin" & Environment.NewLine &
-                                    "Mot de passe : ADMIN",
-                                    "Initialisation administrateur",
-                                    MessageBoxButtons.OK,
-                                    MessageBoxIcon.Information)
+                    Using bootstrap As New FormulaireBootstrapSuperAdmin(service)
+                        If bootstrap.ShowDialog() <> DialogResult.OK Then
+                            _log.Warn("InitAdmin", "Program", "Création du SUPERADMIN initial annulée.")
+                            MessageBox.Show("La création du compte SUPERADMIN initial est obligatoire pour démarrer l'application.",
+                                            "Initialisation SUPERADMIN",
+                                            MessageBoxButtons.OK,
+                                            MessageBoxIcon.Warning)
+                            Return False
+                        End If
+                    End Using
+
+                    _log.Info("InitAdmin", "Program", "Compte SUPERADMIN initial créé via assistant sécurisé.")
                     Return True
                 Catch ex As Exception
                     _log.Error("InitAdmin", "Program", "Impossible d'initialiser le compte administrateur initial.", ex)
@@ -171,13 +180,19 @@ Namespace DevCommerc8ak
                 Return resultat IsNot Nothing AndAlso Convert.ToInt32(resultat) = 1
             End Function
 
-            Private Shared Function AdminExiste(dal As DAL) As Boolean
+            Private Shared Function UtilisateurActifExiste(dal As DAL) As Boolean
+                Dim resultat As Object = dal.ExecuterScalaire("SELECT COUNT(*) FROM dbo.Utilisateurs WHERE ISNULL(EstActif,1)=1", CommandType.Text, Nothing)
+                Return resultat IsNot Nothing AndAlso Convert.ToInt32(resultat) > 0
+            End Function
+
+            Private Shared Function SuperAdminExiste(dal As DAL) As Boolean
                 Dim sql As String =
                     "SELECT COUNT(*) " &
                     "FROM Utilisateurs u " &
                     "INNER JOIN UtilisateurRoles ur ON ur.UtilisateurId = u.UtilisateurId " &
                     "INNER JOIN Roles r ON r.RoleId = ur.RoleId " &
-                    "WHERE UPPER(LTRIM(RTRIM(r.NomRole))) = 'ADMIN'"
+                    "WHERE ISNULL(u.EstActif,1)=1 " &
+                    "AND UPPER(LTRIM(RTRIM(r.NomRole))) = 'SUPERADMIN'"
                 Dim resultat As Object = dal.ExecuterScalaire(sql, CommandType.Text, Nothing)
                 Return resultat IsNot Nothing AndAlso Convert.ToInt32(resultat) > 0
             End Function

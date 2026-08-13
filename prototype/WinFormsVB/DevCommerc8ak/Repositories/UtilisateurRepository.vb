@@ -158,6 +158,23 @@ Namespace DevCommerc8ak
             Return If(role Is Nothing, "", Convert.ToString(role))
         End Function
 
+        Public Function EstDansRole(utilisateurId As Integer, nomRole As String) As Boolean
+            AssurerUtilisateurRolesInfrastructure()
+            Dim sql As String =
+                "SELECT COUNT(*) " &
+                "FROM dbo.UtilisateurRoles ur " &
+                "INNER JOIN dbo.Roles r ON r.RoleId = ur.RoleId " &
+                "WHERE ur.UtilisateurId=@UtilisateurId " &
+                "AND ISNULL(ur.EstActif,1)=1 " &
+                "AND UPPER(LTRIM(RTRIM(r.NomRole)))=@NomRole"
+            Dim p As New List(Of SqlParameter) From {
+                New SqlParameter("@UtilisateurId", utilisateurId),
+                New SqlParameter("@NomRole", nomRole.Trim().ToUpperInvariant())
+            }
+            Dim resultat As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
+            Return resultat IsNot Nothing AndAlso Convert.ToInt32(resultat) > 0
+        End Function
+
         Public Function ListerRolesActifs(utilisateurId As Integer) As List(Of RoleSessionInfo)
             AssurerUtilisateurRolesInfrastructure()
             Dim sql As String =

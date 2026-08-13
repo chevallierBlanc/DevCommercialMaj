@@ -76,6 +76,13 @@ public sealed class AuthService(
             return;
         }
 
+        if (string.IsNullOrWhiteSpace(seed.AdminUsername) ||
+            string.IsNullOrWhiteSpace(seed.AdminPassword) ||
+            seed.AdminPassword == "1234")
+        {
+            throw new InvalidOperationException("DevSeed est activé mais aucun mot de passe administrateur fort n'est configuré.");
+        }
+
         await authRepository.EnsureDevAdminAsync(seed.AdminUsername, seed.AdminPassword, seed.AdminRole, passwordHasher, ct);
     }
 }

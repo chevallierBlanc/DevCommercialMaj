@@ -8,7 +8,22 @@ namespace CommercialMagDb.Api.Infrastructure;
 
 public sealed class JwtTokenService(IConfiguration configuration)
 {
-    public static SymmetricSecurityKey BuildSigningKey(string signingKey) => new(Encoding.UTF8.GetBytes(signingKey));
+    public static SymmetricSecurityKey BuildSigningKey(string signingKey)
+    {
+        if (string.IsNullOrWhiteSpace(signingKey) ||
+            signingKey.StartsWith("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("La clé JWT doit être fournie par configuration externe avant de démarrer l'API.");
+        }
+
+        var keyBytes = Encoding.UTF8.GetBytes(signingKey);
+        if (keyBytes.Length < 32)
+        {
+            throw new InvalidOperationException("La clé JWT doit contenir au moins 32 octets.");
+        }
+
+        return new SymmetricSecurityKey(keyBytes);
+    }
 
     public (string Token, DateTime ExpiresAtUtc) CreateAccessToken(int userId, string username, string role)
     {

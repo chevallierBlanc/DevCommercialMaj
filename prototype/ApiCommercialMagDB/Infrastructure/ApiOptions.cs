@@ -11,8 +11,8 @@ public sealed class JwtOptions
 
 public sealed class DevSeedOptions
 {
-    public bool EnableAdminSeed { get; set; } = true;
+    public bool EnableAdminSeed { get; set; } = false;
     public string AdminUsername { get; set; } = "admin";
-    public string AdminPassword { get; set; } = "1234";
+    public string AdminPassword { get; set; } = string.Empty;
     public string AdminRole { get; set; } = "ADMIN";
 }
