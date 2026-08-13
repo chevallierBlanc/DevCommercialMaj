@@ -23,18 +23,25 @@ Namespace DevCommerc8ak
 
         ' CA journalier pour une date.
         Public Function CAJournalier(dateRef As Date) As Decimal
-            Dim sql As String = "SELECT ISNULL(CAST(SUM(ISNULL(MontantTotal,0)) AS DECIMAL(18,0)),0) FROM FacturesVente WHERE CAST(CreeLe AS DATE)=@d AND Statut='PAYEE'"
-            Dim p As New List(Of SqlParameter) From {New SqlParameter("@d", dateRef.Date)}
+            Dim dateDebut As Date = dateRef.Date
+            Dim dateFin As Date = dateDebut.AddDays(1)
+            Dim sql As String = "SELECT ISNULL(CAST(SUM(ISNULL(MontantTotal,0)) AS DECIMAL(18,0)),0) FROM FacturesVente WHERE CreeLe >= @dateDebut AND CreeLe < @dateFin AND Statut='PAYEE'"
+            Dim p As New List(Of SqlParameter) From {
+                New SqlParameter("@dateDebut", dateDebut),
+                New SqlParameter("@dateFin", dateFin)
+            }
             Dim v As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
             Return Convert.ToDecimal(v)
         End Function
 
         ' CA mensuel pour une date.
         Public Function CAMensuel(dateRef As Date) As Decimal
-            Dim sql As String = "SELECT ISNULL(CAST(SUM(ISNULL(MontantTotal,0)) AS DECIMAL(18,0)),0) FROM FacturesVente WHERE YEAR(CreeLe)=@y AND MONTH(CreeLe)=@m AND Statut='PAYEE'"
+            Dim dateDebut As Date = New Date(dateRef.Year, dateRef.Month, 1)
+            Dim dateFin As Date = dateDebut.AddMonths(1)
+            Dim sql As String = "SELECT ISNULL(CAST(SUM(ISNULL(MontantTotal,0)) AS DECIMAL(18,0)),0) FROM FacturesVente WHERE CreeLe >= @dateDebut AND CreeLe < @dateFin AND Statut='PAYEE'"
             Dim p As New List(Of SqlParameter) From {
-                New SqlParameter("@y", dateRef.Year),
-                New SqlParameter("@m", dateRef.Month)
+                New SqlParameter("@dateDebut", dateDebut),
+                New SqlParameter("@dateFin", dateFin)
             }
             Dim v As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
             Return Convert.ToDecimal(v)
@@ -437,17 +444,20 @@ Namespace DevCommerc8ak
 
         ' Comparatif mois actuel vs precedent.
         Public Function ComparatifMois(dateRef As Date) As DataTable
+            Dim debutActuel As Date = New Date(dateRef.Year, dateRef.Month, 1)
+            Dim finActuel As Date = debutActuel.AddMonths(1)
+            Dim debutPrecedent As Date = debutActuel.AddMonths(-1)
+            Dim finPrecedent As Date = debutActuel
             Dim sql As String = "SELECT 'MoisActuel' AS Periode, ISNULL(CAST(SUM(ISNULL(MontantTotal,0)) AS BIGINT),0) AS CA " &
-                                "FROM FacturesVente WHERE YEAR(CreeLe)=@y AND MONTH(CreeLe)=@m AND Statut='PAYEE' " &
+                                "FROM FacturesVente WHERE CreeLe >= @DebutActuel AND CreeLe < @FinActuel AND Statut='PAYEE' " &
                                 "UNION ALL " &
                                 "SELECT 'MoisPrecedent' AS Periode, ISNULL(CAST(SUM(ISNULL(MontantTotal,0)) AS BIGINT),0) AS CA " &
-                                "FROM FacturesVente WHERE YEAR(CreeLe)=@y2 AND MONTH(CreeLe)=@m2 AND Statut='PAYEE'"
-            Dim prev As Date = dateRef.AddMonths(-1)
+                                "FROM FacturesVente WHERE CreeLe >= @DebutPrecedent AND CreeLe < @FinPrecedent AND Statut='PAYEE'"
             Dim p As New List(Of SqlParameter) From {
-                New SqlParameter("@y", dateRef.Year),
-                New SqlParameter("@m", dateRef.Month),
-                New SqlParameter("@y2", prev.Year),
-                New SqlParameter("@m2", prev.Month)
+                New SqlParameter("@DebutActuel", debutActuel),
+                New SqlParameter("@FinActuel", finActuel),
+                New SqlParameter("@DebutPrecedent", debutPrecedent),
+                New SqlParameter("@FinPrecedent", finPrecedent)
             }
             Return _dal.ExecuterTable(sql, CommandType.Text, p)
         End Function
