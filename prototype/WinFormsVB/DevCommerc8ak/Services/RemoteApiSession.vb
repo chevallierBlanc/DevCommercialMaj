@@ -13,6 +13,7 @@ Namespace DevCommerc8ak
     Public Module RemoteApiSession
         Private ReadOnly _http As New HttpClient() With {.Timeout = TimeSpan.FromSeconds(15)}
         Private ReadOnly _serializer As New JavaScriptSerializer() With {.MaxJsonLength = Integer.MaxValue}
+        Private ReadOnly _log As New SyncLogService()
         Private _accessToken As String = String.Empty
         Private _refreshToken As String = String.Empty
         Private _username As String = String.Empty
@@ -48,6 +49,7 @@ Namespace DevCommerc8ak
                 Dim body As String = _serializer.Serialize(req)
                 Dim resp As HttpResponseMessage = _http.PostAsync(BaseUrl() & "api/auth/login", New StringContent(body, Encoding.UTF8, "application/json")).GetAwaiter().GetResult()
                 If Not resp.IsSuccessStatusCode Then
+                    _log.Warn("Authentification API refusée pour l'utilisateur " & If(username, String.Empty) & " | HTTP " & CInt(resp.StatusCode).ToString())
                     Clear()
                     Return False
                 End If
@@ -65,7 +67,8 @@ Namespace DevCommerc8ak
                 _role = token.Role
                 _accessTokenExpiresAtUtc = token.AccessTokenExpiresAtUtc
                 Return True
-            Catch
+            Catch ex As Exception
+                _log.Error("Erreur d'authentification API pour l'utilisateur " & If(username, String.Empty), ex)
                 Clear()
                 Return False
             End Try
