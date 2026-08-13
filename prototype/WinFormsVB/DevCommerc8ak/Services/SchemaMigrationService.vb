@@ -22,6 +22,7 @@ Namespace DevCommerc8ak
                         AppliquerMigration(cn, tx, 2026080801, "Colonnes stock mesure et type vente mesure", AddressOf MigrationStockMesure)
                         AppliquerMigration(cn, tx, 2026080802, "Index production principaux", AddressOf MigrationIndexProduction)
                         AppliquerMigration(cn, tx, 2026080803, "Precision quantite types vente produit", AddressOf MigrationPrecisionTypesVente)
+                        AppliquerMigration(cn, tx, 2026080804, "Index production dates et audit", AddressOf MigrationIndexDatesEtAudit)
                         tx.Commit()
                     Catch
                         tx.Rollback()
@@ -90,6 +91,22 @@ Namespace DevCommerc8ak
 
         Private Shared Sub MigrationPrecisionTypesVente(cn As SqlConnection, tx As SqlTransaction)
             Executer(cn, tx, "IF OBJECT_ID('dbo.TypesVenteProduit', 'U') IS NOT NULL ALTER TABLE dbo.TypesVenteProduit ALTER COLUMN QuantiteEquivalent DECIMAL(18,4) NOT NULL")
+        End Sub
+
+        Private Shared Sub MigrationIndexDatesEtAudit(cn As SqlConnection, tx As SqlTransaction)
+            Dim indexSql As New List(Of String) From {
+                "IF OBJECT_ID('dbo.Depenses', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_Depenses_Date_Source' AND object_id=OBJECT_ID('dbo.Depenses')) CREATE INDEX IX_Depenses_Date_Source ON dbo.Depenses(DateDepense, Source)",
+                "IF OBJECT_ID('dbo.Paiements', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_Paiements_PayeLe' AND object_id=OBJECT_ID('dbo.Paiements')) CREATE INDEX IX_Paiements_PayeLe ON dbo.Paiements(PayeLe)",
+                "IF OBJECT_ID('dbo.StockPerte', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_StockPerte_Produit_Date' AND object_id=OBJECT_ID('dbo.StockPerte')) CREATE INDEX IX_StockPerte_Produit_Date ON dbo.StockPerte(ProduitId, DatePerte)",
+                "IF OBJECT_ID('dbo.MouvementsStock', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_MouvementsStock_Produit_Date' AND object_id=OBJECT_ID('dbo.MouvementsStock')) CREATE INDEX IX_MouvementsStock_Produit_Date ON dbo.MouvementsStock(ProduitId, EffectueLe)",
+                "IF OBJECT_ID('dbo.Inventaires', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_Inventaires_DateCreation' AND object_id=OBJECT_ID('dbo.Inventaires')) CREATE INDEX IX_Inventaires_DateCreation ON dbo.Inventaires(DateCreation)",
+                "IF OBJECT_ID('dbo.AuditActions', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_AuditActions_CreeLe' AND object_id=OBJECT_ID('dbo.AuditActions')) CREATE INDEX IX_AuditActions_CreeLe ON dbo.AuditActions(CreeLe)",
+                "IF OBJECT_ID('dbo.AuditActions', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_AuditActions_Utilisateur_CreeLe' AND object_id=OBJECT_ID('dbo.AuditActions')) CREATE INDEX IX_AuditActions_Utilisateur_CreeLe ON dbo.AuditActions(Utilisateur, CreeLe)"
+            }
+
+            For Each sql As String In indexSql
+                Executer(cn, tx, sql)
+            Next
         End Sub
 
         Private Shared Sub Executer(cn As SqlConnection, tx As SqlTransaction, sql As String)
