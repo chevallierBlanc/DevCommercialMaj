@@ -40,20 +40,18 @@ Namespace DevCommerc8ak
 
                 Try
                     RemoveHandler _syncTimer.Elapsed, AddressOf OnElapsed
-                Catch
+                Catch ex As Exception
+                    _log.Warn("Impossible de détacher le handler de synchronisation offline : " & ex.Message)
                 End Try
 
                 Try
                     _syncTimer.Enabled = False
                     _syncTimer.AutoReset = False
-                Catch
+                Catch ex As Exception
+                    _log.Warn("Impossible d'arrêter le timer de synchronisation offline : " & ex.Message)
                 End Try
 
-                Try
-                    _dal = Nothing
-                Catch
-                End Try
-
+                _dal = Nothing
                 _started = False
             End SyncLock
         End Sub
