@@ -16,6 +16,7 @@ Namespace DevCommerc8ak
         Private ReadOnly _perteRepo As StockPerteRepository
         Private ReadOnly _inventaireRepo As StockInventaireRepository
         Private ReadOnly _mvtRepo As MouvementStockRepository
+        Private ReadOnly _log As New ProductionLogService()
 
         Public Sub New(dal As DAL)
             _dal = dal
@@ -103,7 +104,8 @@ Namespace DevCommerc8ak
                             For Each item As StockSortie In items
                                 syncService.EssayerSynchroniserStockSortie(item)
                             Next
-                        Catch
+                        Catch ex As Exception
+                            _log.Warn("StockService", "EnregistrerSortiesManuelles", "Synchronisation offline de sortie manuelle échouée après commit : " & numeroSortie & " | " & ex.Message)
                         End Try
                         AuditActionService.Enregistrer("Stock", "Sortie manuelle", "Sortie manuelle " & numeroSortie & " enregistrée.")
                         AppEvents.OnStockModifie()
@@ -165,7 +167,8 @@ Namespace DevCommerc8ak
                         Try
                             Dim syncService As New OfflineSyncService(_dal)
                             syncService.EssayerSynchroniserSortieParNumero(numeroSortie)
-                        Catch
+                        Catch ex As Exception
+                            _log.Warn("StockService", "EnregistrerPaiementSortieManuelle", "Synchronisation offline de paiement sortie échouée après commit : " & numeroSortie & " | " & ex.Message)
                         End Try
                         AuditActionService.Enregistrer("Stock", "Paiement dette", "Paiement enregistré pour la sortie " & numeroSortie & ".")
                         AppEvents.OnCaisseModifiee()
