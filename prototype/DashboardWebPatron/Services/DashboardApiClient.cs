@@ -367,6 +367,12 @@ public sealed class DashboardApiClient
 
     private async Task<bool> TryLoginAsync(CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(_options.Username) || string.IsNullOrWhiteSpace(_options.Password))
+        {
+            TraceAuth("AUTH_LOGIN_SKIPPED missing configured DashboardApi username/password");
+            return false;
+        }
+
         await _authLock.WaitAsync(ct);
         try
         {
