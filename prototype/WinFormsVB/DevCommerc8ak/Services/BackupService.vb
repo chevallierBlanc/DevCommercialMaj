@@ -140,7 +140,7 @@ Namespace DevCommerc8ak
                     Return False
                 End If
 
-                Dim nomFichier As String = "ERPCommercial_" & DateTime.Now.ToString("yyyyMMdd_HHmm", CultureInfo.InvariantCulture) & ".bak"
+                Dim nomFichier As String = "ERPCommercial_" & DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) & "_" & Guid.NewGuid().ToString("N").Substring(0, 8) & ".bak"
                 Dim cheminComplet As String = Path.Combine(dossier, nomFichier)
                 Dim cheminEchappe As String = cheminComplet.Replace("'", "''")
                 Dim databaseEchappee As String = database.Replace("]", "]]")
