@@ -12,6 +12,7 @@ Namespace DevCommerc8ak
         Private _listener As TcpListener
         Private _thread As Thread
         Private _actif As Boolean
+        Private ReadOnly _signalArret As New ManualResetEventSlim(False)
 
         Public Event CodeRecu(code As String)
 
@@ -20,6 +21,7 @@ Namespace DevCommerc8ak
             _listener = New TcpListener(IPAddress.Parse(ip), port)
             _listener.Start()
             _actif = True
+            _signalArret.Reset()
             _thread = New Thread(AddressOf Ecouter)
             _thread.IsBackground = True
             _thread.Start()
@@ -27,6 +29,7 @@ Namespace DevCommerc8ak
 
         Public Sub Arreter()
             _actif = False
+            _signalArret.Set()
             Try
                 _listener.Stop()
             Catch
@@ -47,7 +50,9 @@ Namespace DevCommerc8ak
                     End Using
                     client.Close()
                 Catch
-                    Thread.Sleep(200)
+                    If _actif Then
+                        _signalArret.Wait(200)
+                    End If
                 End Try
             End While
         End Sub
