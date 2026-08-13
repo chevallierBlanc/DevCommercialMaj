@@ -51,6 +51,7 @@ Namespace DevCommerc8ak
         Private ReadOnly chkBackupAuto As CheckBox
         Private ReadOnly chkBackupAvantSortie As CheckBox
         Private ReadOnly btnBackupNow As Button
+        Private ReadOnly btnRestoreBackup As Button
         Private ReadOnly btnCharger As Button
         Private ReadOnly btnEnregistrer As Button
         Private ReadOnly backupService As BackupService
@@ -129,17 +130,20 @@ Namespace DevCommerc8ak
             btnBackupNow = CreateStyledButton("Lancer la sauvegarde", ColorPrimary, 180, 34)
             btnBackupNow.Left = 20
             btnBackupNow.Top = 225
+            btnRestoreBackup = CreateStyledButton("Restaurer une sauvegarde", Color.FromArgb(190, 70, 70), 205, 34)
+            btnRestoreBackup.Left = 20
+            btnRestoreBackup.Top = 275
             Dim lblBackupInfo As New Label() With {
-                .Text = "La destination proposée doit rester facilement accessible et la sauvegarde s'exécute en sourdine.",
-                .Left = 210,
-                .Top = 230,
+                .Text = "La restauration est réservée au SUPERADMIN et doit être testée sur une base non-production.",
+                .Left = 245,
+                .Top = 278,
                 .Width = 430,
                 .Height = 36,
                 .Font = FontControl,
                 .ForeColor = ColorTextSecondary,
                 .AutoSize = False
             }
-            cardBackup.Controls.AddRange({btnBackupFolder, chkBackupAuto, chkBackupAvantSortie, btnBackupNow, lblBackupInfo})
+            cardBackup.Controls.AddRange({btnBackupFolder, chkBackupAuto, chkBackupAvantSortie, btnBackupNow, btnRestoreBackup, lblBackupInfo})
 
             tableGeneral.Controls.Add(cardMagasin, 0, 0)
             tableGeneral.Controls.Add(cardLogo, 0, 1)
@@ -202,6 +206,7 @@ Namespace DevCommerc8ak
             AddHandler btnLogo.Click, AddressOf ChoisirLogo
             AddHandler btnBackupFolder.Click, AddressOf ChoisirDossierBackup
             AddHandler btnBackupNow.Click, AddressOf LancerSauvegardeManuelle
+            AddHandler btnRestoreBackup.Click, AddressOf LancerRestaurationManuelle
             AddHandler btnCharger.Click, AddressOf Charger
             AddHandler btnEnregistrer.Click, AddressOf Enregistrer
 
@@ -381,6 +386,63 @@ Namespace DevCommerc8ak
                 End If
             Catch ex As Exception
                 MessageBox.Show("Erreur sauvegarde : " & ex.Message, "Sauvegarde", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
+        End Sub
+
+        Private Sub LancerRestaurationManuelle(sender As Object, e As EventArgs)
+            Try
+                If Not String.Equals(If(SessionUtilisateur.Role, String.Empty), "SUPERADMIN", StringComparison.OrdinalIgnoreCase) Then
+                    MessageBox.Show("La restauration est réservée au SUPERADMIN.", "Restauration", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    Return
+                End If
+
+                Using ofd As New OpenFileDialog() With {
+                    .Title = "Sélectionner une sauvegarde SQL Server",
+                    .Filter = "Sauvegardes SQL Server (*.bak)|*.bak",
+                    .CheckFileExists = True,
+                    .Multiselect = False
+                }
+                    If ofd.ShowDialog(Me) <> DialogResult.OK Then Return
+
+                    Dim fichier As String = ofd.FileName
+                    If String.IsNullOrWhiteSpace(fichier) OrElse Not File.Exists(fichier) Then
+                        MessageBox.Show("Le fichier de sauvegarde est introuvable.", "Restauration", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                        Return
+                    End If
+
+                    If Not String.Equals(Path.GetExtension(fichier), ".bak", StringComparison.OrdinalIgnoreCase) Then
+                        MessageBox.Show("Sélectionnez un fichier de sauvegarde SQL Server au format .bak.", "Restauration", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                        Return
+                    End If
+
+                    Dim confirmation As DialogResult = MessageBox.Show(
+                        "Cette opération va remplacer la base de données actuelle par la sauvegarde sélectionnée." &
+                        Environment.NewLine & Environment.NewLine &
+                        "Fichier : " & fichier &
+                        Environment.NewLine & Environment.NewLine &
+                        "Fermez les autres postes avant de continuer. Continuer ?",
+                        "Confirmation restauration",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning,
+                        MessageBoxDefaultButton.Button2)
+
+                    If confirmation <> DialogResult.Yes Then Return
+
+                    AuditActionService.Enregistrer("Sauvegarde", "Tentative restauration", "Fichier : " & fichier)
+                    Dim resultat As DatabaseRestoreResult = backupService.RestaurerSauvegarde(fichier)
+                    If resultat.Success Then
+                        AuditActionService.Enregistrer("Sauvegarde", "Restauration réussie", "Fichier : " & fichier)
+                        MessageBox.Show(resultat.Message, "Restauration", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                        ApplicationLifecycle.RequestShutdown()
+                    Else
+                        AuditActionService.Enregistrer("Sauvegarde", "Restauration échouée", "Fichier : " & fichier)
+                        MessageBox.Show(resultat.Message, "Restauration", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                    End If
+                End Using
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("FormulaireParametres", "LancerRestaurationManuelle", "Erreur pendant la restauration manuelle.", ex)
+                MessageBox.Show("Erreur restauration. Consultez le journal technique.", "Restauration", MessageBoxButtons.OK, MessageBoxIcon.Error)
             End Try
         End Sub
     End Class

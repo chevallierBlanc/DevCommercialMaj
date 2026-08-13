@@ -24,6 +24,13 @@ Namespace DevCommerc8ak
         Public Property BackedUpAt As DateTime
     End Class
 
+    Public Class DatabaseRestoreResult
+        Public Property Success As Boolean
+        Public Property FilePath As String
+        Public Property Message As String
+        Public Property RestoredAt As DateTime
+    End Class
+
     Public Class BackupService
         Private ReadOnly _connectionString As String
         Private ReadOnly _settingsFilePath As String
@@ -128,6 +135,65 @@ Namespace DevCommerc8ak
             Return resultat
         End Function
 
+        Public Function RestaurerSauvegarde(fichierSauvegarde As String) As DatabaseRestoreResult
+            Dim resultat As New DatabaseRestoreResult() With {.FilePath = fichierSauvegarde, .RestoredAt = DateTime.Now}
+
+            Try
+                If String.IsNullOrWhiteSpace(fichierSauvegarde) Then
+                    resultat.Message = "Aucun fichier de sauvegarde sélectionné."
+                    Return resultat
+                End If
+
+                Dim cheminComplet As String = Path.GetFullPath(fichierSauvegarde.Trim())
+                If Not File.Exists(cheminComplet) Then
+                    resultat.Message = "Le fichier de sauvegarde est introuvable."
+                    Return resultat
+                End If
+
+                If Not String.Equals(Path.GetExtension(cheminComplet), ".bak", StringComparison.OrdinalIgnoreCase) Then
+                    resultat.Message = "Le fichier sélectionné n'est pas une sauvegarde SQL Server valide (.bak)."
+                    Return resultat
+                End If
+
+                _log.Warn("BackupService", "RestaurerSauvegarde", "Tentative de restauration depuis : " & cheminComplet)
+
+                Dim builder As New SqlConnectionStringBuilder(_connectionString)
+                Dim database As String = If(String.IsNullOrWhiteSpace(builder.InitialCatalog), "CommercialMagDB", builder.InitialCatalog)
+                builder.InitialCatalog = "master"
+
+                Dim databaseEchappee As String = database.Replace("]", "]]")
+                Dim cheminEchappe As String = cheminComplet.Replace("'", "''")
+
+                SqlConnection.ClearAllPools()
+                Using cn As New SqlConnection(builder.ConnectionString)
+                    cn.Open()
+                    Dim baseExiste As Boolean = BaseExiste(cn, database)
+                    If baseExiste Then
+                        ExecuterSqlLong(cn, "ALTER DATABASE [" & databaseEchappee & "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;")
+                    End If
+                    Try
+                        ExecuterSqlLong(cn, "RESTORE DATABASE [" & databaseEchappee & "] FROM DISK = N'" & cheminEchappe & "' WITH REPLACE, STATS = 10;")
+                    Finally
+                        If BaseExiste(cn, database) Then
+                            ExecuterSqlLong(cn, "ALTER DATABASE [" & databaseEchappee & "] SET MULTI_USER;")
+                        End If
+                    End Try
+                End Using
+                SqlConnection.ClearAllPools()
+
+                resultat.Success = True
+                resultat.Message = "Restauration terminée avec succès. Redémarrez l'application pour recharger toutes les connexions."
+                _log.Warn("BackupService", "RestaurerSauvegarde", "Restauration SQL réussie depuis : " & cheminComplet)
+            Catch ex As Exception
+                resultat.Success = False
+                resultat.Message = "Restauration impossible. Vérifiez le fichier, les droits SQL Server et le journal technique."
+                _log.Error("BackupService", "RestaurerSauvegarde", "Erreur lors de la restauration SQL.", ex)
+                TenterRetourMultiUser()
+            End Try
+
+            Return resultat
+        End Function
+
         Private Function ExecuterSauvegardeVersDossier(database As String, dossier As String, resultat As BackupResult, estFallback As Boolean) As Boolean
             Try
                 If Not PeutEcrireDansDossier(dossier) Then
@@ -192,6 +258,40 @@ Namespace DevCommerc8ak
                 Return False
             End Try
         End Function
+
+        Private Shared Sub ExecuterSqlLong(cn As SqlConnection, sql As String)
+            Using cmd As New SqlCommand(sql, cn)
+                cmd.CommandTimeout = 0
+                cmd.ExecuteNonQuery()
+            End Using
+        End Sub
+
+        Private Shared Function BaseExiste(cn As SqlConnection, database As String) As Boolean
+            Using cmd As New SqlCommand("SELECT DB_ID(@DatabaseName)", cn)
+                cmd.Parameters.AddWithValue("@DatabaseName", database)
+                Dim valeur As Object = cmd.ExecuteScalar()
+                Return valeur IsNot Nothing AndAlso valeur IsNot DBNull.Value
+            End Using
+        End Function
+
+        Private Sub TenterRetourMultiUser()
+            Try
+                Dim builder As New SqlConnectionStringBuilder(_connectionString)
+                Dim database As String = If(String.IsNullOrWhiteSpace(builder.InitialCatalog), "CommercialMagDB", builder.InitialCatalog)
+                builder.InitialCatalog = "master"
+                Dim databaseEchappee As String = database.Replace("]", "]]")
+                SqlConnection.ClearAllPools()
+                Using cn As New SqlConnection(builder.ConnectionString)
+                    cn.Open()
+                    If BaseExiste(cn, database) Then
+                        ExecuterSqlLong(cn, "ALTER DATABASE [" & databaseEchappee & "] SET MULTI_USER;")
+                    End If
+                End Using
+                SqlConnection.ClearAllPools()
+            Catch ex As Exception
+                _log.Error("BackupService", "TenterRetourMultiUser", "Impossible de remettre la base en MULTI_USER après échec de restauration.", ex)
+            End Try
+        End Sub
 
         Private Function ObtenirDossierFallback() As String
             Return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CommercialPro", "Backups")
