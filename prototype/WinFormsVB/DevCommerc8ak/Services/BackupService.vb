@@ -143,10 +143,11 @@ Namespace DevCommerc8ak
                 Dim nomFichier As String = "ERPCommercial_" & DateTime.Now.ToString("yyyyMMdd_HHmm", CultureInfo.InvariantCulture) & ".bak"
                 Dim cheminComplet As String = Path.Combine(dossier, nomFichier)
                 Dim cheminEchappe As String = cheminComplet.Replace("'", "''")
+                Dim databaseEchappee As String = database.Replace("]", "]]")
 
                 Using cn As New SqlConnection(_connectionString)
                     cn.Open()
-                    Using cmd As New SqlCommand("BACKUP DATABASE [" & database & "] TO DISK = N'" & cheminEchappe & "' WITH INIT, COPY_ONLY, COMPRESSION, STATS = 10;", cn)
+                    Using cmd As New SqlCommand("BACKUP DATABASE [" & databaseEchappee & "] TO DISK = N'" & cheminEchappe & "' WITH INIT, COPY_ONLY, COMPRESSION, STATS = 10;", cn)
                         cmd.CommandTimeout = 0
                         cmd.ExecuteNonQuery()
                     End Using
