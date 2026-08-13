@@ -11,7 +11,15 @@ using Microsoft.IdentityModel.Tokens;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("DashboardRead", policy =>
+        policy.RequireRole("SUPERADMIN", "ADMIN"));
+    options.AddPolicy("StockSync", policy =>
+        policy.RequireRole("SUPERADMIN", "ADMIN", "FACTURIER", "CAISSIER"));
+    options.AddPolicy("FinanceSync", policy =>
+        policy.RequireRole("SUPERADMIN", "ADMIN"));
+});
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -95,21 +103,21 @@ auth.MapGet("/me", (ClaimsPrincipal user) =>
     });
 }).RequireAuthorization();
 
-var stock = app.MapGroup("/api/stocksortie").RequireAuthorization();
+var stock = app.MapGroup("/api/stocksortie").RequireAuthorization("StockSync");
 stock.MapPost("", async (StockSortieSyncRequest request, SyncService service) =>
 {
     var result = await service.SyncStockSortieAsync(request);
     return Results.Ok(result);
 });
 
-var depenses = app.MapGroup("/api/depenses").RequireAuthorization();
+var depenses = app.MapGroup("/api/depenses").RequireAuthorization("FinanceSync");
 depenses.MapPost("", async (DepenseSyncRequest request, SyncService service) =>
 {
     var result = await service.SyncDepenseAsync(request);
     return Results.Ok(result);
 });
 
-var dashboard = app.MapGroup("/api/dashboard").RequireAuthorization();
+var dashboard = app.MapGroup("/api/dashboard").RequireAuthorization("DashboardRead");
 dashboard.MapGet("/journalier", async (DateTime? date, DateTime? start, DateTime? end, DashboardService service) =>
 {
     if (start.HasValue && end.HasValue)
