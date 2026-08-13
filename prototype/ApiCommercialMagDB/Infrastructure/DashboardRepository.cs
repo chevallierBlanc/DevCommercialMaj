@@ -163,6 +163,7 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
                 SELECT se.StockEntreeId, se.ProduitId, se.DateEntree, se.QuantiteBase,
                        CASE
                            WHEN ISNULL(se.PrixAchat, 0) <= 0 THEN NULL
+                           WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale, 0) > 0 THEN ISNULL(se.PrixAchat, 0) / NULLIF(ISNULL(p.ContenuUnitePrincipale, 0), 0)
                            WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN ISNULL(se.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0)
                            ELSE ISNULL(se.PrixAchat, 0)
                        END AS CoutUnitaireBase,
@@ -202,7 +203,7 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
             Ventes AS
             (
                 SELECT l.ProduitId,
-                       SUM(ISNULL(l.Quantite, 0)) AS QuantiteVenduePieces,
+                       SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) AS QuantiteVenduePieces,
                        SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS ChiffreAffaires
                 FROM LignesFactureVente l
                 INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId
@@ -252,12 +253,12 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
                    ISNULL(CAST(SUM(Benefice) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) AS BIGINT), 0) AS BeneficeNetRealise,
                    ISNULL(CAST(SUM(CoutStockRestant) AS BIGINT), 0) AS CoutStockRestant,
                    ISNULL(CAST(SUM(CoutStockRestant) * (ISNULL(SUM(Benefice), 0) / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS BIGINT), 0) AS ProjectionBeneficeRestant,
-                   ISNULL(CAST(((ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS DECIMAL(10,2)), 0) AS MargeBeneficiairePourcentage,
+                   ISNULL(CAST((ISNULL(SUM(Benefice), 0) * 100.0 / NULLIF(ISNULL(SUM(ChiffreAffaires), 0), 0)) AS DECIMAL(10,2)), 0) AS MargeBeneficiairePourcentage,
                    CASE
                        WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) < 0 THEN 'CRITIQUE / PERTE'
                        WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) = 0 THEN 'POINT MORT'
-                       WHEN (ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0) < 10 THEN 'FAIBLE RENTABILITÉ'
-                       WHEN (ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles)) * 100.0 / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0) BETWEEN 10 AND 25 THEN 'PROGRÈS'
+                       WHEN ISNULL(SUM(Benefice), 0) * 100.0 / NULLIF(ISNULL(SUM(ChiffreAffaires), 0), 0) < 10 THEN 'FAIBLE RENTABILITÉ'
+                       WHEN ISNULL(SUM(Benefice), 0) * 100.0 / NULLIF(ISNULL(SUM(ChiffreAffaires), 0), 0) BETWEEN 10 AND 25 THEN 'PROGRÈS'
                        ELSE 'BONNE RENTABILITÉ'
                    END AS Evaluation
             FROM AnalyseProduit
@@ -422,12 +423,12 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
             ),
             Ventes AS (
                 SELECT
-                    ISNULL(SUM(ISNULL(l.Quantite,0)),0) AS TotalVentes,
-                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'GROS' THEN ISNULL(l.Quantite,0) ELSE 0 END),0) AS TotalGros,
-                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'DEMI' THEN ISNULL(l.Quantite,0) ELSE 0 END),0) AS TotalDemi,
-                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'QUART' THEN ISNULL(l.Quantite,0) ELSE 0 END),0) AS TotalQuart,
-                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) IN ('PIECE','UNITE') THEN ISNULL(l.Quantite,0) ELSE 0 END),0) AS TotalPiece,
-                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'DOUZAINE' THEN ISNULL(l.Quantite,0) ELSE 0 END),0) AS TotalDouzaine,
+                    ISNULL(SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite,0))),0) AS TotalVentes,
+                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'GROS' THEN ISNULL(l.QuantiteBase, ISNULL(l.Quantite,0)) ELSE 0 END),0) AS TotalGros,
+                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'DEMI' THEN ISNULL(l.QuantiteBase, ISNULL(l.Quantite,0)) ELSE 0 END),0) AS TotalDemi,
+                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'QUART' THEN ISNULL(l.QuantiteBase, ISNULL(l.Quantite,0)) ELSE 0 END),0) AS TotalQuart,
+                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) IN ('PIECE','UNITE') THEN ISNULL(l.QuantiteBase, ISNULL(l.Quantite,0)) ELSE 0 END),0) AS TotalPiece,
+                    ISNULL(SUM(CASE WHEN UPPER(ISNULL(l.TypeVente,'')) = 'DOUZAINE' THEN ISNULL(l.QuantiteBase, ISNULL(l.Quantite,0)) ELSE 0 END),0) AS TotalDouzaine,
                     ISNULL(SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie,0) * ISNULL(l.PrixUnitaire,0) END),0) AS MontantTotalGenere
                 FROM LignesFactureVente l
                 INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId
@@ -575,7 +576,7 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
     {
         const string sql = """
             SELECT TOP 10 p.Libelle,
-                  ISNULL(SUM(ISNULL(l.Quantite,0)),0) AS Quantite,
+                  ISNULL(SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite,0))),0) AS Quantite,
                    ISNULL(MAX(ISNULL(l.TypeVente,'')), '') AS TypeVente,
                    ISNULL(SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie,0) * ISNULL(l.PrixUnitaire,0) END),0) AS Montant,
                    ISNULL(MIN(f.CreeLe), GETDATE()) AS Heure,
@@ -679,7 +680,7 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
     {
         const string sql = """
             SELECT TOP 10 p.Libelle,
-                  ISNULL(SUM(ISNULL(l.Quantite,0)),0) AS Quantite,
+                  ISNULL(SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite,0))),0) AS Quantite,
                    ISNULL(MAX(ISNULL(l.TypeVente,'')), '') AS TypeVente,
                    ISNULL(SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie,0) * ISNULL(l.PrixUnitaire,0) END),0) AS Montant,
                    ISNULL(MIN(f.CreeLe), GETDATE()) AS Heure,
@@ -730,14 +731,15 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
             WITH CoutPieceProduit AS (
                 SELECT se.ProduitId,
                        CASE
+                           WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ContenuUnitePrincipale, 0), 0)
                            WHEN ISNULL(p.ConversionUnite, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0)
-                           ELSE SUM(ISNULL(se.QuantiteBase, 0) * ISNULL(se.PrixAchat, 0) / NULLIF(NULLIF(ISNULL(p.ConversionUnite, 0), 0), 0))
+                           ELSE SUM(ISNULL(se.QuantiteBase, 0) * (ISNULL(se.PrixAchat, 0) / NULLIF(CASE WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') THEN ISNULL(p.ContenuUnitePrincipale, 0) ELSE ISNULL(p.ConversionUnite, 0) END, 0)))
                                 / NULLIF(SUM(CASE WHEN ISNULL(se.PrixAchat, 0) > 0 THEN ISNULL(se.QuantiteBase, 0) ELSE 0 END), 0)
                        END AS CoutPiece
                 FROM StockEntree se
                 INNER JOIN Produits p ON p.ProduitId = se.ProduitId
                 WHERE se.DateEntree < DATEADD(DAY, 1, @DateFin)
-                GROUP BY se.ProduitId, p.PrixAchat, p.ConversionUnite
+                GROUP BY se.ProduitId, p.PrixAchat, p.ConversionUnite, p.TypeGestionStock, p.ContenuUnitePrincipale
             )
             SELECT Categorie, SUM(Pieces) AS QuantitePieces, SUM(Montant) AS MontantTotal
             FROM (
@@ -794,14 +796,15 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
             WITH CoutPieceProduit AS (
                 SELECT se.ProduitId,
                        CASE
+                           WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ContenuUnitePrincipale, 0), 0)
                            WHEN ISNULL(p.ConversionUnite, 0) > 0 AND ISNULL(p.PrixAchat, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0)
-                           ELSE SUM(ISNULL(se.QuantiteBase, 0) * ISNULL(se.PrixAchat, 0) / NULLIF(NULLIF(ISNULL(p.ConversionUnite, 0), 0), 0))
+                           ELSE SUM(ISNULL(se.QuantiteBase, 0) * (ISNULL(se.PrixAchat, 0) / NULLIF(CASE WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') THEN ISNULL(p.ContenuUnitePrincipale, 0) ELSE ISNULL(p.ConversionUnite, 0) END, 0)))
                                 / NULLIF(SUM(CASE WHEN ISNULL(se.PrixAchat, 0) > 0 THEN ISNULL(se.QuantiteBase, 0) ELSE 0 END), 0)
                        END AS CoutPiece
                 FROM StockEntree se
                 INNER JOIN Produits p ON p.ProduitId = se.ProduitId
                 WHERE se.DateEntree < DATEADD(DAY, 1, @DateFin)
-                GROUP BY se.ProduitId, p.PrixAchat, p.ConversionUnite
+                GROUP BY se.ProduitId, p.PrixAchat, p.ConversionUnite, p.TypeGestionStock, p.ContenuUnitePrincipale
             )
             SELECT 'Créances clients' AS Categorie,
                    ISNULL(SUM(ISNULL(ss.QuantiteBase, 0)), 0) AS QuantitePieces,
