@@ -16,3 +16,8 @@ public sealed class DevSeedOptions
     public string AdminPassword { get; set; } = string.Empty;
     public string AdminRole { get; set; } = "ADMIN";
 }
+
+public sealed class ApiCorsOptions
+{
+    public string[] AllowedOrigins { get; set; } = [];
+}

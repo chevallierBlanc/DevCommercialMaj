@@ -31,10 +31,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddCors(options =>
 {
+    var cors = builder.Configuration.GetSection("Cors").Get<ApiCorsOptions>() ?? new ApiCorsOptions();
     options.AddDefaultPolicy(policy =>
+    {
         policy.AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowAnyOrigin());
+              .AllowAnyMethod();
+
+        if (cors.AllowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(cors.AllowedOrigins);
+        }
+    });
 });
 
 builder.Services.AddSingleton<JwtTokenService>();
@@ -102,7 +109,7 @@ depenses.MapPost("", async (DepenseSyncRequest request, SyncService service) =>
     return Results.Ok(result);
 });
 
-var dashboard = app.MapGroup("/api/dashboard").AllowAnonymous();
+var dashboard = app.MapGroup("/api/dashboard").RequireAuthorization();
 dashboard.MapGet("/journalier", async (DateTime? date, DateTime? start, DateTime? end, DashboardService service) =>
 {
     if (start.HasValue && end.HasValue)
