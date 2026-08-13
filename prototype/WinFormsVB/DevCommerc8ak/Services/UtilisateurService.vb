@@ -180,12 +180,16 @@ Namespace DevCommerc8ak
         End Function
 
         Private Function VerifierMotDePasse(motDePasse As String, sel As Byte(), hashAttendu As Byte()) As Boolean
+            If sel Is Nothing OrElse hashAttendu Is Nothing Then Return False
             Dim hash As Byte() = HashMotDePasse(motDePasse, sel)
-            If hash.Length <> hashAttendu.Length Then Return False
-            For i As Integer = 0 To hash.Length - 1
-                If hash(i) <> hashAttendu(i) Then Return False
+            Dim difference As Integer = hash.Length Xor hashAttendu.Length
+            Dim longueurMax As Integer = Math.Max(hash.Length, hashAttendu.Length)
+            For i As Integer = 0 To longueurMax - 1
+                Dim octetCalcule As Byte = If(i < hash.Length, hash(i), CByte(0))
+                Dim octetAttendu As Byte = If(i < hashAttendu.Length, hashAttendu(i), CByte(0))
+                difference = difference Or (CInt(octetCalcule) Xor CInt(octetAttendu))
             Next
-            Return True
+            Return difference = 0
         End Function
     End Class
 End Namespace
