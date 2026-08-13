@@ -2482,7 +2482,7 @@ Namespace DevCommerc8ak
                     "INNER JOIN Produits p ON p.ProduitId = ss.ProduitId " &
                     "LEFT JOIN Clients c ON c.ClientId = ss.ClientId " &
                     "LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId " &
-                    "WHERE CAST(ss.DateSortie AS DATE) BETWEEN @Du AND @Au " &
+                    "WHERE ss.DateSortie >= @Du AND ss.DateSortie < DATEADD(DAY, 1, @Au) " &
                     "AND (@Recherche = '' OR ss.NumeroSortie LIKE @Like OR ISNULL(c.NomClient, '') LIKE @Like OR ISNULL(m.Libelle, ss.Source) LIKE @Like) " &
                     "ORDER BY ss.DateSortie DESC"
                 Dim recherche As String = txtRechercheSortie.Text.Trim()
@@ -3339,7 +3339,7 @@ Namespace DevCommerc8ak
                     "          ISNULL((SELECT SUM(sp.QuantiteBase) FROM StockPerte sp WHERE sp.ProduitId = se.ProduitId AND sp.DatePerte <= se.DateEntree), 0) AS StockApresEntree " &
                     "   FROM StockEntree se2 WHERE se2.ProduitId = se.ProduitId AND se2.DateEntree <= se.DateEntree" &
                     ") stock " &
-                    "WHERE CAST(se.DateEntree AS DATE) BETWEEN @Du AND @Au " &
+                    "WHERE se.DateEntree >= @Du AND se.DateEntree < DATEADD(DAY, 1, @Au) " &
                     "ORDER BY se.DateEntree DESC"
                 Dim p As New List(Of System.Data.SqlClient.SqlParameter) From {
                     New System.Data.SqlClient.SqlParameter("@Du", dtpRapportDu.Value.Date),

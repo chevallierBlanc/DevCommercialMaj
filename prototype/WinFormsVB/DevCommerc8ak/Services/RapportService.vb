@@ -96,7 +96,8 @@ Namespace DevCommerc8ak
                 "                   WHERE ms.ProduitId = se.ProduitId " &
                 "                     AND UPPER(ISNULL(ms.TypeMouvement, '')) = 'ENTREE' " &
                 "                     AND UPPER(ISNULL(ms.Observation, '')) LIKE '%STOCK INITIAL TECHNIQUE%' " &
-                "                     AND CAST(ms.EffectueLe AS DATE) = CAST(se.DateEntree AS DATE) " &
+                "                     AND ms.EffectueLe >= CONVERT(date, se.DateEntree) " &
+                "                     AND ms.EffectueLe < DATEADD(DAY, 1, CONVERT(date, se.DateEntree)) " &
                 "                     AND ISNULL(ms.QuantiteBase, 0) = ISNULL(se.QuantiteBase, 0) " &
                 "               ) THEN 1 ELSE 0 " &
                 "           END AS EstStockInitialTechnique " &

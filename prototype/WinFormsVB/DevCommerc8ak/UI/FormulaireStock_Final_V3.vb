@@ -524,7 +524,7 @@ Namespace DevCommerc8ak
                     "INNER JOIN Produits p ON p.ProduitId = ss.ProduitId " &
                     "LEFT JOIN FacturesVente f ON f.NumeroFacture = ss.RefSource " &
                     "LEFT JOIN Clients c ON c.ClientId = f.ClientId " &
-                    "WHERE CAST(ss.DateSortie AS DATE) BETWEEN @Du AND @Au " &
+                    "WHERE ss.DateSortie >= @Du AND ss.DateSortie < DATEADD(DAY, 1, @Au) " &
                     "AND (@Recherche = '' OR ISNULL(f.NumeroFacture, ss.RefSource) LIKE @Like OR ISNULL(c.NomClient, '') LIKE @Like) " &
                     "ORDER BY ss.DateSortie DESC"
                 Dim recherche As String = txtRechercheSortie.Text.Trim()
