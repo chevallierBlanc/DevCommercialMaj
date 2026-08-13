@@ -595,7 +595,14 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
                    ISNULL(MAX(ISNULL(l.TypeVente,'')), '') AS TypeVente,
                    ISNULL(SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie,0) * ISNULL(l.PrixUnitaire,0) END),0) AS Montant,
                    ISNULL(MIN(f.CreeLe), GETDATE()) AS Heure,
-                   ISNULL(MAX(u.NomUtilisateur), '') AS Agent
+                   ISNULL(MAX(u.NomUtilisateur), '') AS Agent,
+                   ISNULL(p.TypeGestionStock, 'UNITE') AS TypeGestionStock,
+                   ISNULL(p.UnitePrincipale, '') AS UnitePrincipale,
+                   ISNULL(p.UniteSecondaire, '') AS UniteSecondaire,
+                   ISNULL(p.UniteMesureStock, '') AS UniteMesureStock,
+                   ISNULL(p.ConversionUnite, 0) AS ConversionUnite,
+                   ISNULL(p.ContenuUnitePrincipale, 0) AS ContenuUnitePrincipale,
+                   ISNULL(p.ContenuUniteSecondaire, 0) AS ContenuUniteSecondaire
             FROM LignesFactureVente l
             INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId
             INNER JOIN Produits p ON p.ProduitId = l.ProduitId
@@ -603,7 +610,7 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
             WHERE f.CreeLe >= @StartDate
               AND f.CreeLe < @EndDate
               AND UPPER(ISNULL(f.Statut,'')) = 'PAYEE'
-            GROUP BY p.Libelle
+            GROUP BY p.Libelle, p.TypeGestionStock, p.UnitePrincipale, p.UniteSecondaire, p.UniteMesureStock, p.ConversionUnite, p.ContenuUnitePrincipale, p.ContenuUniteSecondaire
             ORDER BY SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie,0) * ISNULL(l.PrixUnitaire,0) END) DESC
             """;
         await using var cmd = new SqlCommand(sql, cn);
@@ -613,10 +620,13 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
         var list = new List<DailyProductRow>();
         while (await reader.ReadAsync(ct))
         {
+            var quantity = reader.IsDBNull(1) ? 0m : Convert.ToDecimal(reader.GetValue(1));
             list.Add(new DailyProductRow
             {
                 Product = reader.GetString(0),
-                QuantitySold = reader.IsDBNull(1) ? 0m : Convert.ToDecimal(reader.GetValue(1)),
+                QuantitySold = quantity,
+                QuantityDisplay = FormatStockDisplay(reader, quantity, 6),
+                QuantityUnit = ReferenceUnit(reader, 6),
                 TypeVente = reader.GetValue(2).ToString() ?? string.Empty,
                 AmountGenerated = reader.IsDBNull(3) ? 0m : Convert.ToDecimal(reader.GetValue(3)),
                 Hour = reader.IsDBNull(4) ? start : Convert.ToDateTime(reader.GetValue(4)),
@@ -636,7 +646,14 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
                    ISNULL(u.NomUtilisateur, '') AS Utilisateur,
                    ss.DateSortie,
                    ISNULL(ss.MontantLigne,0) AS Montant,
-                   ISNULL(ss.Observation, '') AS Observation
+                   ISNULL(ss.Observation, '') AS Observation,
+                   ISNULL(p.TypeGestionStock, 'UNITE') AS TypeGestionStock,
+                   ISNULL(p.UnitePrincipale, '') AS UnitePrincipale,
+                   ISNULL(p.UniteSecondaire, '') AS UniteSecondaire,
+                   ISNULL(p.UniteMesureStock, '') AS UniteMesureStock,
+                   ISNULL(p.ConversionUnite, 0) AS ConversionUnite,
+                   ISNULL(p.ContenuUnitePrincipale, 0) AS ContenuUnitePrincipale,
+                   ISNULL(p.ContenuUniteSecondaire, 0) AS ContenuUniteSecondaire
             FROM StockSortie ss
             INNER JOIN Produits p ON p.ProduitId = ss.ProduitId
             LEFT JOIN MotifSortie m ON m.MotifId = ss.MotifId
@@ -653,10 +670,13 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
         var list = new List<ManualExitRow>();
         while (await reader.ReadAsync(ct))
         {
+            var quantity = reader.IsDBNull(1) ? 0m : Convert.ToDecimal(reader.GetValue(1));
             list.Add(new ManualExitRow
             {
                 Product = reader.GetString(0),
-                Quantity = reader.IsDBNull(1) ? 0m : Convert.ToDecimal(reader.GetValue(1)),
+                Quantity = quantity,
+                QuantityDisplay = FormatStockDisplay(reader, quantity, 8),
+                QuantityUnit = ReferenceUnit(reader, 8),
                 Motif = reader.GetValue(2).ToString() ?? string.Empty,
                 Category = reader.GetValue(3).ToString() ?? string.Empty,
                 User = reader.GetValue(4).ToString() ?? string.Empty,
@@ -671,10 +691,18 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
     private static async Task<List<StockAlertRow>> QueryStockAlertsAsync(SqlConnection cn, CancellationToken ct)
     {
         const string sql = """
-            SELECT TOP 10 p.Libelle, ISNULL(s.QuantiteStock,0) AS Stock
+            SELECT TOP 10 p.Libelle,
+                   ISNULL(s.QuantiteStock,0) AS Stock,
+                   ISNULL(p.TypeGestionStock, 'UNITE') AS TypeGestionStock,
+                   ISNULL(p.UnitePrincipale, '') AS UnitePrincipale,
+                   ISNULL(p.UniteSecondaire, '') AS UniteSecondaire,
+                   ISNULL(p.UniteMesureStock, '') AS UniteMesureStock,
+                   ISNULL(p.ConversionUnite, 0) AS ConversionUnite,
+                   ISNULL(p.ContenuUnitePrincipale, 0) AS ContenuUnitePrincipale,
+                   ISNULL(p.ContenuUniteSecondaire, 0) AS ContenuUniteSecondaire
             FROM Produits p
             INNER JOIN vStockProduit s ON s.ProduitId = p.ProduitId
-            WHERE s.QuantiteStock <= 20
+            WHERE s.QuantiteStock <= CASE WHEN ISNULL(p.SeuilCritique, 0) > 0 THEN p.SeuilCritique ELSE 20 END
             ORDER BY s.QuantiteStock ASC, p.Libelle ASC
             """;
         await using var cmd = new SqlCommand(sql, cn);
@@ -682,10 +710,14 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
         var list = new List<StockAlertRow>();
         while (await reader.ReadAsync(ct))
         {
+            var stock = reader.IsDBNull(1) ? 0m : Convert.ToDecimal(reader.GetValue(1));
             list.Add(new StockAlertRow
             {
                 Product = reader.GetValue(0).ToString() ?? string.Empty,
-                Stock = reader.IsDBNull(1) ? 0m : Convert.ToDecimal(reader.GetValue(1))
+                Stock = stock,
+                StockDisplay = FormatStockDisplay(reader, stock, 2),
+                StockUnit = ReferenceUnit(reader, 2),
+                TypeGestionStock = reader.GetValue(2).ToString() ?? string.Empty
             });
         }
         return list;
@@ -699,14 +731,21 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
                    ISNULL(MAX(ISNULL(l.TypeVente,'')), '') AS TypeVente,
                    ISNULL(SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie,0) * ISNULL(l.PrixUnitaire,0) END),0) AS Montant,
                    ISNULL(MIN(f.CreeLe), GETDATE()) AS Heure,
-                   ISNULL(MAX(u.NomUtilisateur), '') AS Agent
+                   ISNULL(MAX(u.NomUtilisateur), '') AS Agent,
+                   ISNULL(p.TypeGestionStock, 'UNITE') AS TypeGestionStock,
+                   ISNULL(p.UnitePrincipale, '') AS UnitePrincipale,
+                   ISNULL(p.UniteSecondaire, '') AS UniteSecondaire,
+                   ISNULL(p.UniteMesureStock, '') AS UniteMesureStock,
+                   ISNULL(p.ConversionUnite, 0) AS ConversionUnite,
+                   ISNULL(p.ContenuUnitePrincipale, 0) AS ContenuUnitePrincipale,
+                   ISNULL(p.ContenuUniteSecondaire, 0) AS ContenuUniteSecondaire
             FROM LignesFactureVente l
             INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId
             INNER JOIN Produits p ON p.ProduitId = l.ProduitId
             LEFT JOIN Utilisateurs u ON u.UtilisateurId = f.CreePar
             WHERE f.CreeLe >= @StartDate AND f.CreeLe < @EndDate
               AND UPPER(ISNULL(f.Statut,'')) = 'PAYEE'
-            GROUP BY p.Libelle
+            GROUP BY p.Libelle, p.TypeGestionStock, p.UnitePrincipale, p.UniteSecondaire, p.UniteMesureStock, p.ConversionUnite, p.ContenuUnitePrincipale, p.ContenuUniteSecondaire
             ORDER BY SUM(CASE WHEN ISNULL(l.MontantLigne, 0) <> 0 THEN l.MontantLigne ELSE ISNULL(l.QuantiteSaisie,0) * ISNULL(l.PrixUnitaire,0) END) DESC
             """;
         await using var cmd = new SqlCommand(sql, cn);
@@ -716,10 +755,13 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
         var list = new List<DailyProductRow>();
         while (await reader.ReadAsync(ct))
         {
+            var quantity = reader.IsDBNull(1) ? 0m : Convert.ToDecimal(reader.GetValue(1));
             list.Add(new DailyProductRow
             {
                 Product = reader.GetValue(0).ToString() ?? string.Empty,
-                QuantitySold = reader.IsDBNull(1) ? 0m : Convert.ToDecimal(reader.GetValue(1)),
+                QuantitySold = quantity,
+                QuantityDisplay = FormatStockDisplay(reader, quantity, 6),
+                QuantityUnit = ReferenceUnit(reader, 6),
                 TypeVente = reader.GetValue(2).ToString() ?? string.Empty,
                 AmountGenerated = reader.IsDBNull(3) ? 0m : Convert.ToDecimal(reader.GetValue(3)),
                 Hour = reader.IsDBNull(4) ? start : Convert.ToDateTime(reader.GetValue(4)),
@@ -895,6 +937,113 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
         list.Sort((a, b) => a.Ordre.CompareTo(b.Ordre));
         return list;
     }
+
+    private static string FormatStockDisplay(SqlDataReader reader, decimal quantity, int stockMetadataStartOrdinal)
+    {
+        var unit = ReferenceUnit(reader, stockMetadataStartOrdinal);
+        var repartition = FormatRepartition(reader, quantity, stockMetadataStartOrdinal);
+        var value = $"{FormatQuantity(quantity)} {unit}".Trim();
+        return string.IsNullOrWhiteSpace(repartition) ? value : $"{value} = {repartition}";
+    }
+
+    private static string ReferenceUnit(SqlDataReader reader, int stockMetadataStartOrdinal)
+    {
+        var mode = ReadString(reader, stockMetadataStartOrdinal);
+        if (IsMeasuredStock(mode))
+        {
+            var measureUnit = ReadString(reader, stockMetadataStartOrdinal + 3);
+            return string.IsNullOrWhiteSpace(measureUnit) ? "MESURE" : measureUnit;
+        }
+
+        var secondaryUnit = ReadString(reader, stockMetadataStartOrdinal + 2);
+        return string.IsNullOrWhiteSpace(secondaryUnit) ? "pièce" : secondaryUnit;
+    }
+
+    private static string FormatRepartition(SqlDataReader reader, decimal quantity, int stockMetadataStartOrdinal)
+    {
+        var mode = ReadString(reader, stockMetadataStartOrdinal);
+        var mainUnit = ReadString(reader, stockMetadataStartOrdinal + 1);
+        var secondaryUnit = ReadString(reader, stockMetadataStartOrdinal + 2);
+        var measureUnit = ReadString(reader, stockMetadataStartOrdinal + 3);
+        var conversion = ReadDecimal(reader, stockMetadataStartOrdinal + 4);
+        var mainContent = ReadDecimal(reader, stockMetadataStartOrdinal + 5);
+        var secondaryContent = ReadDecimal(reader, stockMetadataStartOrdinal + 6);
+
+        if (IsMeasuredStock(mode))
+        {
+            return FormatMeasuredRepartition(quantity, mainUnit, secondaryUnit, measureUnit, mainContent, secondaryContent);
+        }
+
+        return FormatUnitRepartition(quantity, mainUnit, secondaryUnit, conversion);
+    }
+
+    private static string FormatMeasuredRepartition(decimal quantity, string mainUnit, string secondaryUnit, string measureUnit, decimal mainContent, decimal secondaryContent)
+    {
+        if (mainContent <= 0m)
+        {
+            return string.Empty;
+        }
+
+        var parts = new List<string>();
+        var mainCount = Math.Floor(quantity / mainContent);
+        var rest = quantity - (mainCount * mainContent);
+        if (mainCount > 0m && !string.IsNullOrWhiteSpace(mainUnit))
+        {
+            parts.Add($"{FormatQuantity(mainCount)} {mainUnit}");
+        }
+
+        if (secondaryContent > 0m && !string.IsNullOrWhiteSpace(secondaryUnit))
+        {
+            var secondaryCount = Math.Floor(rest / secondaryContent);
+            rest -= secondaryCount * secondaryContent;
+            if (secondaryCount > 0m)
+            {
+                parts.Add($"{FormatQuantity(secondaryCount)} {secondaryUnit}");
+            }
+        }
+
+        if (rest > 0m)
+        {
+            parts.Add($"{FormatQuantity(rest)} {measureUnit}");
+        }
+
+        return string.Join(" + ", parts);
+    }
+
+    private static string FormatUnitRepartition(decimal quantity, string mainUnit, string secondaryUnit, decimal conversion)
+    {
+        if (conversion <= 0m)
+        {
+            conversion = 1m;
+        }
+
+        var parts = new List<string>();
+        var mainCount = Math.Floor(quantity / conversion);
+        var rest = quantity - (mainCount * conversion);
+        if (mainCount > 0m && !string.IsNullOrWhiteSpace(mainUnit))
+        {
+            parts.Add($"{FormatQuantity(mainCount)} {mainUnit}");
+        }
+
+        if (rest > 0m)
+        {
+            var unit = string.IsNullOrWhiteSpace(secondaryUnit) ? "pièce" : secondaryUnit;
+            parts.Add($"{FormatQuantity(rest)} {unit}");
+        }
+
+        return string.Join(" + ", parts);
+    }
+
+    private static bool IsMeasuredStock(string mode)
+        => string.Equals(mode, "MESURE", StringComparison.OrdinalIgnoreCase) ||
+           string.Equals(mode, "POIDS", StringComparison.OrdinalIgnoreCase) ||
+           string.Equals(mode, "VOLUME", StringComparison.OrdinalIgnoreCase);
+
+    private static string ReadString(SqlDataReader reader, int ordinal)
+        => reader.IsDBNull(ordinal) ? string.Empty : reader.GetValue(ordinal)?.ToString()?.Trim() ?? string.Empty;
+
+    private static string FormatQuantity(decimal quantity)
+        => quantity.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
 
     private static decimal ReadDecimal(SqlDataReader reader, int ordinal)
         => reader.IsDBNull(ordinal) ? 0m : Convert.ToDecimal(reader.GetValue(ordinal));

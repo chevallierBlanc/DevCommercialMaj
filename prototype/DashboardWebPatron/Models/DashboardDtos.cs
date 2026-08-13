@@ -11,6 +11,8 @@ public sealed class DailyProductRowDto
 {
     public string Product { get; set; } = string.Empty;
     public decimal QuantitySold { get; set; }
+    public string QuantityDisplay { get; set; } = string.Empty;
+    public string QuantityUnit { get; set; } = string.Empty;
     public string TypeVente { get; set; } = string.Empty;
     public decimal AmountGenerated { get; set; }
     public DateTime Hour { get; set; }
@@ -21,6 +23,8 @@ public sealed class ManualExitRowDto
 {
     public string Product { get; set; } = string.Empty;
     public decimal Quantity { get; set; }
+    public string QuantityDisplay { get; set; } = string.Empty;
+    public string QuantityUnit { get; set; } = string.Empty;
     public string Motif { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
     public string User { get; set; } = string.Empty;
@@ -39,6 +43,9 @@ public sealed class StockAlertRowDto
 {
     public string Product { get; set; } = string.Empty;
     public decimal Stock { get; set; }
+    public string StockDisplay { get; set; } = string.Empty;
+    public string StockUnit { get; set; } = string.Empty;
+    public string TypeGestionStock { get; set; } = string.Empty;
 }
 
 public sealed class PeriodSeriesPointDto
