@@ -106,7 +106,7 @@ Namespace DevCommerc8ak
                         Dim total As Decimal = 0D
                         Dim statut As String = ""
                         Dim numeroFacture As String = ""
-                        Using cmdTotal As New SqlCommand("SELECT MontantTotal, Statut, NumeroFacture FROM FacturesVente WHERE FactureVenteId=@id", cn, tx)
+                        Using cmdTotal As New SqlCommand("SELECT MontantTotal, Statut, NumeroFacture FROM FacturesVente WITH (UPDLOCK, HOLDLOCK) WHERE FactureVenteId=@id", cn, tx)
                             cmdTotal.Parameters.AddWithValue("@id", factureVenteId)
                             Using r As SqlDataReader = cmdTotal.ExecuteReader()
                                 If Not r.Read() Then
@@ -178,10 +178,12 @@ Namespace DevCommerc8ak
                             cmdP.ExecuteNonQuery()
                         End Using
 
-                        Using cmdF As New SqlCommand("UPDATE FacturesVente SET Statut='PAYEE', ValideLe=GETDATE(), ModifierPar=@ModifierPar WHERE FactureVenteId=@id", cn, tx)
+                        Using cmdF As New SqlCommand("UPDATE FacturesVente SET Statut='PAYEE', ValideLe=GETDATE(), ModifierPar=@ModifierPar WHERE FactureVenteId=@id AND Statut='EN_ATTENTE'", cn, tx)
                             cmdF.Parameters.AddWithValue("@id", factureVenteId)
                             cmdF.Parameters.AddWithValue("@ModifierPar", SessionUtilisateur.NomUtilisateur)
-                            cmdF.ExecuteNonQuery()
+                            If cmdF.ExecuteNonQuery() <> 1 Then
+                                Throw New Exception("Facture deja payee ou invalide.")
+                            End If
                         End Using
 
                         tx.Commit()

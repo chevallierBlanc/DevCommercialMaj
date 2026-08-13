@@ -912,39 +912,52 @@ Namespace DevCommerc8ak
         ''' </summary>
         Public Sub EnregistrerSortieManuelle(produitId As Integer, quantiteSaisie As Decimal, unite As String, source As String, clientInfo As String, motif As String, effectuePar As Integer)
             Dim info As DataRow = ObtenirInfosProduit(produitId)
-            Dim stockActuel As Decimal = ObtenirStockActuel(produitId)
             Dim quantiteBase As Decimal = ConvertirEnBase(info, unite, quantiteSaisie)
 
-            If stockActuel < quantiteBase Then Throw New Exception("Stock insuffisant pour cette sortie.")
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    Try
+                        Dim stockActuel As Decimal = ObtenirStockActuel(produitId, cn, tx)
+                        If stockActuel < quantiteBase Then Throw New Exception("Stock insuffisant pour cette sortie.")
 
-            Dim sortie As New StockSortie With {
-                .ProduitId = produitId,
-                .QuantiteSaisie = quantiteSaisie,
-                .Unite = unite,
-                .QuantiteBase = quantiteBase,
-                .DateSortie = Date.Now,
-                .Source = source,
-                .RefSource = clientInfo,
-                .CreePar = effectuePar
-            }
-            ' Note: On utilise RefSource pour stocker le client et Motif pour le motif (si colonnes ajoutées via SQL)
-            _sortieRepo.Ajouter(sortie)
+                        Dim numeroSortie As String = GenererNumeroSortie(cn, tx)
+                        Dim sortie As New StockSortie With {
+                            .NumeroSortie = numeroSortie,
+                            .ProduitId = produitId,
+                            .QuantiteSaisie = quantiteSaisie,
+                            .Unite = unite,
+                            .QuantiteBase = quantiteBase,
+                            .DateSortie = Date.Now,
+                            .Source = source,
+                            .RefSource = clientInfo,
+                            .Observation = motif,
+                            .CreePar = effectuePar
+                        }
+                        _sortieRepo.Ajouter(sortie, numeroSortie, cn, tx)
 
-            ' Enregistrement du mouvement
-            Dim mouvement As New MouvementStock With {
-                .NumeroMouvement = GenererNumeroMouvement(),
-                .ProduitId = produitId,
-                .TypeMouvement = "SORTIE",
-                .Quantite = quantiteSaisie,
-                .QuantiteBase = quantiteBase,
-                .Unite = unite,
-                .StockAvant = stockActuel,
-                .StockApres = stockActuel - quantiteBase,
-                .Reference = clientInfo,
-                .Observation = motif,
-                .EffectuePar = effectuePar
-            }
-            _mvtRepo.Ajouter(mouvement)
+                        Dim mouvement As New MouvementStock With {
+                            .NumeroMouvement = GenererNumeroMouvement(cn, tx),
+                            .ProduitId = produitId,
+                            .TypeMouvement = "SORTIE",
+                            .Quantite = quantiteSaisie,
+                            .QuantiteBase = quantiteBase,
+                            .Unite = unite,
+                            .StockAvant = stockActuel,
+                            .StockApres = stockActuel - quantiteBase,
+                            .Reference = If(String.IsNullOrWhiteSpace(clientInfo), numeroSortie, clientInfo),
+                            .Observation = motif,
+                            .EffectuePar = effectuePar
+                        }
+                        _mvtRepo.Ajouter(mouvement, cn, tx)
+
+                        tx.Commit()
+                    Catch
+                        tx.Rollback()
+                        Throw
+                    End Try
+                End Using
+            End Using
         End Sub
 
         ''' <summary>
