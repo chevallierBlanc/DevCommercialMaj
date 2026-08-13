@@ -122,8 +122,13 @@ public sealed class SyncRepository(DbConnectionFactory factory)
 
     public async Task<SyncResult> SaveDepenseAsync(DepenseSyncRequest request, CancellationToken ct = default)
     {
+        ValidateDepenseRequest(request);
+
         await using var cn = factory.Create();
         await cn.OpenAsync(ct);
+
+        var dateDepense = (request.DateDepense ?? DateTime.UtcNow.Date).Date;
+        var dateDepenseFin = dateDepense.AddDays(1);
 
         const string existsSql = """
             SELECT TOP 1 1
@@ -132,12 +137,14 @@ public sealed class SyncRepository(DbConnectionFactory factory)
               AND Montant = @Montant
               AND Devise = @Devise
               AND ISNULL(Description,'') = ISNULL(@Description,'')
-              AND CONVERT(date, DateDepense) = CONVERT(date, @DateDepense)
+              AND DateDepense >= @DateDepense
+              AND DateDepense < @DateDepenseFin
               AND Source = @Source
               AND TypeDepense = @TypeDepense
             """;
         await using var existsCmd = new SqlCommand(existsSql, cn);
-        AddDepenseParameters(existsCmd, request);
+        AddDepenseParameters(existsCmd, request, dateDepense);
+        existsCmd.Parameters.AddWithValue("@DateDepenseFin", dateDepenseFin);
         var exists = await existsCmd.ExecuteScalarAsync(ct);
         if (exists is not null)
         {
@@ -149,20 +156,53 @@ public sealed class SyncRepository(DbConnectionFactory factory)
             VALUES (@Categorie, @Montant, @Devise, @Description, @DateDepense, @Source, @TypeDepense, @CreePar)
             """;
         await using var insertCmd = new SqlCommand(insertSql, cn);
-        AddDepenseParameters(insertCmd, request);
+        AddDepenseParameters(insertCmd, request, dateDepense);
         await insertCmd.ExecuteNonQueryAsync(ct);
         return new SyncResult(1, 0, null);
     }
 
-    private static void AddDepenseParameters(SqlCommand cmd, DepenseSyncRequest request)
+    private static void ValidateDepenseRequest(DepenseSyncRequest request)
     {
-        cmd.Parameters.AddWithValue("@Categorie", request.Categorie);
+        if (request is null)
+        {
+            throw new ArgumentNullException(nameof(request));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Categorie))
+        {
+            throw new InvalidOperationException("La catégorie de dépense est obligatoire.");
+        }
+
+        if (request.Montant <= 0m)
+        {
+            throw new InvalidOperationException("Le montant de dépense doit être supérieur à zéro.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Devise))
+        {
+            throw new InvalidOperationException("La devise de dépense est obligatoire.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Source))
+        {
+            throw new InvalidOperationException("La source de dépense est obligatoire.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.TypeDepense))
+        {
+            throw new InvalidOperationException("Le type de dépense est obligatoire.");
+        }
+    }
+
+    private static void AddDepenseParameters(SqlCommand cmd, DepenseSyncRequest request, DateTime dateDepense)
+    {
+        cmd.Parameters.AddWithValue("@Categorie", request.Categorie.Trim());
         cmd.Parameters.AddWithValue("@Montant", request.Montant);
-        cmd.Parameters.AddWithValue("@Devise", request.Devise);
+        cmd.Parameters.AddWithValue("@Devise", request.Devise.Trim());
         cmd.Parameters.AddWithValue("@Description", DbNullIfNull(request.Description));
-        cmd.Parameters.AddWithValue("@DateDepense", request.DateDepense ?? DateTime.UtcNow.Date);
-        cmd.Parameters.AddWithValue("@Source", request.Source);
-        cmd.Parameters.AddWithValue("@TypeDepense", request.TypeDepense);
+        cmd.Parameters.AddWithValue("@DateDepense", dateDepense);
+        cmd.Parameters.AddWithValue("@Source", request.Source.Trim());
+        cmd.Parameters.AddWithValue("@TypeDepense", request.TypeDepense.Trim());
         cmd.Parameters.AddWithValue("@CreePar", DbNullIfNull(request.CreePar));
     }
 
