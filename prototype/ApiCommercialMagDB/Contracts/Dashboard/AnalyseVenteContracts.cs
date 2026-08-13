@@ -25,6 +25,9 @@ public sealed class AnalyseVenteResponse
     public decimal CoutStockRestant { get; set; }
     public decimal ProjectionBeneficeRestant { get; set; }
     public decimal MargeBeneficiairePourcentage { get; set; }
+    public bool AnalysePartielle { get; set; }
+    public decimal NbVentesSansCout { get; set; }
+    public decimal NbProduitsSansCout { get; set; }
     public string Evaluation { get; set; } = string.Empty;
     public List<AnalyseVenteDetailRow> Details { get; set; } = [];
 }

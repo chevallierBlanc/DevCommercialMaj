@@ -246,6 +246,9 @@ public sealed class DashboardApiClient
                 CoutStockRestant = ReadDecimal(root, "CoutStockRestant"),
                 ProjectionBeneficeRestant = ReadDecimal(root, "ProjectionBeneficeRestant"),
                 MargeBeneficiairePourcentage = ReadDecimal(root, "MargeBeneficiairePourcentage"),
+                AnalysePartielle = ReadBool(root, "AnalysePartielle"),
+                NbVentesSansCout = ReadDecimal(root, "NbVentesSansCout"),
+                NbProduitsSansCout = ReadDecimal(root, "NbProduitsSansCout"),
                 Evaluation = ReadString(root, "Evaluation")
             };
 
@@ -325,6 +328,21 @@ public sealed class DashboardApiClient
         }
 
         return 0m;
+    }
+
+    private static bool ReadBool(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var value))
+        {
+            return false;
+        }
+
+        if (value.ValueKind == JsonValueKind.True || value.ValueKind == JsonValueKind.False)
+        {
+            return value.GetBoolean();
+        }
+
+        return value.ValueKind == JsonValueKind.String && bool.TryParse(value.GetString(), out var parsed) && parsed;
     }
 
     private static DateTime ReadDate(JsonElement root, string name)

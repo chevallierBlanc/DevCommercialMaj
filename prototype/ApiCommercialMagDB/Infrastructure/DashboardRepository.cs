@@ -194,19 +194,25 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
             ),
             CoutProduit AS
             (
-                SELECT ev.ProduitId,
-                       SUM(ISNULL(ev.QuantiteBase, 0) * ISNULL(ev.CoutUnitaireBase, 0)) / NULLIF(SUM(CASE WHEN ev.CoutUnitaireBase IS NOT NULL THEN ISNULL(ev.QuantiteBase, 0) ELSE 0 END), 0) AS CoutMoyenPiece
-                FROM EntreesValorisees ev
-                WHERE ev.CoutUnitaireBase IS NOT NULL
-                GROUP BY ev.ProduitId
+                SELECT p.ProduitId,
+                       CASE
+                           WHEN ISNULL(p.PrixAchat, 0) <= 0 THEN NULL
+                           WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') AND ISNULL(p.ContenuUnitePrincipale, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ContenuUnitePrincipale, 0), 0)
+                           WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN ISNULL(p.PrixAchat, 0) / NULLIF(ISNULL(p.ConversionUnite, 0), 0)
+                           ELSE ISNULL(p.PrixAchat, 0)
+                       END AS CoutMoyenPiece
+                FROM Produits p
             ),
             Ventes AS
             (
                 SELECT l.ProduitId,
                        SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) AS QuantiteVenduePieces,
-                       SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS ChiffreAffaires
+                       SUM(ISNULL(l.MontantLigne, ISNULL(l.QuantiteSaisie, 0) * ISNULL(l.PrixUnitaire, 0))) AS ChiffreAffaires,
+                       SUM(CASE WHEN COALESCE(l.CoutUnitaireBaseVente, cp.CoutMoyenPiece) IS NOT NULL THEN ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0)) * COALESCE(l.CoutUnitaireBaseVente, cp.CoutMoyenPiece) ELSE 0 END) AS CoutMarchandisesVendues,
+                       SUM(CASE WHEN COALESCE(l.CoutUnitaireBaseVente, cp.CoutMoyenPiece) IS NULL AND ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0)) > 0 THEN 1 ELSE 0 END) AS NbVentesSansCout
                 FROM LignesFactureVente l
                 INNER JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId
+                LEFT JOIN CoutProduit cp ON cp.ProduitId = l.ProduitId
                 WHERE f.Statut = 'PAYEE'
                   AND f.CreeLe >= @DateDebut
                   AND f.CreeLe < DATEADD(DAY, 1, @DateFin)
@@ -234,10 +240,12 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
                        ISNULL(se.ValeurStockEntree, 0) AS ValeurStockEntree,
                        ISNULL(v.QuantiteVenduePieces, 0) AS QuantiteVenduePieces,
                        ISNULL(v.ChiffreAffaires, 0) AS ChiffreAffaires,
-                       CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN ISNULL(v.QuantiteVenduePieces, 0) * cp.CoutMoyenPiece ELSE 0 END AS CoutMarchandisesVendues,
-                       CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN ISNULL(v.ChiffreAffaires, 0) - (ISNULL(v.QuantiteVenduePieces, 0) * cp.CoutMoyenPiece) ELSE 0 END AS Benefice,
+                       ISNULL(v.CoutMarchandisesVendues, 0) AS CoutMarchandisesVendues,
+                       ISNULL(v.ChiffreAffaires, 0) - ISNULL(v.CoutMarchandisesVendues, 0) AS Benefice,
                        ISNULL(s.QuantiteStock, 0) AS StockRestantPieces,
-                       CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN ISNULL(s.QuantiteStock, 0) * cp.CoutMoyenPiece ELSE 0 END AS CoutStockRestant
+                       CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN ISNULL(s.QuantiteStock, 0) * cp.CoutMoyenPiece ELSE 0 END AS CoutStockRestant,
+                       ISNULL(v.NbVentesSansCout, 0) AS VenteSansCout,
+                       CASE WHEN ISNULL(cp.CoutMoyenPiece, 0) > 0 THEN 0 ELSE CASE WHEN ISNULL(s.QuantiteStock, 0) > 0 THEN 1 ELSE 0 END END AS StockSansCout
                 FROM Produits p
                 LEFT JOIN CTEStockEntree se ON se.ProduitId = p.ProduitId
                 LEFT JOIN CoutProduit cp ON cp.ProduitId = p.ProduitId
@@ -254,6 +262,9 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
                    ISNULL(CAST(SUM(CoutStockRestant) AS BIGINT), 0) AS CoutStockRestant,
                    ISNULL(CAST(SUM(CoutStockRestant) * (ISNULL(SUM(Benefice), 0) / NULLIF(ISNULL(SUM(CoutMarchandisesVendues), 0), 0)) AS BIGINT), 0) AS ProjectionBeneficeRestant,
                    ISNULL(CAST((ISNULL(SUM(Benefice), 0) * 100.0 / NULLIF(ISNULL(SUM(ChiffreAffaires), 0), 0)) AS DECIMAL(10,2)), 0) AS MargeBeneficiairePourcentage,
+                   CAST(CASE WHEN SUM(VenteSansCout) > 0 OR SUM(StockSansCout) > 0 THEN 1 ELSE 0 END AS BIT) AS AnalysePartielle,
+                   ISNULL(SUM(VenteSansCout), 0) AS NbVentesSansCout,
+                   ISNULL(SUM(StockSansCout), 0) AS NbProduitsSansCout,
                    CASE
                        WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) < 0 THEN 'CRITIQUE / PERTE'
                        WHEN ISNULL(SUM(Benefice), 0) - MAX(dp.TotalDepenses) - MAX(sm.TotalChargesManuelles) = 0 THEN 'POINT MORT'
@@ -291,7 +302,10 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
                 response.CoutStockRestant = ReadDecimal(reader, 7);
                 response.ProjectionBeneficeRestant = ReadDecimal(reader, 8);
                 response.MargeBeneficiairePourcentage = ReadDecimal(reader, 9);
-                response.Evaluation = reader.IsDBNull(10) ? string.Empty : reader.GetValue(10)?.ToString() ?? string.Empty;
+                response.AnalysePartielle = !reader.IsDBNull(10) && Convert.ToBoolean(reader.GetValue(10));
+                response.NbVentesSansCout = ReadDecimal(reader, 11);
+                response.NbProduitsSansCout = ReadDecimal(reader, 12);
+                response.Evaluation = reader.IsDBNull(13) ? string.Empty : reader.GetValue(13)?.ToString() ?? string.Empty;
             }
         }
 
