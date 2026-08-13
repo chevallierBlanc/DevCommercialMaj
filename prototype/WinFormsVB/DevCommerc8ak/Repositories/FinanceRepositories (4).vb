@@ -77,6 +77,16 @@ Namespace DevCommerc8ak.Finance
         End Function
 
         Public Function GetHistorique(annee As Integer, Optional mois As Integer = 0) As DataTable
+            Dim dateDebut As DateTime
+            Dim dateFin As DateTime
+            If mois > 0 Then
+                dateDebut = New DateTime(annee, mois, 1)
+                dateFin = dateDebut.AddMonths(1)
+            Else
+                dateDebut = New DateTime(annee, 1, 1)
+                dateFin = dateDebut.AddYears(1)
+            End If
+
             Dim sql As String = "" &
                 "SELECT " &
                 "    Id, " &
@@ -90,15 +100,11 @@ Namespace DevCommerc8ak.Finance
                 "    CreePar, " &
                 "    CreatedAt " &
                 "FROM Depenses " &
-                "WHERE YEAR(DateDepense) = @annee "
+                "WHERE DateDepense >= @dateDebut AND DateDepense < @dateFin "
             Dim params As New List(Of SqlParameter) From {
-                New SqlParameter("@annee", annee)
+                New SqlParameter("@dateDebut", dateDebut),
+                New SqlParameter("@dateFin", dateFin)
             }
-
-            If mois > 0 Then
-                sql &= "AND MONTH(DateDepense) = @mois "
-                params.Add(New SqlParameter("@mois", mois))
-            End If
 
             sql &= "ORDER BY DateDepense DESC, CreatedAt DESC"
             Return _dal.ExecuterTable(sql, CommandType.Text, params)
@@ -109,16 +115,24 @@ Namespace DevCommerc8ak.Finance
         End Function
 
         Public Function GetRapportDepenses(annee As Integer, Optional mois As Integer = 0) As DataTable
+            Dim dateDebut As DateTime
+            Dim dateFin As DateTime
+            If mois > 0 Then
+                dateDebut = New DateTime(annee, mois, 1)
+                dateFin = dateDebut.AddMonths(1)
+            Else
+                dateDebut = New DateTime(annee, 1, 1)
+                dateFin = dateDebut.AddYears(1)
+            End If
+
             Dim sql As String = "SELECT Categorie, ISNULL(CAST(SUM(ISNULL(Montant,0)) AS BIGINT),0) as Total, Devise " &
                                "FROM Depenses " &
-                               "WHERE YEAR(DateDepense) = @annee "
+                               "WHERE DateDepense >= @dateDebut AND DateDepense < @dateFin "
 
-            Dim params As New List(Of SqlParameter) From {New SqlParameter("@annee", annee)}
-
-            If mois > 0 Then
-                sql &= "AND MONTH(DateDepense) = @mois "
-                params.Add(New SqlParameter("@mois", mois))
-            End If
+            Dim params As New List(Of SqlParameter) From {
+                New SqlParameter("@dateDebut", dateDebut),
+                New SqlParameter("@dateFin", dateFin)
+            }
 
             sql &= "GROUP BY Categorie, Devise ORDER BY Categorie"
 
