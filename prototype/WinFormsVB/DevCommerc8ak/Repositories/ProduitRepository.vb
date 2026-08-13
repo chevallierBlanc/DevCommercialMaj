@@ -601,32 +601,35 @@ Namespace DevCommerc8ak
                 "LEFT JOIN Utilisateurs u ON u.UtilisateurId = Hist.ModifiePar " &
                 "WHERE AncienPrix <> NouveauPrix " &
                 "AND (@ProduitId IS NULL OR ProduitId=@ProduitId) " &
-                "AND (@DateDebut IS NULL OR CAST(ModifieLe AS DATE) >= @DateDebut) " &
-                "AND (@DateFin IS NULL OR CAST(ModifieLe AS DATE) <= @DateFin) " &
+                "AND (@DateDebut IS NULL OR ModifieLe >= @DateDebut) " &
+                "AND (@DateFinExclusive IS NULL OR ModifieLe < @DateFinExclusive) " &
                 "ORDER BY ModifieLe DESC, Produit"
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@ProduitId", If(produitId.HasValue, CType(produitId.Value, Object), DBNull.Value)),
                 New SqlParameter("@DateDebut", If(dateDebut.HasValue, CType(dateDebut.Value.Date, Object), DBNull.Value)),
-                New SqlParameter("@DateFin", If(dateFin.HasValue, CType(dateFin.Value.Date, Object), DBNull.Value))
+                New SqlParameter("@DateFinExclusive", If(dateFin.HasValue, CType(dateFin.Value.Date.AddDays(1), Object), DBNull.Value))
             }
             Return _dal.ExecuterTable(sql, CommandType.Text, p)
         End Function
 
         Public Function TopProduitsVendus(annee As Integer) As DataTable
+            Dim dateDebut As New DateTime(annee, 1, 1)
             Dim sql As String = "" &
                 "SELECT TOP 10 p.Libelle, SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) AS QuantiteVendue, SUM(l.MontantLigne) AS Recette " &
                 "FROM LignesFactureVente l " &
                 "JOIN FacturesVente f ON f.FactureVenteId=l.FactureVenteId " &
                 "JOIN Produits p ON p.ProduitId=l.ProduitId " &
-                "WHERE f.Statut='PAYEE' AND YEAR(f.CreeLe)=@Annee " &
+                "WHERE f.Statut='PAYEE' AND f.CreeLe >= @DateDebut AND f.CreeLe < @DateFinExclusive " &
                 "GROUP BY p.Libelle ORDER BY SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) DESC"
             Dim p As New List(Of SqlParameter) From {
-                New SqlParameter("@Annee", annee)
+                New SqlParameter("@DateDebut", dateDebut),
+                New SqlParameter("@DateFinExclusive", dateDebut.AddYears(1))
             }
             Return _dal.ExecuterTable(sql, CommandType.Text, p)
         End Function
 
         Public Function ProduitPlusVenduParMois(annee As Integer) As DataTable
+            Dim dateDebut As New DateTime(annee, 1, 1)
             Dim sql As String = "" &
                 "WITH Rangs AS (" &
                 "SELECT MONTH(f.CreeLe) AS Mois, p.Libelle, SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) AS QuantiteVendue, SUM(l.MontantLigne) AS Recette, " &
@@ -634,12 +637,13 @@ Namespace DevCommerc8ak
                 "FROM LignesFactureVente l " &
                 "JOIN FacturesVente f ON f.FactureVenteId=l.FactureVenteId " &
                 "JOIN Produits p ON p.ProduitId=l.ProduitId " &
-                "WHERE f.Statut='PAYEE' AND YEAR(f.CreeLe)=@Annee " &
+                "WHERE f.Statut='PAYEE' AND f.CreeLe >= @DateDebut AND f.CreeLe < @DateFinExclusive " &
                 "GROUP BY MONTH(f.CreeLe), p.Libelle" &
                 ") " &
                 "SELECT Mois, Libelle, QuantiteVendue, Recette FROM Rangs WHERE Rang=1 ORDER BY Mois"
             Dim p As New List(Of SqlParameter) From {
-                New SqlParameter("@Annee", annee)
+                New SqlParameter("@DateDebut", dateDebut),
+                New SqlParameter("@DateFinExclusive", dateDebut.AddYears(1))
             }
             Return _dal.ExecuterTable(sql, CommandType.Text, p)
         End Function

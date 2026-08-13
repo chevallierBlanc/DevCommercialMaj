@@ -552,7 +552,7 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
             ? """
               SELECT ISNULL(Categorie, 'Sans catégorie') AS Category, ISNULL(SUM(ISNULL(Montant,0)),0) AS Amount
               FROM Depenses
-              WHERE CONVERT(date, DateDepense) = @DateRef
+              WHERE DateDepense >= @DateRef AND DateDepense < @DateRefFin
               GROUP BY Categorie
               ORDER BY Amount DESC
               """
@@ -567,6 +567,7 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
         if (end is null)
         {
             cmd.Parameters.AddWithValue("@DateRef", start.Date);
+            cmd.Parameters.AddWithValue("@DateRefFin", start.Date.AddDays(1));
         }
         else
         {

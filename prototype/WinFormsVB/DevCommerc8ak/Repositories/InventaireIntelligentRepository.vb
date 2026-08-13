@@ -208,11 +208,12 @@ Namespace DevCommerc8ak
                 "    LEFT JOIN Produits p ON p.ProduitId = il.ProduitId " &
                 "    WHERE il.InventaireId = i.InventaireId " &
                 ") lc " &
-                "WHERE YEAR(i.DateCreation) = @Annee AND MONTH(i.DateCreation) = @Mois " &
+                "WHERE i.DateCreation >= @DateDebut AND i.DateCreation < @DateFinExclusive " &
                 "ORDER BY i.DateCreation DESC"
+            Dim dateDebut As New DateTime(annee, mois, 1)
             Dim p As New List(Of SqlParameter) From {
-                New SqlParameter("@Mois", mois),
-                New SqlParameter("@Annee", annee)
+                New SqlParameter("@DateDebut", dateDebut),
+                New SqlParameter("@DateFinExclusive", dateDebut.AddMonths(1))
             }
             Return _dal.ExecuterTable(sql, CommandType.Text, p)
         End Function

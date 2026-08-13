@@ -58,9 +58,12 @@ Namespace DevCommerc8ak.Finance
         End Sub
 
         Public Function GetSommeParDevise(dateDepense As DateTime, devise As String, source As String) As Decimal
-            Dim sql As String = "SELECT ISNULL(CAST(SUM(ISNULL(Montant,0)) AS DECIMAL(18,0)),0) FROM Depenses WHERE DateDepense = @date AND Devise = @devise AND Source = @source"
+            Dim dateDebut As DateTime = dateDepense.Date
+            Dim dateFinExclusive As DateTime = dateDebut.AddDays(1)
+            Dim sql As String = "SELECT ISNULL(CAST(SUM(ISNULL(Montant,0)) AS DECIMAL(18,0)),0) FROM Depenses WHERE DateDepense >= @DateDebut AND DateDepense < @DateFinExclusive AND Devise = @devise AND Source = @source"
             Dim params As New List(Of SqlParameter) From {
-                New SqlParameter("@date", dateDepense.Date),
+                New SqlParameter("@DateDebut", dateDebut),
+                New SqlParameter("@DateFinExclusive", dateFinExclusive),
                 New SqlParameter("@devise", devise),
                 New SqlParameter("@source", source)
             }
@@ -239,21 +242,28 @@ Namespace DevCommerc8ak.Finance
                     Return 0D
                 End If
 
+                Dim dateDebut As DateTime = dateJour.Date
+                Dim dateFinExclusive As DateTime = dateDebut.AddDays(1)
+
                 Dim sqlUsd As String = "SELECT ISNULL(CAST(SUM(CASE " &
                                        "WHEN UPPER(ISNULL(Devise, '')) = 'USD' THEN ISNULL(NULLIF(MontantRecu, 0), ISNULL(Montant, 0)) " &
                                        "ELSE 0 END) AS DECIMAL(18,2)),0) " &
-                                       "FROM Paiements WHERE CAST(PayeLe AS DATE) = @date"
+                                       "FROM Paiements WHERE PayeLe >= @DateDebut AND PayeLe < @DateFinExclusive"
                 Dim paramsUsd As New List(Of SqlParameter) From {
-                    New SqlParameter("@date", dateJour.Date)
+                    New SqlParameter("@DateDebut", dateDebut),
+                    New SqlParameter("@DateFinExclusive", dateFinExclusive)
                 }
                 Dim totalFc As Object = _dal.ExecuterScalaire(sqlUsd, CommandType.Text, paramsUsd)
                 Dim montantFc As Decimal = If(totalFc Is DBNull.Value OrElse totalFc Is Nothing, 0D, Convert.ToDecimal(totalFc))
                 Return Decimal.Round(montantFc / tauxUsd.Value, 2, MidpointRounding.AwayFromZero)
             End If
 
-            Dim sql As String = "SELECT ISNULL(CAST(SUM(ISNULL(Montant,0)) AS DECIMAL(18,0)),0) FROM Paiements WHERE CAST(PayeLe AS DATE) = @date"
+            Dim debut As DateTime = dateJour.Date
+            Dim finExclusive As DateTime = debut.AddDays(1)
+            Dim sql As String = "SELECT ISNULL(CAST(SUM(ISNULL(Montant,0)) AS DECIMAL(18,0)),0) FROM Paiements WHERE PayeLe >= @DateDebut AND PayeLe < @DateFinExclusive"
             Dim params As New List(Of SqlParameter) From {
-                New SqlParameter("@date", dateJour.Date)
+                New SqlParameter("@DateDebut", debut),
+                New SqlParameter("@DateFinExclusive", finExclusive)
             }
             Dim result As Object = _dal.ExecuterScalaire(sql, CommandType.Text, params)
             Return If(result Is DBNull.Value OrElse result Is Nothing, 0D, Convert.ToDecimal(result))
