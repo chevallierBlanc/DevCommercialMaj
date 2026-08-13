@@ -507,7 +507,7 @@ Namespace DevCommerc8ak
                                 "FROM LignesFactureVente l " &
                                 "JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
                                 "JOIN Produits p ON p.ProduitId = l.ProduitId " &
-                                "WHERE f.CreeLe BETWEEN @d1 AND @d2 AND f.Statut='PAYEE' " &
+                                "WHERE f.CreeLe >= @d1 AND f.CreeLe < DATEADD(DAY, 1, @d2) AND f.Statut='PAYEE' " &
                                 "GROUP BY p.Libelle ORDER BY SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) DESC"
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@d1", dateDebut),

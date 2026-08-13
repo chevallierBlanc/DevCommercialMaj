@@ -255,7 +255,7 @@ Namespace DevCommerc8ak
                     grid.DataSource = service.ProduitsPlusVendus(dtDebut.Value, dtFin.Value)
                 ElseIf cmbType.SelectedItem.ToString() = "Journalier" Then
                     Dim sql As String = "SELECT CAST(CreeLe AS DATE) AS Jour, SUM(MontantTotal) AS CA " &
-                                        "FROM FacturesVente WHERE CreeLe BETWEEN @d1 AND @d2 AND Statut='PAYEE' " &
+                                        "FROM FacturesVente WHERE CreeLe >= @d1 AND CreeLe < DATEADD(DAY, 1, @d2) AND Statut='PAYEE' " &
                                         "GROUP BY CAST(CreeLe AS DATE) ORDER BY Jour"
                     Dim p As New List(Of System.Data.SqlClient.SqlParameter) From {
                         New System.Data.SqlClient.SqlParameter("@d1", dtDebut.Value),
@@ -264,7 +264,7 @@ Namespace DevCommerc8ak
                     grid.DataSource = dal.ExecuterTable(sql, System.Data.CommandType.Text, p)
                 ElseIf cmbType.SelectedItem.ToString() = "Mensuel" Then
                     Dim sql As String = "SELECT FORMAT(CreeLe,'yyyy-MM') AS Mois, SUM(MontantTotal) AS CA " &
-                                        "FROM FacturesVente WHERE CreeLe BETWEEN @d1 AND @d2 AND Statut='PAYEE' " &
+                                        "FROM FacturesVente WHERE CreeLe >= @d1 AND CreeLe < DATEADD(DAY, 1, @d2) AND Statut='PAYEE' " &
                                         "GROUP BY FORMAT(CreeLe,'yyyy-MM') ORDER BY Mois"
                     Dim p As New List(Of System.Data.SqlClient.SqlParameter) From {
                         New System.Data.SqlClient.SqlParameter("@d1", dtDebut.Value),
