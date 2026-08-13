@@ -209,6 +209,7 @@ Namespace DevCommerc8ak
             If RoleExisteDeja(nomRole, roleId) Then
                 Throw New InvalidOperationException("Un rôle portant ce nom existe déjà.")
             End If
+            VerifierRoleSystemeProtege(roleId, nomRole, estActif)
 
             Using cn As SqlConnection = _dal.CreerConnexion()
                 cn.Open()
@@ -284,12 +285,14 @@ Namespace DevCommerc8ak
         End Function
 
         Public Sub DesactiverRole(roleId As Integer)
+            VerifierRoleSystemeProtege(roleId, Nothing, False)
             Dim sql As String = "UPDATE dbo.Roles SET EstActif = 0 WHERE RoleId=@RoleId"
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@RoleId", roleId)}
             _dal.ExecuterNonRequete(sql, CommandType.Text, p)
         End Sub
 
         Public Sub SupprimerRole(roleId As Integer)
+            VerifierRoleSystemeProtege(roleId, Nothing, False)
             Using cn As SqlConnection = _dal.CreerConnexion()
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
@@ -377,6 +380,25 @@ Namespace DevCommerc8ak
                 "LEFT JOIN dbo.UtilisateurRoles ur ON ur.UtilisateurId = u.UtilisateurId " &
                 "LEFT JOIN dbo.Roles r ON r.RoleId = ur.RoleId"
             Return _dal.ExecuterTable(sql, CommandType.Text, Nothing)
+        End Function
+
+        Private Sub VerifierRoleSystemeProtege(roleId As Integer?, nouveauNomRole As String, estActif As Boolean)
+            If Not roleId.HasValue OrElse roleId.Value <= 0 OrElse Not RoleIdEstSuperAdmin(roleId.Value) Then Return
+            If Not String.Equals(If(SessionUtilisateur.Role, String.Empty), "SUPERADMIN", StringComparison.OrdinalIgnoreCase) Then
+                Throw New InvalidOperationException("Le rôle SUPERADMIN ne peut être modifié que par un SUPERADMIN.")
+            End If
+            If Not estActif Then
+                Throw New InvalidOperationException("Le rôle SUPERADMIN ne peut pas être désactivé ou supprimé.")
+            End If
+            If Not String.IsNullOrWhiteSpace(nouveauNomRole) AndAlso Not String.Equals(nouveauNomRole.Trim(), "SUPERADMIN", StringComparison.OrdinalIgnoreCase) Then
+                Throw New InvalidOperationException("Le rôle SUPERADMIN ne peut pas être renommé.")
+            End If
+        End Sub
+
+        Private Function RoleIdEstSuperAdmin(roleId As Integer) As Boolean
+            Dim sql As String = "SELECT COUNT(*) FROM dbo.Roles WHERE RoleId=@RoleId AND UPPER(LTRIM(RTRIM(NomRole)))='SUPERADMIN'"
+            Dim p As New List(Of SqlParameter) From {New SqlParameter("@RoleId", roleId)}
+            Return Convert.ToInt32(_dal.ExecuterScalaire(sql, CommandType.Text, p)) > 0
         End Function
     End Class
 End Namespace

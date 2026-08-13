@@ -35,6 +35,7 @@ Namespace DevCommerc8ak
         ' Assigne un role a un utilisateur.
         Public Sub AssignerRole(utilisateurId As Integer, roleId As Integer)
             AssurerUtilisateurRolesInfrastructure()
+            VerifierAssignationRoleProtege(roleId)
             Dim sql As String = "IF NOT EXISTS (SELECT 1 FROM UtilisateurRoles WHERE UtilisateurId=@UtilisateurId AND RoleId=@RoleId) " &
                                 "INSERT INTO UtilisateurRoles (UtilisateurId, RoleId, EstActif, EstRolePrincipal, CreePar) VALUES (@UtilisateurId, @RoleId, 1, 0, @CreePar) " &
                                 "ELSE UPDATE UtilisateurRoles SET EstActif=1, ModifieLe=GETDATE(), ModifiePar=@CreePar WHERE UtilisateurId=@UtilisateurId AND RoleId=@RoleId;"
@@ -48,6 +49,7 @@ Namespace DevCommerc8ak
 
         ' Met a jour le compte et le role associe.
         Public Sub MettreAJour(utilisateurId As Integer, nomUtilisateur As String, estActif As Boolean, roleId As Integer, Optional hash As Byte() = Nothing, Optional sel As Byte() = Nothing)
+            VerifierModificationCompteProtege(utilisateurId, estActif, New List(Of Integer) From {roleId}, hash IsNot Nothing AndAlso sel IsNot Nothing)
             Using cn As SqlConnection = _dal.CreerConnexion()
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
@@ -127,6 +129,7 @@ Namespace DevCommerc8ak
 
         ' Met a jour l'etat actif.
         Public Sub MettreAJourActif(utilisateurId As Integer, estActif As Boolean)
+            VerifierModificationCompteProtege(utilisateurId, estActif, Nothing, False)
             Dim sql As String = "UPDATE Utilisateurs SET EstActif=@EstActif WHERE UtilisateurId=@UtilisateurId"
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@EstActif", estActif),
@@ -137,6 +140,7 @@ Namespace DevCommerc8ak
 
         ' Met a jour le mot de passe.
         Public Sub MettreAJourMotDePasse(utilisateurId As Integer, hash As Byte(), sel As Byte())
+            VerifierModificationCompteProtege(utilisateurId, True, Nothing, True)
             Dim sql As String = "UPDATE Utilisateurs SET MotDePasseHash=@MotDePasseHash, MotDePasseSel=@MotDePasseSel WHERE UtilisateurId=@UtilisateurId"
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@MotDePasseHash", hash),
@@ -198,6 +202,10 @@ Namespace DevCommerc8ak
 
         Public Sub MettreAJourRolesUtilisateur(utilisateurId As Integer, roleIds As IEnumerable(Of Integer), rolePrincipalId As Integer)
             AssurerUtilisateurRolesInfrastructure()
+            Dim rolesDemandes As New List(Of Integer)()
+            If roleIds IsNot Nothing Then rolesDemandes.AddRange(roleIds)
+            If rolePrincipalId > 0 AndAlso Not rolesDemandes.Contains(rolePrincipalId) Then rolesDemandes.Add(rolePrincipalId)
+            VerifierModificationCompteProtege(utilisateurId, True, rolesDemandes, False)
             Using cn As SqlConnection = _dal.CreerConnexion()
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
@@ -262,5 +270,48 @@ Namespace DevCommerc8ak
                 "UPDATE ur SET EstRolePrincipal = CASE WHEN ur.RoleId = ru.RoleIdPrincipal THEN 1 ELSE 0 END FROM dbo.UtilisateurRoles ur INNER JOIN RolesUtilisateur ru ON ru.UtilisateurId = ur.UtilisateurId WHERE NOT EXISTS (SELECT 1 FROM dbo.UtilisateurRoles x WHERE x.UtilisateurId = ur.UtilisateurId AND ISNULL(x.EstRolePrincipal,0)=1 AND ISNULL(x.EstActif,1)=1);"
             _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
         End Sub
+
+        Private Sub VerifierAssignationRoleProtege(roleId As Integer)
+            If roleId <= 0 OrElse Not RoleIdEstSuperAdmin(roleId) Then Return
+            If OperationSystemeInitialisationAutorisee() OrElse SessionCouranteSuperAdmin() Then Return
+            Throw New InvalidOperationException("Le rôle SUPERADMIN ne peut être attribué que par un SUPERADMIN.")
+        End Sub
+
+        Private Sub VerifierModificationCompteProtege(utilisateurId As Integer, estActif As Boolean, roleIds As IEnumerable(Of Integer), modifieMotDePasse As Boolean)
+            If utilisateurId <= 0 OrElse Not EstDansRole(utilisateurId, "SUPERADMIN") Then Return
+            If OperationSystemeInitialisationAutorisee() OrElse SessionCouranteSuperAdmin() Then
+                If Not estActif Then
+                    Throw New InvalidOperationException("Le compte SUPERADMIN ne peut pas être désactivé.")
+                End If
+                If roleIds IsNot Nothing AndAlso Not ContientRoleSuperAdmin(roleIds) Then
+                    Throw New InvalidOperationException("Le rôle SUPERADMIN ne peut pas être retiré du compte système.")
+                End If
+                Return
+            End If
+
+            Dim operation As String = If(modifieMotDePasse, "mot de passe", "compte")
+            Throw New InvalidOperationException("Le " & operation & " SUPERADMIN ne peut être modifié que par un SUPERADMIN.")
+        End Sub
+
+        Private Function ContientRoleSuperAdmin(roleIds As IEnumerable(Of Integer)) As Boolean
+            For Each roleId As Integer In roleIds
+                If RoleIdEstSuperAdmin(roleId) Then Return True
+            Next
+            Return False
+        End Function
+
+        Private Function RoleIdEstSuperAdmin(roleId As Integer) As Boolean
+            Dim sql As String = "SELECT COUNT(*) FROM dbo.Roles WHERE RoleId=@RoleId AND UPPER(LTRIM(RTRIM(NomRole)))='SUPERADMIN'"
+            Dim p As New List(Of SqlParameter) From {New SqlParameter("@RoleId", roleId)}
+            Return Convert.ToInt32(_dal.ExecuterScalaire(sql, CommandType.Text, p)) > 0
+        End Function
+
+        Private Function SessionCouranteSuperAdmin() As Boolean
+            Return String.Equals(If(SessionUtilisateur.Role, String.Empty), "SUPERADMIN", StringComparison.OrdinalIgnoreCase)
+        End Function
+
+        Private Function OperationSystemeInitialisationAutorisee() As Boolean
+            Return SessionUtilisateur.UtilisateurId <= 0 AndAlso String.IsNullOrWhiteSpace(SessionUtilisateur.NomUtilisateur)
+        End Function
     End Class
 End Namespace
