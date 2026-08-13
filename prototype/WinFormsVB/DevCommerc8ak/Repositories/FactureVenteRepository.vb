@@ -159,12 +159,12 @@ Namespace DevCommerc8ak
                 p.Add(New SqlParameter("@Telephone", "%" & telephone & "%"))
             End If
             If dateDu.HasValue Then
-                sql &= "AND CAST(f.CreeLe AS DATE) >= @DateDu "
-                p.Add(New SqlParameter("@DateDu", dateDu.Value))
+                sql &= "AND f.CreeLe >= @DateDu "
+                p.Add(New SqlParameter("@DateDu", dateDu.Value.Date))
             End If
             If dateAu.HasValue Then
-                sql &= "AND CAST(f.CreeLe AS DATE) <= @DateAu "
-                p.Add(New SqlParameter("@DateAu", dateAu.Value))
+                sql &= "AND f.CreeLe < @DateAuExclue "
+                p.Add(New SqlParameter("@DateAuExclue", dateAu.Value.Date.AddDays(1)))
             End If
             If statutDb <> "" Then
                 sql &= "AND f.Statut = @Statut "
@@ -189,12 +189,12 @@ Namespace DevCommerc8ak
                 p.Add(New SqlParameter("@q", "%" & recherche & "%"))
             End If
             If dateDu.HasValue Then
-                sql &= "AND CAST(f.CreeLe AS DATE) >= @DateDu "
-                p.Add(New SqlParameter("@DateDu", dateDu.Value))
+                sql &= "AND f.CreeLe >= @DateDu "
+                p.Add(New SqlParameter("@DateDu", dateDu.Value.Date))
             End If
             If dateAu.HasValue Then
-                sql &= "AND CAST(f.CreeLe AS DATE) <= @DateAu "
-                p.Add(New SqlParameter("@DateAu", dateAu.Value))
+                sql &= "AND f.CreeLe < @DateAuExclue "
+                p.Add(New SqlParameter("@DateAuExclue", dateAu.Value.Date.AddDays(1)))
             End If
 
             sql &= "ORDER BY f.CreeLe DESC"
