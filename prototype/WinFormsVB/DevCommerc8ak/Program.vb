@@ -199,10 +199,7 @@ Namespace DevCommerc8ak
 
             Private Sub AfficherSplash()
                 Using splash As New SplashForm()
-                    splash.Show()
-                    Application.DoEvents()
-                    Thread.Sleep(2000)
-                    splash.Close()
+                    splash.ShowDialog()
                 End Using
             End Sub
 

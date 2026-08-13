@@ -28,6 +28,7 @@ Namespace DevCommerc8ak
         Private ReadOnly lblStatus As Label
         Private ReadOnly lblVersion As Label
         Private ReadOnly timerAnim As Timer
+        Private ReadOnly timerFermeture As Timer
         Private _progressWidth As Integer = 0
 
         Public Sub New()
@@ -96,6 +97,10 @@ Namespace DevCommerc8ak
             AddHandler timerAnim.Tick, AddressOf AnimerProgression
             timerAnim.Start()
 
+            timerFermeture = New Timer() With {.Interval = 2000}
+            AddHandler timerFermeture.Tick, AddressOf FermerAutomatiquement
+            timerFermeture.Start()
+
             ' Assemblage
             Me.Controls.AddRange({picLogo, lblTitre, lblStatus, pnlProgressBg, lblVersion})
 
@@ -126,6 +131,11 @@ Namespace DevCommerc8ak
             End If
         End Sub
 
+        Private Sub FermerAutomatiquement(sender As Object, e As EventArgs)
+            timerFermeture.Stop()
+            Close()
+        End Sub
+
         Private Sub ChargerLogo()
             Try
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
@@ -139,6 +149,12 @@ Namespace DevCommerc8ak
             Catch
                 ' Fallback silencieux
             End Try
+        End Sub
+
+        Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+            timerAnim.Stop()
+            timerFermeture.Stop()
+            MyBase.OnFormClosed(e)
         End Sub
     End Class
 End Namespace
