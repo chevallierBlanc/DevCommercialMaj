@@ -47,6 +47,7 @@ Namespace DevCommerc8ak
 
         ' --- Composants UI (Noms conservés) ---
         Private ReadOnly txtRecherche As TextBox
+        Private ReadOnly cmbFiltreCategorie As ComboBox
         Private ReadOnly btnNouveau As Button
         Private ReadOnly btnEnregistrer As Button
         Private ReadOnly btnSupprimer As Button
@@ -169,6 +170,7 @@ Namespace DevCommerc8ak
             ' 1. Barre de Recherche et Actions
             Dim flowHeader As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.LeftToRight, .Padding = New Padding(0, 10, 0, 0), .WrapContents = True, .AutoScroll = True}
             txtRecherche = New TextBox() With {.Width = 250, .Font = FontControl, .BorderStyle = BorderStyle.FixedSingle, .Margin = New Padding(0, 5, 20, 0)}
+            cmbFiltreCategorie = New ComboBox() With {.Width = 170, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl, .FlatStyle = FlatStyle.Flat, .Margin = New Padding(0, 5, 20, 0)}
             btnNouveau = CreateStyledButton("Nouveau", ColorPrimary)
             btnEnregistrer = CreateStyledButton("Enregistrer", Color.ForestGreen)
             btnSupprimer = CreateStyledButton("Supprimer", Color.Crimson)
@@ -178,6 +180,8 @@ Namespace DevCommerc8ak
 
             flowHeader.Controls.Add(New Label() With {.Text = "Recherche :", .Font = FontLabel, .ForeColor = ColorTextSecondary, .Margin = New Padding(0, 10, 5, 0), .AutoSize = True})
             flowHeader.Controls.Add(txtRecherche)
+            flowHeader.Controls.Add(New Label() With {.Text = "Catégorie :", .Font = FontLabel, .ForeColor = ColorTextSecondary, .Margin = New Padding(0, 10, 5, 0), .AutoSize = True})
+            flowHeader.Controls.Add(cmbFiltreCategorie)
             flowHeader.Controls.AddRange({btnNouveau, btnEnregistrer, btnSupprimer, btnActualiser, btnImprimerProduits, btnTypesPersonnalises})
 
             ' 2. Cartes d'Édition (Layout Flexible)
@@ -360,6 +364,7 @@ Namespace DevCommerc8ak
             AddHandler btnImprimerHistorique.Click, AddressOf ImprimerHistoriquePrix
             AddHandler btnTypesPersonnalises.Click, AddressOf OuvrirTypesPersonnalises
             AddHandler txtRecherche.TextChanged, AddressOf Filtrer
+            AddHandler cmbFiltreCategorie.SelectedIndexChanged, AddressOf Filtrer
             AddHandler cmbTypeGestionStock.SelectedIndexChanged, AddressOf ModeGestionStockProduitChange
             AddHandler grid.SelectionChanged, AddressOf ChargerSelection
             AddHandler btnPagePrecedente.Click, AddressOf PagePrecedente
@@ -673,12 +678,20 @@ Namespace DevCommerc8ak
 
         Private Sub Filtrer(sender As Object, e As EventArgs)
             If _produitsView Is Nothing Then Return
+            If TypeOf sender Is ComboBox AndAlso TypeOf cmbFiltreCategorie.SelectedValue Is DataRowView Then Return
+
+            Dim filtres As New List(Of String)()
             Dim q As String = txtRecherche.Text.Trim().Replace("'", "''")
-            If q = "" Then
-                _produitsView.RowFilter = ""
-            Else
-                _produitsView.RowFilter = String.Format("Libelle LIKE '%{0}%' OR CodeBarres LIKE '%{0}%'", q)
+            If q <> "" Then
+                filtres.Add(String.Format("(Libelle LIKE '%{0}%' OR CodeBarres LIKE '%{0}%')", q))
             End If
+
+            Dim categorieFiltre As Integer? = LireCategorieFiltreSelectionnee()
+            If categorieFiltre.HasValue Then
+                filtres.Add("CategorieId = " & categorieFiltre.Value.ToString(Globalization.CultureInfo.InvariantCulture))
+            End If
+
+            _produitsView.RowFilter = String.Join(" AND ", filtres)
             _pageCourante = 1
             MettreAJourPagination()
         End Sub
@@ -1506,6 +1519,17 @@ Namespace DevCommerc8ak
             cmbCategorie.DisplayMember = "NomCategorie"
             cmbCategorie.ValueMember = "CategorieId"
             cmbCategorie.SelectedIndex = -1
+
+            Dim sourceFiltre As DataTable = _categoriesTable.Copy()
+            Dim ligneToutes As DataRow = sourceFiltre.NewRow()
+            ligneToutes("CategorieId") = DBNull.Value
+            ligneToutes("NomCategorie") = "Toutes les catégories"
+            sourceFiltre.Rows.InsertAt(ligneToutes, 0)
+
+            cmbFiltreCategorie.DataSource = sourceFiltre
+            cmbFiltreCategorie.DisplayMember = "NomCategorie"
+            cmbFiltreCategorie.ValueMember = "CategorieId"
+            cmbFiltreCategorie.SelectedIndex = 0
         End Sub
 
         Private Function LireCategorieSelectionnee() As Integer?
@@ -1514,6 +1538,15 @@ Namespace DevCommerc8ak
             End If
 
             Return Convert.ToInt32(cmbCategorie.SelectedValue)
+        End Function
+
+        Private Function LireCategorieFiltreSelectionnee() As Integer?
+            If cmbFiltreCategorie Is Nothing OrElse cmbFiltreCategorie.SelectedValue Is Nothing OrElse
+               TypeOf cmbFiltreCategorie.SelectedValue Is DataRowView OrElse Convert.IsDBNull(cmbFiltreCategorie.SelectedValue) Then
+                Return Nothing
+            End If
+
+            Return Convert.ToInt32(cmbFiltreCategorie.SelectedValue)
         End Function
 
         Private Function ConstruireLargeursColonnes(colonnes As String(), largeurs As Integer(), largeurTotale As Integer) As Integer()
