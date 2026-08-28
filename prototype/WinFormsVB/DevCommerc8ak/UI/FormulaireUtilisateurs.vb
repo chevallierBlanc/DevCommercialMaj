@@ -53,6 +53,7 @@ Namespace DevCommerc8ak
         Private ReadOnly chkActif As CheckBox
         Private ReadOnly btnAjouter As Button
         Private ReadOnly btnModifier As Button
+        Private ReadOnly btnDesactiver As Button
         Private ReadOnly btnResetMdp As Button
         Private ReadOnly btnRafraichir As Button
         Private _utilisateurSelectionneId As Integer = -1
@@ -163,10 +164,11 @@ Namespace DevCommerc8ak
 
             btnAjouter = CreateStyledButton("Ajouter", ColorPrimary)
             btnModifier = CreateStyledButton("Modifier", ColorAccent)
+            btnDesactiver = CreateStyledButton("Désactiver", ColorDanger)
             btnResetMdp = CreateStyledButton("Reset MDP", ColorSecondary)
             btnRafraichir = CreateStyledButton("Rafraîchir", Color.Gray)
 
-            flowButtons.Controls.AddRange(New Control() {btnAjouter, btnModifier, btnResetMdp, btnRafraichir})
+            flowButtons.Controls.AddRange(New Control() {btnAjouter, btnModifier, btnDesactiver, btnResetMdp, btnRafraichir})
 
             ' --- Grilles (Split Vertical) ---
             splitGrids = New TableLayoutPanel() With {
@@ -203,6 +205,7 @@ Namespace DevCommerc8ak
             ' --- Liaison des événements (Logique conservée) ---
             AddHandler btnAjouter.Click, AddressOf Ajouter
             AddHandler btnModifier.Click, AddressOf Modifier
+            AddHandler btnDesactiver.Click, AddressOf DesactiverUtilisateur
             AddHandler btnResetMdp.Click, AddressOf ResetMdp
             AddHandler btnRafraichir.Click, AddressOf Charger
             AddHandler grid.SelectionChanged, AddressOf ChargerSelectionUtilisateur
@@ -468,6 +471,32 @@ Namespace DevCommerc8ak
                 MessageBox.Show("Mot de passe mis a jour.")
             Catch ex As Exception
                 MessageBox.Show("Erreur reset mot de passe: " & ex.Message)
+            End Try
+        End Sub
+
+        Private Sub DesactiverUtilisateur(sender As Object, e As EventArgs)
+            Try
+                If grid.CurrentRow Is Nothing Then
+                    MessageBox.Show("Sélectionnez un utilisateur.")
+                    Return
+                End If
+
+                Dim id As Integer = Convert.ToInt32(grid.CurrentRow.Cells("UtilisateurId").Value)
+                Dim nom As String = Convert.ToString(grid.CurrentRow.Cells("NomUtilisateur").Value)
+                Dim rep As DialogResult = MessageBox.Show(
+                    "Voulez-vous désactiver le compte utilisateur '" & nom & "' ?" & Environment.NewLine &
+                    "Ses opérations historiques resteront consultables.",
+                    "Désactivation utilisateur",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning)
+                If rep <> DialogResult.Yes Then Return
+
+                Dim service As UtilisateurService = ObtenirService()
+                service.DesactiverUtilisateur(id, nom)
+                MessageBox.Show("Utilisateur désactivé.")
+                Charger(sender, e)
+            Catch ex As Exception
+                MessageBox.Show("Erreur désactivation utilisateur: " & ex.Message)
             End Try
         End Sub
 

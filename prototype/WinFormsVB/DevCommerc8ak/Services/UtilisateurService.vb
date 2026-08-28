@@ -138,6 +138,17 @@ Namespace DevCommerc8ak
             _utilisateurRepo.MettreAJourMotDePasse(utilisateurId, hash, sel)
         End Sub
 
+        Public Sub DesactiverUtilisateur(utilisateurId As Integer, nomUtilisateur As String)
+            If utilisateurId <= 0 Then Throw New ArgumentException("Utilisateur invalide.")
+            If utilisateurId = SessionUtilisateur.UtilisateurId Then
+                Throw New InvalidOperationException("Vous ne pouvez pas désactiver votre propre compte connecté.")
+            End If
+
+            VerifierProtectionSuperAdmin(utilisateurId, Nothing, False)
+            _utilisateurRepo.MettreAJourActif(utilisateurId, False)
+            AuditActionService.Enregistrer("Utilisateurs", "UTILISATEUR_DESACTIVE", "Utilisateur " & If(nomUtilisateur, String.Empty).Trim() & " désactivé.")
+        End Sub
+
         Private Sub VerifierProtectionSuperAdmin(utilisateurId As Integer, rolesDemandes As IEnumerable(Of String), estActif As Boolean)
             If utilisateurId <= 0 Then Return
             If Not _utilisateurRepo.EstDansRole(utilisateurId, "SUPERADMIN") Then Return
