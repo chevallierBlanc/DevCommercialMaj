@@ -426,18 +426,18 @@ Namespace DevCommerc8ak
             gridProduits.Columns.Clear()
             gridProduits.AutoGenerateColumns = False
             Dim colProduitId As New DataGridViewTextBoxColumn() With {.DataPropertyName = "ProduitId", .Name = "ProduitId", .Visible = False}
-            Dim colCodeBarres As New DataGridViewTextBoxColumn() With {.DataPropertyName = "CodeBarres", .HeaderText = "CodeBarres", .Width = 210}
-            Dim colLibelle As New DataGridViewTextBoxColumn() With {.DataPropertyName = "Libelle", .HeaderText = "Libelle", .Width = 250}
-            Dim colPrixDetail As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixDetail", .HeaderText = "Prix Detail", .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
+            Dim colCodeBarres As New DataGridViewTextBoxColumn() With {.DataPropertyName = "CodeBarres", .Name = "CodeBarres", .HeaderText = "CodeBarres", .Width = 120, .MinimumWidth = 90, .FillWeight = 15}
+            Dim colLibelle As New DataGridViewTextBoxColumn() With {.DataPropertyName = "Libelle", .Name = "Libelle", .HeaderText = "Libelle", .Width = 320, .MinimumWidth = 220, .FillWeight = 42}
+            Dim colPrixDetail As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixDetail", .Name = "PrixDetail", .HeaderText = "Prix Detail", .Width = 90, .MinimumWidth = 75, .FillWeight = 11, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
             Dim colPrixAchat As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixAchat", .HeaderText = "PrixAchat", .Width = 80, .Visible = False, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
-            Dim colPrixDemi As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixDemi", .HeaderText = "Prix Demi", .Width = 100, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
-            Dim colPrixQuart As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixQuart", .HeaderText = "Prix Quart", .Width = 100, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
-            Dim colPrixDouzaine As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixDouzaine", .HeaderText = "Prix Douzaine", .Width = 100, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
-            Dim colPrixGros As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixGros", .HeaderText = "Prix Gros", .Width = 80, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
+            Dim colPrixDemi As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixDemi", .Name = "PrixDemi", .HeaderText = "Prix Demi", .Width = 85, .MinimumWidth = 70, .FillWeight = 10, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
+            Dim colPrixQuart As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixQuart", .Name = "PrixQuart", .HeaderText = "Prix Quart", .Width = 100, .Visible = False, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
+            Dim colPrixDouzaine As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixDouzaine", .Name = "PrixDouzaine", .HeaderText = "Prix Douzaine", .Width = 100, .Visible = False, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
+            Dim colPrixGros As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixGros", .Name = "PrixGros", .HeaderText = "Prix Gros", .Width = 85, .MinimumWidth = 70, .FillWeight = 10, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
             Dim colPrixSpecial As New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixSpecial", .HeaderText = "PrixSpecial", .Width = 80, .Visible = False}
             Dim colCoefficientGros As New DataGridViewTextBoxColumn() With {.DataPropertyName = "CoefficientGros", .HeaderText = "CoefficientGros", .Width = 80, .Visible = False}
-            Dim colQuantiteStock As New DataGridViewTextBoxColumn() With {.DataPropertyName = "QuantiteStock", .HeaderText = "Qte Stock", .Width = 100, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
-            Dim colSeuilCritique As New DataGridViewTextBoxColumn() With {.DataPropertyName = "SeuilCritique", .HeaderText = "SeuilCritique", .Width = 80, .Visible = False}
+            Dim colQuantiteStock As New DataGridViewTextBoxColumn() With {.DataPropertyName = "QuantiteStock", .Name = "QuantiteStock", .HeaderText = "Qte Stock", .Width = 85, .MinimumWidth = 75, .FillWeight = 12, .DefaultCellStyle = New DataGridViewCellStyle() With {.Alignment = DataGridViewContentAlignment.MiddleRight}}
+            Dim colSeuilCritique As New DataGridViewTextBoxColumn() With {.DataPropertyName = "SeuilCritique", .Name = "SeuilCritique", .HeaderText = "SeuilCritique", .Width = 80, .Visible = False}
             Dim colDateExpiration As New DataGridViewTextBoxColumn() With {.DataPropertyName = "DateExpiration", .HeaderText = "DateExpiration", .Width = 80, .Visible = False}
             Dim colCategorieId As New DataGridViewTextBoxColumn() With {.DataPropertyName = "CategorieId", .HeaderText = "CategorieId", .Width = 80, .Visible = False}
             Dim colNomCategorie As New DataGridViewTextBoxColumn() With {.DataPropertyName = "NomCategorie", .HeaderText = "NomCategorie", .Width = 80, .Visible = False}
@@ -729,9 +729,8 @@ Namespace DevCommerc8ak
 
         Private Sub ColorerStockCritique(sender As Object, e As DataGridViewRowPrePaintEventArgs)
             Dim row As DataGridViewRow = gridProduits.Rows(e.RowIndex)
-            If row.Cells(11).Value Is Nothing OrElse row.Cells(12).Value Is Nothing Then Return
-            Dim stock As Decimal = Convert.ToDecimal(row.Cells(11).Value)
-            Dim seuil As Decimal = Convert.ToDecimal(row.Cells(12).Value)
+            Dim stock As Decimal = SafeDecimal(CellValueByProperty(row, "QuantiteStock"))
+            Dim seuil As Decimal = SafeDecimal(CellValueByProperty(row, "SeuilCritique"))
             If stock <= seuil Then
                 row.DefaultCellStyle.BackColor = Color.LightCoral
             End If
@@ -829,8 +828,12 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            Dim produitId As Integer = Convert.ToInt32(gridProduits.CurrentRow.Cells(0).Value)
-            Dim libelle As String = Convert.ToString(gridProduits.CurrentRow.Cells(2).Value)
+            Dim produitId As Integer = SafeInteger(CellValueByProperty(gridProduits.CurrentRow, "ProduitId"))
+            Dim libelle As String = SafeString(CellValueByProperty(gridProduits.CurrentRow, "Libelle"))
+            If produitId <= 0 Then
+                MessageBox.Show("Produit invalide.")
+                Return
+            End If
             Dim typeChoisi As TypeVenteDTO = ObtenirTypeVenteSelectionne()
             If typeChoisi Is Nothing Then
                 MessageBox.Show("Type de vente invalide.")
@@ -840,7 +843,7 @@ Namespace DevCommerc8ak
             Dim prix As Decimal = PrixSelonUnite()
             Dim quantiteEquivalent As Decimal = typeChoisi.QuantiteEquivalent
             Dim quantiteBase As Decimal = qte * quantiteEquivalent
-            Dim stock As Decimal = Convert.ToDecimal(gridProduits.CurrentRow.Cells(11).Value)
+            Dim stock As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "QuantiteStock"))
 
             Dim deja As Decimal = 0D
             For Each l As PanierLigne In _panier
@@ -867,6 +870,8 @@ Namespace DevCommerc8ak
             End If
 
             RafraichirPanier()
+            txtQuantite.Clear()
+            txtQuantite.Focus()
         End Sub
         Private Sub RetirerDuPanier(sender As Object, e As EventArgs)
             If gridPanier.CurrentRow Is Nothing Then Return
@@ -954,8 +959,9 @@ Namespace DevCommerc8ak
         Private Function ObtenirStockParProduit(produitId As Integer) As Decimal
             If _produitsTable Is Nothing Then Return 0D
             For Each row As DataRow In _produitsTable.Rows
-                If Convert.ToInt32(row(0)) = produitId Then
-                    Return Convert.ToDecimal(row(11))
+                If row.Table.Columns.Contains("ProduitId") AndAlso row.Table.Columns.Contains("QuantiteStock") AndAlso
+                   Convert.ToInt32(row("ProduitId")) = produitId Then
+                    Return SafeDecimal(row("QuantiteStock"))
                 End If
             Next
             Return 0D

@@ -329,11 +329,11 @@ Namespace DevCommerc8ak
         Private Sub ConfigurerGrilleFactures()
             gridFactures.Columns.Clear()
             Dim colId As New DataGridViewTextBoxColumn() With {.DataPropertyName = "FactureVenteId", .Name = "FactureVenteId", .Visible = False}
-            Dim colNumero As New DataGridViewTextBoxColumn() With {.DataPropertyName = "NumeroFacture", .HeaderText = "N° Facture", .Width = 110}
-            Dim colClient As New DataGridViewTextBoxColumn() With {.DataPropertyName = "ClientNom", .HeaderText = "Client", .Width = 120}
-            Dim colTel As New DataGridViewTextBoxColumn() With {.DataPropertyName = "Telephone", .HeaderText = "Telephone", .Width = 120}
-            Dim colDate As New DataGridViewTextBoxColumn() With {.DataPropertyName = "CreeLe", .HeaderText = "Date", .Width = 90}
-            Dim colTotal As New DataGridViewTextBoxColumn() With {.DataPropertyName = "MontantTotal", .HeaderText = "Total", .Width = 80}
+            Dim colNumero As New DataGridViewTextBoxColumn() With {.DataPropertyName = "NumeroFacture", .Name = "NumeroFacture", .HeaderText = "N° Facture", .Width = 110}
+            Dim colClient As New DataGridViewTextBoxColumn() With {.DataPropertyName = "ClientNom", .Name = "ClientNom", .HeaderText = "Client", .Width = 120}
+            Dim colTel As New DataGridViewTextBoxColumn() With {.DataPropertyName = "Telephone", .Name = "Telephone", .HeaderText = "Telephone", .Width = 120}
+            Dim colDate As New DataGridViewTextBoxColumn() With {.DataPropertyName = "CreeLe", .Name = "CreeLe", .HeaderText = "Date", .Width = 90}
+            Dim colTotal As New DataGridViewTextBoxColumn() With {.DataPropertyName = "MontantTotal", .Name = "MontantTotal", .HeaderText = "Total", .Width = 80}
             Dim colStatut As New DataGridViewTextBoxColumn() With {.DataPropertyName = "Statut", .Name = "Statut", .Visible = False}
             gridFactures.Columns.AddRange(New DataGridViewColumn() {colId, colNumero, colClient, colTel, colDate, colTotal, colStatut})
         End Sub
@@ -401,8 +401,8 @@ Namespace DevCommerc8ak
             _isRefreshingFromEvent = True
             Try
                 Dim factureSelectionneeId As Integer? = Nothing
-                If gridFactures.CurrentRow IsNot Nothing AndAlso gridFactures.CurrentRow.Cells(0).Value IsNot Nothing Then
-                    factureSelectionneeId = Convert.ToInt32(gridFactures.CurrentRow.Cells(0).Value)
+                If gridFactures.CurrentRow IsNot Nothing AndAlso CellValueByProperty(gridFactures.CurrentRow, "FactureVenteId") IsNot Nothing Then
+                    factureSelectionneeId = SafeIntegerCell(CellValueByProperty(gridFactures.CurrentRow, "FactureVenteId"))
                 End If
 
                 ChargerFactures(Nothing, EventArgs.Empty)
@@ -410,9 +410,9 @@ Namespace DevCommerc8ak
                 If factureSelectionneeId.HasValue Then
                     For Each row As DataGridViewRow In gridFactures.Rows
                         If row Is Nothing OrElse row.IsNewRow Then Continue For
-                        If Convert.ToInt32(row.Cells(0).Value) = factureSelectionneeId.Value Then
+                        If SafeIntegerCell(CellValueByProperty(row, "FactureVenteId")) = factureSelectionneeId.Value Then
                             row.Selected = True
-                            gridFactures.CurrentCell = row.Cells(1)
+                            gridFactures.CurrentCell = row.Cells("NumeroFacture")
                             Exit For
                         End If
                     Next
@@ -451,11 +451,11 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            Dim numero As String = Convert.ToString(row.Cells(1).Value)
-            Dim client As String = Convert.ToString(row.Cells(2).Value)
-            Dim tel As String = Convert.ToString(row.Cells(3).Value)
-            Dim dtFacture As Date = Convert.ToDateTime(row.Cells(4).Value)
-            _totalCourant = Convert.ToDecimal(row.Cells(5).Value)
+            Dim numero As String = SafeStringCell(CellValueByProperty(row, "NumeroFacture"))
+            Dim client As String = SafeStringCell(CellValueByProperty(row, "ClientNom"))
+            Dim tel As String = SafeStringCell(CellValueByProperty(row, "Telephone"))
+            Dim dtFacture As Date = SafeDateCell(CellValueByProperty(row, "CreeLe"))
+            _totalCourant = SafeDecimalCell(CellValueByProperty(row, "MontantTotal"))
 
             lblNumeroFacture.Text = "Facture: " & numero
             lblClient.Text = "Client: " & client & " / " & tel
@@ -595,11 +595,11 @@ Namespace DevCommerc8ak
             End If
 
             Dim ticket As New TicketData()
-            ticket.Numero = Convert.ToString(row.Cells(1).Value)
-            ticket.Client = Convert.ToString(row.Cells(2).Value)
-            ticket.Telephone = Convert.ToString(row.Cells(3).Value)
-            ticket.DateFacture = Convert.ToDateTime(row.Cells(4).Value)
-            ticket.Total = Convert.ToDecimal(row.Cells(5).Value)
+            ticket.Numero = SafeStringCell(CellValueByProperty(row, "NumeroFacture"))
+            ticket.Client = SafeStringCell(CellValueByProperty(row, "ClientNom"))
+            ticket.Telephone = SafeStringCell(CellValueByProperty(row, "Telephone"))
+            ticket.DateFacture = SafeDateCell(CellValueByProperty(row, "CreeLe"))
+            ticket.Total = SafeDecimalCell(CellValueByProperty(row, "MontantTotal"))
             ticket.MontantRecu = montantRecuFc
             ticket.Monnaie = monnaieFc
             ticket.Devise = devise
@@ -607,7 +607,7 @@ Namespace DevCommerc8ak
             ticket.ReferencePaiement = txtReference.Text.Trim()
             ticket.Caissier = If(String.IsNullOrWhiteSpace(SessionUtilisateur.NomUtilisateur), "SYSTEM", SessionUtilisateur.NomUtilisateur)
 
-            Dim factureId As Integer = Convert.ToInt32(row.Cells(0).Value)
+            Dim factureId As Integer = SafeIntegerCell(CellValueByProperty(row, "FactureVenteId"))
             Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
             Dim dal As New DAL(cs)
             Dim repo As New LigneFactureVenteRepository(dal)
@@ -948,6 +948,48 @@ Namespace DevCommerc8ak
             Return texte & "s"
         End Function
 
+        Private Function CellValueByProperty(row As DataGridViewRow, propertyName As String) As Object
+            If row Is Nothing OrElse row.DataGridView Is Nothing OrElse String.IsNullOrWhiteSpace(propertyName) Then
+                Return Nothing
+            End If
+
+            For Each column As DataGridViewColumn In row.DataGridView.Columns
+                If String.Equals(column.DataPropertyName, propertyName, StringComparison.OrdinalIgnoreCase) OrElse
+                   String.Equals(column.Name, propertyName, StringComparison.OrdinalIgnoreCase) Then
+                    Return row.Cells(column.Index).Value
+                End If
+            Next
+
+            Return Nothing
+        End Function
+
+        Private Function SafeStringCell(value As Object) As String
+            If value Is Nothing OrElse value Is DBNull.Value Then Return String.Empty
+            Return Convert.ToString(value).Trim()
+        End Function
+
+        Private Function SafeIntegerCell(value As Object) As Integer
+            If value Is Nothing OrElse value Is DBNull.Value Then Return 0
+            Dim nombre As Integer
+            If Integer.TryParse(Convert.ToString(value), nombre) Then Return nombre
+            Return 0
+        End Function
+
+        Private Function SafeDecimalCell(value As Object) As Decimal
+            If value Is Nothing OrElse value Is DBNull.Value Then Return 0D
+            Dim nombre As Decimal
+            If Decimal.TryParse(Convert.ToString(value), nombre) Then Return nombre
+            If Decimal.TryParse(Convert.ToString(value), Globalization.NumberStyles.Any, Globalization.CultureInfo.InvariantCulture, nombre) Then Return nombre
+            Return 0D
+        End Function
+
+        Private Function SafeDateCell(value As Object) As Date
+            If value Is Nothing OrElse value Is DBNull.Value Then Return Date.MinValue
+            Dim dateValue As Date
+            If Date.TryParse(Convert.ToString(value), dateValue) Then Return dateValue
+            Return Date.MinValue
+        End Function
+
         Private Function HasFactureSelectionValide() As Boolean
             Dim row As DataGridViewRow = Nothing
             Return TryGetSelectedFactureRow(row)
@@ -963,7 +1005,11 @@ Namespace DevCommerc8ak
             If candidate Is Nothing OrElse candidate.IsNewRow Then
                 Return False
             End If
-            If candidate.Cells.Count = 0 OrElse candidate.Cells(0) Is Nothing OrElse candidate.Cells(0).Value Is Nothing OrElse candidate.Cells(0).Value Is DBNull.Value Then
+            Dim idValue As Object = CellValueByProperty(candidate, "FactureVenteId")
+            If idValue Is Nothing OrElse idValue Is DBNull.Value Then
+                Return False
+            End If
+            If SafeIntegerCell(idValue) <= 0 Then
                 Return False
             End If
 
@@ -978,7 +1024,7 @@ Namespace DevCommerc8ak
                 Return False
             End If
 
-            Return Integer.TryParse(Convert.ToString(row.Cells(0).Value), factureId) AndAlso factureId > 0
+            Return Integer.TryParse(Convert.ToString(CellValueByProperty(row, "FactureVenteId")), factureId) AndAlso factureId > 0
         End Function
 
         Private Sub MettreAJourEtatActions()
@@ -1022,7 +1068,7 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                Dim factureId As Integer = Convert.ToInt32(gridFactures.CurrentRow.Cells(0).Value)
+                Dim factureId As Integer = SafeIntegerCell(CellValueByProperty(gridFactures.CurrentRow, "FactureVenteId"))
                 Dim dal As New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)
                 Dim repo As New FactureVenteRepository(dal)
                 repo.MettreAJourStatut(factureId, "ANNULEE")
