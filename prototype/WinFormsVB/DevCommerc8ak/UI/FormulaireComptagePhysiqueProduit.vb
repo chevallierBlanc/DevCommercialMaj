@@ -47,6 +47,7 @@ Namespace DevCommerc8ak
         Private lblTotal As Label
         Private lblEquivalent As Label
         Private lblEcart As Label
+        Private lblEcartEquivalent As Label
         Private lblResultat As Label
         Private btnAnnuler As Button
         Private btnValider As Button
@@ -120,7 +121,7 @@ Namespace DevCommerc8ak
 
             Dim body As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .BackColor = ColorCard, .ColumnCount = 1, .RowCount = 2, .Padding = New Padding(14), .Margin = New Padding(0, 0, 0, 10)}
             body.RowStyles.Add(New RowStyle(SizeType.Absolute, 126))
-            body.RowStyles.Add(New RowStyle(SizeType.Absolute, 172))
+            body.RowStyles.Add(New RowStyle(SizeType.Absolute, 198))
 
             Dim saisie As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 4}
             saisie.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 210))
@@ -143,19 +144,22 @@ Namespace DevCommerc8ak
             AddHandler txtMesureLibre.TextChanged, AddressOf Quantites_TextChanged
             body.Controls.Add(saisie, 0, 0)
 
-            Dim resume As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .BackColor = Color.FromArgb(248, 250, 252), .Padding = New Padding(14), .ColumnCount = 1, .RowCount = 4, .MinimumSize = New Size(0, 150)}
+            Dim resume As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .BackColor = Color.FromArgb(248, 250, 252), .Padding = New Padding(14), .ColumnCount = 1, .RowCount = 5, .MinimumSize = New Size(0, 176)}
             resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 52))
             resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 28))
-            resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 32))
+            resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 28))
+            resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 28))
             resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 32))
             lblTotal = New Label() With {.Text = "TOTAL COMPTÉ" & Environment.NewLine & "-", .Font = FontTotal, .ForeColor = ColorPrimary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
             lblEquivalent = New Label() With {.Text = "Répartition : -", .Font = FontLabel, .ForeColor = ColorSecondary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
             lblEcart = New Label() With {.Text = "Écart : -", .Font = FontValue, .ForeColor = ColorPrimary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
+            lblEcartEquivalent = New Label() With {.Text = "Répartition écart : -", .Font = FontLabel, .ForeColor = ColorSecondary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
             lblResultat = New Label() With {.Text = "Résultat : -", .Font = FontSection, .ForeColor = ColorSecondary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
             resume.Controls.Add(lblTotal, 0, 0)
             resume.Controls.Add(lblEquivalent, 0, 1)
             resume.Controls.Add(lblEcart, 0, 2)
-            resume.Controls.Add(lblResultat, 0, 3)
+            resume.Controls.Add(lblEcartEquivalent, 0, 3)
+            resume.Controls.Add(lblResultat, 0, 4)
             body.Controls.Add(resume, 0, 1)
             layout.Controls.Add(body, 0, 2)
 
@@ -324,6 +328,7 @@ Namespace DevCommerc8ak
             lblTotal.Text = "TOTAL COMPTÉ" & Environment.NewLine & FormatageGlobal.FormatQuantitePhysique(QuantitePhysiqueBase) & " " & uniteReference
             lblEquivalent.Text = "Répartition : " & ObtenirRepartitionSeule(QuantitePhysiqueBase, uniteReference)
             lblEcart.Text = "Écart : " & If(EcartBase > 0D, "+", "") & FormatageGlobal.FormatQuantitePhysique(EcartBase) & " " & uniteReference
+            lblEcartEquivalent.Text = "Répartition écart : " & FormaterRepartitionEcart(EcartBase, uniteReference)
             lblResultat.Text = "Résultat : " & StatutComptage
             lblResultat.ForeColor = If(StatutComptage = "CONFORME", ColorSuccess, If(StatutComptage = "MANQUE", ColorDanger, ColorWarning))
             btnValider.Enabled = True
@@ -333,6 +338,7 @@ Namespace DevCommerc8ak
             lblTotal.Text = "TOTAL COMPTÉ" & Environment.NewLine & "Saisie invalide"
             lblEquivalent.Text = "Répartition : -"
             lblEcart.Text = "Écart : -"
+            lblEcartEquivalent.Text = "Répartition écart : -"
             lblResultat.Text = "Résultat : -"
             lblResultat.ForeColor = ColorDanger
             btnValider.Enabled = False
@@ -411,6 +417,25 @@ Namespace DevCommerc8ak
                 Return stockFormate.Substring(prefix.Length)
             End If
             Return stockFormate
+        End Function
+
+        Private Function FormaterRepartitionEcart(ecart As Decimal, uniteReference As String) As String
+            If ecart = 0D Then
+                Return "0 " & uniteReference
+            End If
+
+            Dim signe As String = If(ecart < 0D, "-", "+")
+            Dim repartition As String = ObtenirRepartitionSeule(Math.Abs(ecart), uniteReference).Trim()
+            If repartition = String.Empty Then
+                Return signe & FormatageGlobal.FormatQuantitePhysique(Math.Abs(ecart)) & " " & uniteReference
+            End If
+
+            Dim morceaux As String() = repartition.Split(New String() {" + "}, StringSplitOptions.RemoveEmptyEntries)
+            For i As Integer = 0 To morceaux.Length - 1
+                morceaux(i) = signe & morceaux(i).Trim()
+            Next
+
+            Return String.Join(" ", morceaux)
         End Function
     End Class
 End Namespace
