@@ -1236,16 +1236,29 @@ Namespace DevCommerc8ak
 
         Private Sub ExporterPdfInventaire(sender As Object, e As EventArgs)
             Try
-                Dim lignes As List(Of String) = ConstruireLignesInventaire()
-                If lignes.Count = 0 Then
+                Dim source As DataTable = If(_impressionInventaireTable IsNot Nothing, _impressionInventaireTable, _inventaireTable)
+                If source Is Nothing OrElse source.Rows.Count = 0 Then
                     MessageBox.Show("Aucune donnée à exporter.")
                     Return
                 End If
+                _impressionInventaireTitre = "RAPPORT D'INVENTAIRE"
+                _impressionInventaireReference = If(String.IsNullOrWhiteSpace(_referenceInventaire), "-", _referenceInventaire)
+                _impressionInventaireStatut = If(String.IsNullOrWhiteSpace(_inventaireStatut), "EN_COURS", _inventaireStatut)
+                If String.IsNullOrWhiteSpace(_impressionInventaireDate) Then
+                    _impressionInventaireDate = Date.Now.ToString("dd/MM/yyyy HH:mm")
+                End If
+                _impressionInventaireTable = source
                 Using sfd As New SaveFileDialog()
                     sfd.Filter = "PDF (*.pdf)|*.pdf"
                     sfd.FileName = "Rapport_Inventaire_" & If(String.IsNullOrWhiteSpace(_referenceInventaire), Date.Now.ToString("yyyyMMddHHmmss"), _referenceInventaire) & ".pdf"
                     If sfd.ShowDialog(Me) = DialogResult.OK Then
-                        PdfHelper.GenererPdfSimple(sfd.FileName, "RAPPORT D'INVENTAIRE", lignes)
+                        Using doc As New PrintDocument()
+                            doc.DefaultPageSettings.PaperSize = New PaperSize("A4", 827, 1169)
+                            doc.DefaultPageSettings.Margins = New System.Drawing.Printing.Margins(30, 30, 30, 30)
+                            _impressionIndexLigne = 0
+                            AddHandler doc.PrintPage, AddressOf ImprimerPageInventaire
+                            PdfHelper.GenererPdfDepuisPrintDocument(sfd.FileName, doc)
+                        End Using
                         MessageBox.Show("PDF généré.")
                     End If
                 End Using

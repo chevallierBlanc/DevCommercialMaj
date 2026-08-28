@@ -6,6 +6,7 @@ Imports System.Collections.Generic
 Imports System.Globalization
 Imports System.IO
 Imports System.Linq
+Imports System.Drawing.Printing
 Imports System.Text
 
 Namespace DevCommerc8ak
@@ -22,6 +23,29 @@ Namespace DevCommerc8ak
 
             Dim contenu As Byte() = ConstruirePdf(titre, If(lignes, New List(Of String)()))
             File.WriteAllBytes(chemin, contenu)
+        End Sub
+
+        Public Sub GenererPdfDepuisPrintDocument(chemin As String, document As PrintDocument)
+            If String.IsNullOrWhiteSpace(chemin) Then Throw New ArgumentException("Le chemin PDF est vide.", NameOf(chemin))
+            If document Is Nothing Then Throw New ArgumentNullException(NameOf(document))
+
+            Dim dossier As String = Path.GetDirectoryName(chemin)
+            If Not String.IsNullOrWhiteSpace(dossier) AndAlso Not Directory.Exists(dossier) Then
+                Directory.CreateDirectory(dossier)
+            End If
+
+            document.PrinterSettings = New PrinterSettings() With {
+                .PrinterName = "Microsoft Print to PDF",
+                .PrintToFile = True,
+                .PrintFileName = chemin
+            }
+            document.PrintController = New StandardPrintController()
+
+            If Not document.PrinterSettings.IsValid Then
+                Throw New InvalidOperationException("L'imprimante Microsoft Print to PDF est indisponible sur ce poste.")
+            End If
+
+            document.Print()
         End Sub
 
         Private Function ConstruirePdf(titre As String, lignes As IList(Of String)) As Byte()
