@@ -23,6 +23,7 @@ Namespace DevCommerc8ak
                         AppliquerMigration(cn, tx, 2026080802, "Index production principaux", AddressOf MigrationIndexProduction)
                         AppliquerMigration(cn, tx, 2026080803, "Precision quantite types vente produit", AddressOf MigrationPrecisionTypesVente)
                         AppliquerMigration(cn, tx, 2026080804, "Index production dates et audit", AddressOf MigrationIndexDatesEtAudit)
+                        AppliquerMigration(cn, tx, 2026080805, "Reparation identite audit actions", AddressOf MigrationAuditActionsIdentity)
                         tx.Commit()
                     Catch
                         tx.Rollback()
@@ -107,6 +108,71 @@ Namespace DevCommerc8ak
             For Each sql As String In indexSql
                 Executer(cn, tx, sql)
             Next
+        End Sub
+
+        Private Shared Sub MigrationAuditActionsIdentity(cn As SqlConnection, tx As SqlTransaction)
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.AuditActions', 'U') IS NULL " &
+                "BEGIN " &
+                "CREATE TABLE dbo.AuditActions (" &
+                "AuditActionId BIGINT IDENTITY(1,1) PRIMARY KEY, " &
+                "Utilisateur NVARCHAR(80) NULL, " &
+                "[Role] NVARCHAR(50) NULL, " &
+                "Module NVARCHAR(80) NULL, " &
+                "[Action] NVARCHAR(100) NULL, " &
+                "[Description] NVARCHAR(255) NULL, " &
+                "Machine NVARCHAR(100) NULL, " &
+                "[Statut] NVARCHAR(30) NULL, " &
+                "CreeLe DATETIME2 NOT NULL CONSTRAINT DF_AuditActions_CreeLe DEFAULT(GETDATE())) " &
+                "END")
+
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.AuditActions', 'U') IS NOT NULL " &
+                "AND COL_LENGTH('dbo.AuditActions', 'AuditActionId') IS NOT NULL " &
+                "AND COLUMNPROPERTY(OBJECT_ID('dbo.AuditActions'), 'AuditActionId', 'IsIdentity') = 0 " &
+                "BEGIN " &
+                "IF OBJECT_ID('dbo.AuditActions_Rebuild', 'U') IS NOT NULL DROP TABLE dbo.AuditActions_Rebuild; " &
+                "CREATE TABLE dbo.AuditActions_Rebuild (" &
+                "AuditActionId BIGINT IDENTITY(1,1) PRIMARY KEY, " &
+                "Utilisateur NVARCHAR(80) NULL, " &
+                "[Role] NVARCHAR(50) NULL, " &
+                "Module NVARCHAR(80) NULL, " &
+                "[Action] NVARCHAR(100) NULL, " &
+                "[Description] NVARCHAR(255) NULL, " &
+                "Machine NVARCHAR(100) NULL, " &
+                "[Statut] NVARCHAR(30) NULL, " &
+                "CreeLe DATETIME2 NOT NULL CONSTRAINT DF_AuditActions_Rebuild_CreeLe DEFAULT(GETDATE())); " &
+                "SET IDENTITY_INSERT dbo.AuditActions_Rebuild ON; " &
+                "INSERT INTO dbo.AuditActions_Rebuild (AuditActionId, Utilisateur, [Role], Module, [Action], [Description], Machine, [Statut], CreeLe) " &
+                "SELECT AuditActionId, Utilisateur, [Role], Module, [Action], [Description], Machine, [Statut], CreeLe " &
+                "FROM dbo.AuditActions WITH (HOLDLOCK); " &
+                "SET IDENTITY_INSERT dbo.AuditActions_Rebuild OFF; " &
+                "IF (SELECT COUNT(1) FROM dbo.AuditActions_Rebuild) <> (SELECT COUNT(1) FROM dbo.AuditActions) " &
+                "BEGIN RAISERROR('Reconstruction AuditActions interrompue : nombre de lignes incoherent.', 16, 1); RETURN; END " &
+                "DROP TABLE dbo.AuditActions; " &
+                "EXEC sp_rename 'dbo.AuditActions_Rebuild', 'AuditActions'; " &
+                "END")
+
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.AuditActions', 'U') IS NOT NULL " &
+                "AND COLUMNPROPERTY(OBJECT_ID('dbo.AuditActions'), 'AuditActionId', 'IsIdentity') = 1 " &
+                "BEGIN " &
+                "DECLARE @MaxAuditActionId BIGINT; " &
+                "SELECT @MaxAuditActionId = ISNULL(MAX(AuditActionId), 0) FROM dbo.AuditActions WITH (HOLDLOCK); " &
+                "DECLARE @SqlCheckIdent NVARCHAR(400); " &
+                "SET @SqlCheckIdent = N'DBCC CHECKIDENT (''dbo.AuditActions'', RESEED, ' + CAST(@MaxAuditActionId AS NVARCHAR(30)) + N') WITH NO_INFOMSGS'; " &
+                "EXEC (@SqlCheckIdent); " &
+                "END")
+
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.AuditActions', 'U') IS NOT NULL " &
+                "AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_AuditActions_CreeLe' AND object_id=OBJECT_ID('dbo.AuditActions')) " &
+                "CREATE INDEX IX_AuditActions_CreeLe ON dbo.AuditActions(CreeLe)")
+
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.AuditActions', 'U') IS NOT NULL " &
+                "AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_AuditActions_Utilisateur_CreeLe' AND object_id=OBJECT_ID('dbo.AuditActions')) " &
+                "CREATE INDEX IX_AuditActions_Utilisateur_CreeLe ON dbo.AuditActions(Utilisateur, CreeLe)")
         End Sub
 
         Private Shared Sub Executer(cn As SqlConnection, tx As SqlTransaction, sql As String)

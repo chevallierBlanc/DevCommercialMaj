@@ -59,7 +59,7 @@ Namespace DevCommerc8ak
                 "IF OBJECT_ID('dbo.AuditActions', 'U') IS NULL " &
                 "BEGIN " &
                 "CREATE TABLE dbo.AuditActions (" &
-                "AuditActionId INT IDENTITY(1,1) PRIMARY KEY, " &
+                "AuditActionId BIGINT IDENTITY(1,1) PRIMARY KEY, " &
                 "Utilisateur NVARCHAR(80) NULL, " &
                 "[Role] NVARCHAR(50) NULL, " &
                 "Module NVARCHAR(80) NULL, " &
