@@ -15,13 +15,23 @@ Namespace DevCommerc8ak
         Private ReadOnly _btnImprimer As Button
         Private ReadOnly _btnFermer As Button
         Private ReadOnly _creerDocumentImpression As Func(Of PrintDocument)
+        Private ReadOnly _lancerImpression As Action
         Private _impressionEnCours As Boolean
 
         Public Sub New(documentApercu As PrintDocument, creerDocumentImpression As Func(Of PrintDocument))
+            Me.New(documentApercu, creerDocumentImpression, Nothing)
+        End Sub
+
+        Public Sub New(documentApercu As PrintDocument, lancerImpression As Action)
+            Me.New(documentApercu, Nothing, lancerImpression)
+        End Sub
+
+        Private Sub New(documentApercu As PrintDocument, creerDocumentImpression As Func(Of PrintDocument), lancerImpression As Action)
             If documentApercu Is Nothing Then Throw New ArgumentNullException(NameOf(documentApercu))
-            If creerDocumentImpression Is Nothing Then Throw New ArgumentNullException(NameOf(creerDocumentImpression))
+            If creerDocumentImpression Is Nothing AndAlso lancerImpression Is Nothing Then Throw New ArgumentNullException(NameOf(creerDocumentImpression))
 
             _creerDocumentImpression = creerDocumentImpression
+            _lancerImpression = lancerImpression
 
             Text = "Aperçu ticket"
             Width = 1000
@@ -104,9 +114,13 @@ Namespace DevCommerc8ak
             _impressionEnCours = True
             Try
                 Debug.WriteLine("ENTER aperçu ticket détecté")
-                Using doc As PrintDocument = _creerDocumentImpression()
-                    doc.Print()
-                End Using
+                If _lancerImpression IsNot Nothing Then
+                    _lancerImpression()
+                Else
+                    Using doc As PrintDocument = _creerDocumentImpression()
+                        doc.Print()
+                    End Using
+                End If
 
                 DialogResult = DialogResult.OK
                 Close()

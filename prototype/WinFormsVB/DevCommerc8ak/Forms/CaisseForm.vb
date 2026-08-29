@@ -53,6 +53,7 @@ Namespace DevCommerc8ak
         Private _dernierTicket As TicketData
         Private _isRefreshingFromEvent As Boolean
         Private _dataMonitor As DataChangeMonitorService
+        Private _encaissementEnCours As Boolean
 
         Private Class TicketData
             Public Property Numero As String
@@ -315,7 +316,9 @@ Namespace DevCommerc8ak
         Protected Overrides Sub OnKeyDown(e As KeyEventArgs)
             MyBase.OnKeyDown(e)
             If e.KeyCode = Keys.Enter Then
-                Encaisser(Nothing, EventArgs.Empty)
+                If btnEncaisser.Enabled AndAlso Not _encaissementEnCours Then
+                    Encaisser(Nothing, EventArgs.Empty)
+                End If
                 e.Handled = True
             ElseIf e.KeyCode = Keys.F5 Then
                 ChargerFactures(Nothing, EventArgs.Empty)
@@ -500,6 +503,10 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub Encaisser(sender As Object, e As EventArgs)
+            If _encaissementEnCours Then Return
+
+            _encaissementEnCours = True
+            btnEncaisser.Enabled = False
             Try
                 Dim selectedRow As DataGridViewRow = Nothing
                 If Not TryGetSelectedFactureRow(selectedRow) Then
@@ -585,6 +592,9 @@ Namespace DevCommerc8ak
                           "Mode=" & If(cmbMode.SelectedItem Is Nothing, "Nothing", cmbMode.SelectedItem.ToString()) & Environment.NewLine &
                           "Utilisateur=" & SessionUtilisateur.UtilisateurId.ToString(), ex)
                 MessageBox.Show("Erreur paiement: " & ex.Message)
+            Finally
+                _encaissementEnCours = False
+                MettreAJourEtatActions()
             End Try
         End Sub
 
@@ -661,14 +671,13 @@ Namespace DevCommerc8ak
                 End If
 
                 Dim totalCopies As Integer = Math.Max(1, copies)
-                Dim doc As Printing.PrintDocument = CreerDocumentTicket(ticket, totalCopies)
 
                 If afficherApercu AndAlso _param IsNot Nothing AndAlso _param.ApercuAvantImpression Then
-                    Using preview As New FormApercuTicket(doc, Function() CreerDocumentTicket(ticket, totalCopies))
+                    Using preview As New FormApercuTicket(CreerDocumentTicket(ticket, 1, totalCopies), Sub() ImprimerTicketsDistincts(ticket, totalCopies))
                         preview.ShowDialog(Me)
                     End Using
                 Else
-                    doc.Print()
+                    ImprimerTicketsDistincts(ticket, totalCopies)
                 End If
                 Return True
             Catch ex As Exception
@@ -678,20 +687,28 @@ Namespace DevCommerc8ak
             End Try
         End Function
 
-        Private Function CreerDocumentTicket(ticket As TicketData, copies As Integer) As Printing.PrintDocument
+        Private Sub ImprimerTicketsDistincts(ticket As TicketData, totalCopies As Integer)
+            Dim nombreCopies As Integer = Math.Max(1, totalCopies)
+            For copie As Integer = 1 To nombreCopies
+                Using doc As Printing.PrintDocument = CreerDocumentTicket(ticket, copie, nombreCopies)
+                    doc.Print()
+                End Using
+            Next
+        End Sub
+
+        Private Function CreerDocumentTicket(ticket As TicketData, copieCourante As Integer, totalCopies As Integer) As Printing.PrintDocument
             Dim doc As New Printing.PrintDocument()
             _param = PrintConfigurationHelper.ConfigurerDocumentThermique(doc, Me, "CaisseForm", "ImprimerTicket", 315, 1400)
             doc.PrinterSettings.Copies = 1S
             doc.DefaultPageSettings.Color = If(_param IsNot Nothing, _param.ImpressionCouleur, True)
             doc.DefaultPageSettings.Margins = New Printing.Margins(2, 2, 2, 2)
 
-            Dim totalCopies As Integer = Math.Max(1, copies)
-            Dim copieCourante As Integer = 1
+            Dim numeroCopie As Integer = Math.Max(1, copieCourante)
+            Dim nombreCopies As Integer = Math.Max(1, totalCopies)
             AddHandler doc.PrintPage,
                 Sub(s, eV)
-                    ImprimerPageTicket(eV, ticket, copieCourante, totalCopies)
-                    copieCourante += 1
-                    eV.HasMorePages = copieCourante <= totalCopies
+                    ImprimerPageTicket(eV, ticket, numeroCopie, nombreCopies)
+                    eV.HasMorePages = False
                 End Sub
 
             Return doc

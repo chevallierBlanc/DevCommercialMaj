@@ -24,6 +24,7 @@ Namespace DevCommerc8ak
                         AppliquerMigration(cn, tx, 2026080803, "Precision quantite types vente produit", AddressOf MigrationPrecisionTypesVente)
                         AppliquerMigration(cn, tx, 2026080804, "Index production dates et audit", AddressOf MigrationIndexDatesEtAudit)
                         AppliquerMigration(cn, tx, 2026080805, "Reparation identite audit actions", AddressOf MigrationAuditActionsIdentity)
+                        AppliquerMigration(cn, tx, 2026080806, "Sequences metier multiposte", AddressOf MigrationBusinessSequences)
                         tx.Commit()
                     Catch
                         tx.Rollback()
@@ -173,6 +174,25 @@ Namespace DevCommerc8ak
                 "IF OBJECT_ID('dbo.AuditActions', 'U') IS NOT NULL " &
                 "AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_AuditActions_Utilisateur_CreeLe' AND object_id=OBJECT_ID('dbo.AuditActions')) " &
                 "CREATE INDEX IX_AuditActions_Utilisateur_CreeLe ON dbo.AuditActions(Utilisateur, CreeLe)")
+        End Sub
+
+        Private Shared Sub MigrationBusinessSequences(cn As SqlConnection, tx As SqlTransaction)
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.BusinessSequences', 'U') IS NULL " &
+                "BEGIN " &
+                "CREATE TABLE dbo.BusinessSequences (" &
+                "SequenceKey NVARCHAR(120) NOT NULL PRIMARY KEY, " &
+                "Prefix NVARCHAR(30) NOT NULL, " &
+                "Periode NVARCHAR(20) NOT NULL, " &
+                "DernierNumero INT NOT NULL CONSTRAINT DF_BusinessSequences_DernierNumero DEFAULT(0), " &
+                "CreeLe DATETIME2 NOT NULL CONSTRAINT DF_BusinessSequences_CreeLe DEFAULT(SYSDATETIME()), " &
+                "ModifieLe DATETIME2 NOT NULL CONSTRAINT DF_BusinessSequences_ModifieLe DEFAULT(SYSDATETIME())) " &
+                "END")
+
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.BusinessSequences', 'U') IS NOT NULL " &
+                "AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_BusinessSequences_Prefix_Periode' AND object_id=OBJECT_ID('dbo.BusinessSequences')) " &
+                "CREATE INDEX IX_BusinessSequences_Prefix_Periode ON dbo.BusinessSequences(Prefix, Periode)")
         End Sub
 
         Private Shared Sub Executer(cn As SqlConnection, tx As SqlTransaction, sql As String)

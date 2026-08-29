@@ -69,8 +69,24 @@ Namespace DevCommerc8ak
 
         Private Function GenererNumeroSortie() As String
             Dim prefix As String = "SORT-" & DateTime.Now.ToString("yyyyMMdd")
-            Dim sql As String = "SELECT ISNULL(MAX(CAST(RIGHT(NumeroSortie, 3) AS INT)), 0) + 1 FROM StockSortie WHERE NumeroSortie LIKE @PrefixLike"
-            Dim p As New List(Of SqlParameter) From {New SqlParameter("@PrefixLike", prefix & "-%")}
+            Dim sql As String = "" &
+                "DECLARE @SequenceKey NVARCHAR(120) = N'StockSortie:' + @Prefix; " &
+                "DECLARE @LockResult INT; " &
+                "EXEC @LockResult = sp_getapplock @Resource=@SequenceKey, @LockMode='Exclusive', @LockOwner='Session', @LockTimeout=10000; " &
+                "IF @LockResult < 0 BEGIN RAISERROR('Impossible de réserver un numéro de sortie.', 16, 1); RETURN; END " &
+                "IF NOT EXISTS (SELECT 1 FROM dbo.BusinessSequences WHERE SequenceKey=@SequenceKey) " &
+                "BEGIN " &
+                "DECLARE @Initial INT; " &
+                "SELECT @Initial = ISNULL(MAX(CASE WHEN ISNUMERIC(RIGHT(NumeroSortie, 3)) = 1 THEN CAST(RIGHT(NumeroSortie, 3) AS INT) ELSE 0 END), 0) " &
+                "FROM StockSortie WHERE NumeroSortie LIKE @PrefixLike; " &
+                "INSERT INTO dbo.BusinessSequences (SequenceKey, Prefix, Periode, DernierNumero) VALUES (@SequenceKey, N'SORT', @Periode, @Initial); " &
+                "END " &
+                "UPDATE dbo.BusinessSequences SET DernierNumero = DernierNumero + 1, ModifieLe = SYSDATETIME() OUTPUT inserted.DernierNumero WHERE SequenceKey=@SequenceKey;"
+            Dim p As New List(Of SqlParameter) From {
+                New SqlParameter("@Prefix", prefix),
+                New SqlParameter("@Periode", DateTime.Now.ToString("yyyyMMdd")),
+                New SqlParameter("@PrefixLike", prefix & "-%")
+            }
             Dim v As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
             Dim numero As Integer = Convert.ToInt32(v)
             Return prefix & "-" & numero.ToString("000")
