@@ -6,6 +6,8 @@ public sealed class DashboardPageViewModel
     public int Year { get; set; } = DateTime.Today.Year;
     public int Month { get; set; } = DateTime.Today.Month;
     public DateTime Date { get; set; } = DateTime.Today;
+    public string NomBoutique { get; set; } = "ERP COMMERCIAL";
+    public EntrepriseConfigurationDto Entreprise { get; set; } = new();
 
     public JournalierDashboardResponseDto? Journalier { get; set; }
     public MensuelDashboardResponseDto? Mensuel { get; set; }

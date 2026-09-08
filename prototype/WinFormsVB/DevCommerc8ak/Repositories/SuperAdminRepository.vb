@@ -89,6 +89,7 @@ Namespace DevCommerc8ak
             AssurerInterface("PARAMETRES", "Paramètres", False)
             AssurerInterface("SUPERADMIN_TECH", "Interfaces techniques SuperAdmin", True)
             AssurerInterface("SUPERADMIN_STOCK_INITIAL", "Stock initial technique", True)
+            AssurerInterface("SUPERADMIN_INIT_VENTES", "Initialisation des ventes", True)
             AssurerInterface("SUPERADMIN_ROLES", "Rôles et privilèges", True)
             AssurerInterface("SUPERADMIN_AUDIT", "Journal actions utilisateurs", True)
 
@@ -120,9 +121,9 @@ Namespace DevCommerc8ak
             AssurerRoleInterfacesSiVide("CAISSIER", New String() {"CAISSE", "FINANCE"})
             AssurerRoleInterfacesSiVide("CAISSIERE", New String() {"CAISSE", "FINANCE"})
             AssurerRoleInterfacesSiVide("ADMIN", New String() {"FACTURIER", "HISTORIQUE_FACTURES", "CAISSE", "FINANCE", "ADMINISTRATION", "ANALYSE_CAISSE_PHYSIQUE", "STOCK_INVENTAIRE", "ANALYSE_VENTES", "INVENTAIRE", "PARAMETRES"})
-            AssurerRoleInterfacesSiVide("SUPERADMIN", New String() {"FACTURIER", "HISTORIQUE_FACTURES", "CAISSE", "FINANCE", "ADMINISTRATION", "ANALYSE_CAISSE_PHYSIQUE", "STOCK_INVENTAIRE", "ANALYSE_VENTES", "INVENTAIRE", "PARAMETRES", "SUPERADMIN_TECH", "SUPERADMIN_STOCK_INITIAL", "SUPERADMIN_ROLES", "SUPERADMIN_AUDIT"})
+            AssurerRoleInterfacesSiVide("SUPERADMIN", New String() {"FACTURIER", "HISTORIQUE_FACTURES", "CAISSE", "FINANCE", "ADMINISTRATION", "ANALYSE_CAISSE_PHYSIQUE", "STOCK_INVENTAIRE", "ANALYSE_VENTES", "INVENTAIRE", "PARAMETRES", "SUPERADMIN_TECH", "SUPERADMIN_STOCK_INITIAL", "SUPERADMIN_INIT_VENTES", "SUPERADMIN_ROLES", "SUPERADMIN_AUDIT"})
             AssurerRoleInterfaces("ADMIN", New String() {"ANALYSE_CAISSE_PHYSIQUE"})
-            AssurerRoleInterfaces("SUPERADMIN", New String() {"ANALYSE_CAISSE_PHYSIQUE"})
+            AssurerRoleInterfaces("SUPERADMIN", New String() {"ANALYSE_CAISSE_PHYSIQUE", "SUPERADMIN_INIT_VENTES"})
         End Sub
 
         Private Sub AssurerRoleInterfacesSiVide(nomRole As String, codesInterfaces As IEnumerable(Of String))

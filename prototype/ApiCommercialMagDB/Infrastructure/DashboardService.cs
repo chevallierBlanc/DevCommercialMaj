@@ -3,6 +3,9 @@ namespace CommercialMagDb.Api.Infrastructure;
 
 public sealed class DashboardService(DashboardRepository repository)
 {
+    public Task<EntrepriseConfigurationResponse> GetEntrepriseConfigurationAsync(CancellationToken ct = default)
+        => repository.GetEntrepriseConfigurationAsync(ct);
+
     public Task<JournalierDashboardResponse> GetJournalierAsync(DateTime date, CancellationToken ct = default)
         => repository.GetJournalierAsync(date, ct);
 

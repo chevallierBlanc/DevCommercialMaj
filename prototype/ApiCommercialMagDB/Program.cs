@@ -9,6 +9,17 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+ApiStartupLogger.Write(builder.Environment.ContentRootPath, $"Startup begin env={builder.Environment.EnvironmentName}");
+var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
+try
+{
+    _ = JwtTokenService.BuildSigningKey(jwtOptions.SigningKey);
+}
+catch (Exception ex)
+{
+    ApiStartupLogger.Write(builder.Environment.ContentRootPath, "Startup failed: invalid JWT configuration.", ex);
+    throw;
+}
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddAuthorization(options =>
@@ -23,15 +34,14 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        var jwt = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = jwt.Issuer,
+            ValidIssuer = jwtOptions.Issuer,
             ValidateAudience = true,
-            ValidAudience = jwt.Audience,
+            ValidAudience = jwtOptions.Audience,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = JwtTokenService.BuildSigningKey(jwt.SigningKey),
+            IssuerSigningKey = JwtTokenService.BuildSigningKey(jwtOptions.SigningKey),
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(1)
         };
@@ -71,11 +81,45 @@ app.UseAuthorization();
 
 using (var scope = app.Services.CreateScope())
 {
-    var authService = scope.ServiceProvider.GetRequiredService<AuthService>();
-    await authService.EnsureDevAdminAsync();
+    try
+    {
+        var authService = scope.ServiceProvider.GetRequiredService<AuthService>();
+        await authService.EnsureDevAdminAsync();
+    }
+    catch (Exception ex)
+    {
+        ApiStartupLogger.Write(app.Environment.ContentRootPath, "Startup failed: development admin initialization failed.", ex);
+        throw;
+    }
 }
 
 app.MapGet("/", () => Results.Ok(new { service = "CommercialMagDb.Api", status = "running" }));
+app.MapGet("/health", async (DbConnectionFactory factory, IWebHostEnvironment env, CancellationToken ct) =>
+{
+    var databaseOk = false;
+    try
+    {
+        await using var cn = factory.Create();
+        await cn.OpenAsync(ct);
+        await using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT 1";
+        await cmd.ExecuteScalarAsync(ct);
+        databaseOk = true;
+    }
+    catch (Exception ex)
+    {
+        ApiStartupLogger.Write(env.ContentRootPath, "Health check database failure.", ex);
+    }
+
+    return Results.Ok(new
+    {
+        service = "CommercialMagDb.Api",
+        status = "running",
+        environment = env.EnvironmentName,
+        database = databaseOk ? "OK" : "UNAVAILABLE",
+        serverUtc = DateTime.UtcNow
+    });
+}).AllowAnonymous();
 
 var auth = app.MapGroup("/api/auth");
 auth.MapPost("/login", async (LoginRequest request, AuthService service) =>
@@ -176,4 +220,20 @@ dashboard.MapGet("/analyse-vente", async (string? periode, int? year, int? month
     return Results.Ok(result);
 });
 
-app.Run();
+var configuration = app.MapGroup("/api/configuration").RequireAuthorization("DashboardRead");
+configuration.MapGet("/entreprise", async (DashboardService service, CancellationToken ct) =>
+{
+    var result = await service.GetEntrepriseConfigurationAsync(ct);
+    return Results.Ok(result);
+});
+
+ApiStartupLogger.Write(app.Environment.ContentRootPath, $"Host configured env={app.Environment.EnvironmentName}");
+try
+{
+    app.Run();
+}
+catch (Exception ex)
+{
+    ApiStartupLogger.Write(app.Environment.ContentRootPath, "Startup failed: host run failed.", ex);
+    throw;
+}

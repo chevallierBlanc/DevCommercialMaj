@@ -25,6 +25,7 @@ Namespace DevCommerc8ak
                         AppliquerMigration(cn, tx, 2026080804, "Index production dates et audit", AddressOf MigrationIndexDatesEtAudit)
                         AppliquerMigration(cn, tx, 2026080805, "Reparation identite audit actions", AddressOf MigrationAuditActionsIdentity)
                         AppliquerMigration(cn, tx, 2026080806, "Sequences metier multiposte", AddressOf MigrationBusinessSequences)
+                        AppliquerMigration(cn, tx, 2026090801, "Sessions initialisation ventes", AddressOf MigrationInitialisationVentes)
                         tx.Commit()
                     Catch
                         tx.Rollback()
@@ -193,6 +194,59 @@ Namespace DevCommerc8ak
                 "IF OBJECT_ID('dbo.BusinessSequences', 'U') IS NOT NULL " &
                 "AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_BusinessSequences_Prefix_Periode' AND object_id=OBJECT_ID('dbo.BusinessSequences')) " &
                 "CREATE INDEX IX_BusinessSequences_Prefix_Periode ON dbo.BusinessSequences(Prefix, Periode)")
+        End Sub
+
+        Private Shared Sub MigrationInitialisationVentes(cn As SqlConnection, tx As SqlTransaction)
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.InitialisationVenteSessions', 'U') IS NULL " &
+                "BEGIN " &
+                "CREATE TABLE dbo.InitialisationVenteSessions (" &
+                "InitialisationVenteSessionId INT IDENTITY(1,1) NOT NULL PRIMARY KEY, " &
+                "ReferenceSession NVARCHAR(50) NOT NULL UNIQUE, " &
+                "DateDebut DATE NOT NULL, " &
+                "DateFin DATE NOT NULL, " &
+                "ModeStock NVARCHAR(30) NOT NULL CONSTRAINT DF_InitVenteSessions_ModeStock DEFAULT('HISTORIQUE_UNIQUEMENT'), " &
+                "Observation NVARCHAR(500) NULL, " &
+                "Statut NVARCHAR(20) NOT NULL CONSTRAINT DF_InitVenteSessions_Statut DEFAULT('BROUILLON'), " &
+                "CreeLe DATETIME2 NOT NULL CONSTRAINT DF_InitVenteSessions_CreeLe DEFAULT(SYSDATETIME()), " &
+                "CreePar INT NOT NULL, " &
+                "Machine NVARCHAR(100) NULL, " &
+                "ValideeLe DATETIME2 NULL, " &
+                "ValideePar INT NULL, " &
+                "AnnuleeLe DATETIME2 NULL, " &
+                "AnnuleePar INT NULL) " &
+                "END")
+
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.InitialisationVenteLignes', 'U') IS NULL " &
+                "BEGIN " &
+                "CREATE TABLE dbo.InitialisationVenteLignes (" &
+                "InitialisationVenteLigneId INT IDENTITY(1,1) NOT NULL PRIMARY KEY, " &
+                "InitialisationVenteSessionId INT NOT NULL, " &
+                "DateVente DATETIME2 NOT NULL, " &
+                "ProduitId INT NOT NULL, " &
+                "CodeProduit NVARCHAR(80) NULL, " &
+                "LibelleProduit NVARCHAR(200) NOT NULL, " &
+                "Categorie NVARCHAR(150) NULL, " &
+                "TypeVente NVARCHAR(80) NOT NULL, " &
+                "UniteCommerciale NVARCHAR(80) NULL, " &
+                "QuantiteCommerciale DECIMAL(18,4) NOT NULL, " &
+                "PrixUnitaire DECIMAL(18,2) NOT NULL, " &
+                "MontantLigne DECIMAL(18,2) NOT NULL, " &
+                "QuantiteBase DECIMAL(18,4) NOT NULL, " &
+                "CoutUnitaireBaseVente DECIMAL(18,4) NULL, " &
+                "BeneficeEstime DECIMAL(18,2) NULL, " &
+                "CreeLe DATETIME2 NOT NULL CONSTRAINT DF_InitVenteLignes_CreeLe DEFAULT(SYSDATETIME()), " &
+                "CONSTRAINT FK_InitVenteLignes_Session FOREIGN KEY (InitialisationVenteSessionId) REFERENCES dbo.InitialisationVenteSessions(InitialisationVenteSessionId)) " &
+                "END")
+
+            Executer(cn, tx, "IF OBJECT_ID('dbo.FacturesVente', 'U') IS NOT NULL AND COL_LENGTH('dbo.FacturesVente', 'OrigineVente') IS NULL ALTER TABLE dbo.FacturesVente ADD OrigineVente NVARCHAR(30) NULL")
+            Executer(cn, tx, "IF OBJECT_ID('dbo.FacturesVente', 'U') IS NOT NULL AND COL_LENGTH('dbo.FacturesVente', 'InitialisationVenteSessionId') IS NULL ALTER TABLE dbo.FacturesVente ADD InitialisationVenteSessionId INT NULL")
+
+            Executer(cn, tx, "IF OBJECT_ID('dbo.InitialisationVenteSessions', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_InitVenteSessions_Statut_Dates' AND object_id=OBJECT_ID('dbo.InitialisationVenteSessions')) CREATE INDEX IX_InitVenteSessions_Statut_Dates ON dbo.InitialisationVenteSessions(Statut, DateDebut, DateFin)")
+            Executer(cn, tx, "IF OBJECT_ID('dbo.InitialisationVenteLignes', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_InitVenteLignes_Session' AND object_id=OBJECT_ID('dbo.InitialisationVenteLignes')) CREATE INDEX IX_InitVenteLignes_Session ON dbo.InitialisationVenteLignes(InitialisationVenteSessionId)")
+            Executer(cn, tx, "IF OBJECT_ID('dbo.InitialisationVenteLignes', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_InitVenteLignes_Date_Produit' AND object_id=OBJECT_ID('dbo.InitialisationVenteLignes')) CREATE INDEX IX_InitVenteLignes_Date_Produit ON dbo.InitialisationVenteLignes(DateVente, ProduitId)")
+            Executer(cn, tx, "IF OBJECT_ID('dbo.FacturesVente', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_FacturesVente_Origine_InitSession' AND object_id=OBJECT_ID('dbo.FacturesVente')) CREATE INDEX IX_FacturesVente_Origine_InitSession ON dbo.FacturesVente(OrigineVente, InitialisationVenteSessionId)")
         End Sub
 
         Private Shared Sub Executer(cn As SqlConnection, tx As SqlTransaction, sql As String)

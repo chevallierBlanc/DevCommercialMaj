@@ -87,6 +87,7 @@
     <Compile Include="DTOs\TypeVenteDTO.vb" />
     <Compile Include="DTOs\TypeVenteProduitDTO.vb" />
     <Compile Include="DTOs\AuditLogEntryDTO.vb" />
+    <Compile Include="DTOs\InitialisationVenteDTOs.vb" />
     <Compile Include="DTOs\NotificationDTO.vb" />
     <Compile Include="Repositories\ClientRepository.vb" />
     <Compile Include="Repositories\FinanceRepositories %284%29.vb" />
@@ -111,6 +112,7 @@
     <Compile Include="Repositories\DepenseRepository.vb" />
     <Compile Include="Repositories\InventaireIntelligentRepository.vb" />
     <Compile Include="Repositories\SuperAdminRepository.vb" />
+    <Compile Include="Repositories\InitialisationVenteRepository.vb" />
     <Compile Include="Repositories\StockSortieNonSynchroniseRepository.vb" />
     <Compile Include="Repositories\DepensesNonSynchroniseesRepository.vb" />
     <Compile Include="Services\ClientService.vb" />
@@ -153,6 +155,7 @@
     <Compile Include="Services\LogoPathHelper.vb" />
     <Compile Include="Services\PrintConfigurationHelper.vb" />
     <Compile Include="Services\SuperAdminService.vb" />
+    <Compile Include="Services\InitialisationVenteService.vb" />
     <Compile Include="UI\FormAPropos_Retouche.VB">
       <SubType>Form</SubType>
     </Compile>
@@ -214,6 +217,9 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FormulaireSuperAdminRoles.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\FormulaireInitialisationVentes.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\FrmInventaireIntelligent.vb">

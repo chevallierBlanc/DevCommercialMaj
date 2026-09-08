@@ -53,6 +53,13 @@ public sealed class DashboardApiClient
             Date = today
         };
 
+        var entreprise = await GetOrDefaultAsync<EntrepriseConfigurationDto>("api/configuration/entreprise", ct);
+        if (entreprise is not null)
+        {
+            model.Entreprise = entreprise;
+            model.NomBoutique = string.IsNullOrWhiteSpace(entreprise.NomBoutique) ? "ERP COMMERCIAL" : entreprise.NomBoutique;
+        }
+
         var query = $"api/dashboard/journalier?start={Uri.EscapeDataString(startDate.ToString("yyyy-MM-dd"))}&end={Uri.EscapeDataString(endDate.ToString("yyyy-MM-dd"))}&date={Uri.EscapeDataString(today.ToString("yyyy-MM-dd"))}";
         model.Journalier = await GetOrDefaultAsync<JournalierDashboardResponseDto>(query, ct);
 
@@ -82,6 +89,13 @@ public sealed class DashboardApiClient
             DateDebut = startDate,
             DateFin = endDate
         };
+
+        var entreprise = await GetOrDefaultAsync<EntrepriseConfigurationDto>("api/configuration/entreprise", ct);
+        if (entreprise is not null)
+        {
+            model.Entreprise = entreprise;
+            model.NomBoutique = string.IsNullOrWhiteSpace(entreprise.NomBoutique) ? "ERP COMMERCIAL" : entreprise.NomBoutique;
+        }
 
         var query = $"api/dashboard/analyse-vente?periode={Uri.EscapeDataString(mode)}&year={selectedYear}&month={selectedMonth}&date={Uri.EscapeDataString(today.ToString("yyyy-MM-dd"))}&start={Uri.EscapeDataString(startDate.ToString("yyyy-MM-dd"))}&end={Uri.EscapeDataString(endDate.ToString("yyyy-MM-dd"))}";
         model.Analyse = await GetAnalyseAsync(query, ct)

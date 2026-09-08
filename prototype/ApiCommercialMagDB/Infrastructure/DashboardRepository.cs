@@ -6,6 +6,40 @@ namespace CommercialMagDb.Api.Infrastructure;
 
 public sealed class DashboardRepository(DbConnectionFactory factory)
 {
+    public async Task<EntrepriseConfigurationResponse> GetEntrepriseConfigurationAsync(CancellationToken ct = default)
+    {
+        await using var cn = factory.Create();
+        await cn.OpenAsync(ct);
+
+        const string sql = """
+            SELECT TOP 1
+                   ISNULL(NULLIF(LTRIM(RTRIM(NomMagasin)), ''), 'ERP COMMERCIAL') AS NomBoutique,
+                   ISNULL(NULLIF(LTRIM(RTRIM(NomMagasin)), ''), '') AS RaisonSociale,
+                   ISNULL(AdresseMagasin, '') AS Adresse,
+                   ISNULL(TelephoneMagasin, '') AS Telephone,
+                   ISNULL(NULLIF(LTRIM(RTRIM(DeviseParDefaut)), ''), 'FC') AS DevisePrincipale,
+                   ISNULL(LogoPath, '') AS Logo
+            FROM Parametres
+            """;
+
+        await using var cmd = new SqlCommand(sql, cn);
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct))
+        {
+            return new EntrepriseConfigurationResponse();
+        }
+
+        return new EntrepriseConfigurationResponse
+        {
+            NomBoutique = ReadString(reader, 0, "ERP COMMERCIAL"),
+            RaisonSociale = ReadString(reader, 1),
+            Adresse = ReadString(reader, 2),
+            Telephone = ReadString(reader, 3),
+            DevisePrincipale = ReadString(reader, 4, "FC"),
+            Logo = ReadString(reader, 5)
+        };
+    }
+
     public async Task<JournalierDashboardResponse> GetJournalierAsync(DateTime date, CancellationToken ct = default)
         => await GetJournalierAsync(date.Date, date.Date, ct);
 
@@ -1042,6 +1076,12 @@ public sealed class DashboardRepository(DbConnectionFactory factory)
 
     private static string ReadString(SqlDataReader reader, int ordinal)
         => reader.IsDBNull(ordinal) ? string.Empty : reader.GetValue(ordinal)?.ToString()?.Trim() ?? string.Empty;
+
+    private static string ReadString(SqlDataReader reader, int ordinal, string fallback)
+    {
+        var value = ReadString(reader, ordinal);
+        return string.IsNullOrWhiteSpace(value) ? fallback : value;
+    }
 
     private static string FormatQuantity(decimal quantity)
         => quantity.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);

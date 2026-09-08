@@ -106,7 +106,7 @@ Namespace DevCommerc8ak
             }
 
             lblSubtitle = New Label() With {
-                .Text = "Initialisation des quantités réelles et configuration des types de vente par produit.",
+                .Text = "Initialisation des quantités réelles au démarrage. Les ventes antérieures se reprennent dans Initialisation des ventes.",
                 .Font = FontSubtitle,
                 .ForeColor = ColorTextSecondary,
                 .AutoSize = True,
@@ -393,6 +393,17 @@ Namespace DevCommerc8ak
 
             If grid.Columns.Contains("RechercheNormalisee") Then
                 grid.Columns("RechercheNormalisee").Visible = False
+            End If
+
+            If grid.Columns.Contains("CodeBarres") Then
+                grid.Columns("CodeBarres").Frozen = True
+                grid.Columns("CodeBarres").Width = Math.Max(grid.Columns("CodeBarres").Width, 120)
+            End If
+
+            If grid.Columns.Contains("Libelle") Then
+                grid.Columns("Libelle").Frozen = True
+                grid.Columns("Libelle").Width = Math.Max(grid.Columns("Libelle").Width, 240)
+                grid.Columns("Libelle").ToolTipText = "Produit"
             End If
         End Sub
 

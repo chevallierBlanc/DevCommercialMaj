@@ -10,11 +10,13 @@ Namespace DevCommerc8ak
         Inherits Form
 
         Private ReadOnly _ouvrirStockInitial As Action
+        Private ReadOnly _ouvrirInitialisationVentes As Action
         Private ReadOnly _ouvrirRoles As Action
         Private ReadOnly _ouvrirJournal As Action
 
-        Public Sub New(ouvrirStockInitial As Action, ouvrirRoles As Action, ouvrirJournal As Action)
+        Public Sub New(ouvrirStockInitial As Action, ouvrirRoles As Action, ouvrirJournal As Action, Optional ouvrirInitialisationVentes As Action = Nothing)
             _ouvrirStockInitial = ouvrirStockInitial
+            _ouvrirInitialisationVentes = ouvrirInitialisationVentes
             _ouvrirRoles = ouvrirRoles
             _ouvrirJournal = ouvrirJournal
 
@@ -42,7 +44,7 @@ Namespace DevCommerc8ak
                 .Left = 20
             }
             Dim sousTitre As New Label() With {
-                .Text = "Accès rapide aux outils techniques : stock initial, rôles et journal des actions.",
+                .Text = "Accès rapide aux outils techniques : stock initial, initialisation des ventes, rôles et journal des actions.",
                 .Font = New Font("Segoe UI", 10),
                 .ForeColor = Color.FromArgb(107, 114, 128),
                 .AutoSize = True,
@@ -60,6 +62,9 @@ Namespace DevCommerc8ak
             }
 
             cards.Controls.Add(CreerCarte("Stock initial technique", "Préparer et injecter rapidement les stocks initiaux avec conversions et prix.", Color.FromArgb(14, 116, 144), Sub() If _ouvrirStockInitial IsNot Nothing Then _ouvrirStockInitial()))
+            If _ouvrirInitialisationVentes IsNot Nothing Then
+                cards.Controls.Add(CreerCarte("Initialisation des ventes", "Reprendre les ventes antérieures sans confondre historique et stock réel.", Color.FromArgb(234, 88, 12), Sub() _ouvrirInitialisationVentes()))
+            End If
             cards.Controls.Add(CreerCarte("Rôles & privilèges", "Créer, modifier et restreindre les rôles applicatifs.", Color.FromArgb(79, 70, 229), Sub() If _ouvrirRoles IsNot Nothing Then _ouvrirRoles()))
             cards.Controls.Add(CreerCarte("Journal actions", "Consulter les audits utilisateurs et les événements métier.", Color.FromArgb(22, 163, 74), Sub() If _ouvrirJournal IsNot Nothing Then _ouvrirJournal()))
 

@@ -8,5 +8,7 @@ public sealed class AnalyseVentePageViewModel
     public DateTime Date { get; set; } = DateTime.Today;
     public DateTime DateDebut { get; set; } = DateTime.Today.AddMonths(-1);
     public DateTime DateFin { get; set; } = DateTime.Today;
+    public string NomBoutique { get; set; } = "ERP COMMERCIAL";
+    public EntrepriseConfigurationDto Entreprise { get; set; } = new();
     public AnalyseVenteResponseDto? Analyse { get; set; }
 }

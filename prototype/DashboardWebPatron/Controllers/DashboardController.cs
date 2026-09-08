@@ -17,6 +17,7 @@ public sealed class DashboardController : Controller
     public async Task<IActionResult> Index(string? periode = "jour", int? year = null, int? month = null, DateTime? date = null, CancellationToken ct = default)
     {
         var model = await _client.LoadAsync(periode, year, month, date, ct);
+        ViewData["NomBoutique"] = model.NomBoutique;
         return View(model);
     }
 
@@ -24,6 +25,7 @@ public sealed class DashboardController : Controller
     public async Task<IActionResult> Tv(int? year = null, int? month = null, DateTime? date = null, CancellationToken ct = default)
     {
         var model = await _client.LoadAsync("jour", year, month, date, ct);
+        ViewData["NomBoutique"] = model.NomBoutique;
         return View(model);
     }
 
@@ -31,6 +33,7 @@ public sealed class DashboardController : Controller
     public async Task<IActionResult> Mobile(int? year = null, int? month = null, DateTime? date = null, CancellationToken ct = default)
     {
         var model = await _client.LoadAsync("jour", year, month, date, ct);
+        ViewData["NomBoutique"] = model.NomBoutique;
         return View(model);
     }
 
@@ -38,6 +41,7 @@ public sealed class DashboardController : Controller
     public async Task<IActionResult> AnalyseVente(string? periode = "mois", int? year = null, int? month = null, DateTime? date = null, CancellationToken ct = default)
     {
         var model = await _client.LoadAnalyseAsync(periode, year, month, date, ct);
+        ViewData["NomBoutique"] = model.NomBoutique;
         return View(model);
     }
 }

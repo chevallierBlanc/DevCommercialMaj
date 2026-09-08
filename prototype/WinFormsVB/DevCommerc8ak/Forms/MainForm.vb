@@ -507,6 +507,10 @@ Namespace DevCommerc8ak
                 AjouterBoutonSidebar(_flowPnlMenu, "Stock initial technique", y, AddressOf AfficherStockInitialTechnique)
                 y += 50
             End If
+            If VerifierPermission("SUPERADMIN_INIT_VENTES") Then
+                AjouterBoutonSidebar(_flowPnlMenu, "Initialisation ventes", y, AddressOf AfficherInitialisationVentes)
+                y += 50
+            End If
             If VerifierPermission("SUPERADMIN_ROLES") Then
                 AjouterBoutonSidebar(_flowPnlMenu, "Rôles & privilèges", y, AddressOf AfficherRolesSuperAdmin)
                 y += 50
@@ -609,6 +613,8 @@ Namespace DevCommerc8ak
                     Return "SUPERADMIN_TECH"
                 Case "SUPERADMIN_STOCK_INITIAL"
                     Return "SUPERADMIN_STOCK_INITIAL"
+                Case "SUPERADMIN_INIT_VENTES"
+                    Return "SUPERADMIN_INIT_VENTES"
                 Case "SUPERADMIN_ROLES"
                     Return "SUPERADMIN_ROLES"
                 Case "SUPERADMIN_AUDIT"
@@ -1055,11 +1061,16 @@ Namespace DevCommerc8ak
             LoadForm(New FormulaireStockInitialTechnique())
         End Sub
 
+        Private Sub AfficherInitialisationVentes(sender As Object, e As EventArgs)
+            LoadForm(New FormulaireInitialisationVentes())
+        End Sub
+
         Private Sub AfficherTableauTechniqueSuperAdmin(sender As Object, e As EventArgs)
             LoadForm(New FormulaireSuperAdminDashboard(
                 Sub() LoadForm(New FormulaireStockInitialTechnique()),
                 Sub() LoadForm(New FormulaireSuperAdminRoles()),
-                Sub() LoadForm(New FormulaireSuperAdminJournal())))
+                Sub() LoadForm(New FormulaireSuperAdminJournal()),
+                Sub() LoadForm(New FormulaireInitialisationVentes())))
         End Sub
 
         Private Sub AfficherRolesSuperAdmin(sender As Object, e As EventArgs)

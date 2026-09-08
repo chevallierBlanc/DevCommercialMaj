@@ -7,6 +7,16 @@ public sealed class DashboardMetric
     public string Unit { get; set; } = string.Empty;
 }
 
+public sealed class EntrepriseConfigurationResponse
+{
+    public string NomBoutique { get; set; } = "ERP COMMERCIAL";
+    public string RaisonSociale { get; set; } = string.Empty;
+    public string Adresse { get; set; } = string.Empty;
+    public string Telephone { get; set; } = string.Empty;
+    public string DevisePrincipale { get; set; } = "FC";
+    public string Logo { get; set; } = string.Empty;
+}
+
 public sealed class DailyProductRow
 {
     public string Product { get; set; } = string.Empty;

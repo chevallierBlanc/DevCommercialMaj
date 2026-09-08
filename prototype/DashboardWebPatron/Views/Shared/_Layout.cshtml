@@ -1,5 +1,12 @@
 <!DOCTYPE html>
 <html lang="fr">
+@{
+    var nomBoutique = Convert.ToString(ViewData["NomBoutique"]);
+    if (string.IsNullOrWhiteSpace(nomBoutique))
+    {
+        nomBoutique = "ERP COMMERCIAL";
+    }
+}
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,7 +17,7 @@
     <div class="shell">
         <aside class="sidebar">
             <div class="brand">
-                <div class="brand-title">COMMERCIAL PRO</div>
+                <div class="brand-title">@nomBoutique</div>
                 <div class="brand-sub">Dashboard Patron</div>
             </div>
             <nav class="nav">
