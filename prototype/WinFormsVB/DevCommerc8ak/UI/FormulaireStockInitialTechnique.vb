@@ -395,12 +395,18 @@ Namespace DevCommerc8ak
                 grid.Columns("RechercheNormalisee").Visible = False
             End If
 
+            For Each column As DataGridViewColumn In grid.Columns
+                column.Frozen = False
+            Next
+
             If grid.Columns.Contains("CodeBarres") Then
+                grid.Columns("CodeBarres").DisplayIndex = 0
                 grid.Columns("CodeBarres").Frozen = True
                 grid.Columns("CodeBarres").Width = Math.Max(grid.Columns("CodeBarres").Width, 120)
             End If
 
             If grid.Columns.Contains("Libelle") Then
+                grid.Columns("Libelle").DisplayIndex = If(grid.Columns.Contains("CodeBarres"), 1, 0)
                 grid.Columns("Libelle").Frozen = True
                 grid.Columns("Libelle").Width = Math.Max(grid.Columns("Libelle").Width, 240)
                 grid.Columns("Libelle").ToolTipText = "Produit"
@@ -434,13 +440,13 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            Dim dt As DataTable = TryCast(grid.DataSource, DataTable)
-            If dt Is Nothing OrElse e.RowIndex >= dt.Rows.Count Then
+            Dim rowView As DataRowView = TryCast(grid.Rows(e.RowIndex).DataBoundItem, DataRowView)
+            If rowView Is Nothing OrElse rowView.Row Is Nothing Then
                 Return
             End If
 
-            dt.Rows(e.RowIndex)("RechercheNormalisee") = ConstruireTexteRecherche(dt.Rows(e.RowIndex))
-            CalculerLigne(dt.Rows(e.RowIndex))
+            rowView.Row("RechercheNormalisee") = ConstruireTexteRecherche(rowView.Row)
+            CalculerLigne(rowView.Row)
         End Sub
 
         Private Sub ChangerFiltres(sender As Object, e As EventArgs)

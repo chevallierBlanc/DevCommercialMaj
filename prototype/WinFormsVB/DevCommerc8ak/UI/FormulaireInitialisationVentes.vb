@@ -101,7 +101,7 @@ Namespace DevCommerc8ak
             cmbTypeVente = New ComboBox() With {.Dock = DockStyle.Fill, .DropDownStyle = ComboBoxStyle.DropDownList}
             txtQuantite = New TextBox() With {.Dock = DockStyle.Fill}
             txtPrix = New TextBox() With {.Dock = DockStyle.Fill}
-            lblApercu = New Label() With {.Dock = DockStyle.Fill, .ForeColor = colorMuted, .TextAlign = ContentAlignment.MiddleLeft}
+            lblApercu = New Label() With {.Dock = DockStyle.Fill, .ForeColor = colorPrimary, .BackColor = Color.FromArgb(248, 250, 252), .Font = fontBold, .TextAlign = ContentAlignment.MiddleLeft, .Padding = New Padding(10, 0, 10, 0)}
 
             Dim btnAjouter As New Button() With {.Text = "Ajouter ligne", .Dock = DockStyle.Fill, .BackColor = colorAccent, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             btnAjouter.FlatAppearance.BorderSize = 0
@@ -143,7 +143,7 @@ Namespace DevCommerc8ak
             bas.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 150))
             bas.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 150))
             bas.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 170))
-            lblTotal = New Label() With {.Dock = DockStyle.Fill, .Text = "Total CA repris : 0 FC", .Font = fontBold, .ForeColor = colorPrimary, .TextAlign = ContentAlignment.MiddleLeft}
+            lblTotal = New Label() With {.Dock = DockStyle.Fill, .Text = "TOTAL CA REPRIS : 0 FC | TOTAL CMV : 0 FC | BÉNÉFICE REPRIS : 0 FC | LIGNES : 0", .Font = fontBold, .ForeColor = colorPrimary, .BackColor = Color.FromArgb(248, 250, 252), .TextAlign = ContentAlignment.MiddleLeft, .Padding = New Padding(10, 0, 10, 0)}
             Dim btnSupprimer As New Button() With {.Text = "Supprimer ligne", .Dock = DockStyle.Fill, .BackColor = Color.FromArgb(107, 114, 128), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             Dim btnValider As New Button() With {.Text = "Valider session", .Dock = DockStyle.Fill, .BackColor = Color.FromArgb(22, 163, 74), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             Dim btnAnnuler As New Button() With {.Text = "Fermer", .Dock = DockStyle.Fill, .BackColor = Color.FromArgb(75, 85, 99), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
@@ -268,7 +268,7 @@ Namespace DevCommerc8ak
 
         Private Sub TypeVenteSelectionne(sender As Object, e As EventArgs)
             Dim typeVente As TypeVenteDTO = TryCast(cmbTypeVente.SelectedItem, TypeVenteDTO)
-            If typeVente IsNot Nothing AndAlso String.IsNullOrWhiteSpace(txtPrix.Text) Then
+            If typeVente IsNot Nothing Then
                 txtPrix.Text = typeVente.PrixVente.ToString("N0")
             End If
             MettreAJourApercu(Nothing, EventArgs.Empty)
@@ -339,10 +339,20 @@ Namespace DevCommerc8ak
             Dim dt As DataTable = _service.ListerLignes(_sessionId)
             grid.DataSource = dt
             Dim total As Decimal = 0D
+            Dim totalCmv As Decimal = 0D
+            Dim benefice As Decimal = 0D
             For Each row As DataRow In dt.Rows
-                total += SafeDecimal(row("MontantLigne"))
+                Dim montant As Decimal = SafeDecimal(row("MontantLigne"))
+                Dim quantiteBase As Decimal = SafeDecimal(row("QuantiteBase"))
+                Dim coutBase As Decimal = SafeDecimal(row("CoutUnitaireBaseVente"))
+                total += montant
+                totalCmv += quantiteBase * coutBase
+                benefice += SafeDecimal(row("BeneficeEstime"))
             Next
-            lblTotal.Text = "Total CA repris : " & FormatageGlobal.FormatMontant(total)
+            lblTotal.Text = "TOTAL CA REPRIS : " & FormatageGlobal.FormatMontant(total) &
+                " | TOTAL CMV : " & FormatageGlobal.FormatMontant(totalCmv) &
+                " | BÉNÉFICE REPRIS : " & FormatageGlobal.FormatMontant(benefice) &
+                " | LIGNES : " & dt.Rows.Count.ToString("N0", CultureInfo.InvariantCulture)
         End Sub
 
         Private Sub ChangerMode(sender As Object, e As EventArgs)
@@ -362,7 +372,17 @@ Namespace DevCommerc8ak
                 lblApercu.Text = String.Empty
                 Return
             End If
-            lblApercu.Text = "Quantité base : " & FormatageGlobal.FormatQuantitePhysique(qte * typeVente.QuantiteEquivalent) & " | Montant : " & FormatageGlobal.FormatMontant(Math.Round(qte * prix, 2))
+            Dim produitId As Integer
+            If Not Integer.TryParse(Convert.ToString(cmbProduit.SelectedValue), produitId) Then
+                lblApercu.Text = "Quantité base : " & FormatageGlobal.FormatQuantitePhysique(qte * typeVente.QuantiteEquivalent) & " | Montant : " & FormatageGlobal.FormatMontant(Math.Round(qte * prix, 2))
+                Return
+            End If
+
+            Dim apercu As InitialisationVenteLigneDTO = _service.CalculerApercuLigne(produitId, typeVente, qte, prix)
+            lblApercu.Text = "Quantité base : " & apercu.QuantiteBaseAffichage &
+                " | Montant : " & FormatageGlobal.FormatMontant(apercu.MontantLigne) &
+                " | Coût base : " & If(apercu.CoutUnitaireBaseVente.HasValue, FormatageGlobal.FormatMontant(apercu.CoutUnitaireBaseVente.Value), "N/C") &
+                " | Bénéfice estimé : " & If(apercu.BeneficeEstime.HasValue, FormatageGlobal.FormatMontant(apercu.BeneficeEstime.Value), "N/C")
         End Sub
 
         Private Shared Function CreerLabel(texte As String, font As Font, couleur As Color) As Label

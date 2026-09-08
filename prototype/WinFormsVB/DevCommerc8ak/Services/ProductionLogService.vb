@@ -49,6 +49,8 @@ Namespace DevCommerc8ak
                 sb.Append("] ")
                 sb.Append("User=")
                 sb.Append(GetCurrentUserName())
+                sb.Append(" | Role=")
+                sb.Append(GetCurrentRole())
                 sb.Append(" | Host=")
                 sb.Append(Environment.MachineName)
                 If Not String.IsNullOrWhiteSpace(moduleName) Then
@@ -63,9 +65,10 @@ Namespace DevCommerc8ak
                 sb.Append(message)
                 If ex IsNot Nothing Then
                     sb.Append(" | ")
-                    sb.Append(ex.GetType().Name)
+                    sb.Append(ex.GetType().FullName)
                     sb.Append(": ")
                     sb.Append(ex.Message)
+                    AppendInnerExceptions(sb, ex.InnerException)
                     If Not String.IsNullOrWhiteSpace(ex.StackTrace) Then
                         sb.Append(" | ")
                         sb.Append(ex.StackTrace)
@@ -77,6 +80,21 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
+        Private Sub AppendInnerExceptions(sb As StringBuilder, inner As Exception)
+            Dim current As Exception = inner
+            Dim niveau As Integer = 1
+            While current IsNot Nothing AndAlso niveau <= 5
+                sb.Append(" | Inner")
+                sb.Append(niveau.ToString(CultureInfo.InvariantCulture))
+                sb.Append("=")
+                sb.Append(current.GetType().FullName)
+                sb.Append(": ")
+                sb.Append(current.Message)
+                current = current.InnerException
+                niveau += 1
+            End While
+        End Sub
+
         Private Function GetCurrentUserName() As String
             Try
                 If Not String.IsNullOrWhiteSpace(SessionUtilisateur.NomUtilisateur) Then
@@ -85,6 +103,16 @@ Namespace DevCommerc8ak
             Catch
             End Try
             Return Environment.UserName
+        End Function
+
+        Private Function GetCurrentRole() As String
+            Try
+                If Not String.IsNullOrWhiteSpace(SessionUtilisateur.Role) Then
+                    Return SessionUtilisateur.Role
+                End If
+            Catch
+            End Try
+            Return "N/A"
         End Function
     End Class
 End Namespace

@@ -112,6 +112,30 @@ Namespace DevCommerc8ak
             Dim produit As ProduitDTO = (New ProduitRepository(ObtenirDal())).ObtenirParId(produitId)
             If produit Is Nothing Then Throw New InvalidOperationException("Produit introuvable.")
 
+            Return ConstruireLigneDepuisProduit(sessionId, dateVente, produit, typeVente, quantiteCommerciale, prixUnitaire)
+        End Function
+
+        Public Function CalculerApercuLigne(produitId As Integer,
+                                            typeVente As TypeVenteDTO,
+                                            quantiteCommerciale As Decimal,
+                                            prixUnitaire As Decimal) As InitialisationVenteLigneDTO
+            VerifierAccesSuperAdmin()
+            If produitId <= 0 OrElse typeVente Is Nothing OrElse quantiteCommerciale <= 0D Then
+                Return New InitialisationVenteLigneDTO()
+            End If
+
+            Dim produit As ProduitDTO = (New ProduitRepository(ObtenirDal())).ObtenirParId(produitId)
+            If produit Is Nothing Then Return New InitialisationVenteLigneDTO()
+
+            Return ConstruireLigneDepuisProduit(0, Date.Today, produit, typeVente, quantiteCommerciale, prixUnitaire)
+        End Function
+
+        Private Function ConstruireLigneDepuisProduit(sessionId As Integer,
+                                                      dateVente As Date,
+                                                      produit As ProduitDTO,
+                                                      typeVente As TypeVenteDTO,
+                                                      quantiteCommerciale As Decimal,
+                                                      prixUnitaire As Decimal) As InitialisationVenteLigneDTO
             Dim quantiteBase As Decimal = quantiteCommerciale * typeVente.QuantiteEquivalent
             Dim montant As Decimal = Math.Round(quantiteCommerciale * prixUnitaire, 2)
             Dim coutUnitaire As Decimal? = CalculVenteService.CalculerCoutUnitaireBase(produit.PrixAchat, produit.ConversionUnite, produit.TypeGestionStock, produit.ContenuUnitePrincipale)
