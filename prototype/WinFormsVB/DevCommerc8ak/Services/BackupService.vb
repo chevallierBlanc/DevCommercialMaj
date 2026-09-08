@@ -167,8 +167,8 @@ Namespace DevCommerc8ak
                 SqlConnection.ClearAllPools()
                 Using cn As New SqlConnection(builder.ConnectionString)
                     cn.Open()
-                    Dim baseExiste As Boolean = BaseExiste(cn, database)
-                    If baseExiste Then
+                    Dim databaseExiste As Boolean = BaseExiste(cn, database)
+                    If databaseExiste Then
                         ExecuterSqlLong(cn, "ALTER DATABASE [" & databaseEchappee & "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;")
                     End If
                     Try

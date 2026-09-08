@@ -26,7 +26,7 @@ Namespace DevCommerc8ak
         Private ReadOnly FontLabel As New Font("Segoe UI", 9.5F)
         Private ReadOnly FontButton As New Font("Segoe UI", 9.5F, FontStyle.Bold)
         Private ReadOnly FontValue As New Font("Segoe UI", 13, FontStyle.Bold)
-        Private ReadOnly FontTotal As New Font("Segoe UI", 18, FontStyle.Bold)
+        Private ReadOnly FontTotal As New Font("Segoe UI", 14, FontStyle.Bold)
 
         Private ReadOnly _produitId As Integer
         Private ReadOnly _stockTheoriqueBase As Decimal
@@ -144,23 +144,23 @@ Namespace DevCommerc8ak
             AddHandler txtMesureLibre.TextChanged, AddressOf Quantites_TextChanged
             body.Controls.Add(saisie, 0, 0)
 
-            Dim resume As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .BackColor = Color.FromArgb(248, 250, 252), .Padding = New Padding(14), .ColumnCount = 1, .RowCount = 5, .MinimumSize = New Size(0, 176)}
-            resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 52))
-            resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 28))
-            resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 28))
-            resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 28))
-            resume.RowStyles.Add(New RowStyle(SizeType.Absolute, 32))
+            Dim resume1 As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .BackColor = Color.FromArgb(248, 250, 252), .Padding = New Padding(14), .ColumnCount = 1, .RowCount = 5, .MinimumSize = New Size(0, 176)}
+            resume1.RowStyles.Add(New RowStyle(SizeType.Absolute, 52))
+            resume1.RowStyles.Add(New RowStyle(SizeType.Absolute, 28))
+            resume1.RowStyles.Add(New RowStyle(SizeType.Absolute, 28))
+            resume1.RowStyles.Add(New RowStyle(SizeType.Absolute, 28))
+            resume1.RowStyles.Add(New RowStyle(SizeType.Absolute, 32))
             lblTotal = New Label() With {.Text = "TOTAL COMPTÉ" & Environment.NewLine & "-", .Font = FontTotal, .ForeColor = ColorPrimary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
             lblEquivalent = New Label() With {.Text = "Répartition : -", .Font = FontLabel, .ForeColor = ColorSecondary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
             lblEcart = New Label() With {.Text = "Écart : -", .Font = FontValue, .ForeColor = ColorPrimary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
             lblEcartEquivalent = New Label() With {.Text = "Répartition écart : -", .Font = FontLabel, .ForeColor = ColorSecondary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
             lblResultat = New Label() With {.Text = "Résultat : -", .Font = FontSection, .ForeColor = ColorSecondary, .AutoSize = False, .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}
-            resume.Controls.Add(lblTotal, 0, 0)
-            resume.Controls.Add(lblEquivalent, 0, 1)
-            resume.Controls.Add(lblEcart, 0, 2)
-            resume.Controls.Add(lblEcartEquivalent, 0, 3)
-            resume.Controls.Add(lblResultat, 0, 4)
-            body.Controls.Add(resume, 0, 1)
+            resume1.Controls.Add(lblTotal, 0, 0)
+            resume1.Controls.Add(lblEquivalent, 0, 1)
+            resume1.Controls.Add(lblEcart, 0, 2)
+            resume1.Controls.Add(lblEcartEquivalent, 0, 3)
+            resume1.Controls.Add(lblResultat, 0, 4)
+            body.Controls.Add(resume1, 0, 1)
             layout.Controls.Add(body, 0, 2)
 
             Dim actions As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft, .WrapContents = False}

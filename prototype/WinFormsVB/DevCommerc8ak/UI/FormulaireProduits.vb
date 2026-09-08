@@ -171,7 +171,7 @@ Namespace DevCommerc8ak
             Dim flowHeader As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.LeftToRight, .Padding = New Padding(0, 10, 0, 0), .WrapContents = True, .AutoScroll = True}
             txtRecherche = New TextBox() With {.Width = 250, .Font = FontControl, .BorderStyle = BorderStyle.FixedSingle, .Margin = New Padding(0, 5, 20, 0)}
             cmbFiltreCategorie = New ComboBox() With {.Width = 170, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl, .FlatStyle = FlatStyle.Flat, .Margin = New Padding(0, 5, 20, 0)}
-            btnNouveau = CreateStyledButton("Nouveau", ColorPrimary)
+            ' btnNouveau = CreateStyledButton("Nouveau", ColorPrimary)
             btnEnregistrer = CreateStyledButton("Enregistrer", Color.ForestGreen)
             btnSupprimer = CreateStyledButton("Supprimer", Color.Crimson)
             btnActualiser = CreateStyledButton("Actualiser", Color.Gray)
@@ -196,7 +196,7 @@ Namespace DevCommerc8ak
             txtLibelle = CreateField(cardInfos, "Désignation", 20, 45, 280)
             txtCodeBarres = CreateField(cardInfos, "Code Barres / QR", 20, 105, 160)
             cmbCategorie = CreateComboField(cardInfos, "Catégorie", 190, 105, 110)
-            chkActif = New CheckBox() With {.Text = "Actif", .Left = 260, .Top = 108, .Font = FontControl, .AutoSize = True}
+            chkActif = New CheckBox() With {.Text = "Actif", .Left = 20, .Top = 130, .Font = FontControl, .AutoSize = True}
             cardInfos.Controls.Add(chkActif)
 
             ' Carte 2: Unités
@@ -356,7 +356,7 @@ Namespace DevCommerc8ak
             Me.Controls.Add(panelHero)
 
             ' --- Liaison des événements (Logique conservée) ---
-            AddHandler btnNouveau.Click, AddressOf NouveauProduit
+            'AddHandler btnNouveau.Click, AddressOf NouveauProduit
             AddHandler btnEnregistrer.Click, AddressOf EnregistrerProduit
             AddHandler btnSupprimer.Click, AddressOf SupprimerProduit
             AddHandler btnActualiser.Click, AddressOf ChargerDonnees

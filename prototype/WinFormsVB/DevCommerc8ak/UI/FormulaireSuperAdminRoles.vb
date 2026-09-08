@@ -179,9 +179,9 @@ Namespace DevCommerc8ak
             txtNomRole = New TextBox() With {.Location = New Point(0, 22), .Width = 350, .Font = FontMain, .BorderStyle = BorderStyle.FixedSingle}
             
             chkActif = New CheckBox() With {.Text = "Rôle actif et autorisé à se connecter", .Location = New Point(0, 60), .AutoSize = True, .Font = FontMain, .Checked = True}
-            
+
             Dim pnlActions As New FlowLayoutPanel() With {
-                .Dock = DockStyle.Top,
+                .Dock = DockStyle.Bottom,
                 .Location = New Point(0, 100),
                 .Height = 50,
                 .AutoSize = True,
