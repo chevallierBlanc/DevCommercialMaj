@@ -432,6 +432,94 @@ Namespace DevCommerc8ak
             Return ObtenirStockActuel(produitId)
         End Function
 
+        ' Ajuste le stock technique vers une quantite physique finale deja normalisee.
+        Public Function AjusterStockInitialTechnique(produitId As Integer, quantiteBaseFinale As Decimal, reference As String, observation As String, effectuePar As Integer, Optional prixAchatOverride As Decimal = 0D) As Decimal
+            If produitId <= 0 Then
+                Throw New ArgumentException("Produit invalide.", NameOf(produitId))
+            End If
+            If quantiteBaseFinale < 0D Then
+                Throw New ArgumentException("La quantite finale ne peut pas etre negative.", NameOf(quantiteBaseFinale))
+            End If
+
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    Try
+                        Dim info As DataRow = ObtenirInfosProduit(produitId)
+                        Dim stockActuel As Decimal = ObtenirStockActuel(produitId, cn, tx)
+                        Dim ecart As Decimal = quantiteBaseFinale - stockActuel
+                        If ecart = 0D Then
+                            tx.Commit()
+                            Return 0D
+                        End If
+
+                        If ecart > 0D Then
+                            Dim prixAchatUse As Decimal = If(prixAchatOverride > 0D, prixAchatOverride, ObtenirPrixAchat(info))
+                            Dim entree As New StockEntree With {
+                                .IdStock = GenererNumeroStock("INIT", cn, tx),
+                                .ProduitId = produitId,
+                                .QuantiteSaisie = ecart,
+                                .Unite = "base",
+                                .QuantiteBase = ecart,
+                                .PrixAchat = prixAchatUse,
+                                .Devise = "CDF",
+                                .Taux = 0D,
+                                .DateEntree = Date.Now,
+                                .FournisseurId = Nothing,
+                                .CreePar = effectuePar
+                            }
+                            _entreeRepo.Ajouter(entree, cn, tx)
+                        Else
+                            Dim numeroSortie As String = GenererNumeroSortie(cn, tx)
+                            Dim sortie As New StockSortie With {
+                                .NumeroSortie = numeroSortie,
+                                .ProduitId = produitId,
+                                .QuantiteSaisie = Math.Abs(ecart),
+                                .Unite = "base",
+                                .QuantiteBase = Math.Abs(ecart),
+                                .DateSortie = Date.Now,
+                                .Source = "STOCK_INITIAL_TECHNIQUE",
+                                .RefSource = reference,
+                                .CreePar = effectuePar,
+                                .StatutPaiement = "GRATUIT",
+                                .MontantLigne = 0D,
+                                .MontantPaye = 0D,
+                                .ResteAPayer = 0D,
+                                .Observation = observation
+                            }
+                            _sortieRepo.Ajouter(sortie, numeroSortie, cn, tx)
+                        End If
+
+                        Dim mouvement As New MouvementStock With {
+                            .NumeroMouvement = GenererNumeroMouvement(cn, tx),
+                            .ProduitId = produitId,
+                            .TypeMouvement = "STOCK_INITIAL_TECHNIQUE",
+                            .Quantite = Math.Abs(ecart),
+                            .QuantiteBase = Math.Abs(ecart),
+                            .Unite = "base",
+                            .StockAvant = stockActuel,
+                            .StockApres = quantiteBaseFinale,
+                            .Reference = reference,
+                            .Observation = observation,
+                            .TypePerte = Nothing,
+                            .EffectuePar = effectuePar
+                        }
+                        _mvtRepo.Ajouter(mouvement, cn, tx)
+                        tx.Commit()
+
+                        AuditActionService.Enregistrer("Stock", "Stock initial technique", "Ajustement stock initial. ProduitId=" & produitId.ToString() & ", Référence=" & reference)
+                        AppEvents.OnStockModifie()
+                        AppEvents.OnAnalyseVenteModifiee()
+                        AppEvents.OnDataChanged()
+                        Return ecart
+                    Catch
+                        tx.Rollback()
+                        Throw
+                    End Try
+                End Using
+            End Using
+        End Function
+
         ' Annule un mouvement et restaure le stock.
         Public Sub AnnulerMouvement(mouvementStockId As Integer, effectuePar As Integer, motif As String)
             Using cn As SqlConnection = _dal.CreerConnexion()

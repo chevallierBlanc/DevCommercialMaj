@@ -26,6 +26,7 @@ Namespace DevCommerc8ak
                         AppliquerMigration(cn, tx, 2026080805, "Reparation identite audit actions", AddressOf MigrationAuditActionsIdentity)
                         AppliquerMigration(cn, tx, 2026080806, "Sequences metier multiposte", AddressOf MigrationBusinessSequences)
                         AppliquerMigration(cn, tx, 2026090801, "Sessions initialisation ventes", AddressOf MigrationInitialisationVentes)
+                        AppliquerMigration(cn, tx, 2026090802, "Sessions stock initial technique", AddressOf MigrationStockInitialTechnique)
                         tx.Commit()
                     Catch
                         tx.Rollback()
@@ -247,6 +248,46 @@ Namespace DevCommerc8ak
             Executer(cn, tx, "IF OBJECT_ID('dbo.InitialisationVenteLignes', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_InitVenteLignes_Session' AND object_id=OBJECT_ID('dbo.InitialisationVenteLignes')) CREATE INDEX IX_InitVenteLignes_Session ON dbo.InitialisationVenteLignes(InitialisationVenteSessionId)")
             Executer(cn, tx, "IF OBJECT_ID('dbo.InitialisationVenteLignes', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_InitVenteLignes_Date_Produit' AND object_id=OBJECT_ID('dbo.InitialisationVenteLignes')) CREATE INDEX IX_InitVenteLignes_Date_Produit ON dbo.InitialisationVenteLignes(DateVente, ProduitId)")
             Executer(cn, tx, "IF OBJECT_ID('dbo.FacturesVente', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_FacturesVente_Origine_InitSession' AND object_id=OBJECT_ID('dbo.FacturesVente')) CREATE INDEX IX_FacturesVente_Origine_InitSession ON dbo.FacturesVente(OrigineVente, InitialisationVenteSessionId)")
+        End Sub
+
+        Private Shared Sub MigrationStockInitialTechnique(cn As SqlConnection, tx As SqlTransaction)
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.StockInitialTechniqueSessions', 'U') IS NULL " &
+                "BEGIN " &
+                "CREATE TABLE dbo.StockInitialTechniqueSessions (" &
+                "StockInitialTechniqueSessionId INT IDENTITY(1,1) NOT NULL PRIMARY KEY, " &
+                "ReferenceSession NVARCHAR(60) NOT NULL UNIQUE, " &
+                "DateSession DATETIME2 NOT NULL CONSTRAINT DF_StockInitTechSessions_Date DEFAULT(SYSDATETIME()), " &
+                "ModeOperation NVARCHAR(30) NOT NULL, " &
+                "Observation NVARCHAR(500) NULL, " &
+                "CreePar INT NOT NULL, " &
+                "Machine NVARCHAR(100) NULL, " &
+                "CreeLe DATETIME2 NOT NULL CONSTRAINT DF_StockInitTechSessions_CreeLe DEFAULT(SYSDATETIME())) " &
+                "END")
+
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.StockInitialTechniqueLignes', 'U') IS NULL " &
+                "BEGIN " &
+                "CREATE TABLE dbo.StockInitialTechniqueLignes (" &
+                "StockInitialTechniqueLigneId INT IDENTITY(1,1) NOT NULL PRIMARY KEY, " &
+                "StockInitialTechniqueSessionId INT NOT NULL, " &
+                "ProduitId INT NOT NULL, " &
+                "AncienneQuantiteBase DECIMAL(18,4) NOT NULL, " &
+                "NouvelleQuantiteBase DECIMAL(18,4) NOT NULL, " &
+                "DifferenceBase DECIMAL(18,4) NOT NULL, " &
+                "TypeGestionStock NVARCHAR(20) NULL, " &
+                "UnitePrincipale NVARCHAR(50) NULL, " &
+                "UniteSecondaire NVARCHAR(50) NULL, " &
+                "ContenuUnitePrincipale DECIMAL(18,4) NULL, " &
+                "ContenuUniteSecondaire DECIMAL(18,4) NULL, " &
+                "ModeOperation NVARCHAR(30) NOT NULL, " &
+                "Observation NVARCHAR(500) NULL, " &
+                "CreeLe DATETIME2 NOT NULL CONSTRAINT DF_StockInitTechLignes_CreeLe DEFAULT(SYSDATETIME()), " &
+                "CONSTRAINT FK_StockInitTechLignes_Session FOREIGN KEY (StockInitialTechniqueSessionId) REFERENCES dbo.StockInitialTechniqueSessions(StockInitialTechniqueSessionId)) " &
+                "END")
+
+            Executer(cn, tx, "IF OBJECT_ID('dbo.StockInitialTechniqueLignes', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_StockInitTechLignes_Session' AND object_id=OBJECT_ID('dbo.StockInitialTechniqueLignes')) CREATE INDEX IX_StockInitTechLignes_Session ON dbo.StockInitialTechniqueLignes(StockInitialTechniqueSessionId)")
+            Executer(cn, tx, "IF OBJECT_ID('dbo.StockInitialTechniqueLignes', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_StockInitTechLignes_Produit' AND object_id=OBJECT_ID('dbo.StockInitialTechniqueLignes')) CREATE INDEX IX_StockInitTechLignes_Produit ON dbo.StockInitialTechniqueLignes(ProduitId)")
         End Sub
 
         Private Shared Sub Executer(cn As SqlConnection, tx As SqlTransaction, sql As String)

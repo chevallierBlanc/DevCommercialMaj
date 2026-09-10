@@ -96,9 +96,101 @@ Namespace DevCommerc8ak
             Return repo.ListerTable()
         End Function
 
+        Public Sub VerifierAccesStockInitialTechnique()
+            If Not String.Equals(If(SessionUtilisateur.Role, String.Empty), "SUPERADMIN", StringComparison.OrdinalIgnoreCase) Then
+                AuditActionService.Enregistrer("SuperAdmin", "Accès refusé stock initial", "Tentative d'accès au stock initial technique par " & If(SessionUtilisateur.NomUtilisateur, "SYSTEM"))
+                Throw New UnauthorizedAccessException("Le stock initial technique est réservé au SUPERADMIN.")
+            End If
+        End Sub
+
         Public Function ListerCategories() As DataTable
             Dim sql As String = "SELECT CategorieId, ISNULL(NomCategorie, '') AS NomCategorie FROM dbo.CategoriesProduits ORDER BY NomCategorie"
             Return ObtenirDal().ExecuterTable(sql, CommandType.Text, Nothing)
+        End Function
+
+        Public Function AssurerCategorieProduit(nomCategorie As String) As Integer?
+            Dim nomNormalise As String = NormaliserNomCategorie(nomCategorie)
+            If nomNormalise = String.Empty Then
+                Return Nothing
+            End If
+
+            Using cn As SqlConnection = ObtenirDal().CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction(IsolationLevel.Serializable)
+                    Try
+                        Dim categorieId As Integer? = Nothing
+                        Using cmd As New SqlCommand("SELECT TOP 1 CategorieId FROM dbo.CategoriesProduits WITH (UPDLOCK, HOLDLOCK) WHERE UPPER(LTRIM(RTRIM(NomCategorie)))=@Nom", cn, tx)
+                            cmd.Parameters.AddWithValue("@Nom", nomNormalise.ToUpperInvariant())
+                            Dim v As Object = cmd.ExecuteScalar()
+                            If v IsNot Nothing AndAlso v IsNot DBNull.Value Then
+                                categorieId = Convert.ToInt32(v)
+                            End If
+                        End Using
+
+                        If Not categorieId.HasValue Then
+                            Using cmdInsert As New SqlCommand("INSERT INTO dbo.CategoriesProduits (NomCategorie) VALUES (@NomCategorie); SELECT CAST(SCOPE_IDENTITY() AS INT);", cn, tx)
+                                cmdInsert.Parameters.AddWithValue("@NomCategorie", nomNormalise)
+                                categorieId = Convert.ToInt32(cmdInsert.ExecuteScalar())
+                            End Using
+                            AuditActionService.Enregistrer("SuperAdmin", "Création catégorie", "Catégorie créée pendant stock initial : " & nomNormalise)
+                        End If
+
+                        tx.Commit()
+                        Return categorieId
+                    Catch
+                        tx.Rollback()
+                        Throw
+                    End Try
+                End Using
+            End Using
+        End Function
+
+        Public Function CreerSessionStockInitialTechnique(modeOperation As String, observation As String) As Integer
+            VerifierAccesStockInitialTechnique()
+            Dim mode As String = If(String.IsNullOrWhiteSpace(modeOperation), "CORRECTION", modeOperation.Trim().ToUpperInvariant())
+            Dim reference As String = "INIT-STOCK-" & Date.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) & "-" & Guid.NewGuid().ToString("N").Substring(0, 6).ToUpperInvariant()
+            Using cn As SqlConnection = ObtenirDal().CreerConnexion()
+                cn.Open()
+                Using cmd As New SqlCommand("INSERT INTO dbo.StockInitialTechniqueSessions (ReferenceSession, ModeOperation, Observation, CreePar, Machine) VALUES (@ReferenceSession, @ModeOperation, @Observation, @CreePar, @Machine); SELECT CAST(SCOPE_IDENTITY() AS INT);", cn)
+                    cmd.Parameters.AddWithValue("@ReferenceSession", reference)
+                    cmd.Parameters.AddWithValue("@ModeOperation", mode)
+                    cmd.Parameters.AddWithValue("@Observation", If(String.IsNullOrWhiteSpace(observation), CType(DBNull.Value, Object), observation.Trim()))
+                    cmd.Parameters.AddWithValue("@CreePar", SessionUtilisateur.UtilisateurId)
+                    cmd.Parameters.AddWithValue("@Machine", Environment.MachineName)
+                    Return Convert.ToInt32(cmd.ExecuteScalar())
+                End Using
+            End Using
+        End Function
+
+        Public Sub EnregistrerLigneStockInitialTechnique(sessionId As Integer, produitId As Integer, ancienneQuantiteBase As Decimal, nouvelleQuantiteBase As Decimal, typeGestionStock As String, unitePrincipale As String, uniteSecondaire As String, contenuPrincipal As Decimal, contenuSecondaire As Decimal?, modeOperation As String, observation As String)
+            If sessionId <= 0 OrElse produitId <= 0 Then
+                Return
+            End If
+
+            Dim sql As String = "INSERT INTO dbo.StockInitialTechniqueLignes (StockInitialTechniqueSessionId, ProduitId, AncienneQuantiteBase, NouvelleQuantiteBase, DifferenceBase, TypeGestionStock, UnitePrincipale, UniteSecondaire, ContenuUnitePrincipale, ContenuUniteSecondaire, ModeOperation, Observation) " &
+                                "VALUES (@SessionId, @ProduitId, @Ancienne, @Nouvelle, @Difference, @TypeGestionStock, @UnitePrincipale, @UniteSecondaire, @ContenuPrincipal, @ContenuSecondaire, @ModeOperation, @Observation)"
+            Dim p As New List(Of SqlParameter) From {
+                New SqlParameter("@SessionId", sessionId),
+                New SqlParameter("@ProduitId", produitId),
+                New SqlParameter("@Ancienne", ancienneQuantiteBase),
+                New SqlParameter("@Nouvelle", nouvelleQuantiteBase),
+                New SqlParameter("@Difference", nouvelleQuantiteBase - ancienneQuantiteBase),
+                New SqlParameter("@TypeGestionStock", If(String.IsNullOrWhiteSpace(typeGestionStock), "UNITE", typeGestionStock.Trim().ToUpperInvariant())),
+                New SqlParameter("@UnitePrincipale", If(String.IsNullOrWhiteSpace(unitePrincipale), CType(DBNull.Value, Object), unitePrincipale.Trim())),
+                New SqlParameter("@UniteSecondaire", If(String.IsNullOrWhiteSpace(uniteSecondaire), CType(DBNull.Value, Object), uniteSecondaire.Trim())),
+                New SqlParameter("@ContenuPrincipal", contenuPrincipal),
+                New SqlParameter("@ContenuSecondaire", If(contenuSecondaire.HasValue, CType(contenuSecondaire.Value, Object), DBNull.Value)),
+                New SqlParameter("@ModeOperation", If(String.IsNullOrWhiteSpace(modeOperation), "CORRECTION", modeOperation.Trim().ToUpperInvariant())),
+                New SqlParameter("@Observation", If(String.IsNullOrWhiteSpace(observation), CType(DBNull.Value, Object), observation.Trim()))
+            }
+            ObtenirDal().ExecuterNonRequete(sql, CommandType.Text, p)
+        End Sub
+
+        Private Function NormaliserNomCategorie(nomCategorie As String) As String
+            If String.IsNullOrWhiteSpace(nomCategorie) Then
+                Return String.Empty
+            End If
+            Return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(nomCategorie.Trim().ToLowerInvariant())
         End Function
 
         Public Function ListerActionsUtilisateur(dateDebut As Date?, dateFin As Date?, utilisateur As String, role As String, moduleName As String, actionName As String, typeAction As String) As List(Of AuditLogEntryDTO)
