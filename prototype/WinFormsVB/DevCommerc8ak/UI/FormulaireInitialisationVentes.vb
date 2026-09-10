@@ -236,7 +236,7 @@ Namespace DevCommerc8ak
 
         Private Sub AppliquerFiltreProduits(sender As Object, e As EventArgs)
             If _chargement OrElse _vueProduits Is Nothing Then Return
-            Dim clauses As New List(Of String)()
+            Dim clauses As New System.Collections.Generic.List(Of String)()
             Dim recherche As String = txtRecherche.Text.Trim().Replace("'", "''").ToUpperInvariant()
             If recherche <> String.Empty Then clauses.Add("RechercheNormalisee LIKE '%" & recherche & "%'")
 
@@ -254,7 +254,7 @@ Namespace DevCommerc8ak
             Dim produitId As Integer
             If Not Integer.TryParse(Convert.ToString(cmbProduit.SelectedValue), produitId) Then Return
             Try
-                Dim types As List(Of TypeVenteDTO) = _service.ListerTypesVente(produitId)
+                Dim types As System.Collections.Generic.List(Of TypeVenteDTO) = _service.ListerTypesVente(produitId)
                 cmbTypeVente.DataSource = types
                 cmbTypeVente.DisplayMember = "NomAffichage"
                 cmbTypeVente.ValueMember = "Nom"

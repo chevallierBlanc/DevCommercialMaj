@@ -574,7 +574,7 @@ Namespace DevCommerc8ak
             End If
 
             Dim texte As String = Clipboard.GetText()
-            Dim lignes As String() = texte.Replace(vbCrLf, vbLf).TrimEnd(ControlChars.Lf).Split(ControlChars.Lf)
+            Dim lignes As String() = texte.Replace(Environment.NewLine, ChrW(10)).Replace(ChrW(13), ChrW(10)).TrimEnd(ChrW(10)).Split(ChrW(10))
             Dim startRow As Integer = grid.CurrentCell.RowIndex
             Dim startCol As Integer = grid.CurrentCell.ColumnIndex
 
@@ -583,7 +583,7 @@ Namespace DevCommerc8ak
                 For i As Integer = 0 To lignes.Length - 1
                     Dim rowIndex As Integer = startRow + i
                     If rowIndex >= grid.Rows.Count OrElse grid.Rows(rowIndex).IsNewRow Then Exit For
-                    Dim cellules As String() = lignes(i).Split(ControlChars.Tab)
+                    Dim cellules As String() = lignes(i).Split(ChrW(9))
                     For j As Integer = 0 To cellules.Length - 1
                         Dim colIndex As Integer = startCol + j
                         If colIndex >= grid.Columns.Count Then Exit For
