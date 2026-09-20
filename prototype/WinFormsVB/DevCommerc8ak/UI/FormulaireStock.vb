@@ -1000,10 +1000,7 @@ Namespace DevCommerc8ak
                 End If
 
                 Dim doc As New PrintDocument()
-                If _parametres IsNot Nothing AndAlso _parametres.ImprimanteA4 <> "" Then
-                    doc.PrinterSettings.PrinterName = _parametres.ImprimanteA4
-                End If
-                doc.DefaultPageSettings.Landscape = True
+                _parametres = PrintConfigurationHelper.ConfigurerDocumentA4(doc, Me, "FormulaireStock", "ImprimerRapportEntrees", True)
                 AddHandler doc.PrintPage, AddressOf ImprimerPageRapportEntrees
 
                 Dim preview As New PrintPreviewDialog()

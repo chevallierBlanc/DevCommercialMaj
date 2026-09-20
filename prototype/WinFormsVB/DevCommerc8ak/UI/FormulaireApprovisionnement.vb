@@ -694,14 +694,10 @@ Namespace DevCommerc8ak
             End If
 
             Try
-                Dim param As ParametreDTO = (New ParametreService(New ParametreRepository(_dal))).Charger()
                 Dim dtLignes As DataTable = _repo.ListerLignes(_bonCourantId)
                 Dim fournisseur As String = If(cmbFournisseur.Text.Trim() = "", "Sans fournisseur", cmbFournisseur.Text.Trim())
                 Dim doc As New PrintDocument()
-                If param IsNot Nothing AndAlso param.ImprimanteA4 <> "" Then
-                    doc.PrinterSettings.PrinterName = param.ImprimanteA4
-                End If
-                doc.DefaultPageSettings.Color = If(param IsNot Nothing, param.ImpressionCouleur, True)
+                Dim param As ParametreDTO = PrintConfigurationHelper.ConfigurerDocumentA4(doc, Me, "FormulaireApprovisionnement", "ImprimerBon")
 
                 AddHandler doc.PrintPage,
                     Sub(s As Object, pe As PrintPageEventArgs)

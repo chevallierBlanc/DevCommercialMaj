@@ -409,15 +409,11 @@ Namespace DevCommerc8ak
         Private Sub ImprimerFacture(factureId As Integer, numero As String, client As String, tel As String)
             Try
                 Dim dal As DAL = ObtenirDAL()
-                Dim param As ParametreDTO = (New ParametreService(New ParametreRepository(dal))).Charger()
                 Dim repo As New LigneFactureVenteRepository(dal)
                 Dim dt As DataTable = repo.ListerDetailsParFacture(factureId)
 
                 Dim doc As New Printing.PrintDocument()
-                If param IsNot Nothing AndAlso param.ImprimanteA4 <> "" Then
-                    doc.PrinterSettings.PrinterName = param.ImprimanteA4
-                End If
-                doc.DefaultPageSettings.Color = If(param IsNot Nothing, param.ImpressionCouleur, True)
+                Dim param As ParametreDTO = PrintConfigurationHelper.ConfigurerDocumentA4(doc, Me, "FormulaireFactures", "ImprimerFacture")
 
                 AddHandler doc.PrintPage,
                     Sub(s, e)

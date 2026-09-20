@@ -54,6 +54,7 @@ Namespace DevCommerc8ak
         Private _isRefreshingFromEvent As Boolean
         Private _dataMonitor As DataChangeMonitorService
         Private _encaissementEnCours As Boolean
+        Private _dernierMessageErreurImpression As String
 
         Private Class TicketData
             Public Property Numero As String
@@ -645,7 +646,9 @@ Namespace DevCommerc8ak
                 End If
 
                 If Not ImprimerTicket(ticket, 2, True) Then
-                    MessageBox.Show("Aucune imprimante ticket n'est configurée ou disponible.")
+                    MessageBox.Show(If(String.IsNullOrWhiteSpace(_dernierMessageErreurImpression),
+                                       "Aucune imprimante ticket n'est configurée ou disponible.",
+                                       _dernierMessageErreurImpression))
                 End If
             Catch ex As Exception
                 MessageBox.Show("Erreur impression: " & ex.Message)
@@ -654,14 +657,13 @@ Namespace DevCommerc8ak
 
         Private Function ImprimerTicket(ticket As TicketData, Optional copies As Integer = 1, Optional afficherApercu As Boolean = True) As Boolean
             Try
+                _dernierMessageErreurImpression = String.Empty
                 If ticket Is Nothing Then
                     Return False
                 End If
 
                 If _param Is Nothing Then
-                    Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
-                    Dim dal As New DAL(cs)
-                    _param = (New ParametreService(New ParametreRepository(dal))).Charger()
+                    _param = PrintConfigurationHelper.ChargerParametres()
                 End If
 
                 If _param Is Nothing OrElse String.IsNullOrWhiteSpace(_param.ImprimanteTicket) Then
@@ -683,6 +685,7 @@ Namespace DevCommerc8ak
             Catch ex As Exception
                 Dim log As New ProductionLogService()
                 log.Error("CaisseForm", "ImprimerTicket", "Erreur lors de l'impression du ticket.", ex)
+                _dernierMessageErreurImpression = ex.Message
                 Return False
             End Try
         End Function
@@ -698,7 +701,7 @@ Namespace DevCommerc8ak
 
         Private Function CreerDocumentTicket(ticket As TicketData, copieCourante As Integer, totalCopies As Integer) As Printing.PrintDocument
             Dim doc As New Printing.PrintDocument()
-            _param = PrintConfigurationHelper.ConfigurerDocumentThermique(doc, Me, "CaisseForm", "ImprimerTicket", 315, 1400)
+            _param = PrintConfigurationHelper.ConfigurerDocumentThermique(doc, Me, "CaisseForm", "ImprimerTicket", 315, CalculerHauteurTicket(ticket))
             doc.PrinterSettings.Copies = 1S
             doc.DefaultPageSettings.Color = If(_param IsNot Nothing, _param.ImpressionCouleur, True)
             doc.DefaultPageSettings.Margins = New Printing.Margins(2, 2, 2, 2)
@@ -712,6 +715,16 @@ Namespace DevCommerc8ak
                 End Sub
 
             Return doc
+        End Function
+
+        Private Shared Function CalculerHauteurTicket(ticket As TicketData) As Integer
+            Dim lignes As Integer = 0
+            If ticket IsNot Nothing AndAlso ticket.Lignes IsNot Nothing Then
+                lignes = ticket.Lignes.Rows.Count
+            End If
+
+            Dim hauteur As Integer = 420 + (lignes * 54)
+            Return Math.Max(420, Math.Min(5000, hauteur))
         End Function
 
         Private Sub ConfigurerTicket80Mm(doc As Printing.PrintDocument)
@@ -799,6 +812,9 @@ Namespace DevCommerc8ak
             y = DessinerSeparateurTicket(e.Graphics, fontLigne, gauche, y, largeurDisponible)
             y = DessinerTexteCentre(e.Graphics, "ACHAT DÉFINITIF - Aucun échange ni reprise.", fontLigne, gauche, largeurDisponible, y)
             y = DessinerTexteCentre(e.Graphics, "Merci pour votre confiance", fontSection, gauche, largeurDisponible, y)
+            Dim nomApplication As String = If(String.IsNullOrWhiteSpace(Application.ProductName), "COMMERCIAL PRO", Application.ProductName)
+            y = DessinerTexteCentre(e.Graphics, nomApplication & " - v" & PrintConfigurationHelper.ObtenirVersionApplication(), fontLigne, gauche, largeurDisponible, y)
+            y = DessinerTexteCentre(e.Graphics, "Développé par Andy Ntanta", fontLigne, gauche, largeurDisponible, y)
             y = DessinerTexteCentre(e.Graphics, "Imprimé le " & Date.Now.ToString("dd/MM/yyyy HH:mm"), fontLigne, gauche, largeurDisponible, y)
         End Sub
 

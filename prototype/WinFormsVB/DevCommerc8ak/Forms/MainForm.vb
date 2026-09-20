@@ -184,6 +184,7 @@ Namespace DevCommerc8ak
         Private _isCheckingStatus As Boolean
         Private _childFormLoaded As Form
         Private _permissionsDepuisBase As Dictionary(Of String, Boolean)
+        Private _deconnexionEnCours As Boolean
 
         ' Boutons de navigation
         Private ReadOnly btnFact As Button
@@ -198,6 +199,7 @@ Namespace DevCommerc8ak
             Me.WindowState = FormWindowState.Maximized
             Me.BackColor = ColorBg
             Me.Font = FontMain
+            Me.MinimumSize = New Size(1100, 720)
             _backupService = New BackupService()
             _backupSettings = _backupService.ChargerParametres()
             panelHeader = New Panel() With {
@@ -1018,6 +1020,7 @@ Namespace DevCommerc8ak
         Private Sub Deconnecter(sender As Object, e As EventArgs)
             If MessageBox.Show("Voulez-vous vraiment vous déconnecter ?", "Déconnexion", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.No Then Return
 
+            _deconnexionEnCours = True
             Try
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
@@ -1025,8 +1028,40 @@ Namespace DevCommerc8ak
                 repo.FermerSession(SessionUtilisateur.SessionId)
             Catch
             End Try
+            FermerFormulairesSession()
+            SessionUtilisateur.Reinitialiser()
             ApplicationLifecycle.RequestReturnToLogin()
             Me.Close()
+        End Sub
+
+        Private Sub FermerFormulairesSession()
+            Try
+                If panelContent IsNot Nothing Then
+                    panelContent.SuspendLayout()
+                    While panelContent.Controls.Count > 0
+                        Dim controle As Control = panelContent.Controls(0)
+                        panelContent.Controls.RemoveAt(0)
+                        controle.Dispose()
+                    End While
+                    panelContent.ResumeLayout(False)
+                End If
+
+                Dim formulairesAFermer As New List(Of Form)()
+                For Each formOuvert As Form In Application.OpenForms
+                    If formOuvert IsNot Me AndAlso Not TypeOf formOuvert Is LoginForm Then
+                        formulairesAFermer.Add(formOuvert)
+                    End If
+                Next
+
+                For Each formOuvert As Form In formulairesAFermer
+                    If Not formOuvert.IsDisposed Then
+                        formOuvert.Close()
+                    End If
+                Next
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Warn("MainForm", "FermerFormulairesSession", "Nettoyage des fenêtres de session incomplet : " & ex.Message)
+            End Try
         End Sub
 
         ''' <summary>
@@ -1149,10 +1184,12 @@ Namespace DevCommerc8ak
                     End If
                 End If
 
-                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
-                Dim dal As New DAL(cs)
-                Dim repo As New SessionRepository(dal)
-                repo.FermerSession(SessionUtilisateur.SessionId)
+                If Not _deconnexionEnCours Then
+                    Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                    Dim dal As New DAL(cs)
+                    Dim repo As New SessionRepository(dal)
+                    repo.FermerSession(SessionUtilisateur.SessionId)
+                End If
             Catch
             End Try
             MyBase.OnFormClosing(e)

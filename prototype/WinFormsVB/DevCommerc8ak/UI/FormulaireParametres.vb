@@ -32,6 +32,8 @@ Namespace DevCommerc8ak
         Private ReadOnly txtAlerteJours As TextBox
         Private ReadOnly cmbImprimanteA4 As ComboBox
         Private ReadOnly cmbImprimanteTicket As ComboBox
+        Private ReadOnly btnTestImprimanteA4 As Button
+        Private ReadOnly btnTestImprimanteTicket As Button
         Private ReadOnly chkApercu As CheckBox
         Private ReadOnly chkCouleur As CheckBox
         Private ReadOnly cmbDevise As ComboBox
@@ -165,9 +167,25 @@ Namespace DevCommerc8ak
             Dim cardPrinters As Panel = CreateCard("Configuration des Impressions")
             cmbImprimanteA4 = CreateComboField(cardPrinters, "Imprimante A4 (Factures/Rapports)", 20, 45, 400)
             cmbImprimanteTicket = CreateComboField(cardPrinters, "Imprimante Thermique (Tickets)", 20, 105, 400)
-            chkApercu = New CheckBox() With {.Text = "Afficher l'aperçu avant impression", .Left = 20, .Top = 160, .Font = FontControl, .AutoSize = True}
-            chkCouleur = New CheckBox() With {.Text = "Forcer l'impression en couleur", .Left = 20, .Top = 190, .Font = FontControl, .AutoSize = True}
-            cardPrinters.Controls.AddRange({chkApercu, chkCouleur})
+            btnTestImprimanteA4 = CreateStyledButton("Tester imprimante A4", ColorPrimary, 180, 32)
+            btnTestImprimanteA4.Left = 440
+            btnTestImprimanteA4.Top = 42
+            btnTestImprimanteTicket = CreateStyledButton("Tester imprimante thermique", ColorPrimary, 220, 32)
+            btnTestImprimanteTicket.Left = 440
+            btnTestImprimanteTicket.Top = 102
+            chkApercu = New CheckBox() With {.Text = "Afficher l'aperçu avant impression", .Left = 20, .Top = 165, .Font = FontControl, .AutoSize = True}
+            chkCouleur = New CheckBox() With {.Text = "Forcer l'impression en couleur", .Left = 20, .Top = 195, .Font = FontControl, .AutoSize = True}
+            Dim lblInfoImprimantes As New Label() With {
+                .Text = "Les imprimantes sont enregistrées localement sur ce poste et ne sont pas imposées aux autres ordinateurs.",
+                .Left = 20,
+                .Top = 232,
+                .Width = 640,
+                .Height = 34,
+                .Font = FontControl,
+                .ForeColor = ColorTextSecondary,
+                .AutoSize = False
+            }
+            cardPrinters.Controls.AddRange({btnTestImprimanteA4, btnTestImprimanteTicket, chkApercu, chkCouleur, lblInfoImprimantes})
             tablePrinters.Controls.Add(cardPrinters, 0, 0)
             tabImprimantes.Controls.Add(tablePrinters)
 
@@ -207,6 +225,8 @@ Namespace DevCommerc8ak
             AddHandler btnBackupFolder.Click, AddressOf ChoisirDossierBackup
             AddHandler btnBackupNow.Click, AddressOf LancerSauvegardeManuelle
             AddHandler btnRestoreBackup.Click, AddressOf LancerRestaurationManuelle
+            AddHandler btnTestImprimanteA4.Click, AddressOf TesterImprimanteA4
+            AddHandler btnTestImprimanteTicket.Click, AddressOf TesterImprimanteTicket
             AddHandler btnCharger.Click, AddressOf Charger
             AddHandler btnEnregistrer.Click, AddressOf Enregistrer
 
@@ -275,6 +295,7 @@ Namespace DevCommerc8ak
                 Dim service As ParametreService = ObtenirService()
                 Dim p As ParametreDTO = service.Charger()
                 If p IsNot Nothing Then
+                    PrintConfigurationHelper.AppliquerImprimantesLocales(p)
                     txtRemiseMax.Text = p.RemiseMaxPourcent.ToString()
                     txtSeuilStock.Text = p.SeuilStockCritique.ToString()
                     txtAlerteJours.Text = p.AlerteExpirationJours.ToString()
@@ -311,6 +332,7 @@ Namespace DevCommerc8ak
         Private Sub Enregistrer(sender As Object, e As EventArgs)
             Try
                 Dim service As ParametreService = ObtenirService()
+                Dim parametresExistants As ParametreDTO = service.Charger()
                 Dim intervalleBackup As Integer
                 If Not Integer.TryParse(If(txtBackupInterval.Text.Trim() = "", "240", txtBackupInterval.Text.Trim()), intervalleBackup) Then
                     intervalleBackup = 240
@@ -326,8 +348,8 @@ Namespace DevCommerc8ak
                     .RemiseMaxPourcent = Decimal.Parse(If(txtRemiseMax.Text.Trim() = "", "0", txtRemiseMax.Text.Trim())),
                     .SeuilStockCritique = Decimal.Parse(If(txtSeuilStock.Text.Trim() = "", "0", txtSeuilStock.Text.Trim())),
                     .AlerteExpirationJours = Convert.ToInt32(If(txtAlerteJours.Text.Trim() = "", "30", txtAlerteJours.Text.Trim())),
-                    .ImprimanteA4 = cmbImprimanteA4.Text,
-                    .ImprimanteTicket = cmbImprimanteTicket.Text,
+                    .ImprimanteA4 = If(parametresExistants Is Nothing, String.Empty, parametresExistants.ImprimanteA4),
+                    .ImprimanteTicket = If(parametresExistants Is Nothing, String.Empty, parametresExistants.ImprimanteTicket),
                     .DeviseParDefaut = If(cmbDevise.SelectedItem Is Nothing, "FC", cmbDevise.SelectedItem.ToString()),
                     .TauxUsd = Decimal.Parse(If(txtTauxUsd.Text.Trim() = "", "0", txtTauxUsd.Text.Trim())),
                     .ScannerIp = txtScannerIp.Text.Trim(),
@@ -342,6 +364,7 @@ Namespace DevCommerc8ak
                     .ImpressionCouleur = chkCouleur.Checked
                 }
                 service.Enregistrer(p)
+                PrintConfigurationHelper.EnregistrerImprimantesLocales(cmbImprimanteA4.Text, cmbImprimanteTicket.Text)
                 txtLogoPath.Text = logoPathStable
 
                 Dim backupSettings As New BackupSettings With {
@@ -386,6 +409,26 @@ Namespace DevCommerc8ak
                 End If
             Catch ex As Exception
                 MessageBox.Show("Erreur sauvegarde : " & ex.Message, "Sauvegarde", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
+        End Sub
+
+        Private Sub TesterImprimanteA4(sender As Object, e As EventArgs)
+            Try
+                PrintConfigurationHelper.EnregistrerImprimantesLocales(cmbImprimanteA4.Text, cmbImprimanteTicket.Text)
+                PrintConfigurationHelper.TesterImprimanteA4(Me)
+                MessageBox.Show("Test imprimante A4 envoyé.", "Imprimante A4", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Catch ex As Exception
+                MessageBox.Show(ex.Message, "Imprimante A4", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            End Try
+        End Sub
+
+        Private Sub TesterImprimanteTicket(sender As Object, e As EventArgs)
+            Try
+                PrintConfigurationHelper.EnregistrerImprimantesLocales(cmbImprimanteA4.Text, cmbImprimanteTicket.Text)
+                PrintConfigurationHelper.TesterImprimanteThermique(Me)
+                MessageBox.Show("Test imprimante thermique envoyé.", "Imprimante thermique", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Catch ex As Exception
+                MessageBox.Show(ex.Message, "Imprimante thermique", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             End Try
         End Sub
 

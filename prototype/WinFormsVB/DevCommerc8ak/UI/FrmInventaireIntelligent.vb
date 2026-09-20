@@ -1198,8 +1198,7 @@ Namespace DevCommerc8ak
                 _impressionInventaireTable = _inventaireTable
                 _impressionIndexLigne = 0
 
-                _printDoc.DefaultPageSettings.PaperSize = New PaperSize("A4", 827, 1169)
-                _printDoc.DefaultPageSettings.Margins = New System.Drawing.Printing.Margins(30, 30, 30, 30)
+                PrintConfigurationHelper.ConfigurerDocumentA4(_printDoc, Me, "FrmInventaireIntelligent", "ImprimerInventaire")
                 Dim lignes As List(Of String) = ConstruireLignesInventaire()
                 If lignes.Count = 0 Then
                     MessageBox.Show("Aucune donnée à imprimer.")
@@ -1222,8 +1221,7 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                _printDoc.DefaultPageSettings.PaperSize = New PaperSize("A4", 827, 1169)
-                _printDoc.DefaultPageSettings.Margins = New System.Drawing.Printing.Margins(30, 30, 30, 30)
+                PrintConfigurationHelper.ConfigurerDocumentA4(_printDoc, Me, "FrmInventaireIntelligent", "ImprimerInventaireHistorique")
                 _printPreview.Document = _printDoc
                 _printPreview.Width = 1000
                 _printPreview.Height = 700

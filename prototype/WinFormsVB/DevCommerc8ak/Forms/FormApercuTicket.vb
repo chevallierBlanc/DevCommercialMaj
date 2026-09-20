@@ -14,6 +14,8 @@ Namespace DevCommerc8ak
         Private ReadOnly _preview As PrintPreviewControl
         Private ReadOnly _btnImprimer As Button
         Private ReadOnly _btnFermer As Button
+        Private ReadOnly _cmbZoom As ComboBox
+        Private ReadOnly _btnAjusterPage As Button
         Private ReadOnly _creerDocumentImpression As Func(Of PrintDocument)
         Private ReadOnly _lancerImpression As Action
         Private _impressionEnCours As Boolean
@@ -70,8 +72,29 @@ Namespace DevCommerc8ak
             }
             _btnFermer.FlatAppearance.BorderSize = 0
 
+            _cmbZoom = New ComboBox() With {
+                .Width = 90,
+                .Height = 30,
+                .DropDownStyle = ComboBoxStyle.DropDownList,
+                .Font = Font
+            }
+            _cmbZoom.Items.AddRange(New Object() {"50 %", "75 %", "100 %", "125 %", "150 %", "200 %"})
+            _cmbZoom.SelectedItem = "100 %"
+
+            _btnAjusterPage = New Button() With {
+                .Text = "Ajuster à la page",
+                .Width = 130,
+                .Height = 30,
+                .BackColor = Color.FromArgb(230, 235, 240),
+                .ForeColor = Color.FromArgb(52, 73, 94),
+                .FlatStyle = FlatStyle.Flat
+            }
+            _btnAjusterPage.FlatAppearance.BorderSize = 0
+
             barreActions.Controls.Add(_btnFermer)
             barreActions.Controls.Add(_btnImprimer)
+            barreActions.Controls.Add(_cmbZoom)
+            barreActions.Controls.Add(_btnAjusterPage)
 
             _preview = New PrintPreviewControl() With {
                 .Dock = DockStyle.Fill,
@@ -91,6 +114,19 @@ Namespace DevCommerc8ak
                                              DialogResult = DialogResult.Cancel
                                              Close()
                                          End Sub
+            AddHandler _btnAjusterPage.Click, Sub()
+                                                  _preview.AutoZoom = True
+                                              End Sub
+            AddHandler _cmbZoom.SelectedIndexChanged, AddressOf ChangerZoom
+        End Sub
+
+        Private Sub ChangerZoom(sender As Object, e As EventArgs)
+            Dim texte As String = If(_cmbZoom.SelectedItem Is Nothing, String.Empty, _cmbZoom.SelectedItem.ToString()).Replace("%", String.Empty).Trim()
+            Dim pourcentage As Integer
+            If Integer.TryParse(texte, pourcentage) AndAlso pourcentage > 0 Then
+                _preview.AutoZoom = False
+                _preview.Zoom = pourcentage / 100.0R
+            End If
         End Sub
 
         Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean

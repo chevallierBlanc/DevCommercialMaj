@@ -1213,15 +1213,8 @@ Namespace DevCommerc8ak
                     MessageBox.Show("Panier vide.")
                     Return
                 End If
-                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
-                Dim dal As New DAL(cs)
-                _parametres = (New ParametreService(New ParametreRepository(dal))).Charger()
-
                 Dim doc As New Printing.PrintDocument()
-                If _parametres IsNot Nothing AndAlso _parametres.ImprimanteA4 <> "" Then
-                    doc.PrinterSettings.PrinterName = _parametres.ImprimanteA4
-                End If
-                doc.DefaultPageSettings.Color = If(_parametres IsNot Nothing, _parametres.ImpressionCouleur, True)
+                _parametres = PrintConfigurationHelper.ConfigurerDocumentA4(doc, Me, "FacturationForm", "ImprimerA4")
                 AddHandler doc.PrintPage, AddressOf ImprimerPage
 
                 If _parametres IsNot Nothing AndAlso _parametres.ApercuAvantImpression Then
@@ -1244,8 +1237,14 @@ Namespace DevCommerc8ak
                 End If
                 Dim sfd As New SaveFileDialog() With {.Filter = "PDF (*.pdf)|*.pdf"}
                 If sfd.ShowDialog() <> DialogResult.OK Then Return
-                Dim lignes As List(Of String) = ConstruireLignesExport()
-                PdfHelper.GenererPdfSimple(sfd.FileName, "FACTURE", lignes)
+                _parametres = PrintConfigurationHelper.ChargerParametres()
+                Using doc As New Printing.PrintDocument()
+                    doc.DefaultPageSettings.PaperSize = New Printing.PaperSize("A4", 827, 1169)
+                    doc.DefaultPageSettings.Margins = New Printing.Margins(30, 30, 30, 30)
+                    doc.DefaultPageSettings.Color = If(_parametres IsNot Nothing, _parametres.ImpressionCouleur, True)
+                    AddHandler doc.PrintPage, AddressOf ImprimerPage
+                    PdfHelper.GenererPdfDepuisPrintDocument(sfd.FileName, doc)
+                End Using
                 MessageBox.Show("PDF genere.")
             Catch ex As Exception
                 MessageBox.Show("Erreur PDF: " & ex.Message)

@@ -3065,9 +3065,7 @@ Namespace DevCommerc8ak
                 }
 
                 Dim doc As New Printing.PrintDocument()
-                If _parametres IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(_parametres.ImprimanteTicket) Then
-                    doc.PrinterSettings.PrinterName = _parametres.ImprimanteTicket
-                End If
+                _parametres = PrintConfigurationHelper.ConfigurerDocumentThermique(doc, Me, "FormulaireStock", "ImprimerTicketDette")
                 AddHandler doc.PrintPage, Sub(s, ev) ImprimerPageDette(ev, ticket)
 
                 If _parametres IsNot Nothing AndAlso _parametres.ApercuAvantImpression Then
