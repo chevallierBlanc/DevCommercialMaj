@@ -1021,6 +1021,7 @@ Namespace DevCommerc8ak
             If MessageBox.Show("Voulez-vous vraiment vous déconnecter ?", "Déconnexion", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.No Then Return
 
             _deconnexionEnCours = True
+            ApplicationLifecycle.RequestReturnToLogin()
             Try
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
@@ -1028,10 +1029,14 @@ Namespace DevCommerc8ak
                 repo.FermerSession(SessionUtilisateur.SessionId)
             Catch
             End Try
+            Me.Hide()
             FermerFormulairesSession()
             SessionUtilisateur.Reinitialiser()
-            ApplicationLifecycle.RequestReturnToLogin()
             Me.Close()
+        End Sub
+
+        Public Sub DeconnecterDepuisModuleSession()
+            Deconnecter(Me, EventArgs.Empty)
         End Sub
 
         Private Sub FermerFormulairesSession()

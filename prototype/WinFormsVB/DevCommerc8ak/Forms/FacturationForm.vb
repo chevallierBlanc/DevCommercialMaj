@@ -1392,9 +1392,11 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub Deconnecter(sender As Object, e As EventArgs)
-            Dim main As Form = Me.FindForm()
+            Dim main As MainForm = TryCast(Me.FindForm(), MainForm)
             If main IsNot Nothing Then
-                main.Close()
+                main.DeconnecterDepuisModuleSession()
+            Else
+                Me.Close()
             End If
         End Sub
 

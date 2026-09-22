@@ -701,7 +701,10 @@ Namespace DevCommerc8ak
 
         Private Function CreerDocumentTicket(ticket As TicketData, copieCourante As Integer, totalCopies As Integer) As Printing.PrintDocument
             Dim doc As New Printing.PrintDocument()
-            _param = PrintConfigurationHelper.ConfigurerDocumentThermique(doc, Me, "CaisseForm", "ImprimerTicket", 315, CalculerHauteurTicket(ticket))
+            Dim largeurTicket As Integer = 315
+            _param = PrintConfigurationHelper.ChargerParametres()
+            Dim hauteurTicket As Integer = CalculerHauteurTicket(ticket, _param, largeurTicket)
+            _param = PrintConfigurationHelper.ConfigurerDocumentThermique(doc, Me, "CaisseForm", "ImprimerTicket", largeurTicket, hauteurTicket)
             doc.PrinterSettings.Copies = 1S
             doc.DefaultPageSettings.Color = If(_param IsNot Nothing, _param.ImpressionCouleur, True)
             doc.DefaultPageSettings.Margins = New Printing.Margins(2, 2, 2, 2)
@@ -717,14 +720,107 @@ Namespace DevCommerc8ak
             Return doc
         End Function
 
-        Private Shared Function CalculerHauteurTicket(ticket As TicketData) As Integer
-            Dim lignes As Integer = 0
-            If ticket IsNot Nothing AndAlso ticket.Lignes IsNot Nothing Then
-                lignes = ticket.Lignes.Rows.Count
+        Private Shared Function CalculerHauteurTicket(ticket As TicketData, param As ParametreDTO, largeurPapier As Integer) As Integer
+            Using bmp As New Bitmap(1, 1)
+                Using g As Graphics = Graphics.FromImage(bmp)
+                    Dim margeInterne As Integer = Math.Max(4, CInt(Math.Round(g.DpiX * 3D / 25.4D)))
+                    Dim gauche As Integer = 2 + margeInterne
+                    Dim droite As Integer = largeurPapier - 2 - margeInterne
+                    Dim largeurDisponible As Integer = Math.Max(180, droite - gauche)
+                    Dim y As Integer = 3
+
+                    Using fontTitre As New Font("Segoe UI", 10, FontStyle.Bold),
+                          fontSection As New Font("Segoe UI", 7.5F, FontStyle.Bold),
+                          fontLigne As New Font("Segoe UI", 7.5F),
+                          fontTotal As New Font("Segoe UI", 8.5F, FontStyle.Bold)
+
+                        Dim logoPath As String = If(param Is Nothing, String.Empty, LogoPathHelper.GetLogoPath(param))
+                        If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
+                            y += 54
+                        End If
+
+                        y = MesurerTexteTicket(g, If(param Is Nothing OrElse param.NomMagasin = "", "MAGASIN", param.NomMagasin), fontTitre, largeurDisponible, y)
+                        If param IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(param.AdresseMagasin) Then
+                            y = MesurerTexteTicket(g, param.AdresseMagasin, fontLigne, largeurDisponible, y)
+                        End If
+                        If param IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(param.TelephoneMagasin) Then
+                            y = MesurerTexteTicket(g, param.TelephoneMagasin, fontLigne, largeurDisponible, y)
+                        End If
+                        y = MesurerTexteTicket(g, "TICKET DE CAISSE", fontSection, largeurDisponible, y + 2)
+                        y = MesurerSeparateurTicket(g, fontLigne, y)
+                        If ticket IsNot Nothing Then
+                            y = MesurerBlocTicket(g, ticket.Numero, fontLigne, droite - gauche, y)
+                            y = MesurerBlocTicket(g, ticket.DateFacture.ToString("dd/MM/yyyy HH:mm"), fontLigne, droite - gauche, y)
+                            y = MesurerBlocTicket(g, ticket.Caissier, fontLigne, droite - gauche, y)
+                            If Not String.IsNullOrWhiteSpace(ticket.Client) Then
+                                y = MesurerBlocTicket(g, ticket.Client, fontLigne, droite - gauche, y)
+                            End If
+                        End If
+                        y = MesurerBlocTicket(g, "2/2", fontLigne, droite - gauche, y)
+                        y = MesurerSeparateurTicket(g, fontLigne, y)
+
+                        If ticket IsNot Nothing AndAlso ticket.Lignes IsNot Nothing Then
+                            For Each row As DataRow In ticket.Lignes.Rows
+                                Dim libelle As String = Convert.ToString(row("Libelle"))
+                                Dim qte As Decimal = SafeDecimalTicket(row, "QuantiteSaisie")
+                                Dim prix As Decimal = SafeDecimalTicket(row, "PrixUnitaire")
+                                Dim total As Decimal = SafeDecimalTicket(row, "MontantLigne")
+                                Dim libelleType As String = GetLibelleTypeVentePourTicket(row, qte)
+                                y = MesurerTexteTicket(g, libelle, fontSection, largeurDisponible, y)
+                                y = MesurerLigneArticleTicket(g, FormaterQuantiteTicket(qte) & " " & libelleType & " (" & FormatMontantTicket(prix) & ")", FormatMontantTicket(total), fontLigne, droite - gauche - 4, y)
+                            Next
+                        End If
+
+                        y = MesurerSeparateurTicket(g, fontLigne, y)
+                        y = MesurerBlocTicket(g, If(ticket Is Nothing, String.Empty, FormatMontantTicket(ticket.Total)), fontLigne, droite - gauche, y)
+                        y = MesurerBlocTicket(g, If(ticket Is Nothing, String.Empty, FormatMontantTicket(ticket.Total)), fontTotal, droite - gauche, y)
+                        y = MesurerBlocTicket(g, If(ticket Is Nothing, String.Empty, FormaterMontantTicket(ticket.MontantRecu, ticket.Devise)), fontLigne, droite - gauche, y)
+                        y = MesurerBlocTicket(g, If(ticket Is Nothing, String.Empty, FormatMontantTicket(ticket.Monnaie)), fontLigne, droite - gauche, y)
+                        y = MesurerBlocTicket(g, If(ticket Is Nothing, String.Empty, ticket.ModePaiement), fontLigne, droite - gauche, y)
+                        If ticket IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(ticket.ReferencePaiement) Then
+                            y = MesurerBlocTicket(g, ticket.ReferencePaiement, fontLigne, droite - gauche, y)
+                        End If
+                        y = MesurerSeparateurTicket(g, fontLigne, y)
+                        y = MesurerTexteTicket(g, "ACHAT DÉFINITIF - Aucun échange ni reprise.", fontLigne, largeurDisponible, y)
+                        y = MesurerTexteTicket(g, "Merci pour votre confiance", fontSection, largeurDisponible, y)
+                        Dim nomApplication As String = If(String.IsNullOrWhiteSpace(Application.ProductName), "COMMERCIAL PRO", Application.ProductName)
+                        y = MesurerTexteTicket(g, nomApplication & " - v" & PrintConfigurationHelper.ObtenirVersionApplication(), fontLigne, largeurDisponible, y)
+                        y = MesurerTexteTicket(g, "Développé par : Andy Ntanta", fontLigne, largeurDisponible, y)
+                        y = MesurerTexteTicket(g, "Imprimé le " & Date.Now.ToString("dd/MM/yyyy HH:mm"), fontLigne, largeurDisponible, y)
+                    End Using
+
+                    Return Math.Max(420, Math.Min(5000, y + 90))
+                End Using
+            End Using
+        End Function
+
+        Private Shared Function MesurerSeparateurTicket(graphics As Graphics, font As Font, y As Integer) As Integer
+            Return y + CInt(Math.Ceiling(font.GetHeight(graphics))) + 2
+        End Function
+
+        Private Shared Function MesurerTexteTicket(graphics As Graphics, texte As String, font As Font, largeur As Integer, y As Integer) As Integer
+            If String.IsNullOrWhiteSpace(texte) Then
+                Return y
             End If
 
-            Dim hauteur As Integer = 420 + (lignes * 54)
-            Return Math.Max(420, Math.Min(5000, hauteur))
+            Dim taille As SizeF = graphics.MeasureString(texte, font, New SizeF(largeur, 1000))
+            Return y + CInt(Math.Ceiling(taille.Height)) + 2
+        End Function
+
+        Private Shared Function MesurerBlocTicket(graphics As Graphics, valeur As String, font As Font, largeurTotale As Integer, y As Integer) As Integer
+            Dim largeurLibelle As Integer = Math.Min(82, Math.Max(58, CInt(largeurTotale * 0.38R)))
+            Dim largeurValeur As Integer = Math.Max(50, largeurTotale - largeurLibelle)
+            Dim tailleValeur As SizeF = graphics.MeasureString(If(valeur, String.Empty), font, New SizeF(largeurValeur, 1000))
+            Dim hauteur As Integer = Math.Max(CInt(Math.Ceiling(font.GetHeight(graphics))), CInt(Math.Ceiling(tailleValeur.Height))) + 3
+            Return y + hauteur
+        End Function
+
+        Private Shared Function MesurerLigneArticleTicket(graphics As Graphics, detail As String, montant As String, font As Font, largeurTotale As Integer, y As Integer) As Integer
+            Dim largeurMontant As Integer = Math.Min(CInt(largeurTotale * 0.45R), Math.Max(70, CInt(Math.Ceiling(graphics.MeasureString(If(montant, String.Empty), font).Width)) + 8))
+            Dim largeurDetail As Integer = Math.Max(60, largeurTotale - largeurMontant - 6)
+            Dim tailleDetail As SizeF = graphics.MeasureString(If(detail, String.Empty), font, New SizeF(largeurDetail, 1000))
+            Dim hauteur As Integer = Math.Max(CInt(Math.Ceiling(tailleDetail.Height)), CInt(Math.Ceiling(font.GetHeight(graphics)))) + 3
+            Return y + hauteur
         End Function
 
         Private Sub ConfigurerTicket80Mm(doc As Printing.PrintDocument)
@@ -814,7 +910,7 @@ Namespace DevCommerc8ak
             y = DessinerTexteCentre(e.Graphics, "Merci pour votre confiance", fontSection, gauche, largeurDisponible, y)
             Dim nomApplication As String = If(String.IsNullOrWhiteSpace(Application.ProductName), "COMMERCIAL PRO", Application.ProductName)
             y = DessinerTexteCentre(e.Graphics, nomApplication & " - v" & PrintConfigurationHelper.ObtenirVersionApplication(), fontLigne, gauche, largeurDisponible, y)
-            y = DessinerTexteCentre(e.Graphics, "Développé par Andy Ntanta", fontLigne, gauche, largeurDisponible, y)
+            y = DessinerTexteCentre(e.Graphics, "Développé par : Andy Ntanta", fontLigne, gauche, largeurDisponible, y)
             y = DessinerTexteCentre(e.Graphics, "Imprimé le " & Date.Now.ToString("dd/MM/yyyy HH:mm"), fontLigne, gauche, largeurDisponible, y)
         End Sub
 

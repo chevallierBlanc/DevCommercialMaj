@@ -3379,70 +3379,125 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub ImprimerPageRapportEntrees(sender As Object, e As PrintPageEventArgs)
-            Dim g As Graphics = e.Graphics
-            Dim fontTitre As New Font("Segoe UI", 14, FontStyle.Bold)
-            Dim fontTexte As New Font("Segoe UI", 9, FontStyle.Regular)
-            Dim y As Integer = 40
-
-            g.DrawString(If(_parametres IsNot Nothing AndAlso _parametres.NomMagasin <> "", _parametres.NomMagasin, "Entreprise"), fontTitre, Brushes.Black, 40, y)
-            y += 28
-            g.DrawString(If(_parametres IsNot Nothing, _parametres.AdresseMagasin, ""), fontTexte, Brushes.Black, 40, y)
-            y += 18
-            g.DrawString(If(_parametres IsNot Nothing, _parametres.TelephoneMagasin, ""), fontTexte, Brushes.Black, 40, y)
-            y += 28
-            g.DrawString("Rapport des entrées du " & dtpRapportDu.Value.ToString("dd/MM/yyyy") & " au " & dtpRapportAu.Value.ToString("dd/MM/yyyy"), fontTexte, Brushes.Black, 40, y)
-            y += 30
-
-            Dim x As Integer = 40
-            Dim widths As Integer() = {90, 120, 180, 80, 80, 80, 80, 80, 70}
-            Dim headers As String() = {"Date", "Ref stock", "Produit", "Qté entrée", "Stock après", "Prix achat", "Prix gros", "Marge %", "Devise"}
-
-            For i As Integer = 0 To headers.Length - 1
-                g.DrawRectangle(Pens.Black, x, y, widths(i), 24)
-                g.DrawString(headers(i), fontTexte, Brushes.Black, x + 2, y + 4)
-                x += widths(i)
-            Next
-            y += 26
-
             If _rapportEntreesTable Is Nothing OrElse _rapportEntreesTable.Rows.Count = 0 Then
                 e.HasMorePages = False
                 Return
             End If
 
-            Dim lignesImprimees As Integer = 0
-            For i As Integer = _rapportEntreesPrintRowIndex To _rapportEntreesTable.Rows.Count - 1
-                Dim row As DataRow = _rapportEntreesTable.Rows(i)
-                x = 40
-                Dim values As String() = {
-                    Convert.ToDateTime(row("DateEntree")).ToString("dd/MM/yyyy"),
-                    Convert.ToString(row("ReferenceStock")),
-                    Convert.ToString(row("Produit")),
-                    Convert.ToDecimal(row("QuantiteEntree")).ToString("N0"),
-                    Convert.ToDecimal(row("StockApresEntree")).ToString("N0"),
-                    Convert.ToDecimal(row("PrixAchat")).ToString("N0"),
-                    Convert.ToDecimal(row("PrixGros")).ToString("N0"),
-                    FormaterMargePourcent(row("MargePourcent")),
-                    Convert.ToString(row("Devise"))
-                }
-                For j As Integer = 0 To values.Length - 1
-                    g.DrawRectangle(Pens.Gray, x, y, widths(j), 22)
-                    g.DrawString(values(j), fontTexte, Brushes.Black, x + 2, y + 4)
-                    x += widths(j)
-                Next
-                y += 22
-                lignesImprimees += 1
-                If y > e.MarginBounds.Bottom - 40 Then
-                    g.DrawString("Page " & _rapportEntreesPrintPageIndex.ToString(), fontTexte, Brushes.Black, e.MarginBounds.Right - 70, e.MarginBounds.Bottom + 10)
-                    e.HasMorePages = lignesImprimees > 0
-                    If e.HasMorePages Then
-                        _rapportEntreesPrintRowIndex = i + 1
-                        _rapportEntreesPrintPageIndex += 1
-                    End If
-                    Return
-                End If
-            Next
+            Dim g As Graphics = e.Graphics
+            Dim left As Integer = e.MarginBounds.Left
+            Dim width As Integer = e.MarginBounds.Width
+            Dim y As Integer = e.MarginBounds.Top
 
-            g.DrawString("Page " & _rapportEntreesPrintPageIndex.ToString(), fontTexte, Brushes.Black, e.MarginBounds.Right - 70, e.MarginBounds.Bottom + 10)
+            Using pinceauBleu As New SolidBrush(Color.FromArgb(17, 35, 74)),
+                  pinceauGris As New SolidBrush(Color.FromArgb(92, 104, 120)),
+                  fondBande As New SolidBrush(Color.FromArgb(17, 35, 74)),
+                  fondTable As New SolidBrush(Color.FromArgb(229, 239, 252)),
+                  penBordure As New Pen(Color.FromArgb(210, 219, 232)),
+                  rowPen As New Pen(Color.FromArgb(232, 236, 242)),
+                  fontTitre As New Font("Segoe UI", 16, FontStyle.Bold),
+                  fontSousTitre As New Font("Segoe UI", 10, FontStyle.Regular),
+                  fontBloc As New Font("Segoe UI", 9.0F, FontStyle.Regular),
+                  fontBlocGras As New Font("Segoe UI", 9.5F, FontStyle.Bold)
+
+                Dim xHeader As Integer = left
+                Dim logoPath As String = LogoPathHelper.GetLogoPath(_parametres)
+                If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
+                    Using logo As Image = Image.FromFile(logoPath)
+                        g.DrawImage(logo, xHeader, y, 70, 70)
+                    End Using
+                    xHeader += 84
+                End If
+
+                g.DrawString(If(_parametres IsNot Nothing AndAlso _parametres.NomMagasin <> "", _parametres.NomMagasin, "Entreprise"), fontTitre, pinceauBleu, xHeader, y)
+                y += 28
+                g.DrawString(If(_parametres IsNot Nothing, _parametres.AdresseMagasin, ""), fontSousTitre, pinceauGris, xHeader, y)
+                y += 18
+                g.DrawString(If(_parametres IsNot Nothing, _parametres.TelephoneMagasin, ""), fontSousTitre, pinceauGris, xHeader, y)
+                y = e.MarginBounds.Top + 88
+
+                g.FillRectangle(fondBande, left, y, width, 34)
+                g.DrawString("RAPPORT DES ENTRÉES DE STOCK", New Font("Segoe UI", 12, FontStyle.Bold), Brushes.White, left + 12, y + 8)
+                y += 50
+
+                Dim blocGauche As Integer = CInt((width - 12) * 0.5)
+                Dim blocDroite As Integer = width - blocGauche - 12
+                g.DrawRectangle(penBordure, left, y, blocGauche, 82)
+                g.DrawRectangle(penBordure, left + blocGauche + 12, y, blocDroite, 82)
+                g.DrawString("Période", fontBlocGras, pinceauBleu, left + 12, y + 10)
+                g.DrawString("Du : " & dtpRapportDu.Value.ToString("dd/MM/yyyy"), fontBloc, Brushes.Black, left + 12, y + 34)
+                g.DrawString("Au : " & dtpRapportAu.Value.ToString("dd/MM/yyyy"), fontBloc, Brushes.Black, left + 12, y + 54)
+                Dim droiteX As Integer = left + blocGauche + 12
+                g.DrawString("Informations édition", fontBlocGras, pinceauBleu, droiteX + 12, y + 10)
+                g.DrawString("Lignes : " & _rapportEntreesTable.Rows.Count.ToString("N0"), fontBloc, Brushes.Black, droiteX + 12, y + 34)
+                g.DrawString("Édité le : " & Date.Now.ToString("dd/MM/yyyy HH:mm"), fontBloc, Brushes.Black, droiteX + 12, y + 54)
+                y += 104
+
+                Dim headers As String() = {"Date", "Réf. stock", "Produit", "Qté entrée", "Stock après", "Prix achat", "Prix gros", "Marge", "Devise"}
+                Dim weights As Decimal() = {0.1D, 0.12D, 0.24D, 0.1D, 0.1D, 0.1D, 0.1D, 0.08D, 0.06D}
+                Dim widths(headers.Length - 1) As Integer
+                Dim used As Integer = 0
+                For i As Integer = 0 To headers.Length - 2
+                    widths(i) = CInt(Math.Floor(width * weights(i)))
+                    used += widths(i)
+                Next
+                widths(headers.Length - 1) = width - used
+
+                Dim headerHeight As Integer = 28
+                Dim rowHeight As Integer = 24
+                Dim x As Integer = left
+                For i As Integer = 0 To headers.Length - 1
+                    g.FillRectangle(fondTable, x, y, widths(i), headerHeight)
+                    g.DrawRectangle(penBordure, x, y, widths(i), headerHeight)
+                    g.DrawString(headers(i), fontBlocGras, pinceauBleu, New RectangleF(x + 4, y + 6, widths(i) - 8, headerHeight - 8))
+                    x += widths(i)
+                Next
+                y += headerHeight
+
+                Using alignRight As New StringFormat() With {.Alignment = StringAlignment.Far, .LineAlignment = StringAlignment.Center},
+                      alignLeft As New StringFormat() With {.Alignment = StringAlignment.Near, .LineAlignment = StringAlignment.Center}
+                    Dim lignesImprimees As Integer = 0
+                    While _rapportEntreesPrintRowIndex < _rapportEntreesTable.Rows.Count
+                        If y + rowHeight > e.MarginBounds.Bottom - 20 Then
+                            g.DrawString("Page " & _rapportEntreesPrintPageIndex.ToString(), fontBloc, pinceauGris, e.MarginBounds.Right - 70, e.MarginBounds.Bottom + 8)
+                            e.HasMorePages = lignesImprimees > 0
+                            If e.HasMorePages Then
+                                _rapportEntreesPrintPageIndex += 1
+                            End If
+                            Return
+                        End If
+
+                        Dim row As DataRow = _rapportEntreesTable.Rows(_rapportEntreesPrintRowIndex)
+                        Dim values As String() = {
+                            Convert.ToDateTime(row("DateEntree")).ToString("dd/MM/yyyy"),
+                            Convert.ToString(row("ReferenceStock")),
+                            Convert.ToString(row("Produit")),
+                            Convert.ToDecimal(row("QuantiteEntree")).ToString("N2"),
+                            Convert.ToDecimal(row("StockApresEntree")).ToString("N2"),
+                            Convert.ToDecimal(row("PrixAchat")).ToString("N0"),
+                            Convert.ToDecimal(row("PrixGros")).ToString("N0"),
+                            FormaterMargePourcent(row("MargePourcent")),
+                            Convert.ToString(row("Devise"))
+                        }
+
+                        x = left
+                        For j As Integer = 0 To values.Length - 1
+                            g.DrawLine(rowPen, x, y + rowHeight - 1, x + widths(j), y + rowHeight - 1)
+                            Dim fmt As StringFormat = If(j >= 3 AndAlso j <= 7, alignRight, alignLeft)
+                            g.DrawString(values(j), fontBloc, Brushes.Black, New RectangleF(x + 4, y, widths(j) - 8, rowHeight), fmt)
+                            x += widths(j)
+                        Next
+                        y += rowHeight
+                        _rapportEntreesPrintRowIndex += 1
+                        lignesImprimees += 1
+                    End While
+                End Using
+
+                y += 12
+                g.DrawLine(rowPen, left, y, left + width, y)
+                g.DrawString("Page " & _rapportEntreesPrintPageIndex.ToString(), fontBloc, pinceauGris, e.MarginBounds.Right - 70, e.MarginBounds.Bottom + 8)
+            End Using
+
             _rapportEntreesPrintRowIndex = 0
             _rapportEntreesPrintPageIndex = 1
             e.HasMorePages = False

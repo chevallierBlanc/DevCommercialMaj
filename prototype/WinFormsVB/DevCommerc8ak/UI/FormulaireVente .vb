@@ -61,6 +61,8 @@ Namespace DevCommerc8ak
         Private ReadOnly btnExporterPdfVentes As Button
         Private ReadOnly btnImprimerStock As Button
         Private ReadOnly btnExporterPdfStock As Button
+        Private ReadOnly btnImprimerDepenses As Button
+        Private ReadOnly btnExporterPdfDepenses As Button
 
         Private ReadOnly lblResumeVentes As Label
         Private ReadOnly lblResumeStock As Label
@@ -522,6 +524,32 @@ Namespace DevCommerc8ak
             btnRafraichirDepenses.FlatAppearance.MouseDownBackColor = Color.FromArgb(ColorPrimary.R - 20, ColorPrimary.G - 20, ColorPrimary.B - 20)
             btnRafraichirDepenses.FlatAppearance.MouseOverBackColor = Color.FromArgb(ColorPrimary.R + 20, ColorPrimary.G + 20, ColorPrimary.B + 20)
 
+            btnImprimerDepenses = New Button() With {
+                .Text = "Imprimer A4",
+                .Width = 136,
+                .Height = 34,
+                .BackColor = ColorSecondary,
+                .ForeColor = Color.White,
+                .FlatStyle = FlatStyle.Flat,
+                .Font = FontButton,
+                .Cursor = Cursors.Hand,
+                .Margin = New Padding(0)
+            }
+            btnImprimerDepenses.FlatAppearance.BorderSize = 0
+
+            btnExporterPdfDepenses = New Button() With {
+                .Text = "Exporter PDF",
+                .Width = 136,
+                .Height = 34,
+                .BackColor = ColorAccent,
+                .ForeColor = Color.White,
+                .FlatStyle = FlatStyle.Flat,
+                .Font = FontButton,
+                .Cursor = Cursors.Hand,
+                .Margin = New Padding(0, 0, 8, 0)
+            }
+            btnExporterPdfDepenses.FlatAppearance.BorderSize = 0
+
             lblResumeDepenses = New Label() With {
                 .Text = "Total dépenses: 0 FC | Catégories: 0",
                 .Font = New Font("Segoe UI", 10, FontStyle.Bold),
@@ -539,8 +567,19 @@ Namespace DevCommerc8ak
             filtresDepensesLayout.Controls.Add(cmbMoisDepenses, 5, 0)
             filtresDepensesLayout.Controls.Add(lblAnneeDepenses, 6, 0)
             filtresDepensesLayout.Controls.Add(cmbAnneeDepenses, 7, 0)
-            filtresDepensesLayout.SetColumnSpan(lblResumeDepenses, 8)
+            filtresDepensesLayout.SetColumnSpan(lblResumeDepenses, 4)
             filtresDepensesLayout.Controls.Add(lblResumeDepenses, 0, 1)
+            Dim pnlActionsDepenses As New FlowLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .FlowDirection = FlowDirection.RightToLeft,
+                .WrapContents = False,
+                .Padding = New Padding(0, 6, 0, 0),
+                .Margin = New Padding(0)
+            }
+            pnlActionsDepenses.Controls.Add(btnImprimerDepenses)
+            pnlActionsDepenses.Controls.Add(btnExporterPdfDepenses)
+            filtresDepensesLayout.Controls.Add(pnlActionsDepenses, 4, 1)
+            filtresDepensesLayout.SetColumnSpan(pnlActionsDepenses, 4)
 
             pnlFiltresDepensesCard.Controls.Add(filtresDepensesLayout)
 
@@ -589,6 +628,8 @@ Namespace DevCommerc8ak
             'AddHandler cmbMoisDepenses.SelectedIndexChanged, AddressOf ChargerDepenses
             'AddHandler cmbAnneeDepenses.SelectedIndexChanged, AddressOf ChargerDepenses
             AddHandler btnRafraichirDepenses.Click, Sub() ChargerDepenses()
+            AddHandler btnImprimerDepenses.Click, AddressOf ImprimerDepenses
+            AddHandler btnExporterPdfDepenses.Click, AddressOf ExporterPdfDepenses
             AddHandler btnImprimerVentes.Click, AddressOf ImprimerVentes
             AddHandler btnExporterPdfVentes.Click, AddressOf ExporterPdfVentes
             AddHandler btnImprimerStock.Click, AddressOf ImprimerStock
@@ -928,8 +969,14 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                Dim lignes As List(Of String) = ConstruireLignesPdfVentes(dt)
-                PdfHelper.GenererPdfSimple(sfd.FileName, "RAPPORT DES VENTES", lignes)
+                _ventePrintRowIndex = 0
+                _ventePrintPageIndex = 1
+                _venteRapportTitre = "RAPPORT DES VENTES"
+                _parametres = PrintConfigurationHelper.ChargerParametres()
+                pdocVentes.DefaultPageSettings.PaperSize = New PaperSize("A4", 827, 1169)
+                pdocVentes.DefaultPageSettings.Landscape = True
+                pdocVentes.DefaultPageSettings.Margins = New Margins(35, 35, 50, 50)
+                PdfHelper.GenererPdfDepuisPrintDocument(sfd.FileName, pdocVentes)
             End Using
         End Sub
 
@@ -1297,6 +1344,29 @@ Namespace DevCommerc8ak
                 preview.Height = 800
                 preview.StartPosition = FormStartPosition.CenterParent
                 preview.ShowDialog(Me)
+            End Using
+        End Sub
+
+        Private Sub ExporterPdfDepenses(sender As Object, e As EventArgs)
+            If _depensesCourantes Is Nothing OrElse _depensesCourantes.Rows.Count = 0 Then
+                MessageBox.Show("Aucune dépense à exporter.", "Ventes", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+
+            Using sfd As New SaveFileDialog()
+                sfd.Filter = "PDF (*.pdf)|*.pdf"
+                sfd.FileName = "Rapport_Depenses_" & Date.Now.ToString("yyyyMMdd_HHmmss") & ".pdf"
+                If sfd.ShowDialog(Me) <> DialogResult.OK Then
+                    Return
+                End If
+
+                _depensePrintRowIndex = 0
+                _depensePrintPageIndex = 1
+                _parametres = PrintConfigurationHelper.ChargerParametres()
+                pdocDepenses.DefaultPageSettings.PaperSize = New PaperSize("A4", 827, 1169)
+                pdocDepenses.DefaultPageSettings.Landscape = True
+                pdocDepenses.DefaultPageSettings.Margins = New Margins(50, 50, 60, 60)
+                PdfHelper.GenererPdfDepuisPrintDocument(sfd.FileName, pdocDepenses)
             End Using
         End Sub
 

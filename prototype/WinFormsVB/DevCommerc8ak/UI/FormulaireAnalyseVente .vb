@@ -729,24 +729,19 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                Dim lignes As New List(Of String)()
-                lignes.Add("Période: " & Convert.ToString(cmbPeriode.SelectedItem) & " - " & ChargerContexteTexte())
-                lignes.Add(" ")
-                For Each row As DataRow In dt.Rows
-                    Dim dateVente As String = If(row.IsNull("DateVente"), "", Convert.ToDateTime(row("DateVente")).ToString("dd/MM/yyyy HH:mm"))
-                    Dim produit As String = LireTexte(row, "Produit")
-                    Dim prix As String = LireCoutDetailTexte(row)
-                    Dim qte As String = FormaterQuantiteVente(row)
-                    Dim montant As String = Convert.ToDecimal(If(row.IsNull("MontantGenere"), 0D, row("MontantGenere"))).ToString("N0")
-                    Dim benefice As String = Convert.ToDecimal(If(row.IsNull("Benefice"), 0D, row("Benefice"))).ToString("N0")
-                    lignes.Add(dateVente & " | " & produit & " | Coût:" & prix & " | Qte:" & qte & " | Mnt:" & montant & " | Bénéf:" & benefice)
-                Next
-
                 Using sfd As New SaveFileDialog()
                     sfd.Filter = "PDF (*.pdf)|*.pdf"
                     sfd.FileName = "Analyse_Ventes_" & Date.Now.ToString("yyyyMMdd_HHmmss") & ".pdf"
                     If sfd.ShowDialog(Me) = DialogResult.OK Then
-                        PdfHelper.GenererPdfSimple(sfd.FileName, "ANALYSE DES VENTES", lignes)
+                        dtDetailVentesAImprimer = dt
+                        _impressionIndexDetailVentes = 0
+                        _impressionPageDetailVentes = 1
+                        _titreDetailVentes = "RAPPORT DES VENTES - " & Convert.ToString(cmbPeriode.SelectedItem).ToUpperInvariant()
+                        _parametres = PrintConfigurationHelper.ChargerParametres()
+                        printDocDetailVentes.DefaultPageSettings.PaperSize = New PaperSize("A4", 827, 1169)
+                        printDocDetailVentes.DefaultPageSettings.Landscape = True
+                        printDocDetailVentes.DefaultPageSettings.Margins = New Margins(30, 30, 30, 30)
+                        PdfHelper.GenererPdfDepuisPrintDocument(sfd.FileName, printDocDetailVentes)
                         MessageBox.Show("PDF généré avec succès.", "Analyse ventes", MessageBoxButtons.OK, MessageBoxIcon.Information)
                     End If
                 End Using
