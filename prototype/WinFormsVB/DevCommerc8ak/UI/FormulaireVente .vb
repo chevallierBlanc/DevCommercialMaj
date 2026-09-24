@@ -1014,56 +1014,16 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                Dim lignes As List(Of String) = ConstruireLignesPdfStock(dt)
-                PdfHelper.GenererPdfSimple(sfd.FileName, "RAPPORT STOCK", lignes)
+                _stockPrintRowIndex = 0
+                _stockPrintPageIndex = 1
+                _stockRapportTitre = "RAPPORT STOCK PRODUITS"
+                _parametres = PrintConfigurationHelper.ChargerParametres()
+                pdocStock.DefaultPageSettings.PaperSize = New PaperSize("A4", 827, 1169)
+                pdocStock.DefaultPageSettings.Landscape = True
+                pdocStock.DefaultPageSettings.Margins = New Margins(35, 35, 50, 50)
+                PdfHelper.GenererPdfDepuisPrintDocument(sfd.FileName, pdocStock)
             End Using
         End Sub
-
-        Private Function ConstruireLignesPdfVentes(dt As DataTable) As List(Of String)
-            Dim lignes As New List(Of String)()
-            lignes.Add("RAPPORT DES VENTES")
-            lignes.Add("Période : " & Convert.ToString(cmbPeriode.SelectedItem))
-            lignes.Add("Jour : " & dtpJour.Value.ToString("dd/MM/yyyy"))
-            lignes.Add("Mois : " & Convert.ToString(cmbMois.SelectedItem))
-            lignes.Add("Année : " & Convert.ToString(cmbAnnee.SelectedItem))
-            lignes.Add("Résumé : " & lblResumeVentes.Text)
-            lignes.Add("------------------------------------------------------------")
-            lignes.Add("Date | Produit | Coût unitaire base | Quantité vendue | Montant | Bénéfice")
-            lignes.Add("------------------------------------------------------------")
-
-            For Each row As DataRow In dt.Rows
-                Dim dateVente As String = If(dt.Columns.Contains("DateVente") AndAlso Not row.IsNull("DateVente"), Convert.ToDateTime(row("DateVente")).ToString("dd/MM/yyyy HH:mm"), "")
-                Dim produit As String = If(dt.Columns.Contains("Produit") AndAlso Not row.IsNull("Produit"), Convert.ToString(row("Produit")), "")
-                Dim qte As String = FormaterQuantiteBase(row, "QuantiteVenduePieces", False)
-                Dim prixAchat As String = If(dt.Columns.Contains("CoutUnitaireBase") AndAlso Not row.IsNull("CoutUnitaireBase"), Convert.ToDecimal(row("CoutUnitaireBase")).ToString("N0"), "0")
-                Dim montant As String = If(dt.Columns.Contains("MontantGenere") AndAlso Not row.IsNull("MontantGenere"), FormatageGlobal.FormatMontant(Convert.ToDecimal(row("MontantGenere"))), "0 FC")
-                Dim benefice As String = If(dt.Columns.Contains("Benefice") AndAlso Not row.IsNull("Benefice"), FormatageGlobal.FormatMontant(Convert.ToDecimal(row("Benefice"))), "0 FC")
-                lignes.Add(dateVente & " | " & produit & " | " & prixAchat & " | " & qte & " | " & montant & " | " & benefice)
-            Next
-
-            Return lignes
-        End Function
-
-        Private Function ConstruireLignesPdfStock(dt As DataTable) As List(Of String)
-            Dim lignes As New List(Of String)()
-            lignes.Add("RAPPORT STOCK")
-            lignes.Add("Résumé : " & lblResumeStock.Text)
-            lignes.Add("------------------------------------------------------------")
-            lignes.Add("Produit | Stock actuel | Présentation | Ventes | Sorties | Restant")
-            lignes.Add("------------------------------------------------------------")
-
-            For Each row As DataRow In dt.Rows
-                Dim produit As String = If(dt.Columns.Contains("Produit") AndAlso Not row.IsNull("Produit"), Convert.ToString(row("Produit")), "")
-                Dim stockPieces As String = FormaterQuantiteBase(row, "StockActuelPieces", True)
-                Dim stockCartons As String = FormaterPresentationPrincipale(row, "StockActuelCartons")
-                Dim ventes As String = FormaterQuantiteBase(row, "QuantiteVenduePieces", False)
-                Dim sorties As String = FormaterQuantiteBase(row, "QuantiteSortieManuellePieces", False)
-                Dim restant As String = FormaterQuantiteBase(row, "RestantPieces", True)
-                lignes.Add(produit & " | " & stockPieces & " | " & stockCartons & " | " & ventes & " | " & sorties & " | " & restant)
-            Next
-
-            Return lignes
-        End Function
 
         Private Sub PdocVentes_PrintPage(sender As Object, e As PrintPageEventArgs)
             Dim data As DataTable = If(_ventesCourantes, TryCast(gridVentes.DataSource, DataTable))

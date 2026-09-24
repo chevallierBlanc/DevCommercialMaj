@@ -445,7 +445,7 @@ Namespace DevCommerc8ak
             }
             AddHandler panelHeader.Paint, Sub(s, e) e.Graphics.DrawLine(New Pen(Color.FromArgb(229, 231, 235)), 0, 69, panelHeader.Width, 69)
             lblEntreprise = New Label() With {.Text = "PAON REHOBOTH", .Left = 25, .Top = 20, .AutoSize = True, .Font = FontTitle, .ForeColor = ColorPrimary}
-            lblUtilisateur = New Label() With {.Text = "Connecté en tant que : admin", .Left = 400, .Top = 28, .AutoSize = True, .Font = FontSubTitle, .ForeColor = ColorTextSecondary}
+            lblUtilisateur = New Label() With {.Text = ConstruireLibelleUtilisateurConnecte(), .Left = 400, .Top = 28, .AutoSize = True, .Font = FontSubTitle, .ForeColor = ColorTextSecondary}
             lblDateHeure = New Label() With {.Text = "mardi 21 avril 2026, 17:59:44", .Left = 620, .Top = 28, .AutoSize = True, .Font = FontSubTitle, .ForeColor = ColorTextSecondary}
 
             btnNotif = CreateStyledButton("Notifications", Color.FromArgb(235, 243, 255), 140, 38)
@@ -545,7 +545,7 @@ Namespace DevCommerc8ak
             kpiCurrent = New Dictionary(Of Label, Decimal)()
 
             AddHandler btnNotif.Click, AddressOf AfficherNotifications
-            AddHandler btnDeconnexion.Click, Sub() Me.Close()
+            AddHandler btnDeconnexion.Click, AddressOf DeconnecterDepuisDashboard
             AddHandler btnFacture.Click, Sub() Ouvrir(New FacturationForm())
             AddHandler btnEncaisser.Click, Sub() Ouvrir(New CaisseForm())
             AddHandler btnProduit.Click, Sub() Ouvrir(New FormulaireProduits())
@@ -567,6 +567,32 @@ Namespace DevCommerc8ak
             ' Initialisation
             ConfigurerAlertes()
             Charger()
+        End Sub
+
+        Private Function ConstruireLibelleUtilisateurConnecte() As String
+            Dim nom As String = If(SessionUtilisateur.NomUtilisateur, String.Empty).Trim()
+            Dim role As String = If(SessionUtilisateur.Role, String.Empty).Trim()
+
+            If String.IsNullOrWhiteSpace(nom) Then
+                nom = "Utilisateur"
+            End If
+
+            If String.IsNullOrWhiteSpace(role) Then
+                Return "Connecté en tant que : " & nom
+            End If
+
+            Return "Connecté en tant que : " & nom & " (" & role & ")"
+        End Function
+
+        Private Sub DeconnecterDepuisDashboard(sender As Object, e As EventArgs)
+            Dim main As MainForm = TryCast(Me.FindForm(), MainForm)
+            If main IsNot Nothing Then
+                main.DeconnecterDepuisModuleSession()
+            Else
+                ApplicationLifecycle.RequestReturnToLogin()
+                SessionUtilisateur.Reinitialiser()
+                Me.Close()
+            End If
         End Sub
 
         ' --- Helpers de Design ---
