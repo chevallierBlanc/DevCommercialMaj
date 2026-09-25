@@ -741,11 +741,12 @@ Namespace DevCommerc8ak
                         printDocDetailVentes.DefaultPageSettings.PaperSize = New PaperSize("A4", 827, 1169)
                         printDocDetailVentes.DefaultPageSettings.Landscape = True
                         printDocDetailVentes.DefaultPageSettings.Margins = New Margins(30, 30, 30, 30)
-                        PdfHelper.GenererPdfDepuisPrintDocument(sfd.FileName, printDocDetailVentes)
-                        MessageBox.Show("PDF généré avec succès.", "Analyse ventes", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                        Dim cheminPdf As String = PdfHelper.GenererPdfDepuisPrintDocumentEtRetournerChemin(sfd.FileName, printDocDetailVentes)
+                        AfficherConfirmationExportPdf(cheminPdf)
                     End If
                 End Using
             Catch ex As Exception
+                JournaliserErreurExportPdf("ExporterPdfDetailVentes", ex)
                 MessageBox.Show("Impossible d'exporter les ventes en PDF : " & ex.Message, "Analyse ventes", MessageBoxButtons.OK, MessageBoxIcon.Error)
             End Try
         End Sub
@@ -756,6 +757,89 @@ Namespace DevCommerc8ak
 
         Private Function ChargerContexteTexte() As String
             Return Convert.ToString(cmbMois.SelectedItem) & " " & Convert.ToString(cmbAnnee.SelectedItem)
+        End Function
+
+        Private Sub AfficherConfirmationExportPdf(chemin As String)
+            If File.Exists(chemin) AndAlso New FileInfo(chemin).Length > 0 Then
+                MessageBox.Show("Rapport PDF généré avec succès." & Environment.NewLine & Environment.NewLine & "Fichier :" & Environment.NewLine & chemin, "Export PDF", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Else
+                MessageBox.Show("Le rapport PDF n'a pas été retrouvé après la génération." & Environment.NewLine & Environment.NewLine & "Emplacement attendu :" & Environment.NewLine & chemin, "Export PDF", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            End If
+        End Sub
+
+        Private Sub JournaliserErreurExportPdf(action As String, ex As Exception)
+            Try
+                Dim log As New ProductionLogService()
+                log.Error("FormulaireAnalyseVente", action, "Erreur lors de l'export PDF.", ex)
+            Catch
+            End Try
+        End Sub
+
+        Private Function CalculerLargeursColonnes(largeurTotale As Integer, ratios As Single()) As Integer()
+            Dim largeurs(ratios.Length - 1) As Integer
+            Dim totalUtilise As Integer = 0
+            For i As Integer = 0 To ratios.Length - 2
+                largeurs(i) = CInt(Math.Floor(largeurTotale * ratios(i)))
+                totalUtilise += largeurs(i)
+            Next
+            largeurs(ratios.Length - 1) = largeurTotale - totalUtilise
+            Return largeurs
+        End Function
+
+        Private Function MesurerHauteurLigneTableau(g As Graphics, police As Font, valeurs As String(), largeurs As Integer(), hauteurMin As Integer) As Integer
+            Dim hauteur As Integer = hauteurMin
+            For i As Integer = 0 To valeurs.Length - 1
+                Dim largeurTexte As Integer = Math.Max(20, largeurs(i) - 8)
+                Dim mesure As SizeF = g.MeasureString(If(valeurs(i), String.Empty), police, largeurTexte)
+                hauteur = Math.Max(hauteur, CInt(Math.Ceiling(mesure.Height)) + 8)
+            Next
+            Return hauteur
+        End Function
+
+        Private Sub DessinerCelluleTableau(g As Graphics, texte As String, police As Font, couleur As Brush, bordure As Pen, x As Integer, y As Integer, largeur As Integer, hauteur As Integer, format As StringFormat, Optional fond As Brush = Nothing)
+            If fond IsNot Nothing Then
+                g.FillRectangle(fond, x, y, largeur, hauteur)
+            End If
+            g.DrawRectangle(bordure, x, y, largeur, hauteur)
+            g.DrawString(If(texte, String.Empty), police, couleur, New RectangleF(x + 4, y + 3, largeur - 8, hauteur - 6), format)
+        End Sub
+
+        Private Function DessinerEnteteRapportA4(g As Graphics, titre As String, left As Integer, y As Integer, largeur As Integer, titreFont As Font, sousTitreFont As Font, pinceauBleu As Brush, pinceauGris As Brush, fondBande As Brush, parametres As ParametreDTO) As Integer
+            Dim xHeader As Integer = left
+            Dim logoPath As String = LogoPathHelper.GetLogoPath(parametres)
+            If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
+                Using img As Image = Image.FromFile(logoPath)
+                    g.DrawImage(img, xHeader, y, 56, 56)
+                End Using
+                xHeader += 70
+            End If
+
+            g.DrawString(If(parametres IsNot Nothing AndAlso parametres.NomMagasin <> "", parametres.NomMagasin, "ERPCommercial"), titreFont, pinceauBleu, xHeader, y)
+            y += 23
+            g.DrawString(If(parametres IsNot Nothing, parametres.AdresseMagasin, ""), sousTitreFont, pinceauGris, xHeader, y)
+            y += 17
+            g.DrawString(If(parametres IsNot Nothing, parametres.TelephoneMagasin, ""), sousTitreFont, pinceauGris, xHeader, y)
+            y += 26
+
+            g.FillRectangle(fondBande, left, y, largeur, 34)
+            Using sfTitre As New StringFormat() With {.Alignment = StringAlignment.Center, .LineAlignment = StringAlignment.Center}
+                g.DrawString(titre, titreFont, Brushes.White, New RectangleF(left, y, largeur, 34), sfTitre)
+            End Using
+            Return y + 44
+        End Function
+
+        Private Function DessinerSyntheseAnalyse(g As Graphics, left As Integer, y As Integer, largeur As Integer, titreFont As Font, texteFont As Font, titreBrush As Brush, texteBrush As Brush, bordure As Pen, fond As Brush) As Integer
+            Dim hauteur As Integer = 74
+            g.FillRectangle(fond, left, y, largeur, hauteur)
+            g.DrawRectangle(bordure, left, y, largeur, hauteur)
+            g.DrawString("SYNTHÈSE DU RAPPORT", titreFont, titreBrush, New RectangleF(left + 12, y + 8, largeur - 24, 20))
+            g.DrawString("Période", texteFont, texteBrush, New RectangleF(left + 12, y + 34, CInt(largeur * 0.35F), 18))
+            Using sfRight As New StringFormat() With {.Alignment = StringAlignment.Far, .LineAlignment = StringAlignment.Near, .Trimming = StringTrimming.EllipsisCharacter}
+                g.DrawString(ChargerContexteTexte(), texteFont, texteBrush, New RectangleF(left + CInt(largeur * 0.35F), y + 34, largeur - CInt(largeur * 0.35F) - 12, 18), sfRight)
+                g.DrawString(Date.Now.ToString("dd/MM/yyyy HH:mm"), texteFont, texteBrush, New RectangleF(left + CInt(largeur * 0.35F), y + 52, largeur - CInt(largeur * 0.35F) - 12, 18), sfRight)
+            End Using
+            g.DrawString("Date d'impression", texteFont, texteBrush, New RectangleF(left + 12, y + 52, CInt(largeur * 0.35F), 18))
+            Return y + hauteur
         End Function
 
         Private Sub PrintDocDetailVentes_PrintPage(sender As Object, e As PrintPageEventArgs)
@@ -774,57 +858,31 @@ Namespace DevCommerc8ak
                       pinceauGris As New SolidBrush(Color.FromArgb(92, 104, 120)),
                       fondBande As New SolidBrush(Color.FromArgb(17, 35, 74)),
                       fondTable As New SolidBrush(Color.FromArgb(229, 239, 252)),
+                      fondBloc As New SolidBrush(Color.White),
                       bordure As New Pen(Color.FromArgb(210, 219, 232)),
-                      rowPen As New Pen(Color.FromArgb(232, 236, 242)),
                       fontTitre As New Font("Segoe UI", 16.0F, FontStyle.Bold),
                       fontSousTitre As New Font("Segoe UI", 9.5F, FontStyle.Regular),
-                      fontBloc As New Font("Segoe UI", 9.0F, FontStyle.Regular),
-                      fontBlocGras As New Font("Segoe UI", 9.0F, FontStyle.Bold),
-                      sfLeft As New StringFormat() With {.Alignment = StringAlignment.Near, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter, .FormatFlags = StringFormatFlags.NoWrap},
-                      sfRight As New StringFormat() With {.Alignment = StringAlignment.Far, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter, .FormatFlags = StringFormatFlags.NoWrap},
-                      sfCenter As New StringFormat() With {.Alignment = StringAlignment.Center, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter, .FormatFlags = StringFormatFlags.NoWrap}
+                      fontBloc As New Font("Segoe UI", 8.5F, FontStyle.Regular),
+                      fontBlocGras As New Font("Segoe UI", 8.5F, FontStyle.Bold),
+                      sfLeft As New StringFormat() With {.Alignment = StringAlignment.Near, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter},
+                      sfRight As New StringFormat() With {.Alignment = StringAlignment.Far, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter}
 
-                    Dim xHeader As Integer = left
-                    Dim logoPath As String = LogoPathHelper.GetLogoPath(_parametres)
-                    If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
-                        Using img As Image = Image.FromFile(logoPath)
-                            e.Graphics.DrawImage(img, xHeader, y, 60, 60)
-                        End Using
-                        xHeader += 74
+                    y = DessinerEnteteRapportA4(e.Graphics, _titreDetailVentes, left, y, width, fontTitre, fontSousTitre, pinceauBleu, pinceauGris, fondBande, _parametres)
+
+                    If _impressionPageDetailVentes = 1 Then
+                        y = DessinerSyntheseAnalyse(e.Graphics, left, y, width, fontBlocGras, fontSousTitre, pinceauBleu, pinceauGris, bordure, fondBloc) + 16
                     End If
 
-                    e.Graphics.DrawString(If(_parametres IsNot Nothing AndAlso _parametres.NomMagasin <> "", _parametres.NomMagasin, "ERPCommercial"), fontTitre, pinceauBleu, xHeader, y)
-                    y += 24
-                    e.Graphics.DrawString(If(_parametres IsNot Nothing, _parametres.AdresseMagasin, ""), fontSousTitre, pinceauGris, xHeader, y)
-                    y += 18
-                    e.Graphics.DrawString(If(_parametres IsNot Nothing, _parametres.TelephoneMagasin, ""), fontSousTitre, pinceauGris, xHeader, y)
-                    y += 18
-                    e.Graphics.DrawString("Période : " & ChargerContexteTexte(), fontSousTitre, pinceauGris, xHeader, y)
-                    y += 18
-                    e.Graphics.DrawString("Date d'impression : " & Date.Now.ToString("dd/MM/yyyy HH:mm"), fontSousTitre, pinceauGris, xHeader, y)
-                    y += 32
-
-                    e.Graphics.FillRectangle(fondBande, left, y, width, 34)
-                    e.Graphics.DrawString(_titreDetailVentes, fontBlocGras, Brushes.White, New RectangleF(left + 8, y, width - 16, 34), sfCenter)
-                    y += 46
-
                     Dim titres As String() = {"Date", "Produit", "Coût unitaire", "Qté", "Montant", "Bénéfice"}
-                    Dim largeurs As Integer() = {
-                        CInt(width * 0.16),
-                        CInt(width * 0.30),
-                        CInt(width * 0.14),
-                        CInt(width * 0.14),
-                        CInt(width * 0.13),
-                        width - CInt(width * 0.16) - CInt(width * 0.30) - CInt(width * 0.14) - CInt(width * 0.14) - CInt(width * 0.13)
-                    }
+                    Dim largeurs As Integer() = CalculerLargeursColonnes(width, New Single() {0.14F, 0.36F, 0.12F, 0.11F, 0.14F, 0.13F})
                     Dim hauteurEntete As Integer = 28
-                    Dim hauteurLigne As Integer = 24
+                    Dim hauteurLigneMin As Integer = 26
+                    Dim limiteBasTableau As Integer = e.MarginBounds.Bottom - 24
+                    Dim footerY As Integer = e.MarginBounds.Bottom - 16
 
                     Dim x As Integer = left
                     For i As Integer = 0 To titres.Length - 1
-                        e.Graphics.FillRectangle(fondTable, x, y, largeurs(i), hauteurEntete)
-                        e.Graphics.DrawRectangle(bordure, x, y, largeurs(i), hauteurEntete)
-                        e.Graphics.DrawString(titres(i), fontBlocGras, pinceauBleu, New RectangleF(x + 4, y, largeurs(i) - 8, hauteurEntete), If(i >= 2, sfRight, sfLeft))
+                        DessinerCelluleTableau(e.Graphics, titres(i), fontBlocGras, pinceauBleu, bordure, x, y, largeurs(i), hauteurEntete, If(i >= 2, sfRight, sfLeft), fondTable)
                         x += largeurs(i)
                     Next
                     y += hauteurEntete
@@ -832,14 +890,6 @@ Namespace DevCommerc8ak
                     Dim lignesImprimees As Integer = 0
                     While _impressionIndexDetailVentes < dt.Rows.Count
                         Dim row As DataRow = dt.Rows(_impressionIndexDetailVentes)
-                        If y + hauteurLigne > e.MarginBounds.Bottom Then
-                            e.Graphics.DrawString("Page " & _impressionPageDetailVentes.ToString(), fontSousTitre, pinceauGris, e.MarginBounds.Right - 80, e.MarginBounds.Bottom + 8)
-                            e.HasMorePages = lignesImprimees > 0
-                            If e.HasMorePages Then
-                                _impressionPageDetailVentes += 1
-                            End If
-                            Return
-                        End If
 
                         Dim valeurs As String() = {
                             If(row.IsNull("DateVente"), "", Convert.ToDateTime(row("DateVente")).ToString("dd/MM/yyyy HH:mm")),
@@ -850,19 +900,25 @@ Namespace DevCommerc8ak
                             Convert.ToDecimal(If(row.IsNull("Benefice"), 0D, row("Benefice"))).ToString("N0")
                         }
 
+                        Dim hauteurLigne As Integer = MesurerHauteurLigneTableau(e.Graphics, fontBloc, valeurs, largeurs, hauteurLigneMin)
+                        If y + hauteurLigne > limiteBasTableau AndAlso lignesImprimees > 0 Then
+                            e.Graphics.DrawString("Page " & _impressionPageDetailVentes.ToString(), fontSousTitre, pinceauGris, e.MarginBounds.Right - 80, footerY)
+                            e.HasMorePages = True
+                            _impressionPageDetailVentes += 1
+                            Return
+                        End If
+
                         x = left
                         For i As Integer = 0 To valeurs.Length - 1
-                            e.Graphics.DrawRectangle(bordure, x, y, largeurs(i), hauteurLigne)
-                            e.Graphics.DrawString(valeurs(i), fontBloc, Brushes.Black, New RectangleF(x + 4, y, largeurs(i) - 8, hauteurLigne), If(i >= 2, sfRight, sfLeft))
+                            DessinerCelluleTableau(e.Graphics, valeurs(i), fontBloc, Brushes.Black, bordure, x, y, largeurs(i), hauteurLigne, If(i >= 2, sfRight, sfLeft))
                             x += largeurs(i)
                         Next
-                        e.Graphics.DrawLine(rowPen, left, y + hauteurLigne, left + width, y + hauteurLigne)
                         y += hauteurLigne
                         _impressionIndexDetailVentes += 1
                         lignesImprimees += 1
                     End While
 
-                    e.Graphics.DrawString("Page " & _impressionPageDetailVentes.ToString(), fontSousTitre, pinceauGris, e.MarginBounds.Right - 80, e.MarginBounds.Bottom + 8)
+                    e.Graphics.DrawString("Page " & _impressionPageDetailVentes.ToString(), fontSousTitre, pinceauGris, e.MarginBounds.Right - 80, footerY)
                     _impressionIndexDetailVentes = 0
                     _impressionPageDetailVentes = 1
                     e.HasMorePages = False

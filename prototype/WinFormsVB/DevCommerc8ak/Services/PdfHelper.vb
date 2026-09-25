@@ -26,18 +26,27 @@ Namespace DevCommerc8ak
         End Sub
 
         Public Sub GenererPdfDepuisPrintDocument(chemin As String, document As PrintDocument)
+            GenererPdfDepuisPrintDocumentEtRetournerChemin(chemin, document)
+        End Sub
+
+        Public Function GenererPdfDepuisPrintDocumentEtRetournerChemin(chemin As String, document As PrintDocument) As String
             If String.IsNullOrWhiteSpace(chemin) Then Throw New ArgumentException("Le chemin PDF est vide.", NameOf(chemin))
             If document Is Nothing Then Throw New ArgumentNullException(NameOf(document))
 
-            Dim dossier As String = Path.GetDirectoryName(chemin)
+            Dim cheminFinal As String = Path.GetFullPath(chemin)
+            Dim dossier As String = Path.GetDirectoryName(cheminFinal)
             If Not String.IsNullOrWhiteSpace(dossier) AndAlso Not Directory.Exists(dossier) Then
                 Directory.CreateDirectory(dossier)
+            End If
+
+            If File.Exists(cheminFinal) Then
+                File.Delete(cheminFinal)
             End If
 
             document.PrinterSettings = New PrinterSettings() With {
                 .PrinterName = "Microsoft Print to PDF",
                 .PrintToFile = True,
-                .PrintFileName = chemin
+                .PrintFileName = cheminFinal
             }
             document.PrintController = New StandardPrintController()
 
@@ -46,6 +55,39 @@ Namespace DevCommerc8ak
             End If
 
             document.Print()
+            AttendreFichierPdf(cheminFinal, document.PrinterSettings)
+            Return cheminFinal
+        End Function
+
+        Private Sub AttendreFichierPdf(chemin As String, settings As PrinterSettings)
+            Dim derniereTaille As Long = -1
+            Dim tailleStableConsecutive As Integer = 0
+
+            For tentative As Integer = 1 To 50
+                If File.Exists(chemin) Then
+                    Dim info As New FileInfo(chemin)
+                    If info.Length > 0 Then
+                        If info.Length = derniereTaille Then
+                            tailleStableConsecutive += 1
+                            If tailleStableConsecutive >= 2 Then
+                                Return
+                            End If
+                        Else
+                            derniereTaille = info.Length
+                            tailleStableConsecutive = 0
+                        End If
+                    End If
+                End If
+                System.Threading.Thread.Sleep(200)
+            Next
+
+            Dim printerName As String = If(settings Is Nothing, "", settings.PrinterName)
+            Dim printFileName As String = If(settings Is Nothing, "", settings.PrintFileName)
+            Dim printToFile As Boolean = settings IsNot Nothing AndAlso settings.PrintToFile
+            Throw New FileNotFoundException("Le fichier PDF n'a pas été créé ou est resté vide après impression. Chemin demandé: " & chemin &
+                                            " | PrinterName: " & printerName &
+                                            " | PrintToFile: " & printToFile.ToString() &
+                                            " | PrintFileName: " & printFileName, chemin)
         End Sub
 
         Private Function ConstruirePdf(titre As String, lignes As IList(Of String)) As Byte()
