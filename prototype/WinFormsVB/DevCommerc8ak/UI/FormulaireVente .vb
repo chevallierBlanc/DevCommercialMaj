@@ -1071,16 +1071,106 @@ Namespace DevCommerc8ak
             g.DrawString(If(texte, String.Empty), police, couleur, New RectangleF(x + 4, y + 3, largeur - 8, hauteur - 6), format)
         End Sub
 
-        Private Function CalculerLargeursColonnes(largeurTotale As Integer, ratios As Single()) As Integer()
-            Dim largeurs(ratios.Length - 1) As Integer
-            Dim totalUtilise As Integer = 0
-            For i As Integer = 0 To ratios.Length - 2
-                largeurs(i) = CInt(Math.Floor(largeurTotale * ratios(i)))
-                totalUtilise += largeurs(i)
+        Private Function CalculerLargeursColonnesDynamiques(g As Graphics, enteteFont As Font, ligneFont As Font, titres As String(), lignes As List(Of String()), largeurTotale As Integer, minima As Integer(), priorites As Single()) As Integer()
+            Dim nbColonnes As Integer = titres.Length
+            Dim largeurs(nbColonnes - 1) As Integer
+            Dim souhaits(nbColonnes - 1) As Integer
+            Dim totalMinima As Integer = 0
+
+            For i As Integer = 0 To nbColonnes - 1
+                largeurs(i) = minima(i)
+                souhaits(i) = Math.Max(minima(i), CInt(Math.Ceiling(g.MeasureString(titres(i), enteteFont).Width)) + 18)
+                totalMinima += minima(i)
             Next
-            largeurs(ratios.Length - 1) = largeurTotale - totalUtilise
+
+            If lignes IsNot Nothing Then
+                For Each valeurs As String() In lignes
+                    For i As Integer = 0 To Math.Min(nbColonnes, valeurs.Length) - 1
+                        Dim texte As String = If(valeurs(i), String.Empty)
+                        souhaits(i) = Math.Max(souhaits(i), CInt(Math.Ceiling(g.MeasureString(texte, ligneFont).Width)) + 18)
+                    Next
+                Next
+            End If
+
+            If totalMinima >= largeurTotale Then
+                Return CalculerLargeursColonnesDepuisMinimaContraints(largeurTotale, minima)
+            End If
+
+            Dim restant As Integer = largeurTotale - totalMinima
+            Dim besoins(nbColonnes - 1) As Integer
+            Dim poidsTotal As Single = 0.0F
+            For i As Integer = 0 To nbColonnes - 1
+                besoins(i) = Math.Max(0, souhaits(i) - minima(i))
+                If besoins(i) > 0 Then
+                    poidsTotal += Math.Max(0.1F, priorites(i))
+                End If
+            Next
+
+            If poidsTotal > 0.0F Then
+                For i As Integer = 0 To nbColonnes - 1
+                    If besoins(i) > 0 AndAlso restant > 0 Then
+                        Dim part As Integer = CInt(Math.Floor((largeurTotale - totalMinima) * (Math.Max(0.1F, priorites(i)) / poidsTotal)))
+                        Dim ajout As Integer = Math.Min(besoins(i), Math.Max(0, part))
+                        largeurs(i) += ajout
+                        restant -= ajout
+                    End If
+                Next
+            End If
+
+            Dim progression As Boolean = True
+            While restant > 0 AndAlso progression
+                progression = False
+                For i As Integer = 0 To nbColonnes - 1
+                    If restant <= 0 Then Exit For
+                    If largeurs(i) < souhaits(i) Then
+                        largeurs(i) += 1
+                        restant -= 1
+                        progression = True
+                    End If
+                Next
+            End While
+
+            If restant > 0 Then
+                poidsTotal = 0.0F
+                For i As Integer = 0 To nbColonnes - 1
+                    poidsTotal += Math.Max(0.1F, priorites(i))
+                Next
+                Dim distribue As Integer = 0
+                For i As Integer = 0 To nbColonnes - 2
+                    Dim ajout As Integer = CInt(Math.Floor(restant * (Math.Max(0.1F, priorites(i)) / poidsTotal)))
+                    largeurs(i) += ajout
+                    distribue += ajout
+                Next
+                largeurs(nbColonnes - 1) += restant - distribue
+            End If
+
+            AjusterLargeurTotale(largeurs, largeurTotale)
             Return largeurs
         End Function
+
+        Private Function CalculerLargeursColonnesDepuisMinimaContraints(largeurTotale As Integer, minima As Integer()) As Integer()
+            Dim largeurs(minima.Length - 1) As Integer
+            Dim totalMinima As Integer = 0
+            For Each minimum As Integer In minima
+                totalMinima += minimum
+            Next
+            Dim utilise As Integer = 0
+            For i As Integer = 0 To minima.Length - 2
+                largeurs(i) = Math.Max(1, CInt(Math.Floor(largeurTotale * (minima(i) / CDbl(totalMinima)))))
+                utilise += largeurs(i)
+            Next
+            largeurs(minima.Length - 1) = Math.Max(1, largeurTotale - utilise)
+            Return largeurs
+        End Function
+
+        Private Sub AjusterLargeurTotale(largeurs As Integer(), largeurTotale As Integer)
+            Dim total As Integer = 0
+            For Each largeur As Integer In largeurs
+                total += largeur
+            Next
+            If total = largeurTotale Then Return
+            largeurs(largeurs.Length - 1) += largeurTotale - total
+        End Sub
 
         Private Function ExtrairePairesSynthese(texte As String) As List(Of KeyValuePair(Of String, String))
             Dim paires As New List(Of KeyValuePair(Of String, String))()
@@ -1195,23 +1285,8 @@ Namespace DevCommerc8ak
 
                 Dim colonnes As String() = {"DateVente", "Produit", "CoutUnitaireBase", "QuantiteVenduePieces", "MontantGenere", "Benefice"}
                 Dim titres As String() = {"Date", "Produit", "Coût base", "Qté vendue", "Montant", "Bénéfice"}
-                Dim largeurs As Integer() = CalculerLargeursColonnes(largeur, New Single() {0.14F, 0.36F, 0.12F, 0.11F, 0.14F, 0.13F})
-                Dim hauteurEntete As Integer = 28
-                Dim hauteurLigneMin As Integer = 26
-                Dim limiteBasTableau As Integer = e.MarginBounds.Bottom - 24
-                Dim footerY As Integer = e.MarginBounds.Bottom - 16
-
-                Dim x As Integer = left
-                For i As Integer = 0 To titres.Length - 1
-                    DessinerCelluleTableau(e.Graphics, titres(i), enteteFont, pinceauBleu, bordure, x, y, largeurs(i), hauteurEntete, If(i >= 2, sfRight, sfLeft), fondTable)
-                    x += largeurs(i)
-                Next
-                y += hauteurEntete
-
-                Dim lignesImprimees As Integer = 0
-                While _ventePrintRowIndex < data.Rows.Count
-                    Dim row As DataRow = data.Rows(_ventePrintRowIndex)
-
+                Dim lignesValeurs As New List(Of String())()
+                For Each row As DataRow In data.Rows
                     Dim valeurs(colonnes.Length - 1) As String
                     For i As Integer = 0 To colonnes.Length - 1
                         valeurs(i) = String.Empty
@@ -1228,6 +1303,25 @@ Namespace DevCommerc8ak
                             End Select
                         End If
                     Next
+                    lignesValeurs.Add(valeurs)
+                Next
+
+                Dim largeurs As Integer() = CalculerLargeursColonnesDynamiques(e.Graphics, enteteFont, ligneFont, titres, lignesValeurs, largeur, New Integer() {110, 260, 110, 115, 120, 120}, New Single() {0.9F, 2.6F, 1.0F, 1.1F, 1.1F, 1.1F})
+                Dim hauteurEntete As Integer = 28
+                Dim hauteurLigneMin As Integer = 26
+                Dim limiteBasTableau As Integer = e.MarginBounds.Bottom - 24
+                Dim footerY As Integer = e.MarginBounds.Bottom - 16
+
+                Dim x As Integer = left
+                For i As Integer = 0 To titres.Length - 1
+                    DessinerCelluleTableau(e.Graphics, titres(i), enteteFont, pinceauBleu, bordure, x, y, largeurs(i), hauteurEntete, If(i >= 2, sfRight, sfLeft), fondTable)
+                    x += largeurs(i)
+                Next
+                y += hauteurEntete
+
+                Dim lignesImprimees As Integer = 0
+                While _ventePrintRowIndex < data.Rows.Count
+                    Dim valeurs As String() = lignesValeurs(_ventePrintRowIndex)
 
                     Dim hauteurLigne As Integer = MesurerHauteurLigneTableau(e.Graphics, ligneFont, valeurs, largeurs, hauteurLigneMin)
                     If y + hauteurLigne > limiteBasTableau AndAlso lignesImprimees > 0 Then
@@ -1299,23 +1393,8 @@ Namespace DevCommerc8ak
 
                 Dim colonnes As String() = {"Produit", "StockActuelPieces", "StockActuelCartons", "QuantiteVenduePieces", "QuantiteSortieManuellePieces", "RestantPieces"}
                 Dim titres As String() = {"Produit", "Stock", "Présentation", "Ventes", "Sorties", "Restant"}
-                Dim largeurs As Integer() = CalculerLargeursColonnes(largeur, New Single() {0.24F, 0.25F, 0.15F, 0.07F, 0.07F, 0.22F})
-                Dim hauteurEntete As Integer = 28
-                Dim hauteurLigneMin As Integer = 26
-                Dim limiteBasTableau As Integer = e.MarginBounds.Bottom - 24
-                Dim footerY As Integer = e.MarginBounds.Bottom - 16
-
-                Dim x As Integer = left
-                For i As Integer = 0 To titres.Length - 1
-                    DessinerCelluleTableau(e.Graphics, titres(i), enteteFont, pinceauBleu, bordure, x, y, largeurs(i), hauteurEntete, If(i = 0, sfLeft, sfRight), fondTable)
-                    x += largeurs(i)
-                Next
-                y += hauteurEntete
-
-                Dim lignesImprimees As Integer = 0
-                While _stockPrintRowIndex < data.Rows.Count
-                    Dim row As DataRow = data.Rows(_stockPrintRowIndex)
-
+                Dim lignesValeurs As New List(Of String())()
+                For Each row As DataRow In data.Rows
                     Dim valeurs(colonnes.Length - 1) As String
                     For i As Integer = 0 To colonnes.Length - 1
                         valeurs(i) = String.Empty
@@ -1335,6 +1414,25 @@ Namespace DevCommerc8ak
                             End If
                         End If
                     Next
+                    lignesValeurs.Add(valeurs)
+                Next
+
+                Dim largeurs As Integer() = CalculerLargeursColonnesDynamiques(e.Graphics, enteteFont, ligneFont, titres, lignesValeurs, largeur, New Integer() {210, 180, 145, 105, 105, 180}, New Single() {1.7F, 1.8F, 1.2F, 0.8F, 0.8F, 1.7F})
+                Dim hauteurEntete As Integer = 28
+                Dim hauteurLigneMin As Integer = 26
+                Dim limiteBasTableau As Integer = e.MarginBounds.Bottom - 24
+                Dim footerY As Integer = e.MarginBounds.Bottom - 16
+
+                Dim x As Integer = left
+                For i As Integer = 0 To titres.Length - 1
+                    DessinerCelluleTableau(e.Graphics, titres(i), enteteFont, pinceauBleu, bordure, x, y, largeurs(i), hauteurEntete, If(i = 0, sfLeft, sfRight), fondTable)
+                    x += largeurs(i)
+                Next
+                y += hauteurEntete
+
+                Dim lignesImprimees As Integer = 0
+                While _stockPrintRowIndex < data.Rows.Count
+                    Dim valeurs As String() = lignesValeurs(_stockPrintRowIndex)
 
                     Dim hauteurLigne As Integer = MesurerHauteurLigneTableau(e.Graphics, ligneFont, valeurs, largeurs, hauteurLigneMin)
                     If y + hauteurLigne > limiteBasTableau AndAlso lignesImprimees > 0 Then
@@ -1449,24 +1547,9 @@ Namespace DevCommerc8ak
                 End If
 
                 Dim colonnes As String() = {"Categorie", "NombreDepenses", "MontantTotal", "PremiereDate", "DerniereDate"}
-                Dim largeurs As Integer() = CalculerLargeursColonnes(pageWidth, New Single() {0.43F, 0.10F, 0.19F, 0.14F, 0.14F})
                 Dim titres As String() = {"Catégorie", "Nombre", "Montant (FC)", "Première", "Dernière"}
-                Dim hauteurEntete As Integer = 28
-                Dim hauteurLigneMin As Integer = 26
-                Dim limiteBasTableau As Integer = e.MarginBounds.Bottom - 24
-                Dim footerY As Integer = e.MarginBounds.Bottom - 16
-
-                Dim x As Integer = left
-                For i As Integer = 0 To titres.Length - 1
-                    DessinerCelluleTableau(e.Graphics, titres(i), enteteFont, pinceauBleu, bordure, x, y, largeurs(i), hauteurEntete, If(i = 0, sfLeft, sfRight), fondTable)
-                    x += largeurs(i)
-                Next
-                y += hauteurEntete
-
-                Dim lignesImprimees As Integer = 0
-                While _depensePrintRowIndex < data.Rows.Count
-                    Dim row As DataRow = data.Rows(_depensePrintRowIndex)
-
+                Dim lignesValeurs As New List(Of String())()
+                For Each row As DataRow In data.Rows
                     Dim valeurs(colonnes.Length - 1) As String
                     For i As Integer = 0 To colonnes.Length - 1
                         valeurs(i) = String.Empty
@@ -1482,6 +1565,25 @@ Namespace DevCommerc8ak
                             End If
                         End If
                     Next
+                    lignesValeurs.Add(valeurs)
+                Next
+
+                Dim largeurs As Integer() = CalculerLargeursColonnesDynamiques(e.Graphics, enteteFont, ligneFont, titres, lignesValeurs, pageWidth, New Integer() {280, 90, 150, 120, 120}, New Single() {2.7F, 0.7F, 1.2F, 1.0F, 1.0F})
+                Dim hauteurEntete As Integer = 28
+                Dim hauteurLigneMin As Integer = 26
+                Dim limiteBasTableau As Integer = e.MarginBounds.Bottom - 24
+                Dim footerY As Integer = e.MarginBounds.Bottom - 16
+
+                Dim x As Integer = left
+                For i As Integer = 0 To titres.Length - 1
+                    DessinerCelluleTableau(e.Graphics, titres(i), enteteFont, pinceauBleu, bordure, x, y, largeurs(i), hauteurEntete, If(i = 0, sfLeft, sfRight), fondTable)
+                    x += largeurs(i)
+                Next
+                y += hauteurEntete
+
+                Dim lignesImprimees As Integer = 0
+                While _depensePrintRowIndex < data.Rows.Count
+                    Dim valeurs As String() = lignesValeurs(_depensePrintRowIndex)
 
                     Dim hauteurLigne As Integer = MesurerHauteurLigneTableau(e.Graphics, ligneFont, valeurs, largeurs, hauteurLigneMin)
                     If y + hauteurLigne > limiteBasTableau AndAlso lignesImprimees > 0 Then
