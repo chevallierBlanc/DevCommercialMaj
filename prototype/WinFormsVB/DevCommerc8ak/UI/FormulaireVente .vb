@@ -975,7 +975,7 @@ Namespace DevCommerc8ak
                 _parametres = PrintConfigurationHelper.ChargerParametres()
                 pdocVentes.DefaultPageSettings.PaperSize = New PaperSize("A4", 827, 1169)
                 pdocVentes.DefaultPageSettings.Landscape = True
-                pdocVentes.DefaultPageSettings.Margins = New Margins(35, 35, 50, 50)
+                pdocVentes.DefaultPageSettings.Margins = New Margins(30, 30, 30, 30)
                 Try
                     Dim cheminPdf As String = PdfHelper.GenererPdfDepuisPrintDocumentEtRetournerChemin(sfd.FileName, pdocVentes)
                     AfficherConfirmationExportPdf(cheminPdf)
@@ -1026,7 +1026,7 @@ Namespace DevCommerc8ak
                 _parametres = PrintConfigurationHelper.ChargerParametres()
                 pdocStock.DefaultPageSettings.PaperSize = New PaperSize("A4", 827, 1169)
                 pdocStock.DefaultPageSettings.Landscape = True
-                pdocStock.DefaultPageSettings.Margins = New Margins(35, 35, 50, 50)
+                pdocStock.DefaultPageSettings.Margins = New Margins(30, 30, 30, 30)
                 Try
                     Dim cheminPdf As String = PdfHelper.GenererPdfDepuisPrintDocumentEtRetournerChemin(sfd.FileName, pdocStock)
                     AfficherConfirmationExportPdf(cheminPdf)
@@ -1070,6 +1070,21 @@ Namespace DevCommerc8ak
             g.DrawRectangle(bordure, x, y, largeur, hauteur)
             g.DrawString(If(texte, String.Empty), police, couleur, New RectangleF(x + 4, y + 3, largeur - 8, hauteur - 6), format)
         End Sub
+
+        Private Function ObtenirZoneImprimable(e As PrintPageEventArgs, doc As PrintDocument) As RectangleF
+            If doc IsNot Nothing AndAlso doc.OriginAtMargins Then
+                Return New RectangleF(0.0F, 0.0F, e.MarginBounds.Width, e.MarginBounds.Height)
+            End If
+            Return New RectangleF(e.MarginBounds.Left, e.MarginBounds.Top, e.MarginBounds.Width, e.MarginBounds.Height)
+        End Function
+
+        Private Function ObtenirZoneRapport(e As PrintPageEventArgs, doc As PrintDocument, ratioLargeur As Single) As RectangleF
+            Dim zoneImprimable As RectangleF = ObtenirZoneImprimable(e, doc)
+            Dim ratio As Single = Math.Max(0.9F, Math.Min(0.96F, ratioLargeur))
+            Dim largeurRapport As Single = CSng(Math.Floor(zoneImprimable.Width * ratio))
+            Dim gaucheRapport As Single = zoneImprimable.Left + ((zoneImprimable.Width - largeurRapport) / 2.0F)
+            Return New RectangleF(gaucheRapport, zoneImprimable.Top, largeurRapport, zoneImprimable.Height)
+        End Function
 
         Private Function CalculerLargeursColonnesDynamiques(g As Graphics, enteteFont As Font, ligneFont As Font, titres As String(), lignes As List(Of String()), largeurTotale As Integer, minima As Integer(), priorites As Single()) As Integer()
             Dim nbColonnes As Integer = titres.Length
@@ -1245,16 +1260,18 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            Dim left As Integer = e.MarginBounds.Left
-            Dim top As Integer = e.MarginBounds.Top
-            Dim largeur As Integer = e.MarginBounds.Width
+            Dim zoneImprimable As RectangleF = ObtenirZoneImprimable(e, TryCast(sender, PrintDocument))
+            Dim zoneRapport As RectangleF = ObtenirZoneRapport(e, TryCast(sender, PrintDocument), 0.94F)
+            Dim left As Integer = CInt(Math.Round(zoneRapport.Left))
+            Dim top As Integer = CInt(Math.Round(zoneRapport.Top))
+            Dim largeur As Integer = CInt(Math.Round(zoneRapport.Width))
             Dim y As Integer = top
 
             Using titreFont As New Font("Segoe UI", 16.0F, FontStyle.Bold),
                   sousTitreFont As New Font("Segoe UI", 9.5F, FontStyle.Regular),
                   blocTitreFont As New Font("Segoe UI", 10.0F, FontStyle.Bold),
-                  enteteFont As New Font("Segoe UI", 8.5F, FontStyle.Bold),
-                  ligneFont As New Font("Segoe UI", 8.5F, FontStyle.Regular),
+                  enteteFont As New Font("Segoe UI", 9.0F, FontStyle.Bold),
+                  ligneFont As New Font("Segoe UI", 9.0F, FontStyle.Regular),
                   pinceauBleu As New SolidBrush(Color.FromArgb(17, 35, 74)),
                   pinceauGris As New SolidBrush(Color.FromArgb(92, 104, 120)),
                   fondBande As New SolidBrush(Color.FromArgb(17, 35, 74)),
@@ -1309,8 +1326,8 @@ Namespace DevCommerc8ak
                 Dim largeurs As Integer() = CalculerLargeursColonnesDynamiques(e.Graphics, enteteFont, ligneFont, titres, lignesValeurs, largeur, New Integer() {110, 260, 110, 115, 120, 120}, New Single() {0.9F, 2.6F, 1.0F, 1.1F, 1.1F, 1.1F})
                 Dim hauteurEntete As Integer = 28
                 Dim hauteurLigneMin As Integer = 26
-                Dim limiteBasTableau As Integer = e.MarginBounds.Bottom - 24
-                Dim footerY As Integer = e.MarginBounds.Bottom - 16
+                Dim limiteBasTableau As Integer = CInt(Math.Round(zoneImprimable.Bottom)) - 24
+                Dim footerY As Integer = CInt(Math.Round(zoneImprimable.Bottom)) - 16
 
                 Dim x As Integer = left
                 For i As Integer = 0 To titres.Length - 1
@@ -1325,7 +1342,7 @@ Namespace DevCommerc8ak
 
                     Dim hauteurLigne As Integer = MesurerHauteurLigneTableau(e.Graphics, ligneFont, valeurs, largeurs, hauteurLigneMin)
                     If y + hauteurLigne > limiteBasTableau AndAlso lignesImprimees > 0 Then
-                        e.Graphics.DrawString("Page " & _ventePrintPageIndex.ToString(), sousTitreFont, pinceauGris, e.MarginBounds.Right - 80, footerY)
+                        e.Graphics.DrawString("Page " & _ventePrintPageIndex.ToString(), sousTitreFont, pinceauGris, left + largeur - 80, footerY)
                         e.HasMorePages = True
                         _ventePrintPageIndex += 1
                         Return
@@ -1348,7 +1365,7 @@ Namespace DevCommerc8ak
                 If y + 18 < limiteBasTableau Then
                     e.Graphics.DrawString("Impression professionnelle générée depuis le module d'analyse des ventes.", sousTitreFont, pinceauGris, left, y)
                 End If
-                e.Graphics.DrawString("Page " & _ventePrintPageIndex.ToString(), sousTitreFont, pinceauGris, e.MarginBounds.Right - 80, footerY)
+                e.Graphics.DrawString("Page " & _ventePrintPageIndex.ToString(), sousTitreFont, pinceauGris, left + largeur - 80, footerY)
             End Using
 
             _ventePrintRowIndex = 0
@@ -1363,16 +1380,18 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            Dim left As Integer = e.MarginBounds.Left
-            Dim top As Integer = e.MarginBounds.Top
-            Dim largeur As Integer = e.MarginBounds.Width
+            Dim zoneImprimable As RectangleF = ObtenirZoneImprimable(e, TryCast(sender, PrintDocument))
+            Dim zoneRapport As RectangleF = ObtenirZoneRapport(e, TryCast(sender, PrintDocument), 0.94F)
+            Dim left As Integer = CInt(Math.Round(zoneRapport.Left))
+            Dim top As Integer = CInt(Math.Round(zoneRapport.Top))
+            Dim largeur As Integer = CInt(Math.Round(zoneRapport.Width))
             Dim y As Integer = top
 
             Using titreFont As New Font("Segoe UI", 16.0F, FontStyle.Bold),
                   sousTitreFont As New Font("Segoe UI", 9.5F, FontStyle.Regular),
                   blocTitreFont As New Font("Segoe UI", 10.0F, FontStyle.Bold),
-                  enteteFont As New Font("Segoe UI", 8.5F, FontStyle.Bold),
-                  ligneFont As New Font("Segoe UI", 8.5F, FontStyle.Regular),
+                  enteteFont As New Font("Segoe UI", 9.0F, FontStyle.Bold),
+                  ligneFont As New Font("Segoe UI", 9.0F, FontStyle.Regular),
                   pinceauBleu As New SolidBrush(Color.FromArgb(17, 35, 74)),
                   pinceauGris As New SolidBrush(Color.FromArgb(92, 104, 120)),
                   fondBande As New SolidBrush(Color.FromArgb(17, 35, 74)),
@@ -1420,8 +1439,8 @@ Namespace DevCommerc8ak
                 Dim largeurs As Integer() = CalculerLargeursColonnesDynamiques(e.Graphics, enteteFont, ligneFont, titres, lignesValeurs, largeur, New Integer() {210, 180, 145, 105, 105, 180}, New Single() {1.7F, 1.8F, 1.2F, 0.8F, 0.8F, 1.7F})
                 Dim hauteurEntete As Integer = 28
                 Dim hauteurLigneMin As Integer = 26
-                Dim limiteBasTableau As Integer = e.MarginBounds.Bottom - 24
-                Dim footerY As Integer = e.MarginBounds.Bottom - 16
+                Dim limiteBasTableau As Integer = CInt(Math.Round(zoneImprimable.Bottom)) - 24
+                Dim footerY As Integer = CInt(Math.Round(zoneImprimable.Bottom)) - 16
 
                 Dim x As Integer = left
                 For i As Integer = 0 To titres.Length - 1
@@ -1436,7 +1455,7 @@ Namespace DevCommerc8ak
 
                     Dim hauteurLigne As Integer = MesurerHauteurLigneTableau(e.Graphics, ligneFont, valeurs, largeurs, hauteurLigneMin)
                     If y + hauteurLigne > limiteBasTableau AndAlso lignesImprimees > 0 Then
-                        e.Graphics.DrawString("Page " & _stockPrintPageIndex.ToString(), sousTitreFont, pinceauGris, e.MarginBounds.Right - 80, footerY)
+                        e.Graphics.DrawString("Page " & _stockPrintPageIndex.ToString(), sousTitreFont, pinceauGris, left + largeur - 80, footerY)
                         e.HasMorePages = True
                         _stockPrintPageIndex += 1
                         Return
@@ -1459,7 +1478,7 @@ Namespace DevCommerc8ak
                 If y + 18 < limiteBasTableau Then
                     e.Graphics.DrawString("Impression professionnelle générée depuis le module d'analyse du stock.", sousTitreFont, pinceauGris, left, y)
                 End If
-                e.Graphics.DrawString("Page " & _stockPrintPageIndex.ToString(), sousTitreFont, pinceauGris, e.MarginBounds.Right - 80, footerY)
+                e.Graphics.DrawString("Page " & _stockPrintPageIndex.ToString(), sousTitreFont, pinceauGris, left + largeur - 80, footerY)
             End Using
 
             _stockPrintRowIndex = 0
@@ -1503,7 +1522,7 @@ Namespace DevCommerc8ak
                 _parametres = PrintConfigurationHelper.ChargerParametres()
                 pdocDepenses.DefaultPageSettings.PaperSize = New PaperSize("A4", 827, 1169)
                 pdocDepenses.DefaultPageSettings.Landscape = True
-                pdocDepenses.DefaultPageSettings.Margins = New Margins(50, 50, 60, 60)
+                pdocDepenses.DefaultPageSettings.Margins = New Margins(30, 30, 30, 30)
                 Try
                     Dim cheminPdf As String = PdfHelper.GenererPdfDepuisPrintDocumentEtRetournerChemin(sfd.FileName, pdocDepenses)
                     AfficherConfirmationExportPdf(cheminPdf)
@@ -1521,14 +1540,16 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            Dim left As Integer = e.MarginBounds.Left
-            Dim pageWidth As Integer = e.MarginBounds.Width
-            Dim y As Integer = e.MarginBounds.Top
+            Dim zoneImprimable As RectangleF = ObtenirZoneImprimable(e, TryCast(sender, PrintDocument))
+            Dim zoneRapport As RectangleF = ObtenirZoneRapport(e, TryCast(sender, PrintDocument), 0.92F)
+            Dim left As Integer = CInt(Math.Round(zoneRapport.Left))
+            Dim pageWidth As Integer = CInt(Math.Round(zoneRapport.Width))
+            Dim y As Integer = CInt(Math.Round(zoneRapport.Top))
 
             Using titreFont As New Font("Segoe UI", 16.0F, FontStyle.Bold),
                   sousTitreFont As New Font("Segoe UI", 9.5F, FontStyle.Regular),
-                  enteteFont As New Font("Segoe UI", 8.5F, FontStyle.Bold),
-                  ligneFont As New Font("Segoe UI", 8.5F, FontStyle.Regular),
+                  enteteFont As New Font("Segoe UI", 9.0F, FontStyle.Bold),
+                  ligneFont As New Font("Segoe UI", 9.0F, FontStyle.Regular),
                   pinceauBleu As New SolidBrush(Color.FromArgb(17, 35, 74)),
                   pinceauGris As New SolidBrush(Color.FromArgb(92, 104, 120)),
                   fondBande As New SolidBrush(Color.FromArgb(17, 35, 74)),
@@ -1571,8 +1592,8 @@ Namespace DevCommerc8ak
                 Dim largeurs As Integer() = CalculerLargeursColonnesDynamiques(e.Graphics, enteteFont, ligneFont, titres, lignesValeurs, pageWidth, New Integer() {280, 90, 150, 120, 120}, New Single() {2.7F, 0.7F, 1.2F, 1.0F, 1.0F})
                 Dim hauteurEntete As Integer = 28
                 Dim hauteurLigneMin As Integer = 26
-                Dim limiteBasTableau As Integer = e.MarginBounds.Bottom - 24
-                Dim footerY As Integer = e.MarginBounds.Bottom - 16
+                Dim limiteBasTableau As Integer = CInt(Math.Round(zoneImprimable.Bottom)) - 24
+                Dim footerY As Integer = CInt(Math.Round(zoneImprimable.Bottom)) - 16
 
                 Dim x As Integer = left
                 For i As Integer = 0 To titres.Length - 1
@@ -1587,7 +1608,7 @@ Namespace DevCommerc8ak
 
                     Dim hauteurLigne As Integer = MesurerHauteurLigneTableau(e.Graphics, ligneFont, valeurs, largeurs, hauteurLigneMin)
                     If y + hauteurLigne > limiteBasTableau AndAlso lignesImprimees > 0 Then
-                        e.Graphics.DrawString("Page " & _depensePrintPageIndex.ToString(), sousTitreFont, pinceauGris, e.MarginBounds.Right - 80, footerY)
+                        e.Graphics.DrawString("Page " & _depensePrintPageIndex.ToString(), sousTitreFont, pinceauGris, left + pageWidth - 80, footerY)
                         e.HasMorePages = True
                         _depensePrintPageIndex += 1
                         Return
@@ -1603,7 +1624,7 @@ Namespace DevCommerc8ak
                     _depensePrintRowIndex += 1
                     lignesImprimees += 1
                 End While
-                e.Graphics.DrawString("Page " & _depensePrintPageIndex.ToString(), sousTitreFont, pinceauGris, e.MarginBounds.Right - 80, footerY)
+                e.Graphics.DrawString("Page " & _depensePrintPageIndex.ToString(), sousTitreFont, pinceauGris, left + pageWidth - 80, footerY)
             End Using
 
             _depensePrintRowIndex = 0

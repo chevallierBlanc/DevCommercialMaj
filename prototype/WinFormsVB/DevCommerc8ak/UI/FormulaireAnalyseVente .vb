@@ -804,6 +804,20 @@ Namespace DevCommerc8ak
             g.DrawString(If(texte, String.Empty), police, couleur, New RectangleF(x + 4, y + 3, largeur - 8, hauteur - 6), format)
         End Sub
 
+        Private Function ObtenirZoneImprimable(e As PrintPageEventArgs, doc As PrintDocument) As RectangleF
+            If doc IsNot Nothing AndAlso doc.OriginAtMargins Then
+                Return New RectangleF(0.0F, 0.0F, e.MarginBounds.Width, e.MarginBounds.Height)
+            End If
+            Return New RectangleF(e.MarginBounds.Left, e.MarginBounds.Top, e.MarginBounds.Width, e.MarginBounds.Height)
+        End Function
+
+        Private Function ObtenirZoneRapport(e As PrintPageEventArgs, doc As PrintDocument) As RectangleF
+            Dim zoneImprimable As RectangleF = ObtenirZoneImprimable(e, doc)
+            Dim largeurRapport As Single = CSng(Math.Floor(zoneImprimable.Width * 0.94F))
+            Dim gaucheRapport As Single = zoneImprimable.Left + ((zoneImprimable.Width - largeurRapport) / 2.0F)
+            Return New RectangleF(gaucheRapport, zoneImprimable.Top, largeurRapport, zoneImprimable.Height)
+        End Function
+
         Private Function DessinerEnteteRapportA4(g As Graphics, titre As String, left As Integer, y As Integer, largeur As Integer, titreFont As Font, sousTitreFont As Font, pinceauBleu As Brush, pinceauGris As Brush, fondBande As Brush, parametres As ParametreDTO) As Integer
             Dim xHeader As Integer = left
             Dim logoPath As String = LogoPathHelper.GetLogoPath(parametres)
@@ -850,9 +864,11 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                Dim left As Integer = e.MarginBounds.Left
-                Dim width As Integer = e.MarginBounds.Width
-                Dim y As Integer = e.MarginBounds.Top
+                Dim zoneImprimable As RectangleF = ObtenirZoneImprimable(e, TryCast(sender, PrintDocument))
+                Dim zoneRapport As RectangleF = ObtenirZoneRapport(e, TryCast(sender, PrintDocument))
+                Dim left As Integer = CInt(Math.Round(zoneRapport.Left))
+                Dim width As Integer = CInt(Math.Round(zoneRapport.Width))
+                Dim y As Integer = CInt(Math.Round(zoneRapport.Top))
 
                 Using pinceauBleu As New SolidBrush(Color.FromArgb(17, 35, 74)),
                       pinceauGris As New SolidBrush(Color.FromArgb(92, 104, 120)),
@@ -862,8 +878,8 @@ Namespace DevCommerc8ak
                       bordure As New Pen(Color.FromArgb(210, 219, 232)),
                       fontTitre As New Font("Segoe UI", 16.0F, FontStyle.Bold),
                       fontSousTitre As New Font("Segoe UI", 9.5F, FontStyle.Regular),
-                      fontBloc As New Font("Segoe UI", 8.5F, FontStyle.Regular),
-                      fontBlocGras As New Font("Segoe UI", 8.5F, FontStyle.Bold),
+                      fontBloc As New Font("Segoe UI", 9.0F, FontStyle.Regular),
+                      fontBlocGras As New Font("Segoe UI", 9.0F, FontStyle.Bold),
                       sfLeft As New StringFormat() With {.Alignment = StringAlignment.Near, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter},
                       sfRight As New StringFormat() With {.Alignment = StringAlignment.Far, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter}
 
@@ -874,11 +890,11 @@ Namespace DevCommerc8ak
                     End If
 
                     Dim titres As String() = {"Date", "Produit", "Coût unitaire", "Qté", "Montant", "Bénéfice"}
-                    Dim largeurs As Integer() = CalculerLargeursColonnes(width, New Single() {0.14F, 0.36F, 0.12F, 0.11F, 0.14F, 0.13F})
+                    Dim largeurs As Integer() = CalculerLargeursColonnes(width, New Single() {0.145F, 0.355F, 0.12F, 0.12F, 0.13F, 0.13F})
                     Dim hauteurEntete As Integer = 28
                     Dim hauteurLigneMin As Integer = 26
-                    Dim limiteBasTableau As Integer = e.MarginBounds.Bottom - 24
-                    Dim footerY As Integer = e.MarginBounds.Bottom - 16
+                    Dim limiteBasTableau As Integer = CInt(Math.Round(zoneImprimable.Bottom)) - 24
+                    Dim footerY As Integer = CInt(Math.Round(zoneImprimable.Bottom)) - 16
 
                     Dim x As Integer = left
                     For i As Integer = 0 To titres.Length - 1
@@ -902,7 +918,7 @@ Namespace DevCommerc8ak
 
                         Dim hauteurLigne As Integer = MesurerHauteurLigneTableau(e.Graphics, fontBloc, valeurs, largeurs, hauteurLigneMin)
                         If y + hauteurLigne > limiteBasTableau AndAlso lignesImprimees > 0 Then
-                            e.Graphics.DrawString("Page " & _impressionPageDetailVentes.ToString(), fontSousTitre, pinceauGris, e.MarginBounds.Right - 80, footerY)
+                            e.Graphics.DrawString("Page " & _impressionPageDetailVentes.ToString(), fontSousTitre, pinceauGris, left + width - 80, footerY)
                             e.HasMorePages = True
                             _impressionPageDetailVentes += 1
                             Return
@@ -918,7 +934,7 @@ Namespace DevCommerc8ak
                         lignesImprimees += 1
                     End While
 
-                    e.Graphics.DrawString("Page " & _impressionPageDetailVentes.ToString(), fontSousTitre, pinceauGris, e.MarginBounds.Right - 80, footerY)
+                    e.Graphics.DrawString("Page " & _impressionPageDetailVentes.ToString(), fontSousTitre, pinceauGris, left + width - 80, footerY)
                     _impressionIndexDetailVentes = 0
                     _impressionPageDetailVentes = 1
                     e.HasMorePages = False
