@@ -586,13 +586,21 @@ Namespace DevCommerc8ak
 
         Private Sub DeconnecterDepuisDashboard(sender As Object, e As EventArgs)
             Dim main As MainForm = TryCast(Me.FindForm(), MainForm)
-            If main IsNot Nothing Then
-                main.DeconnecterDepuisModuleSession()
-            Else
-                ApplicationLifecycle.RequestReturnToLogin()
-                SessionUtilisateur.Reinitialiser()
-                Me.Close()
+            If main Is Nothing Then
+                For Each formOuvert As Form In Application.OpenForms
+                    main = TryCast(formOuvert, MainForm)
+                    If main IsNot Nothing Then
+                        Exit For
+                    End If
+                Next
             End If
+
+            If main Is Nothing Then
+                MessageBox.Show("Impossible de trouver la fenêtre principale pour terminer la session.", "Déconnexion", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Return
+            End If
+
+            main.DeconnecterDepuisModuleSession()
         End Sub
 
         ' --- Helpers de Design ---
