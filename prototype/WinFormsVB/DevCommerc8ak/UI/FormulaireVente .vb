@@ -1038,7 +1038,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub AfficherConfirmationExportPdf(chemin As String)
-            If File.Exists(chemin) Then
+            If File.Exists(chemin) AndAlso New FileInfo(chemin).Length > 0 Then
                 MessageBox.Show("Le rapport PDF a été généré avec succès." & Environment.NewLine & Environment.NewLine & "Emplacement :" & Environment.NewLine & chemin, "Export PDF", MessageBoxButtons.OK, MessageBoxIcon.Information)
             Else
                 MessageBox.Show("Le rapport PDF n'a pas été retrouvé après la génération." & Environment.NewLine & Environment.NewLine & "Emplacement attendu :" & Environment.NewLine & chemin, "Export PDF", MessageBoxButtons.OK, MessageBoxIcon.Warning)
@@ -1071,6 +1071,83 @@ Namespace DevCommerc8ak
             g.DrawString(If(texte, String.Empty), police, couleur, New RectangleF(x + 4, y + 3, largeur - 8, hauteur - 6), format)
         End Sub
 
+        Private Function CalculerLargeursColonnes(largeurTotale As Integer, ratios As Single()) As Integer()
+            Dim largeurs(ratios.Length - 1) As Integer
+            Dim totalUtilise As Integer = 0
+            For i As Integer = 0 To ratios.Length - 2
+                largeurs(i) = CInt(Math.Floor(largeurTotale * ratios(i)))
+                totalUtilise += largeurs(i)
+            Next
+            largeurs(ratios.Length - 1) = largeurTotale - totalUtilise
+            Return largeurs
+        End Function
+
+        Private Function ExtrairePairesSynthese(texte As String) As List(Of KeyValuePair(Of String, String))
+            Dim paires As New List(Of KeyValuePair(Of String, String))()
+            If String.IsNullOrWhiteSpace(texte) Then Return paires
+
+            For Each segment As String In texte.Split("|"c)
+                Dim entree As String = segment.Trim()
+                If String.IsNullOrWhiteSpace(entree) Then Continue For
+
+                Dim pos As Integer = entree.IndexOf(":"c)
+                If pos > 0 Then
+                    paires.Add(New KeyValuePair(Of String, String)(entree.Substring(0, pos).Trim(), entree.Substring(pos + 1).Trim()))
+                Else
+                    paires.Add(New KeyValuePair(Of String, String)(entree, String.Empty))
+                End If
+            Next
+
+            Return paires
+        End Function
+
+        Private Function DessinerSyntheseVerticale(g As Graphics, titre As String, paires As List(Of KeyValuePair(Of String, String)), left As Integer, y As Integer, largeur As Integer, titreFont As Font, texteFont As Font, titreBrush As Brush, texteBrush As Brush, bordure As Pen, fond As Brush) As Integer
+            Dim lignes As Integer = Math.Max(1, If(paires Is Nothing, 0, paires.Count))
+            Dim hauteur As Integer = 34 + (lignes * 20) + 12
+            g.FillRectangle(fond, left, y, largeur, hauteur)
+            g.DrawRectangle(bordure, left, y, largeur, hauteur)
+            g.DrawString(titre, titreFont, titreBrush, New RectangleF(left + 12, y + 8, largeur - 24, 22))
+
+            Dim ligneY As Integer = y + 34
+            If paires IsNot Nothing AndAlso paires.Count > 0 Then
+                For Each paire As KeyValuePair(Of String, String) In paires
+                    g.DrawString(paire.Key, texteFont, texteBrush, New RectangleF(left + 12, ligneY, CInt(largeur * 0.58F), 18))
+                    Using sfValue As New StringFormat() With {.Alignment = StringAlignment.Far, .LineAlignment = StringAlignment.Near, .Trimming = StringTrimming.EllipsisCharacter}
+                        g.DrawString(paire.Value, texteFont, texteBrush, New RectangleF(left + CInt(largeur * 0.58F), ligneY, largeur - CInt(largeur * 0.58F) - 12, 18), sfValue)
+                    End Using
+                    ligneY += 20
+                Next
+            Else
+                g.DrawString("Aucune synthèse disponible", texteFont, texteBrush, New RectangleF(left + 12, ligneY, largeur - 24, 18))
+            End If
+
+            Return y + hauteur
+        End Function
+
+        Private Function DessinerEnteteRapportA4(g As Graphics, titre As String, left As Integer, y As Integer, largeur As Integer, titreFont As Font, sousTitreFont As Font, pinceauBleu As Brush, pinceauGris As Brush, fondBande As Brush, parametres As ParametreDTO) As Integer
+            Dim xHeader As Integer = left
+            Dim logoPath As String = LogoPathHelper.GetLogoPath(parametres)
+            If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
+                Using img As Image = Image.FromFile(logoPath)
+                    g.DrawImage(img, xHeader, y, 56, 56)
+                End Using
+                xHeader += 70
+            End If
+
+            g.DrawString(If(parametres IsNot Nothing AndAlso parametres.NomMagasin <> "", parametres.NomMagasin, "ERPCommercial"), titreFont, pinceauBleu, xHeader, y)
+            y += 23
+            g.DrawString(If(parametres IsNot Nothing, parametres.AdresseMagasin, ""), sousTitreFont, pinceauGris, xHeader, y)
+            y += 17
+            g.DrawString(If(parametres IsNot Nothing, parametres.TelephoneMagasin, ""), sousTitreFont, pinceauGris, xHeader, y)
+            y += 26
+
+            g.FillRectangle(fondBande, left, y, largeur, 34)
+            Using sfTitre As New StringFormat() With {.Alignment = StringAlignment.Center, .LineAlignment = StringAlignment.Center}
+                g.DrawString(titre, titreFont, Brushes.White, New RectangleF(left, y, largeur, 34), sfTitre)
+            End Using
+            Return y + 44
+        End Function
+
         Private Sub PdocVentes_PrintPage(sender As Object, e As PrintPageEventArgs)
             Dim data As DataTable = If(_ventesCourantes, TryCast(gridVentes.DataSource, DataTable))
             If data Is Nothing OrElse data.Rows.Count = 0 Then
@@ -1096,54 +1173,29 @@ Namespace DevCommerc8ak
                   bordure As New Pen(Color.FromArgb(210, 219, 232)),
                   ligneSep As New Pen(Color.FromArgb(232, 236, 242)),
                   sfLeft As New StringFormat() With {.Alignment = StringAlignment.Near, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter},
-                  sfRight As New StringFormat() With {.Alignment = StringAlignment.Far, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter},
-                  sfCenter As New StringFormat() With {.Alignment = StringAlignment.Center, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter}
-                Dim xHeader As Integer = left
-                Dim logoPath As String = LogoPathHelper.GetLogoPath(_parametres)
-                If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
-                    Using img As Image = Image.FromFile(logoPath)
-                        e.Graphics.DrawImage(img, xHeader, y, 60, 60)
-                    End Using
-                    xHeader += 74
+                  sfRight As New StringFormat() With {.Alignment = StringAlignment.Far, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter}
+
+                y = DessinerEnteteRapportA4(e.Graphics, _venteRapportTitre, left, y, largeur, titreFont, sousTitreFont, pinceauBleu, pinceauGris, fondBande, _parametres)
+
+                If _ventePrintPageIndex = 1 Then
+                    Dim blocGaucheLargeur As Integer = CInt((largeur - 12) * 0.44)
+                    Dim blocDroiteLargeur As Integer = largeur - blocGaucheLargeur - 12
+                    Dim infos As New List(Of KeyValuePair(Of String, String)) From {
+                        New KeyValuePair(Of String, String)("Période", Convert.ToString(cmbPeriode.SelectedItem)),
+                        New KeyValuePair(Of String, String)("Jour", dtpJour.Value.ToString("dd/MM/yyyy")),
+                        New KeyValuePair(Of String, String)("Mois", Convert.ToString(cmbMois.SelectedItem))
+                    }
+                    Dim synthese As List(Of KeyValuePair(Of String, String)) = ExtrairePairesSynthese(lblResumeVentes.Text)
+                    synthese.Add(New KeyValuePair(Of String, String)("Nombre de lignes", data.Rows.Count.ToString("N0")))
+
+                    Dim basInfo As Integer = DessinerSyntheseVerticale(e.Graphics, "INFORMATIONS DU RAPPORT", infos, left, y, blocGaucheLargeur, blocTitreFont, sousTitreFont, pinceauBleu, pinceauGris, bordure, fondBloc)
+                    Dim basSynthese As Integer = DessinerSyntheseVerticale(e.Graphics, "SYNTHÈSE VENTES", synthese, left + blocGaucheLargeur + 12, y, blocDroiteLargeur, blocTitreFont, sousTitreFont, pinceauBleu, pinceauGris, bordure, fondBloc)
+                    y = Math.Max(basInfo, basSynthese) + 16
                 End If
-
-                e.Graphics.DrawString(If(_parametres IsNot Nothing AndAlso _parametres.NomMagasin <> "", _parametres.NomMagasin, "ERPCommercial"), titreFont, pinceauBleu, xHeader, y)
-                y += 24
-                e.Graphics.DrawString(If(_parametres IsNot Nothing, _parametres.AdresseMagasin, ""), sousTitreFont, pinceauGris, xHeader, y)
-                y += 18
-                e.Graphics.DrawString(If(_parametres IsNot Nothing, _parametres.TelephoneMagasin, ""), sousTitreFont, pinceauGris, xHeader, y)
-                y += 28
-
-                e.Graphics.FillRectangle(fondBande, left, y, largeur, 36)
-                Using sfTitre As New StringFormat() With {.Alignment = StringAlignment.Center, .LineAlignment = StringAlignment.Center}
-                    e.Graphics.DrawString(_venteRapportTitre, titreFont, Brushes.White, New RectangleF(left, y, largeur, 36), sfTitre)
-                End Using
-                y += 48
-
-                Dim blocGaucheLargeur As Integer = CInt((largeur - 12) * 0.48)
-                Dim blocDroiteLargeur As Integer = largeur - blocGaucheLargeur - 12
-                e.Graphics.DrawRectangle(bordure, left, y, blocGaucheLargeur, 84)
-                e.Graphics.DrawRectangle(bordure, left + blocGaucheLargeur + 12, y, blocDroiteLargeur, 84)
-                e.Graphics.DrawString("Informations du rapport", blocTitreFont, pinceauBleu, left + 12, y + 10)
-                e.Graphics.DrawString("Période : " & Convert.ToString(cmbPeriode.SelectedItem), sousTitreFont, Brushes.Black, left + 12, y + 34)
-                e.Graphics.DrawString("Jour : " & dtpJour.Value.ToString("dd/MM/yyyy"), sousTitreFont, Brushes.Black, left + 12, y + 52)
-                e.Graphics.DrawString("Mois : " & Convert.ToString(cmbMois.SelectedItem), sousTitreFont, Brushes.Black, left + 12, y + 70)
-                Dim droiteX As Integer = left + blocGaucheLargeur + 12
-                e.Graphics.DrawString("Synthèse ventes", blocTitreFont, pinceauBleu, droiteX + 12, y + 10)
-                e.Graphics.DrawString(lblResumeVentes.Text, sousTitreFont, pinceauGris, droiteX + 12, y + 38)
-                e.Graphics.DrawString("Lignes : " & data.Rows.Count.ToString("N0"), sousTitreFont, pinceauGris, droiteX + 12, y + 60)
-                y += 104
 
                 Dim colonnes As String() = {"DateVente", "Produit", "CoutUnitaireBase", "QuantiteVenduePieces", "MontantGenere", "Benefice"}
                 Dim titres As String() = {"Date", "Produit", "Coût base", "Qté vendue", "Montant", "Bénéfice"}
-                Dim largeurs As Integer() = {
-                    CInt(largeur * 0.15),
-                    CInt(largeur * 0.31),
-                    CInt(largeur * 0.13),
-                    CInt(largeur * 0.14),
-                    CInt(largeur * 0.135),
-                    largeur - CInt(largeur * 0.15) - CInt(largeur * 0.31) - CInt(largeur * 0.13) - CInt(largeur * 0.14) - CInt(largeur * 0.135)
-                }
+                Dim largeurs As Integer() = CalculerLargeursColonnes(largeur, New Single() {0.16F, 0.34F, 0.115F, 0.12F, 0.135F, 0.15F})
                 Dim hauteurEntete As Integer = 28
                 Dim hauteurLigneMin As Integer = 26
 
@@ -1199,7 +1251,9 @@ Namespace DevCommerc8ak
                 y += 18
                 e.Graphics.DrawLine(ligneSep, left, y, left + largeur, y)
                 y += 16
-                e.Graphics.DrawString("Impression professionnelle générée depuis le module d'analyse des ventes.", sousTitreFont, pinceauGris, left, y)
+                If y + 18 < e.MarginBounds.Bottom Then
+                    e.Graphics.DrawString("Impression professionnelle générée depuis le module d'analyse des ventes.", sousTitreFont, pinceauGris, left, y)
+                End If
                 e.Graphics.DrawString("Page " & _ventePrintPageIndex.ToString(), sousTitreFont, pinceauGris, e.MarginBounds.Right - 80, e.MarginBounds.Bottom + 8)
             End Using
 
@@ -1229,61 +1283,23 @@ Namespace DevCommerc8ak
                   pinceauGris As New SolidBrush(Color.FromArgb(92, 104, 120)),
                   fondBande As New SolidBrush(Color.FromArgb(17, 35, 74)),
                   fondTable As New SolidBrush(Color.FromArgb(229, 239, 252)),
+                  fondBloc As New SolidBrush(Color.White),
                   bordure As New Pen(Color.FromArgb(210, 219, 232)),
                   ligneSep As New Pen(Color.FromArgb(232, 236, 242)),
                   sfLeft As New StringFormat() With {.Alignment = StringAlignment.Near, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter},
-                  sfRight As New StringFormat() With {.Alignment = StringAlignment.Far, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter},
-                  sfTopLeft As New StringFormat() With {.Alignment = StringAlignment.Near, .LineAlignment = StringAlignment.Near, .Trimming = StringTrimming.EllipsisCharacter}
-                Dim xHeader As Integer = left
-                Dim logoPath As String = LogoPathHelper.GetLogoPath(_parametres)
-                If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
-                    Using img As Image = Image.FromFile(logoPath)
-                        e.Graphics.DrawImage(img, xHeader, y, 60, 60)
-                    End Using
-                    xHeader += 74
+                  sfRight As New StringFormat() With {.Alignment = StringAlignment.Far, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter}
+
+                y = DessinerEnteteRapportA4(e.Graphics, _stockRapportTitre, left, y, largeur, titreFont, sousTitreFont, pinceauBleu, pinceauGris, fondBande, _parametres)
+
+                If _stockPrintPageIndex = 1 Then
+                    Dim synthese As List(Of KeyValuePair(Of String, String)) = ExtrairePairesSynthese(lblResumeStock.Text)
+                    synthese.Add(New KeyValuePair(Of String, String)("Produits visibles", data.Rows.Count.ToString("N0")))
+                    y = DessinerSyntheseVerticale(e.Graphics, "SYNTHÈSE DU STOCK", synthese, left, y, largeur, blocTitreFont, sousTitreFont, pinceauBleu, pinceauGris, bordure, fondBloc) + 16
                 End If
-
-                e.Graphics.DrawString(If(_parametres IsNot Nothing AndAlso _parametres.NomMagasin <> "", _parametres.NomMagasin, "ERPCommercial"), titreFont, pinceauBleu, xHeader, y)
-                y += 24
-                e.Graphics.DrawString(If(_parametres IsNot Nothing, _parametres.AdresseMagasin, ""), sousTitreFont, pinceauGris, xHeader, y)
-                y += 18
-                e.Graphics.DrawString(If(_parametres IsNot Nothing, _parametres.TelephoneMagasin, ""), sousTitreFont, pinceauGris, xHeader, y)
-                y += 28
-
-                e.Graphics.FillRectangle(fondBande, left, y, largeur, 36)
-                Using sfTitre As New StringFormat() With {.Alignment = StringAlignment.Center, .LineAlignment = StringAlignment.Center}
-                    e.Graphics.DrawString(_stockRapportTitre, titreFont, Brushes.White, New RectangleF(left, y, largeur, 36), sfTitre)
-                End Using
-                y += 48
-
-                Dim blocGaucheLargeur As Integer = CInt((largeur - 12) * 0.48)
-                Dim blocDroiteLargeur As Integer = largeur - blocGaucheLargeur - 12
-                Dim texteSynthese As String = "Stock global : " & lblResumeStock.Text & Environment.NewLine &
-                                              "Produits visibles : " & data.Rows.Count.ToString("N0")
-                Dim texteRepartition As String = "Ventes / sorties manuelles / restant"
-                Dim hauteurSynthese As Integer = CInt(Math.Ceiling(e.Graphics.MeasureString(texteSynthese, sousTitreFont, blocGaucheLargeur - 24).Height)) + 46
-                Dim hauteurRepartition As Integer = CInt(Math.Ceiling(e.Graphics.MeasureString(texteRepartition, sousTitreFont, blocDroiteLargeur - 24).Height)) + 46
-                Dim hauteurBloc As Integer = Math.Max(92, Math.Max(hauteurSynthese, hauteurRepartition))
-
-                e.Graphics.DrawRectangle(bordure, left, y, blocGaucheLargeur, hauteurBloc)
-                e.Graphics.DrawRectangle(bordure, left + blocGaucheLargeur + 12, y, blocDroiteLargeur, hauteurBloc)
-                e.Graphics.DrawString("Synthèse du stock", blocTitreFont, pinceauBleu, left + 12, y + 10)
-                e.Graphics.DrawString(texteSynthese, sousTitreFont, Brushes.Black, New RectangleF(left + 12, y + 34, blocGaucheLargeur - 24, hauteurBloc - 42), sfTopLeft)
-                Dim droiteX As Integer = left + blocGaucheLargeur + 12
-                e.Graphics.DrawString("Répartition", blocTitreFont, pinceauBleu, droiteX + 12, y + 10)
-                e.Graphics.DrawString(texteRepartition, sousTitreFont, pinceauGris, New RectangleF(droiteX + 12, y + 34, blocDroiteLargeur - 24, hauteurBloc - 42), sfTopLeft)
-                y += hauteurBloc + 20
 
                 Dim colonnes As String() = {"Produit", "StockActuelPieces", "StockActuelCartons", "QuantiteVenduePieces", "QuantiteSortieManuellePieces", "RestantPieces"}
                 Dim titres As String() = {"Produit", "Stock", "Présentation", "Ventes", "Sorties", "Restant"}
-                Dim largeurs As Integer() = {
-                    CInt(largeur * 0.28),
-                    CInt(largeur * 0.17),
-                    CInt(largeur * 0.18),
-                    CInt(largeur * 0.11),
-                    CInt(largeur * 0.11),
-                    largeur - CInt(largeur * 0.28) - CInt(largeur * 0.17) - CInt(largeur * 0.18) - CInt(largeur * 0.11) - CInt(largeur * 0.11)
-                }
+                Dim largeurs As Integer() = CalculerLargeursColonnes(largeur, New Single() {0.25F, 0.22F, 0.16F, 0.085F, 0.085F, 0.20F})
                 Dim hauteurEntete As Integer = 28
                 Dim hauteurLigneMin As Integer = 26
 
@@ -1342,7 +1358,9 @@ Namespace DevCommerc8ak
                 y += 18
                 e.Graphics.DrawLine(ligneSep, left, y, left + largeur, y)
                 y += 16
-                e.Graphics.DrawString("Impression professionnelle générée depuis le module d'analyse du stock.", sousTitreFont, pinceauGris, left, y)
+                If y + 18 < e.MarginBounds.Bottom Then
+                    e.Graphics.DrawString("Impression professionnelle générée depuis le module d'analyse du stock.", sousTitreFont, pinceauGris, left, y)
+                End If
                 e.Graphics.DrawString("Page " & _stockPrintPageIndex.ToString(), sousTitreFont, pinceauGris, e.MarginBounds.Right - 80, e.MarginBounds.Bottom + 8)
             End Using
 
@@ -1417,41 +1435,21 @@ Namespace DevCommerc8ak
                   pinceauGris As New SolidBrush(Color.FromArgb(92, 104, 120)),
                   fondBande As New SolidBrush(Color.FromArgb(17, 35, 74)),
                   fondTable As New SolidBrush(Color.FromArgb(229, 239, 252)),
+                  fondBloc As New SolidBrush(Color.White),
                   bordure As New Pen(Color.FromArgb(210, 219, 232)),
                   sfLeft As New StringFormat() With {.Alignment = StringAlignment.Near, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter},
                   sfRight As New StringFormat() With {.Alignment = StringAlignment.Far, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter},
                   sfCenter As New StringFormat() With {.Alignment = StringAlignment.Center, .LineAlignment = StringAlignment.Center, .Trimming = StringTrimming.EllipsisCharacter}
 
-                Dim xHeader As Integer = left
-                Dim logoPath As String = LogoPathHelper.GetLogoPath(_parametres)
-                If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
-                    Using img As Image = Image.FromFile(logoPath)
-                        e.Graphics.DrawImage(img, xHeader, y, 60, 60)
-                    End Using
-                    xHeader += 74
+                y = DessinerEnteteRapportA4(e.Graphics, "RAPPORT DES DÉPENSES", left, y, pageWidth, titreFont, sousTitreFont, pinceauBleu, pinceauGris, fondBande, _parametres)
+
+                If _depensePrintPageIndex = 1 Then
+                    Dim synthese As List(Of KeyValuePair(Of String, String)) = ExtrairePairesSynthese(lblResumeDepenses.Text)
+                    y = DessinerSyntheseVerticale(e.Graphics, "SYNTHÈSE DES DÉPENSES", synthese, left, y, pageWidth, enteteFont, sousTitreFont, pinceauBleu, pinceauGris, bordure, fondBloc) + 16
                 End If
 
-                e.Graphics.DrawString(If(_parametres IsNot Nothing AndAlso _parametres.NomMagasin <> "", _parametres.NomMagasin, "ERPCommercial"), titreFont, pinceauBleu, xHeader, y)
-                y += 24
-                e.Graphics.DrawString(If(_parametres IsNot Nothing, _parametres.AdresseMagasin, ""), sousTitreFont, pinceauGris, xHeader, y)
-                y += 18
-                e.Graphics.DrawString(If(_parametres IsNot Nothing, _parametres.TelephoneMagasin, ""), sousTitreFont, pinceauGris, xHeader, y)
-                y += 30
-
-                e.Graphics.FillRectangle(fondBande, left, y, pageWidth, 36)
-                e.Graphics.DrawString("RAPPORT DES DÉPENSES", titreFont, Brushes.White, New RectangleF(left, y, pageWidth, 36), sfCenter)
-                y += 48
-                e.Graphics.DrawString(lblResumeDepenses.Text, sousTitreFont, pinceauGris, New RectangleF(left, y, pageWidth, 24), sfLeft)
-                y += 34
-
                 Dim colonnes As String() = {"Categorie", "NombreDepenses", "MontantTotal", "PremiereDate", "DerniereDate"}
-                Dim largeurs As Integer() = {
-                    CInt(pageWidth * 0.42),
-                    CInt(pageWidth * 0.10),
-                    CInt(pageWidth * 0.18),
-                    CInt(pageWidth * 0.15),
-                    pageWidth - CInt(pageWidth * 0.42) - CInt(pageWidth * 0.10) - CInt(pageWidth * 0.18) - CInt(pageWidth * 0.15)
-                }
+                Dim largeurs As Integer() = CalculerLargeursColonnes(pageWidth, New Single() {0.43F, 0.10F, 0.19F, 0.14F, 0.14F})
                 Dim titres As String() = {"Catégorie", "Nombre", "Montant (FC)", "Première", "Dernière"}
                 Dim hauteurEntete As Integer = 28
                 Dim hauteurLigneMin As Integer = 26
