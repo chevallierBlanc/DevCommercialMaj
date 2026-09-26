@@ -14,6 +14,7 @@ Namespace DevCommerc8ak
         Public Property ModePrix As String
         Public Property Coefficient As Decimal?
         Public Property PrixVente As Decimal
+        Public Property ProduitConditionnementId As Integer?
         Public Property Actif As Boolean
         Public Property CreeLe As Date?
         Public Property ModifieLe As Date?

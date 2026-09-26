@@ -8,9 +8,11 @@ Imports System.Linq
 Namespace DevCommerc8ak
     Public Class TypeVenteService
         Private ReadOnly _typeVenteProduitService As TypeVenteProduitService
+        Private ReadOnly _produitConditionnementService As ProduitConditionnementService
 
         Public Sub New()
             _typeVenteProduitService = New TypeVenteProduitService()
+            _produitConditionnementService = New ProduitConditionnementService()
         End Sub
 
         ' ########### Calcul type vente
@@ -173,6 +175,12 @@ Namespace DevCommerc8ak
                     ToList()
             End If
 
+            Dim conditionnementsParId As Dictionary(Of Integer, ProduitConditionnementDTO) = Nothing
+            If typesPersonnalises.Any(Function(x) x.ProduitConditionnementId.HasValue) Then
+                conditionnementsParId = _produitConditionnementService.ListerParProduit(produitId, True).
+                    ToDictionary(Function(c) c.ProduitConditionnementId)
+            End If
+
             For Each item As TypeVenteProduitDTO In typesPersonnalises
                 If liste.Any(Function(x) String.Equals(x.Nom, item.Nom, StringComparison.OrdinalIgnoreCase)) Then
                     Continue For
@@ -183,7 +191,16 @@ Namespace DevCommerc8ak
                 Dim nb As Decimal = If(nbUniteParBase > 0D, nbUniteParBase, 1D)
                 Dim typeQuantite As String = If(String.IsNullOrWhiteSpace(item.TypeQuantiteEquivalent), item.TypeUniteEquivalent, item.TypeQuantiteEquivalent)
                 Dim contenuPrincipal As Decimal = If(contenuUnitePrincipale > 0D, contenuUnitePrincipale, nb)
-                Dim quantiteBaseType As Decimal = CalculVenteService.CalculerQuantiteBaseTypeVente(item.QuantiteEquivalent, typeQuantite, nb, contenuPrincipal, contenuUniteSecondaire)
+                Dim quantiteBaseType As Decimal
+                If item.ProduitConditionnementId.HasValue Then
+                    Dim conditionnement As ProduitConditionnementDTO = Nothing
+                    If conditionnementsParId Is Nothing OrElse Not conditionnementsParId.TryGetValue(item.ProduitConditionnementId.Value, conditionnement) Then
+                        Throw New InvalidOperationException("Le conditionnement du type de vente est introuvable ou inactif.")
+                    End If
+                    quantiteBaseType = ConversionUniteService.CalculerQuantiteBase(1D, item, conditionnement)
+                Else
+                    quantiteBaseType = CalculVenteService.CalculerQuantiteBaseTypeVente(item.QuantiteEquivalent, typeQuantite, nb, contenuPrincipal, contenuUniteSecondaire)
+                End If
                 If String.Equals(item.ModePrix, "COEFFICIENT", StringComparison.OrdinalIgnoreCase) AndAlso coefficient > 0D Then
                     Dim coutEquivalent As Decimal = prixAchat * (quantiteBaseType / contenuPrincipal)
                     If coutEquivalent > 0D Then
@@ -193,6 +210,7 @@ Namespace DevCommerc8ak
 
                 liste.Add(New TypeVenteDTO With {
                     .TypeVenteProduitId = item.TypeVenteProduitId,
+                    .ProduitConditionnementId = item.ProduitConditionnementId,
                     .Nom = item.Nom,
                     .QuantiteEquivalent = quantiteBaseType,
                     .TypeUniteEquivalent = typeQuantite,

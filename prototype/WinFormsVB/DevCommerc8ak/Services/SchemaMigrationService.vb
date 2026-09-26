@@ -27,6 +27,7 @@ Namespace DevCommerc8ak
                         AppliquerMigration(cn, tx, 2026080806, "Sequences metier multiposte", AddressOf MigrationBusinessSequences)
                         AppliquerMigration(cn, tx, 2026090801, "Sessions initialisation ventes", AddressOf MigrationInitialisationVentes)
                         AppliquerMigration(cn, tx, 2026090802, "Sessions stock initial technique", AddressOf MigrationStockInitialTechnique)
+                        AppliquerMigration(cn, tx, 2026092601, "Fondation conditionnements produits dynamiques", AddressOf MigrationConditionnementsDynamiques)
                         tx.Commit()
                     Catch
                         tx.Rollback()
@@ -288,6 +289,200 @@ Namespace DevCommerc8ak
 
             Executer(cn, tx, "IF OBJECT_ID('dbo.StockInitialTechniqueLignes', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_StockInitTechLignes_Session' AND object_id=OBJECT_ID('dbo.StockInitialTechniqueLignes')) CREATE INDEX IX_StockInitTechLignes_Session ON dbo.StockInitialTechniqueLignes(StockInitialTechniqueSessionId)")
             Executer(cn, tx, "IF OBJECT_ID('dbo.StockInitialTechniqueLignes', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_StockInitTechLignes_Produit' AND object_id=OBJECT_ID('dbo.StockInitialTechniqueLignes')) CREATE INDEX IX_StockInitTechLignes_Produit ON dbo.StockInitialTechniqueLignes(ProduitId)")
+        End Sub
+
+        Private Shared Sub MigrationConditionnementsDynamiques(cn As SqlConnection, tx As SqlTransaction)
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.UnitesMesure', 'U') IS NULL " &
+                "BEGIN " &
+                "CREATE TABLE dbo.UnitesMesure (" &
+                "UniteMesureId INT IDENTITY(1,1) NOT NULL PRIMARY KEY, " &
+                "Code NVARCHAR(40) NOT NULL, " &
+                "Libelle NVARCHAR(100) NOT NULL, " &
+                "Symbole NVARCHAR(30) NULL, " &
+                "CategorieUnite NVARCHAR(30) NOT NULL CONSTRAINT DF_UnitesMesure_Categorie DEFAULT('AUTRE'), " &
+                "AutoriseFraction BIT NOT NULL CONSTRAINT DF_UnitesMesure_Fraction DEFAULT(0), " &
+                "NombreDecimales INT NOT NULL CONSTRAINT DF_UnitesMesure_Decimales DEFAULT(0), " &
+                "EstActif BIT NOT NULL CONSTRAINT DF_UnitesMesure_Actif DEFAULT(1), " &
+                "CreeLe DATETIME2 NOT NULL CONSTRAINT DF_UnitesMesure_CreeLe DEFAULT(SYSDATETIME()), " &
+                "ModifieLe DATETIME2 NULL) " &
+                "END")
+
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.UnitesMesure', 'U') IS NOT NULL " &
+                "AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='UX_UnitesMesure_Code' AND object_id=OBJECT_ID('dbo.UnitesMesure')) " &
+                "CREATE UNIQUE INDEX UX_UnitesMesure_Code ON dbo.UnitesMesure(Code)")
+
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.ProduitConditionnements', 'U') IS NULL " &
+                "BEGIN " &
+                "CREATE TABLE dbo.ProduitConditionnements (" &
+                "ProduitConditionnementId INT IDENTITY(1,1) NOT NULL PRIMARY KEY, " &
+                "ProduitId INT NOT NULL, " &
+                "UniteMesureId INT NOT NULL, " &
+                "ConditionnementParentId INT NULL, " &
+                "FacteurVersParent DECIMAL(18,4) NULL, " &
+                "FacteurVersBase DECIMAL(18,4) NOT NULL, " &
+                "Niveau INT NOT NULL CONSTRAINT DF_ProduitConditionnements_Niveau DEFAULT(0), " &
+                "EstUniteBase BIT NOT NULL CONSTRAINT DF_ProduitConditionnements_Base DEFAULT(0), " &
+                "EstAchetable BIT NOT NULL CONSTRAINT DF_ProduitConditionnements_Achetable DEFAULT(1), " &
+                "EstVendable BIT NOT NULL CONSTRAINT DF_ProduitConditionnements_Vendable DEFAULT(1), " &
+                "AutoriseFraction BIT NOT NULL CONSTRAINT DF_ProduitConditionnements_Fraction DEFAULT(0), " &
+                "OrdreAffichage INT NOT NULL CONSTRAINT DF_ProduitConditionnements_Ordre DEFAULT(0), " &
+                "EstActif BIT NOT NULL CONSTRAINT DF_ProduitConditionnements_Actif DEFAULT(1), " &
+                "CreeLe DATETIME2 NOT NULL CONSTRAINT DF_ProduitConditionnements_CreeLe DEFAULT(SYSDATETIME()), " &
+                "ModifieLe DATETIME2 NULL, " &
+                "ModifiePar NVARCHAR(80) NULL) " &
+                "END")
+
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.ProduitConditionnementMigrationDiagnostics', 'U') IS NULL " &
+                "BEGIN " &
+                "CREATE TABLE dbo.ProduitConditionnementMigrationDiagnostics (" &
+                "DiagnosticId INT IDENTITY(1,1) NOT NULL PRIMARY KEY, " &
+                "ProduitId INT NOT NULL, " &
+                "CodeProduit NVARCHAR(80) NULL, " &
+                "LibelleProduit NVARCHAR(200) NULL, " &
+                "Motif NVARCHAR(255) NOT NULL, " &
+                "Detail NVARCHAR(1000) NULL, " &
+                "CreeLe DATETIME2 NOT NULL CONSTRAINT DF_ProduitCondMigDiag_CreeLe DEFAULT(SYSDATETIME())) " &
+                "END")
+
+            Dim contraintes As New List(Of String) From {
+                "IF OBJECT_ID('dbo.ProduitConditionnements', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name='CK_ProduitConditionnements_FacteurBase') ALTER TABLE dbo.ProduitConditionnements ADD CONSTRAINT CK_ProduitConditionnements_FacteurBase CHECK (FacteurVersBase > 0)",
+                "IF OBJECT_ID('dbo.ProduitConditionnements', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name='CK_ProduitConditionnements_FacteurParent') ALTER TABLE dbo.ProduitConditionnements ADD CONSTRAINT CK_ProduitConditionnements_FacteurParent CHECK (FacteurVersParent IS NULL OR FacteurVersParent > 0)",
+                "IF OBJECT_ID('dbo.ProduitConditionnements', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name='CK_ProduitConditionnements_ParentDifferent') ALTER TABLE dbo.ProduitConditionnements ADD CONSTRAINT CK_ProduitConditionnements_ParentDifferent CHECK (ConditionnementParentId IS NULL OR ConditionnementParentId <> ProduitConditionnementId)",
+                "IF OBJECT_ID('dbo.ProduitConditionnements', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name='FK_ProduitConditionnements_Produits') ALTER TABLE dbo.ProduitConditionnements ADD CONSTRAINT FK_ProduitConditionnements_Produits FOREIGN KEY (ProduitId) REFERENCES dbo.Produits(ProduitId)",
+                "IF OBJECT_ID('dbo.ProduitConditionnements', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name='FK_ProduitConditionnements_UnitesMesure') ALTER TABLE dbo.ProduitConditionnements ADD CONSTRAINT FK_ProduitConditionnements_UnitesMesure FOREIGN KEY (UniteMesureId) REFERENCES dbo.UnitesMesure(UniteMesureId)",
+                "IF OBJECT_ID('dbo.ProduitConditionnements', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name='FK_ProduitConditionnements_Parent') ALTER TABLE dbo.ProduitConditionnements ADD CONSTRAINT FK_ProduitConditionnements_Parent FOREIGN KEY (ConditionnementParentId) REFERENCES dbo.ProduitConditionnements(ProduitConditionnementId)"
+            }
+
+            For Each sql As String In contraintes
+                Executer(cn, tx, sql)
+            Next
+
+            Executer(cn, tx, "IF OBJECT_ID('dbo.TypesVenteProduit', 'U') IS NOT NULL AND COL_LENGTH('dbo.TypesVenteProduit', 'ProduitConditionnementId') IS NULL ALTER TABLE dbo.TypesVenteProduit ADD ProduitConditionnementId INT NULL")
+            Executer(cn, tx, "IF OBJECT_ID('dbo.TypesVenteProduit', 'U') IS NOT NULL AND OBJECT_ID('dbo.ProduitConditionnements', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name='FK_TypesVenteProduit_ProduitConditionnement') ALTER TABLE dbo.TypesVenteProduit ADD CONSTRAINT FK_TypesVenteProduit_ProduitConditionnement FOREIGN KEY (ProduitConditionnementId) REFERENCES dbo.ProduitConditionnements(ProduitConditionnementId)")
+
+            InsererUniteSiAbsente(cn, tx, "PIECE", "Piece", "Piece", "UNITE", False, 0)
+            InsererUniteSiAbsente(cn, tx, "CARTON", "Carton", "Carton", "UNITE", False, 0)
+            InsererUniteSiAbsente(cn, tx, "PAQUET", "Paquet", "Paquet", "UNITE", False, 0)
+            InsererUniteSiAbsente(cn, tx, "BOITE", "Boite", "Boite", "UNITE", False, 0)
+            InsererUniteSiAbsente(cn, tx, "SAC", "Sac", "Sac", "UNITE", False, 0)
+            InsererUniteSiAbsente(cn, tx, "SACHET", "Sachet", "Sachet", "UNITE", False, 0)
+            InsererUniteSiAbsente(cn, tx, "PALETTE", "Palette", "Palette", "UNITE", False, 0)
+            InsererUniteSiAbsente(cn, tx, "BIDON", "Bidon", "Bidon", "UNITE", False, 0)
+            InsererUniteSiAbsente(cn, tx, "BOUTEILLE", "Bouteille", "Bouteille", "UNITE", False, 0)
+            InsererUniteSiAbsente(cn, tx, "KG", "Kilogramme", "KG", "MASSE", True, 3)
+            InsererUniteSiAbsente(cn, tx, "G", "Gramme", "G", "MASSE", True, 3)
+            InsererUniteSiAbsente(cn, tx, "L", "Litre", "L", "VOLUME", True, 3)
+            InsererUniteSiAbsente(cn, tx, "ML", "Millilitre", "ML", "VOLUME", True, 3)
+            InsererUniteSiAbsente(cn, tx, "M", "Metre", "M", "LONGUEUR", True, 3)
+            InsererUniteSiAbsente(cn, tx, "CM", "Centimetre", "CM", "LONGUEUR", True, 3)
+
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.Produits', 'U') IS NOT NULL " &
+                "BEGIN " &
+                "WITH UnitesSources AS (" &
+                "SELECT LTRIM(RTRIM(UnitePrincipale)) AS NomUnite FROM dbo.Produits WHERE LTRIM(RTRIM(ISNULL(UnitePrincipale, ''))) <> '' " &
+                "UNION SELECT LTRIM(RTRIM(UniteSecondaire)) FROM dbo.Produits WHERE LTRIM(RTRIM(ISNULL(UniteSecondaire, ''))) <> '' " &
+                "UNION SELECT LTRIM(RTRIM(UniteMesureStock)) FROM dbo.Produits WHERE LTRIM(RTRIM(ISNULL(UniteMesureStock, ''))) <> '') " &
+                "INSERT INTO dbo.UnitesMesure (Code, Libelle, Symbole, CategorieUnite, AutoriseFraction, NombreDecimales) " &
+                "SELECT UPPER(NomUnite), NomUnite, NomUnite, " &
+                "CASE WHEN UPPER(NomUnite) IN ('KG','G') THEN 'MASSE' WHEN UPPER(NomUnite) IN ('L','ML') THEN 'VOLUME' WHEN UPPER(NomUnite) IN ('M','CM') THEN 'LONGUEUR' ELSE 'UNITE' END, " &
+                "CASE WHEN UPPER(NomUnite) IN ('KG','G','L','ML','M','CM') THEN 1 ELSE 0 END, " &
+                "CASE WHEN UPPER(NomUnite) IN ('KG','G','L','ML','M','CM') THEN 3 ELSE 0 END " &
+                "FROM UnitesSources s " &
+                "WHERE NOT EXISTS (SELECT 1 FROM dbo.UnitesMesure u WHERE u.Code = UPPER(s.NomUnite)); " &
+                "END")
+
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.Produits', 'U') IS NOT NULL " &
+                "BEGIN " &
+                "WITH ProduitBase AS (" &
+                "SELECT p.ProduitId, " &
+                "CASE WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') " &
+                "THEN UPPER(ISNULL(NULLIF(LTRIM(RTRIM(p.UniteMesureStock)), ''), ISNULL(NULLIF(LTRIM(RTRIM(p.UniteSecondaire)), ''), 'PIECE'))) " &
+                "ELSE UPPER(ISNULL(NULLIF(LTRIM(RTRIM(p.UniteSecondaire)), ''), 'PIECE')) END AS CodeBase, " &
+                "CASE WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') THEN 1 ELSE 0 END AS FractionBase " &
+                "FROM dbo.Produits p) " &
+                "INSERT INTO dbo.ProduitConditionnements (ProduitId, UniteMesureId, FacteurVersBase, Niveau, EstUniteBase, EstAchetable, EstVendable, AutoriseFraction, OrdreAffichage, ModifiePar) " &
+                "SELECT pb.ProduitId, u.UniteMesureId, 1, 0, 1, 1, 1, CASE WHEN pb.FractionBase = 1 OR u.AutoriseFraction = 1 THEN 1 ELSE 0 END, 0, 'MIGRATION' " &
+                "FROM ProduitBase pb INNER JOIN dbo.UnitesMesure u ON u.Code = pb.CodeBase " &
+                "WHERE NOT EXISTS (SELECT 1 FROM dbo.ProduitConditionnements pc WHERE pc.ProduitId = pb.ProduitId AND pc.EstActif = 1 AND pc.EstUniteBase = 1); " &
+                "END")
+
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.Produits', 'U') IS NOT NULL " &
+                "BEGIN " &
+                "WITH Donnees AS (" &
+                "SELECT p.ProduitId, UPPER(LTRIM(RTRIM(ISNULL(p.UnitePrincipale, '')))) AS CodePrincipale, " &
+                "CASE WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') " &
+                "THEN CASE WHEN ISNULL(p.ContenuUnitePrincipale, 0) > 0 THEN p.ContenuUnitePrincipale WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN p.ConversionUnite ELSE 0 END " &
+                "ELSE CASE WHEN ISNULL(p.ConversionUnite, 0) > 0 THEN p.ConversionUnite ELSE 0 END END AS FacteurBase, " &
+                "CASE WHEN UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME') " &
+                "THEN UPPER(ISNULL(NULLIF(LTRIM(RTRIM(p.UniteMesureStock)), ''), ISNULL(NULLIF(LTRIM(RTRIM(p.UniteSecondaire)), ''), 'PIECE'))) " &
+                "ELSE UPPER(ISNULL(NULLIF(LTRIM(RTRIM(p.UniteSecondaire)), ''), 'PIECE')) END AS CodeBase " &
+                "FROM dbo.Produits p) " &
+                "INSERT INTO dbo.ProduitConditionnements (ProduitId, UniteMesureId, ConditionnementParentId, FacteurVersParent, FacteurVersBase, Niveau, EstUniteBase, EstAchetable, EstVendable, AutoriseFraction, OrdreAffichage, ModifiePar) " &
+                "SELECT d.ProduitId, u.UniteMesureId, basePc.ProduitConditionnementId, d.FacteurBase, d.FacteurBase, 1, 0, 1, 1, u.AutoriseFraction, 10, 'MIGRATION' " &
+                "FROM Donnees d INNER JOIN dbo.UnitesMesure u ON u.Code = d.CodePrincipale " &
+                "INNER JOIN dbo.ProduitConditionnements basePc ON basePc.ProduitId = d.ProduitId AND basePc.EstActif = 1 AND basePc.EstUniteBase = 1 " &
+                "WHERE d.CodePrincipale <> '' AND d.CodePrincipale <> d.CodeBase AND d.FacteurBase > 0 " &
+                "AND NOT EXISTS (SELECT 1 FROM dbo.ProduitConditionnements pc WHERE pc.ProduitId = d.ProduitId AND pc.UniteMesureId = u.UniteMesureId AND pc.EstActif = 1); " &
+                "END")
+
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.Produits', 'U') IS NOT NULL " &
+                "BEGIN " &
+                "WITH Donnees AS (" &
+                "SELECT p.ProduitId, UPPER(LTRIM(RTRIM(ISNULL(p.UniteSecondaire, '')))) AS CodeSecondaire, " &
+                "UPPER(ISNULL(NULLIF(LTRIM(RTRIM(p.UniteMesureStock)), ''), '')) AS CodeBase, ISNULL(p.ContenuUniteSecondaire, 0) AS FacteurBase " &
+                "FROM dbo.Produits p WHERE UPPER(ISNULL(p.TypeGestionStock, 'UNITE')) IN ('MESURE','POIDS','VOLUME')) " &
+                "INSERT INTO dbo.ProduitConditionnements (ProduitId, UniteMesureId, ConditionnementParentId, FacteurVersParent, FacteurVersBase, Niveau, EstUniteBase, EstAchetable, EstVendable, AutoriseFraction, OrdreAffichage, ModifiePar) " &
+                "SELECT d.ProduitId, u.UniteMesureId, basePc.ProduitConditionnementId, d.FacteurBase, d.FacteurBase, 1, 0, 1, 1, u.AutoriseFraction, 20, 'MIGRATION' " &
+                "FROM Donnees d INNER JOIN dbo.UnitesMesure u ON u.Code = d.CodeSecondaire " &
+                "INNER JOIN dbo.ProduitConditionnements basePc ON basePc.ProduitId = d.ProduitId AND basePc.EstActif = 1 AND basePc.EstUniteBase = 1 " &
+                "WHERE d.CodeSecondaire <> '' AND d.CodeSecondaire <> d.CodeBase AND d.FacteurBase > 0 " &
+                "AND NOT EXISTS (SELECT 1 FROM dbo.ProduitConditionnements pc WHERE pc.ProduitId = d.ProduitId AND pc.UniteMesureId = u.UniteMesureId AND pc.EstActif = 1); " &
+                "END")
+
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.Produits', 'U') IS NOT NULL " &
+                "BEGIN " &
+                "INSERT INTO dbo.ProduitConditionnementMigrationDiagnostics (ProduitId, CodeProduit, LibelleProduit, Motif, Detail) " &
+                "SELECT p.ProduitId, p.CodeBarres, p.Libelle, 'CONVERSION_PRINCIPALE_AMBIGUE', " &
+                "'UnitePrincipale=' + ISNULL(p.UnitePrincipale, '') + '; UniteSecondaire=' + ISNULL(p.UniteSecondaire, '') + '; UniteMesureStock=' + ISNULL(p.UniteMesureStock, '') + '; ConversionUnite=' + CAST(ISNULL(p.ConversionUnite, 0) AS NVARCHAR(40)) + '; ContenuUnitePrincipale=' + CAST(ISNULL(p.ContenuUnitePrincipale, 0) AS NVARCHAR(40)) " &
+                "FROM dbo.Produits p " &
+                "WHERE LTRIM(RTRIM(ISNULL(p.UnitePrincipale, ''))) <> '' " &
+                "AND NOT EXISTS (SELECT 1 FROM dbo.ProduitConditionnements pc INNER JOIN dbo.UnitesMesure u ON u.UniteMesureId = pc.UniteMesureId WHERE pc.ProduitId = p.ProduitId AND pc.EstActif = 1 AND u.Code = UPPER(LTRIM(RTRIM(p.UnitePrincipale)))) " &
+                "AND NOT EXISTS (SELECT 1 FROM dbo.ProduitConditionnementMigrationDiagnostics d WHERE d.ProduitId = p.ProduitId AND d.Motif = 'CONVERSION_PRINCIPALE_AMBIGUE'); " &
+                "END")
+
+            Dim indexSql As New List(Of String) From {
+                "IF OBJECT_ID('dbo.ProduitConditionnements', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='UX_ProduitConditionnements_BaseActive' AND object_id=OBJECT_ID('dbo.ProduitConditionnements')) CREATE UNIQUE INDEX UX_ProduitConditionnements_BaseActive ON dbo.ProduitConditionnements(ProduitId) WHERE EstActif = 1 AND EstUniteBase = 1",
+                "IF OBJECT_ID('dbo.ProduitConditionnements', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='UX_ProduitConditionnements_ProduitUniteActive' AND object_id=OBJECT_ID('dbo.ProduitConditionnements')) CREATE UNIQUE INDEX UX_ProduitConditionnements_ProduitUniteActive ON dbo.ProduitConditionnements(ProduitId, UniteMesureId) WHERE EstActif = 1",
+                "IF OBJECT_ID('dbo.ProduitConditionnements', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_ProduitConditionnements_Produit_Facteur' AND object_id=OBJECT_ID('dbo.ProduitConditionnements')) CREATE INDEX IX_ProduitConditionnements_Produit_Facteur ON dbo.ProduitConditionnements(ProduitId, FacteurVersBase DESC)",
+                "IF OBJECT_ID('dbo.ProduitConditionnements', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_ProduitConditionnements_Parent' AND object_id=OBJECT_ID('dbo.ProduitConditionnements')) CREATE INDEX IX_ProduitConditionnements_Parent ON dbo.ProduitConditionnements(ConditionnementParentId)",
+                "IF OBJECT_ID('dbo.TypesVenteProduit', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_TypesVenteProduit_Conditionnement' AND object_id=OBJECT_ID('dbo.TypesVenteProduit')) CREATE INDEX IX_TypesVenteProduit_Conditionnement ON dbo.TypesVenteProduit(ProduitConditionnementId)",
+                "IF OBJECT_ID('dbo.ProduitConditionnementMigrationDiagnostics', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_ProduitCondMigDiag_Produit' AND object_id=OBJECT_ID('dbo.ProduitConditionnementMigrationDiagnostics')) CREATE INDEX IX_ProduitCondMigDiag_Produit ON dbo.ProduitConditionnementMigrationDiagnostics(ProduitId, Motif)"
+            }
+
+            For Each sql As String In indexSql
+                Executer(cn, tx, sql)
+            Next
+        End Sub
+
+        Private Shared Sub InsererUniteSiAbsente(cn As SqlConnection, tx As SqlTransaction, code As String, libelle As String, symbole As String, categorie As String, autoriseFraction As Boolean, nombreDecimales As Integer)
+            Using cmd As New SqlCommand("IF NOT EXISTS (SELECT 1 FROM dbo.UnitesMesure WHERE Code=@Code) INSERT INTO dbo.UnitesMesure (Code, Libelle, Symbole, CategorieUnite, AutoriseFraction, NombreDecimales) VALUES (@Code, @Libelle, @Symbole, @CategorieUnite, @AutoriseFraction, @NombreDecimales)", cn, tx)
+                cmd.Parameters.AddWithValue("@Code", code)
+                cmd.Parameters.AddWithValue("@Libelle", libelle)
+                cmd.Parameters.AddWithValue("@Symbole", symbole)
+                cmd.Parameters.AddWithValue("@CategorieUnite", categorie)
+                cmd.Parameters.AddWithValue("@AutoriseFraction", autoriseFraction)
+                cmd.Parameters.AddWithValue("@NombreDecimales", nombreDecimales)
+                cmd.ExecuteNonQuery()
+            End Using
         End Sub
 
         Private Shared Sub Executer(cn As SqlConnection, tx As SqlTransaction, sql As String)

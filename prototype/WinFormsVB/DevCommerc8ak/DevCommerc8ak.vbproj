@@ -86,6 +86,8 @@
     <Compile Include="DTOs\BonApprovisionnementDTO.vb" />
     <Compile Include="DTOs\TypeVenteDTO.vb" />
     <Compile Include="DTOs\TypeVenteProduitDTO.vb" />
+    <Compile Include="DTOs\UniteMesureDTO.vb" />
+    <Compile Include="DTOs\ProduitConditionnementDTO.vb" />
     <Compile Include="DTOs\AuditLogEntryDTO.vb" />
     <Compile Include="DTOs\InitialisationVenteDTOs.vb" />
     <Compile Include="DTOs\NotificationDTO.vb" />
@@ -94,6 +96,7 @@
     <Compile Include="Repositories\AnalyseCaissePhysiqueRepository.vb" />
     <Compile Include="Repositories\ProduitRepository.vb" />
     <Compile Include="Repositories\TypeVenteProduitRepository.vb" />
+    <Compile Include="Repositories\ProduitConditionnementRepository.vb" />
     <Compile Include="Repositories\FournisseurRepository.vb" />
     <Compile Include="Repositories\FactureVenteRepository.vb" />
     <Compile Include="Repositories\LigneFactureVenteRepository.vb" />
@@ -134,6 +137,7 @@
     <Compile Include="Services\CalculVenteService.vb" />
     <Compile Include="Services\SchemaMigrationService.vb" />
     <Compile Include="Services\StockUnitConversionService.vb" />
+    <Compile Include="Services\ConversionUniteService.vb" />
     <Compile Include="Services\PdfHelper.vb" />
     <Compile Include="Services\FormatageGlobal.vb" />
     <Compile Include="Services\ProductionLogService.vb" />
@@ -150,6 +154,7 @@
     <Compile Include="Services\VenteService.vb" />
     <Compile Include="Services\TypeVenteService.vb" />
     <Compile Include="Services\TypeVenteProduitService.vb" />
+    <Compile Include="Services\ProduitConditionnementService.vb" />
     <Compile Include="Services\NotificationService.vb" />
     <Compile Include="Services\IconsHelper.vb" />
     <Compile Include="Services\LogoPathHelper.vb" />

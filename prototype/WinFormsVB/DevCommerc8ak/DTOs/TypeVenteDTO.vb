@@ -6,6 +6,7 @@ Imports System
 Namespace DevCommerc8ak
     Public Class TypeVenteDTO
         Public Property TypeVenteProduitId As Integer?
+        Public Property ProduitConditionnementId As Integer?
         Public Property Nom As String
         Public Property QuantiteEquivalent As Decimal
         Public Property TypeUniteEquivalent As String = "SECONDAIRE"
