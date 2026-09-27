@@ -227,6 +227,9 @@
     <Compile Include="UI\FormulaireInitialisationVentes.vb">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="UI\FormulaireConditionnementsProduit.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="UI\FrmInventaireIntelligent.vb">
       <SubType>Form</SubType>
     </Compile>

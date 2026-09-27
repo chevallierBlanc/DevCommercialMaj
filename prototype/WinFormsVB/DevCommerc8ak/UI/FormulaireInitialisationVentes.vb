@@ -374,7 +374,7 @@ Namespace DevCommerc8ak
             End If
             Dim produitId As Integer
             If Not Integer.TryParse(Convert.ToString(cmbProduit.SelectedValue), produitId) Then
-                lblApercu.Text = "Quantité base : " & FormatageGlobal.FormatQuantitePhysique(qte * typeVente.QuantiteEquivalent) & " | Montant : " & FormatageGlobal.FormatMontant(Math.Round(qte * prix, 2))
+                lblApercu.Text = "Quantité base : " & FormatageGlobal.FormatQuantitePhysique(ConversionUniteService.CalculerQuantiteBase(qte, typeVente)) & " | Montant : " & FormatageGlobal.FormatMontant(Math.Round(qte * prix, 2))
                 Return
             End If
 

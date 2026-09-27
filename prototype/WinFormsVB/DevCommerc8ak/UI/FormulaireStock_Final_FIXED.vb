@@ -1521,6 +1521,7 @@ Namespace DevCommerc8ak
                 .ProduitId = source.ProduitId,
                 .Nom = source.Nom,
                 .QuantiteEquivalent = source.QuantiteEquivalent,
+                .ProduitConditionnementId = source.ProduitConditionnementId,
                 .TypeUniteEquivalent = source.TypeUniteEquivalent,
                 .TypeQuantiteEquivalent = source.TypeQuantiteEquivalent,
                 .ModePrix = source.ModePrix,
@@ -1907,7 +1908,9 @@ Namespace DevCommerc8ak
             Dim unite As String = typeChoisi.Nom
             Dim prix As Decimal = PrixSelonUnite()
             Dim quantiteEquivalent As Decimal = typeChoisi.QuantiteEquivalent
-            Dim quantiteBase As Decimal = qte * quantiteEquivalent
+            ' Conversion centralisée : la sortie manuelle doit retirer la même
+            ' quantité base qu'une vente normale pour un même type commercial.
+            Dim quantiteBase As Decimal = ConversionUniteService.CalculerQuantiteBase(qte, typeChoisi)
             Dim stock As Decimal = service.AfficherQteProduitSelect(produitId)
 
 
@@ -2112,7 +2115,9 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            Dim quantiteReelle As Decimal = qte * typeChoisi.QuantiteEquivalent
+            ' Ne pas recalculer localement les règles Demi/Quart/Douzaine :
+            ' TypeVenteDTO porte déjà l'équivalent base fourni par le moteur.
+            Dim quantiteReelle As Decimal = ConversionUniteService.CalculerQuantiteBase(qte, typeChoisi)
             lblTotalReel.Text = "Total réel: " & FormaterQuantiteReferenceSortie(quantiteReelle) & " " & ObtenirUniteReferenceSortie()
         End Sub
 

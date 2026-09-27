@@ -42,6 +42,16 @@ Namespace DevCommerc8ak
             Return quantiteCommerciale * coefficient
         End Function
 
+        Public Shared Function CalculerQuantiteBase(quantiteCommerciale As Decimal, typeVente As TypeVenteDTO) As Decimal
+            If typeVente Is Nothing Then Throw New ArgumentNullException("typeVente")
+            If quantiteCommerciale < 0D Then Throw New ArgumentOutOfRangeException("quantiteCommerciale", "La quantite ne peut pas etre negative.")
+
+            ' TypeVenteDTO expose déjà l'équivalent en unité de base pour une
+            ' unité commerciale. Les formulaires doivent passer ici au lieu de
+            ' refaire la multiplication chacun de leur côté.
+            Return quantiteCommerciale * Math.Max(0D, typeVente.QuantiteEquivalent)
+        End Function
+
         Public Shared Sub ValiderQuantite(quantite As Decimal, conditionnement As ProduitConditionnementDTO)
             If conditionnement Is Nothing Then Throw New ArgumentNullException("conditionnement")
             If quantite < 0D Then Throw New ArgumentOutOfRangeException("quantite", "La quantite ne peut pas etre negative.")
@@ -97,6 +107,15 @@ Namespace DevCommerc8ak
             End If
 
             Return String.Join(" + ", morceaux)
+        End Function
+
+        Public Shared Function DecrireEquivalentTypeVente(typeVente As TypeVenteDTO, conditionnements As IEnumerable(Of ProduitConditionnementDTO)) As String
+            If typeVente Is Nothing Then Return String.Empty
+
+            ' L'utilisateur voit un type commercial, mais le stock est retiré
+            ' en base. Cette description rend le lien compréhensible sans
+            ' exposer les identifiants techniques.
+            Return DecomposerStock(Math.Max(0D, typeVente.QuantiteEquivalent), conditionnements)
         End Function
 
         Private Shared Function ObtenirLibelleUnite(conditionnement As ProduitConditionnementDTO) As String

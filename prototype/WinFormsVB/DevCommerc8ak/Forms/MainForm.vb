@@ -1105,12 +1105,17 @@ Namespace DevCommerc8ak
             LoadForm(New FormulaireInitialisationVentes())
         End Sub
 
+        Private Sub AfficherConditionnementsProduits(sender As Object, e As EventArgs)
+            LoadForm(New FormulaireConditionnementsProduit())
+        End Sub
+
         Private Sub AfficherTableauTechniqueSuperAdmin(sender As Object, e As EventArgs)
             LoadForm(New FormulaireSuperAdminDashboard(
                 Sub() LoadForm(New FormulaireStockInitialTechnique()),
                 Sub() LoadForm(New FormulaireSuperAdminRoles()),
                 Sub() LoadForm(New FormulaireSuperAdminJournal()),
-                Sub() LoadForm(New FormulaireInitialisationVentes())))
+                Sub() LoadForm(New FormulaireInitialisationVentes()),
+                Sub() LoadForm(New FormulaireConditionnementsProduit())))
         End Sub
 
         Private Sub AfficherRolesSuperAdmin(sender As Object, e As EventArgs)

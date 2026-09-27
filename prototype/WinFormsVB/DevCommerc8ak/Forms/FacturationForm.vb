@@ -63,6 +63,7 @@ Namespace DevCommerc8ak
         Private ReadOnly _panier As List(Of PanierLigne)
         Private ReadOnly _typeVenteService As TypeVenteService 'nouveau
         Private ReadOnly _typeVenteProduitService As TypeVenteProduitService
+        Private ReadOnly _conditionnementService As ProduitConditionnementService
         Private _remiseMax As Decimal
         Private _produitsTable As DataTable
         Private _produitsView As DataView
@@ -104,6 +105,7 @@ Namespace DevCommerc8ak
             _panier = New List(Of PanierLigne)()
             _typeVenteService = New TypeVenteService()
             _typeVenteProduitService = New TypeVenteProduitService()
+            _conditionnementService = New ProduitConditionnementService()
             _typesVenteCourants = New List(Of TypeVenteDTO)()
 
             ' --- Header Panel ---
@@ -721,6 +723,10 @@ Namespace DevCommerc8ak
             txtPrixUnitaire.Text = prix.ToString("N0")
             If typeChoisi Is Nothing Then
                 lblEquivalent.Text = "Equivalent: 0 " & ObtenirUniteReferenceCourante() & " / unité"
+            ElseIf typeChoisi.ProduitConditionnementId.HasValue Then
+                Dim produitId As Integer = SafeInteger(CellValueByProperty(gridProduits.CurrentRow, "ProduitId"))
+                Dim conditionnements As List(Of ProduitConditionnementDTO) = _conditionnementService.ListerParProduit(produitId, True)
+                lblEquivalent.Text = "Equivalent: " & ConversionUniteService.DecrireEquivalentTypeVente(typeChoisi, conditionnements) & " / unité"
             Else
                 lblEquivalent.Text = "Equivalent: " & FormaterQuantiteReferenceCourante(typeChoisi.QuantiteEquivalent) & " " & ObtenirUniteReferenceCourante() & " / unité"
             End If
@@ -788,8 +794,15 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            Dim quantiteReelle As Decimal = qte * typeChoisi.QuantiteEquivalent
-            lblTotalReel.Text = "Total réel: " & FormaterQuantiteReferenceCourante(quantiteReelle) & " " & ObtenirUniteReferenceCourante()
+            ' Convertit la quantité commerciale choisie par le facturier
+            ' vers l'unité de base utilisée par le moteur de stock.
+            Dim quantiteReelle As Decimal = ConversionUniteService.CalculerQuantiteBase(qte, typeChoisi)
+            If typeChoisi.ProduitConditionnementId.HasValue Then
+                Dim produitId As Integer = SafeInteger(CellValueByProperty(gridProduits.CurrentRow, "ProduitId"))
+                lblTotalReel.Text = "Total réel: " & _conditionnementService.FormaterStock(produitId, quantiteReelle, Function() FormaterQuantiteReferenceCourante(quantiteReelle) & " " & ObtenirUniteReferenceCourante())
+            Else
+                lblTotalReel.Text = "Total réel: " & FormaterQuantiteReferenceCourante(quantiteReelle) & " " & ObtenirUniteReferenceCourante()
+            End If
         End Sub
 
         Private Sub MettreAJourAffichageStockProduit()
@@ -810,8 +823,9 @@ Namespace DevCommerc8ak
                 End If
             Next
             Dim restant As Decimal = Math.Max(0D, stock - reserve)
-            lblStock.Text = "Stock: " & FormatageGlobal.FormatStockSelonGestion(stock, nbUnites, uniteBase, uniteSecondaire, typeGestion, uniteMesure, contenuPrincipal, contenuSecondaire) &
-                " | Restant: " & FormatageGlobal.FormatStockSelonGestion(restant, nbUnites, uniteBase, uniteSecondaire, typeGestion, uniteMesure, contenuPrincipal, contenuSecondaire)
+            Dim stockAffichage As String = _conditionnementService.FormaterStock(produitId, stock, Function() FormatageGlobal.FormatStockSelonGestion(stock, nbUnites, uniteBase, uniteSecondaire, typeGestion, uniteMesure, contenuPrincipal, contenuSecondaire))
+            Dim restantAffichage As String = _conditionnementService.FormaterStock(produitId, restant, Function() FormatageGlobal.FormatStockSelonGestion(restant, nbUnites, uniteBase, uniteSecondaire, typeGestion, uniteMesure, contenuPrincipal, contenuSecondaire))
+            lblStock.Text = "Stock: " & stockAffichage & " | Restant: " & restantAffichage
         End Sub
 
         Private Sub AjouterAuPanier(sender As Object, e As EventArgs) '"""#### Nouvelle logique tres bon
@@ -842,7 +856,9 @@ Namespace DevCommerc8ak
             Dim unite As String = typeChoisi.Nom
             Dim prix As Decimal = PrixSelonUnite()
             Dim quantiteEquivalent As Decimal = typeChoisi.QuantiteEquivalent
-            Dim quantiteBase As Decimal = qte * quantiteEquivalent
+            ' Le service central garantit que la même formule est utilisée
+            ' par la facturation, l'initialisation des ventes et les futurs flux stock.
+            Dim quantiteBase As Decimal = ConversionUniteService.CalculerQuantiteBase(qte, typeChoisi)
             Dim stock As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "QuantiteStock"))
 
             Dim deja As Decimal = 0D

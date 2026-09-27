@@ -136,7 +136,10 @@ Namespace DevCommerc8ak
                                                       typeVente As TypeVenteDTO,
                                                       quantiteCommerciale As Decimal,
                                                       prixUnitaire As Decimal) As InitialisationVenteLigneDTO
-            Dim quantiteBase As Decimal = quantiteCommerciale * typeVente.QuantiteEquivalent
+            ' Les ventes reprises doivent utiliser exactement le même moteur
+            ' de conversion que la facturation normale pour éviter un écart
+            ' entre historique commercial et mouvements de stock.
+            Dim quantiteBase As Decimal = ConversionUniteService.CalculerQuantiteBase(quantiteCommerciale, typeVente)
             Dim montant As Decimal = Math.Round(quantiteCommerciale * prixUnitaire, 2)
             Dim coutUnitaire As Decimal? = CalculVenteService.CalculerCoutUnitaireBase(produit.PrixAchat, produit.ConversionUnite, produit.TypeGestionStock, produit.ContenuUnitePrincipale)
             Dim benefice As Decimal? = Nothing
@@ -159,15 +162,18 @@ Namespace DevCommerc8ak
                 .QuantiteBase = quantiteBase,
                 .CoutUnitaireBaseVente = coutUnitaire,
                 .BeneficeEstime = benefice,
-                .QuantiteBaseAffichage = FormatageGlobal.FormatStockSelonGestion(
+                .QuantiteBaseAffichage = (New ProduitConditionnementService()).FormaterStock(
+                    produit.ProduitId,
                     quantiteBase,
-                    produit.ConversionUnite,
-                    produit.UnitePrincipale,
-                    produit.UniteSecondaire,
-                    produit.TypeGestionStock,
-                    produit.UniteMesureStock,
-                    produit.ContenuUnitePrincipale,
-                    If(produit.ContenuUniteSecondaire.HasValue, produit.ContenuUniteSecondaire.Value, 0D))
+                    Function() FormatageGlobal.FormatStockSelonGestion(
+                        quantiteBase,
+                        produit.ConversionUnite,
+                        produit.UnitePrincipale,
+                        produit.UniteSecondaire,
+                        produit.TypeGestionStock,
+                        produit.UniteMesureStock,
+                        produit.ContenuUnitePrincipale,
+                        If(produit.ContenuUniteSecondaire.HasValue, produit.ContenuUniteSecondaire.Value, 0D)))
             }
         End Function
 
