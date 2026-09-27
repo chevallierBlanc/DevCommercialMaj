@@ -7,6 +7,7 @@ Imports System.Data.SqlClient
 Imports System.Collections.Generic
 Imports System.Configuration
 Imports System.Web.Script.Serialization
+Imports System.Linq
 
 Namespace DevCommerc8ak
     Public Class StockService
@@ -735,6 +736,19 @@ Namespace DevCommerc8ak
         End Function
 
         Private Function ConvertirEnBase(info As DataRow, unite As String, quantite As Decimal) As Decimal
+            If String.Equals(If(unite, String.Empty).Trim(), "base", StringComparison.OrdinalIgnoreCase) Then
+                Return quantite
+            End If
+
+            Dim produitId As Integer = If(info.Table.Columns.Contains("ProduitId") AndAlso Not info.IsNull("ProduitId"), Convert.ToInt32(info("ProduitId")), 0)
+            Dim conditionnement As ProduitConditionnementDTO = ObtenirConditionnementParUnite(produitId, unite)
+            If conditionnement IsNot Nothing Then
+                ' Le service stock reste l'autorité finale : même si le formulaire
+                ' affiche une quantité commerciale, la persistance utilise toujours
+                ' une QuantiteBase recalculée à partir de la configuration produit.
+                Return ConversionUniteService.ConvertirVersBase(quantite, conditionnement)
+            End If
+
             Dim uniteBase As String = If(info.IsNull("UnitePrincipale"), "", Convert.ToString(info("UnitePrincipale")))
             Dim uniteSecondaire As String = If(info.IsNull("UniteSecondaire"), "", Convert.ToString(info("UniteSecondaire")))
             Dim conversion As Decimal = If(info.IsNull("ConversionUnite"), 0D, Convert.ToDecimal(info("ConversionUnite")))
@@ -767,6 +781,15 @@ Namespace DevCommerc8ak
                 End If
             End If
             Return quantite
+        End Function
+
+        Private Function ObtenirConditionnementParUnite(produitId As Integer, unite As String) As ProduitConditionnementDTO
+            If produitId <= 0 OrElse String.IsNullOrWhiteSpace(unite) Then Return Nothing
+            Dim recherche As String = unite.Trim()
+            Dim conditionnements As List(Of ProduitConditionnementDTO) = (New ProduitConditionnementRepository(_dal)).ListerParProduit(produitId, True)
+            Return conditionnements.FirstOrDefault(Function(c) String.Equals(c.CodeUnite, recherche, StringComparison.OrdinalIgnoreCase) OrElse
+                                                             String.Equals(c.LibelleUnite, recherche, StringComparison.OrdinalIgnoreCase) OrElse
+                                                             String.Equals(c.SymboleUnite, recherche, StringComparison.OrdinalIgnoreCase))
         End Function
 
         Private Function GenererNumeroMouvement() As String

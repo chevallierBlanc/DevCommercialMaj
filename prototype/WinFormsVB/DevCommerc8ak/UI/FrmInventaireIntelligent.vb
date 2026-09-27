@@ -36,6 +36,8 @@ Namespace DevCommerc8ak
 
         Private ReadOnly _repo As InventaireIntelligentRepository
         Private ReadOnly _stockService As StockService
+        Private ReadOnly _conditionnementService As New ProduitConditionnementService()
+        Private ReadOnly _conditionnementsCache As New Dictionary(Of Integer, List(Of ProduitConditionnementDTO))()
         Private ReadOnly _printDoc As New PrintDocument()
         Private ReadOnly _printPreview As New PrintPreviewDialog()
 
@@ -1454,24 +1456,42 @@ Namespace DevCommerc8ak
                     quantiteInitiale = stockPhysiqueInitial
                 End If
 
-                Using frm As New FormulaireComptagePhysiqueProduit(produitId, stockTheorique, quantiteInitiale)
-                    If frm.ShowDialog(Me) <> DialogResult.OK Then Return
+                Dim conditionnements As List(Of ProduitConditionnementDTO) = ObtenirConditionnementsProduit(produitId)
+                If conditionnements.Count > 0 Then
+                    Dim libelleProduit As String = LireTexteTable(row, "NomProduit")
+                    Using frm As New FormulaireQuantitesConditionnements(produitId, "Comptage physique - " & libelleProduit, quantiteInitiale)
+                        If frm.ShowDialog(Me) <> DialogResult.OK Then Return
 
-                    row("StockPhysique") = frm.QuantitePhysiqueBase
-                    row("Ecart") = frm.EcartBase
-                    row("Statut") = frm.StatutComptage
-                    row("StatutComptage") = "COMPTÉ"
-                    If row.Table.Columns.Contains("DateComptage") Then
-                        row("DateComptage") = Date.Now
-                    End If
-                    If row.Table.Columns.Contains("Motif") AndAlso row.IsNull("Motif") Then
-                        row("Motif") = String.Empty
-                    End If
+                        ' Le comptage multi-conditionnement est converti vers
+                        ' QuantiteBase avant comparaison avec le stock théorique.
+                        row("StockPhysique") = frm.QuantiteBase
+                        row("Ecart") = frm.QuantiteBase - stockTheorique
+                        row("Statut") = If(Convert.ToDecimal(row("Ecart")) = 0D, "CONFORME", If(Convert.ToDecimal(row("Ecart")) < 0D, "MANQUE", "SURPLUS"))
+                        row("StatutComptage") = "COMPTÉ"
+                        If row.Table.Columns.Contains("DateComptage") Then row("DateComptage") = Date.Now
+                        If row.Table.Columns.Contains("Motif") AndAlso row.IsNull("Motif") Then row("Motif") = String.Empty
+                    End Using
+                Else
+                    Using frm As New FormulaireComptagePhysiqueProduit(produitId, stockTheorique, quantiteInitiale)
+                        If frm.ShowDialog(Me) <> DialogResult.OK Then Return
 
-                    ActualiserResumeInventaire()
-                    AppliquerTooltipsStockInventaire()
-                    gridInventaire.Invalidate()
-                End Using
+                        row("StockPhysique") = frm.QuantitePhysiqueBase
+                        row("Ecart") = frm.EcartBase
+                        row("Statut") = frm.StatutComptage
+                        row("StatutComptage") = "COMPTÉ"
+                        If row.Table.Columns.Contains("DateComptage") Then
+                            row("DateComptage") = Date.Now
+                        End If
+                        If row.Table.Columns.Contains("Motif") AndAlso row.IsNull("Motif") Then
+                            row("Motif") = String.Empty
+                        End If
+
+                    End Using
+                End If
+
+                ActualiserResumeInventaire()
+                AppliquerTooltipsStockInventaire()
+                gridInventaire.Invalidate()
             Catch ex As Exception
                 Dim log As New ProductionLogService()
                 log.Error("FrmInventaireIntelligent", "OuvrirComptagePhysique", "Erreur ouverture comptage physique.", ex)
@@ -1629,6 +1649,13 @@ Namespace DevCommerc8ak
         End Function
 
         Private Function FormaterStockDepuisDataRow(row As DataRow, quantiteBase As Decimal) As String
+            If row IsNot Nothing AndAlso row.Table IsNot Nothing AndAlso row.Table.Columns.Contains("ProduitId") AndAlso Not row.IsNull("ProduitId") Then
+                Dim conditionnements As List(Of ProduitConditionnementDTO) = ObtenirConditionnementsProduit(Convert.ToInt32(row("ProduitId")))
+                If conditionnements.Count > 0 Then
+                    Return ConversionUniteService.DecomposerStock(quantiteBase, conditionnements)
+                End If
+            End If
+
             Return FormatageGlobal.FormatStockSelonGestion(
                 quantiteBase,
                 LireDecimalTable(row, "ConversionUnite"),
@@ -1638,6 +1665,14 @@ Namespace DevCommerc8ak
                 LireTexteTable(row, "UniteMesureStock"),
                 LireDecimalTable(row, "ContenuUnitePrincipale"),
                 LireDecimalTable(row, "ContenuUniteSecondaire"))
+        End Function
+
+        Private Function ObtenirConditionnementsProduit(produitId As Integer) As List(Of ProduitConditionnementDTO)
+            If produitId <= 0 Then Return New List(Of ProduitConditionnementDTO)()
+            If Not _conditionnementsCache.ContainsKey(produitId) Then
+                _conditionnementsCache(produitId) = _conditionnementService.ListerParProduit(produitId, True)
+            End If
+            Return _conditionnementsCache(produitId)
         End Function
 
         Private Function ObtenirUniteReference(row As DataRow) As String

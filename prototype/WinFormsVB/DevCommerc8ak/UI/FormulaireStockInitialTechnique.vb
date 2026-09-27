@@ -41,6 +41,8 @@ Namespace DevCommerc8ak
         Private _chargementEnCours As Boolean
         Private _sourceTable As DataTable
         Private ReadOnly _bindingSource As New BindingSource()
+        Private ReadOnly _conditionnementService As New ProduitConditionnementService()
+        Private ReadOnly _conditionnementsCache As New Dictionary(Of Integer, List(Of ProduitConditionnementDTO))()
 
         ' --- Palette de Couleurs Enterprise ERP ---
         Private ReadOnly ColorBg As Color = Color.FromArgb(240, 242, 245)
@@ -257,6 +259,7 @@ Namespace DevCommerc8ak
             AddHandler btnRecharger.Click, AddressOf Recharger
             AddHandler btnEnregistrer.Click, AddressOf EnregistrerStockInitial
             AddHandler grid.CellValueChanged, AddressOf Grid_CellValueChanged
+            AddHandler grid.CellContentClick, AddressOf Grid_CellContentClick
             AddHandler grid.CurrentCellDirtyStateChanged, AddressOf Grid_CurrentCellDirtyStateChanged
             AddHandler grid.DataError, AddressOf Grid_DataError
             AddHandler txtRecherche.TextChanged, AddressOf ChangerFiltres
@@ -337,6 +340,8 @@ Namespace DevCommerc8ak
                 If Not dt.Columns.Contains("StockApresLisible") Then dt.Columns.Add("StockApresLisible", GetType(String))
                 If Not dt.Columns.Contains("ResumeQuantite") Then dt.Columns.Add("ResumeQuantite", GetType(String))
                 If Not dt.Columns.Contains("RechercheNormalisee") Then dt.Columns.Add("RechercheNormalisee", GetType(String))
+                If Not dt.Columns.Contains("QuantiteDynamiqueBase") Then dt.Columns.Add("QuantiteDynamiqueBase", GetType(Decimal))
+                If Not dt.Columns.Contains("ResumeDynamique") Then dt.Columns.Add("ResumeDynamique", GetType(String))
                 For Each row As DataRow In dt.Rows
                     If row.IsNull("DateInitiale") Then
                         row("DateInitiale") = Date.Now
@@ -432,6 +437,9 @@ Namespace DevCommerc8ak
             If grid.Columns.Contains("RechercheNormalisee") Then
                 grid.Columns("RechercheNormalisee").Visible = False
             End If
+            If grid.Columns.Contains("QuantiteDynamiqueBase") Then grid.Columns("QuantiteDynamiqueBase").Visible = False
+            If grid.Columns.Contains("ResumeDynamique") Then grid.Columns("ResumeDynamique").Visible = False
+            AjouterColonneConditionnements()
 
             For Each column As DataGridViewColumn In grid.Columns
                 column.Frozen = False
@@ -449,6 +457,18 @@ Namespace DevCommerc8ak
                 grid.Columns("Libelle").Width = Math.Max(grid.Columns("Libelle").Width, 240)
                 grid.Columns("Libelle").ToolTipText = "Produit"
             End If
+        End Sub
+
+        Private Sub AjouterColonneConditionnements()
+            If grid.Columns.Contains("colConditionnementsDynamiques") Then Return
+            Dim col As New DataGridViewButtonColumn() With {
+                .Name = "colConditionnementsDynamiques",
+                .HeaderText = "NIVEAUX",
+                .Text = "Saisir",
+                .UseColumnTextForButtonValue = True,
+                .Width = 86
+            }
+            grid.Columns.Insert(Math.Min(3, grid.Columns.Count), col)
         End Sub
 
         Private Sub RemplacerParCombo(columnName As String, values As String())
@@ -538,6 +558,15 @@ Namespace DevCommerc8ak
 
             rowView.Row("RechercheNormalisee") = ConstruireTexteRecherche(rowView.Row)
             CalculerLigne(rowView.Row)
+        End Sub
+
+        Private Sub Grid_CellContentClick(sender As Object, e As DataGridViewCellEventArgs)
+            If e.RowIndex < 0 OrElse e.ColumnIndex < 0 Then Return
+            If Not String.Equals(grid.Columns(e.ColumnIndex).Name, "colConditionnementsDynamiques", StringComparison.OrdinalIgnoreCase) Then Return
+
+            Dim rowView As DataRowView = TryCast(grid.Rows(e.RowIndex).DataBoundItem, DataRowView)
+            If rowView Is Nothing OrElse rowView.Row Is Nothing Then Return
+            OuvrirSaisieConditionnements(rowView.Row)
         End Sub
 
         Private Sub ChangerFiltres(sender As Object, e As EventArgs)
@@ -657,7 +686,9 @@ Namespace DevCommerc8ak
             If row Is Nothing Then
                 Return False
             End If
-            Return SafeDecimal(CellValue(row, "QuantitePrincipale")) > 0D OrElse SafeDecimal(CellValue(row, "QuantiteSecondaire")) > 0D
+            Return SafeDecimal(CellValue(row, "QuantitePrincipale")) > 0D OrElse
+                SafeDecimal(CellValue(row, "QuantiteSecondaire")) > 0D OrElse
+                SafeDecimal(CellValue(row, "QuantiteDynamiqueBase")) > 0D
         End Function
 
         Private Sub ChargerCategoriesFiltre()
@@ -832,6 +863,14 @@ Namespace DevCommerc8ak
                 Throw New InvalidOperationException("Les quantités ne peuvent pas être négatives.")
             End If
 
+            Dim quantiteDynamique As Decimal = SafeDecimal(row("QuantiteDynamiqueBase"))
+            If quantiteDynamique > 0D Then
+                ' Pour les produits migrés, la saisie N niveaux devient la source
+                ' de vérité de la ligne. Les anciennes colonnes QTÉ(P)/QTÉ(S)
+                ' restent disponibles uniquement pour le fallback legacy.
+                Return quantiteDynamique
+            End If
+
             Dim typeGestion As String = StockUnitConversionService.NormaliserTypeGestionStock(SafeString(row("TypeGestionStock")))
             If StockUnitConversionService.EstGestionMesuree(typeGestion) Then
                 Dim contenuPrincipal As Decimal = SafeDecimal(row("ContenuUnitePrincipale"))
@@ -857,6 +896,14 @@ Namespace DevCommerc8ak
         End Function
 
         Private Function FormaterStockInitial(row As DataRow, stockBase As Decimal) As String
+            Dim produitId As Integer = SafeInteger(row("ProduitId"))
+            If produitId > 0 Then
+                Dim conditionnements As List(Of ProduitConditionnementDTO) = ObtenirConditionnementsProduit(produitId)
+                If conditionnements.Count > 0 Then
+                    Return ConversionUniteService.DecomposerStock(stockBase, conditionnements)
+                End If
+            End If
+
             Return FormatageGlobal.FormatStockSelonGestion(stockBase,
                                                            SafeDecimal(row("ConversionUnite")),
                                                            SafeString(row("UnitePrincipale")),
@@ -868,6 +915,11 @@ Namespace DevCommerc8ak
         End Function
 
         Private Function ConstruireResumeSaisie(row As DataRow, quantitePrincipale As Decimal, quantiteSecondaire As Decimal, totalBase As Decimal, unitePrincipale As String, uniteBase As String) As String
+            Dim resumeDynamique As String = SafeString(row("ResumeDynamique"))
+            If resumeDynamique <> String.Empty Then
+                Return resumeDynamique & " = " & FormaterDecimal(totalBase) & " " & uniteBase
+            End If
+
             Dim parties As New List(Of String)()
             If quantitePrincipale > 0D Then parties.Add(FormaterDecimal(quantitePrincipale) & " " & unitePrincipale)
             If quantiteSecondaire > 0D Then
@@ -888,6 +940,44 @@ Namespace DevCommerc8ak
 
         Private Function ModeAjoutOmission() As Boolean
             Return cmbModeOperation IsNot Nothing AndAlso String.Equals(Convert.ToString(cmbModeOperation.SelectedItem), "AJOUTER PRODUIT OMIS", StringComparison.OrdinalIgnoreCase)
+        End Function
+
+        Private Sub OuvrirSaisieConditionnements(row As DataRow)
+            Dim produitId As Integer = SafeInteger(row("ProduitId"))
+            If produitId <= 0 Then
+                MessageBox.Show("Enregistrez d'abord le produit avant d'utiliser les conditionnements dynamiques.", "Stock initial technique", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+
+            Dim conditionnements As List(Of ProduitConditionnementDTO) = ObtenirConditionnementsProduit(produitId)
+            If conditionnements.Count = 0 Then
+                MessageBox.Show("Ce produit n'a pas encore de conditionnements dynamiques. Utilisez QTÉ(P)/QTÉ(S) ou configurez le produit depuis l'espace SuperAdmin.", "Stock initial technique", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+
+            Dim quantiteInitiale As Decimal? = Nothing
+            Dim quantiteCourante As Decimal = SafeDecimal(row("QuantiteDynamiqueBase"))
+            If quantiteCourante > 0D Then quantiteInitiale = quantiteCourante
+
+            Using frm As New FormulaireQuantitesConditionnements(produitId, "Quantités initiales - " & SafeString(row("Libelle")), quantiteInitiale)
+                If frm.ShowDialog(Me) <> DialogResult.OK Then Return
+
+                ' La saisie dynamique conserve N niveaux dans un résumé lisible,
+                ' mais seule la QuantiteBase normalisée est utilisée par le moteur stock.
+                row("QuantiteDynamiqueBase") = frm.QuantiteBase
+                row("ResumeDynamique") = frm.RepresentationLisible
+                row("QuantitePrincipale") = 0D
+                row("QuantiteSecondaire") = 0D
+                CalculerLigne(row)
+            End Using
+        End Sub
+
+        Private Function ObtenirConditionnementsProduit(produitId As Integer) As List(Of ProduitConditionnementDTO)
+            If produitId <= 0 Then Return New List(Of ProduitConditionnementDTO)()
+            If Not _conditionnementsCache.ContainsKey(produitId) Then
+                _conditionnementsCache(produitId) = _conditionnementService.ListerParProduit(produitId, True)
+            End If
+            Return _conditionnementsCache(produitId)
         End Function
 
         Private Sub EnregistrerStockInitial(sender As Object, e As EventArgs)

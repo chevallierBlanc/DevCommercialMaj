@@ -230,6 +230,9 @@
     <Compile Include="UI\FormulaireConditionnementsProduit.vb">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="UI\FormulaireQuantitesConditionnements.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="UI\FrmInventaireIntelligent.vb">
       <SubType>Form</SubType>
     </Compile>

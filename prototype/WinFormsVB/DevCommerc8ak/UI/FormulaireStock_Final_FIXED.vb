@@ -50,6 +50,8 @@ Namespace DevCommerc8ak
         Private ReadOnly txtContenuUniteSecondaireEntree As TextBox
         Private ReadOnly txtQuantiteEntree As TextBox
         Private ReadOnly txtQuantiteSecondaireEntree As TextBox
+        Private ReadOnly btnQuantitesConditionnementsEntree As Button
+        Private ReadOnly lblQuantitesConditionnementsEntree As Label
         Private ReadOnly lblStockActuel As Label
         Private ReadOnly lblStockActuelPiece As Label
         Private ReadOnly lblStockApres As Label
@@ -174,6 +176,8 @@ Namespace DevCommerc8ak
         ' --- Perte ---
         Private ReadOnly cmbProduitPerte As ComboBox
         Private ReadOnly txtQuantitePerte As TextBox
+        Private ReadOnly btnQuantitesConditionnementsPerte As Button
+        Private ReadOnly lblQuantitesConditionnementsPerte As Label
         Private ReadOnly cmbTypePerte As ComboBox
         Private ReadOnly dtpDatePerte As DateTimePicker
         Private ReadOnly txtObservationPerte As TextBox
@@ -195,7 +199,9 @@ Namespace DevCommerc8ak
         Private _coefficientDetailCalcule As Decimal
         Private _parametres As ParametreDTO
         Private ReadOnly _typeVenteService As TypeVenteService
-        Private _typesVenteCourants As List(Of TypeVenteDTO) 'nouveau 
+        Private ReadOnly _conditionnementService As New ProduitConditionnementService()
+        Private ReadOnly _conditionnementsCache As New Dictionary(Of Integer, List(Of ProduitConditionnementDTO))()
+        Private _typesVenteCourants As List(Of TypeVenteDTO) 'nouveau
         Private _isFilteringProduits As Boolean
         Private ReadOnly _panier As List(Of PanierLigne)
         Private ReadOnly _typesPersonnalisesTemporairesParProduit As Dictionary(Of Integer, List(Of TypeVenteProduitDTO))
@@ -205,6 +211,10 @@ Namespace DevCommerc8ak
         Private _miseAJourCoefficientDepuisPrix As Boolean
         Private _isSavingEntree As Boolean
         Private _stockActuelEntreeBase As Decimal
+        Private _quantiteEntreeDynamiqueBase As Decimal
+        Private _resumeEntreeDynamique As String = String.Empty
+        Private _quantitePerteDynamiqueBase As Decimal
+        Private _resumePerteDynamique As String = String.Empty
         Private _rapportEntreesPrintRowIndex As Integer
         Private _rapportEntreesPrintPageIndex As Integer
         Private _rapportEntreesTable As DataTable
@@ -313,6 +323,8 @@ Namespace DevCommerc8ak
             txtNbUniteParBase = New TextBox() With {.Left = 160, .Top = 75, .Width = 100}
             txtQuantiteEntree = New TextBox() With {.Left = 160, .Top = 105, .Width = 100}
             txtQuantiteSecondaireEntree = New TextBox() With {.Left = 160, .Top = 135, .Width = 100}
+            btnQuantitesConditionnementsEntree = New Button() With {.Text = "Conditionnements", .Left = 270, .Top = 105, .Width = 140, .Height = 26, .BackColor = ColorSecondary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            lblQuantitesConditionnementsEntree = New Label() With {.Left = 270, .Top = 136, .Width = 300, .Height = 32, .ForeColor = ColorSecondary}
             cmbTypeGestionStockEntree = New ComboBox() With {.Left = 455, .Top = 45, .Width = 125, .DropDownStyle = ComboBoxStyle.DropDownList}
             cmbTypeGestionStockEntree.Items.AddRange(New Object() {"UNITE", "MESURE"})
             cmbTypeGestionStockEntree.SelectedItem = "UNITE"
@@ -334,7 +346,7 @@ Namespace DevCommerc8ak
                 New Label() With {.Text = "Unité mesure", .Left = 300, .Top = 78, .AutoSize = True},
                 New Label() With {.Text = "Contenu principal", .Left = 300, .Top = 108, .AutoSize = True},
                 New Label() With {.Text = "Contenu secondaire", .Left = 300, .Top = 138, .AutoSize = True},
-                cmbUniteBase, txtNbUniteParBase, txtQuantiteEntree, txtQuantiteSecondaireEntree, cmbTypeGestionStockEntree, cmbUniteMesureStockEntree, txtContenuUnitePrincipaleEntree, txtContenuUniteSecondaireEntree, lblStockActuel, lblStockActuelPiece, lblStockApres, lblStockApresPiece
+                cmbUniteBase, txtNbUniteParBase, txtQuantiteEntree, txtQuantiteSecondaireEntree, btnQuantitesConditionnementsEntree, lblQuantitesConditionnementsEntree, cmbTypeGestionStockEntree, cmbUniteMesureStockEntree, txtContenuUnitePrincipaleEntree, txtContenuUniteSecondaireEntree, lblStockActuel, lblStockActuelPiece, lblStockApres, lblStockApresPiece
             })
             'layoutEntree.Controls.Add(cardUnite)
 
@@ -649,6 +661,8 @@ Namespace DevCommerc8ak
             Dim cardPerte As Panel = CreateCard(600, 300, "ENREGISTRER UNE PERTE")
             cmbProduitPerte = New ComboBox() With {.Left = 150, .Top = 45, .Width = 300, .DropDownStyle = ComboBoxStyle.DropDownList}
             txtQuantitePerte = New TextBox() With {.Left = 150, .Top = 85, .Width = 100}
+            btnQuantitesConditionnementsPerte = New Button() With {.Text = "Conditionnements", .Left = 260, .Top = 84, .Width = 140, .Height = 26, .BackColor = ColorSecondary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            lblQuantitesConditionnementsPerte = New Label() With {.Left = 150, .Top = 112, .Width = 330, .Height = 18, .ForeColor = ColorSecondary}
             cmbTypePerte = New ComboBox() With {.Left = 150, .Top = 125, .Width = 200, .DropDownStyle = ComboBoxStyle.DropDownList}
             cmbTypePerte.Items.AddRange(New Object() {"AVARIE", "VOL", "PEREMPTION", "AUTRE"})
             dtpDatePerte = New DateTimePicker() With {.Left = 150, .Top = 165, .Width = 150}
@@ -656,7 +670,7 @@ Namespace DevCommerc8ak
             btnEnregistrerPerte = New Button() With {.Text = "Enregistrer Perte", .Left = 150, .Top = 265, .Width = 200, .Height = 40, .BackColor = ColorDanger, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             cardPerte.Controls.AddRange(New Control() {
                 New Label() With {.Text = "Produit:", .Left = 20, .Top = 48, .AutoSize = True}, cmbProduitPerte,
-                New Label() With {.Text = "Quantité:", .Left = 20, .Top = 88, .AutoSize = True}, txtQuantitePerte,
+                New Label() With {.Text = "Quantité:", .Left = 20, .Top = 88, .AutoSize = True}, txtQuantitePerte, btnQuantitesConditionnementsPerte, lblQuantitesConditionnementsPerte,
                 New Label() With {.Text = "Type:", .Left = 20, .Top = 128, .AutoSize = True}, cmbTypePerte,
                 New Label() With {.Text = "Date:", .Left = 20, .Top = 168, .AutoSize = True}, dtpDatePerte,
                 New Label() With {.Text = "Observation:", .Left = 20, .Top = 208, .AutoSize = True}, txtObservationPerte,
@@ -721,6 +735,7 @@ Namespace DevCommerc8ak
             AddHandler txtContenuUniteSecondaireEntree.TextChanged, AddressOf RecalculerStock
             AddHandler txtQuantiteEntree.TextChanged, AddressOf RecalculerStock
             AddHandler txtQuantiteSecondaireEntree.TextChanged, AddressOf RecalculerStock
+            AddHandler btnQuantitesConditionnementsEntree.Click, AddressOf OuvrirQuantitesConditionnementsEntree
             AddHandler txtPrixAchat.TextChanged, AddressOf RecalculerPrixAuto
             AddHandler cmbDevise.SelectedIndexChanged, AddressOf DeviseOuPrixAchatChange
             AddHandler txtCoefficientInput.TextChanged, AddressOf CoefficientInputChange
@@ -761,6 +776,8 @@ Namespace DevCommerc8ak
             AddHandler btnValiderInventaire.Click, AddressOf ValiderInventaire
             AddHandler btnRafraichirAlertes.Click, AddressOf ChargerAlertes
             AddHandler btnEnregistrerPerte.Click, AddressOf EnregistrerPerte
+            AddHandler btnQuantitesConditionnementsPerte.Click, AddressOf OuvrirQuantitesConditionnementsPerte
+            AddHandler cmbProduitPerte.SelectedIndexChanged, AddressOf ProduitPerteChange
             AddHandler btnChargerRapportEntrees.Click, AddressOf ChargerRapportEntrees
             AddHandler btnImprimerRapportEntrees.Click, AddressOf ImprimerRapportEntrees
             AddHandler gridRapportEntrees.CellFormatting, AddressOf FormaterCelluleRapportEntrees
@@ -1245,6 +1262,7 @@ Namespace DevCommerc8ak
 
         Private Sub BasculerProduitExistant(sender As Object, e As EventArgs)
             Dim existant As Boolean = chkProduitExistant.Checked
+            ReinitialiserQuantiteDynamiqueEntree()
             cmbProduitExistant.Enabled = existant
             txtNomProduit.Enabled = Not existant
             cmbCategorie.Enabled = Not existant
@@ -1329,6 +1347,7 @@ Namespace DevCommerc8ak
                 Return
             End If
             If cmbProduitExistant.SelectedValue Is Nothing Then Return
+            ReinitialiserQuantiteDynamiqueEntree()
             Dim row As DataRowView = TryCast(cmbProduitExistant.SelectedItem, DataRowView)
             If row Is Nothing Then Return
             Dim r As DataRow = row.Row
@@ -2167,7 +2186,7 @@ Namespace DevCommerc8ak
             Dim quantiteEntree As Decimal = LireDecimal(txtQuantiteEntree.Text)
             Dim quantiteSecondaire As Decimal = LireDecimal(txtQuantiteSecondaireEntree.Text)
             Dim stockActuelPieces As Decimal = _stockActuelEntreeBase
-            Dim totalPiecesEntree As Decimal = CalculerQuantiteBaseEntree(quantiteEntree, quantiteSecondaire, nb)
+            Dim totalPiecesEntree As Decimal = If(_quantiteEntreeDynamiqueBase > 0D, _quantiteEntreeDynamiqueBase, CalculerQuantiteBaseEntree(quantiteEntree, quantiteSecondaire, nb))
             Dim stockApresPieces As Decimal = stockActuelPieces + totalPiecesEntree
             Dim uniteBase As String = If(cmbUniteBase.Text.Trim() = "", "base", cmbUniteBase.Text.Trim())
             Dim uniteSecondaire As String = ObtenirUniteSecondaireEntree()
@@ -2191,7 +2210,8 @@ Namespace DevCommerc8ak
                 lblStockActuel.Text = "Stock actuel: " & stockActuelLisible
                 lblStockActuelPiece.Text = libelleEquivalent & stockActuelPieces.ToString(formatQuantite) & " " & uniteSecondaire
                 lblStockApres.Text = "Stock après: " & stockApresLisible
-                lblStockApresPiece.Text = "Après: " & stockApresPieces.ToString(formatQuantite) & " " & uniteSecondaire & " (" & quantiteEntree.ToString("N0") & " " & uniteBase & " + " & quantiteSecondaire.ToString(formatQuantite) & " " & uniteComplement & ")"
+                Dim detailEntree As String = If(_quantiteEntreeDynamiqueBase > 0D, _resumeEntreeDynamique, quantiteEntree.ToString("N0") & " " & uniteBase & " + " & quantiteSecondaire.ToString(formatQuantite) & " " & uniteComplement)
+                lblStockApresPiece.Text = "Après: " & stockApresPieces.ToString(formatQuantite) & " " & uniteSecondaire & " (" & detailEntree & ")"
             End If
             RafraichirTypesVente()
         End Sub
@@ -2207,7 +2227,52 @@ Namespace DevCommerc8ak
                 If(contenuSecondaire.HasValue, contenuSecondaire.Value, 0D))
         End Function
 
+        Private Sub OuvrirQuantitesConditionnementsEntree(sender As Object, e As EventArgs)
+            Dim produitId As Integer = ObtenirProduitEntreeSelectionneId()
+            If produitId <= 0 Then
+                MessageBox.Show("Sélectionnez un produit existant déjà configuré avant d'utiliser les conditionnements dynamiques.", "Conditionnements", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+            Dim conditionnements As List(Of ProduitConditionnementDTO) = ObtenirConditionnementsProduit(produitId)
+            If conditionnements.Count = 0 Then
+                MessageBox.Show("Aucun conditionnement dynamique actif n'est configuré pour ce produit.", "Conditionnements", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+
+            Using frm As New FormulaireQuantitesConditionnements(produitId, "Entrée stock par conditionnement", If(_quantiteEntreeDynamiqueBase > 0D, CType(_quantiteEntreeDynamiqueBase, Decimal?), CType(Nothing, Decimal?)))
+                If frm.ShowDialog(Me) <> DialogResult.OK Then Return
+                _quantiteEntreeDynamiqueBase = frm.QuantiteBase
+                _resumeEntreeDynamique = frm.RepresentationLisible
+                lblQuantitesConditionnementsEntree.Text = frm.RepresentationLisible
+                txtQuantiteEntree.Text = "0"
+                txtQuantiteSecondaireEntree.Text = "0"
+                RecalculerStock(Nothing, EventArgs.Empty)
+            End Using
+        End Sub
+
+        Private Sub ReinitialiserQuantiteDynamiqueEntree()
+            _quantiteEntreeDynamiqueBase = 0D
+            _resumeEntreeDynamique = String.Empty
+            If lblQuantitesConditionnementsEntree IsNot Nothing Then lblQuantitesConditionnementsEntree.Text = String.Empty
+        End Sub
+
+        Private Function ObtenirConditionnementsProduit(produitId As Integer) As List(Of ProduitConditionnementDTO)
+            If produitId <= 0 Then Return New List(Of ProduitConditionnementDTO)()
+            If Not _conditionnementsCache.ContainsKey(produitId) Then
+                _conditionnementsCache(produitId) = _conditionnementService.ListerParProduit(produitId, True)
+            End If
+            Return _conditionnementsCache(produitId)
+        End Function
+
         Private Function FormaterStockLisible(stockBase As Decimal, conversion As Decimal, unitePrincipale As String, uniteSecondaire As String) As String
+            Dim produitId As Integer = ObtenirProduitEntreeSelectionneId()
+            If produitId > 0 Then
+                Dim conditionnements As List(Of ProduitConditionnementDTO) = ObtenirConditionnementsProduit(produitId)
+                If conditionnements.Count > 0 Then
+                    Return ConversionUniteService.DecomposerStock(stockBase, conditionnements)
+                End If
+            End If
+
             If EstGestionMesureEntree() Then
                 Dim contenuSecondaire As Decimal? = LireContenuUniteSecondaireEntree()
                 Dim decomposition As String = FormatageGlobal.DecomposerStockMesure(
@@ -2615,7 +2680,9 @@ Namespace DevCommerc8ak
                     End If
                     Return
                 End If
-                Dim qte As Decimal = CalculerQuantiteBaseEntree(quantitePrincipale, quantiteSecondaire, conversionEntree)
+                ' Pour un produit configuré en N niveaux, la quantité saisie
+                ' dans le dialogue dynamique est déjà normalisée en QuantiteBase.
+                Dim qte As Decimal = If(_quantiteEntreeDynamiqueBase > 0D, _quantiteEntreeDynamiqueBase, CalculerQuantiteBaseEntree(quantitePrincipale, quantiteSecondaire, conversionEntree))
                 If qte <= 0D Then
                     MessageBox.Show("La quantité entrée doit être supérieure à zéro.")
                     txtQuantiteEntree.Focus()
@@ -2723,7 +2790,7 @@ Namespace DevCommerc8ak
                                               If(contenuSecondaireDebug.HasValue, contenuSecondaireDebug.Value, 0D),
                                               qte,
                                               stockApresAttendu))
-                service.EnregistrerEntree(produitId, qte, ObtenirUniteSecondaireEntree(), txtReference.Text.Trim(), txtObservationEntree.Text.Trim(), SessionUtilisateur.UtilisateurId, prixAchatVal)
+                service.EnregistrerEntree(produitId, qte, If(_quantiteEntreeDynamiqueBase > 0D, "base", ObtenirUniteSecondaireEntree()), txtReference.Text.Trim(), txtObservationEntree.Text.Trim(), SessionUtilisateur.UtilisateurId, prixAchatVal)
                 Dim stockReluApresSauvegarde As Decimal = service.ObtenirStockActuelProduit(produitId)
                 _stockActuelEntreeBase = stockReluApresSauvegarde
                 Debug.WriteLine(String.Format(Globalization.CultureInfo.InvariantCulture,
@@ -2740,6 +2807,7 @@ Namespace DevCommerc8ak
                     cmbProduitExistant.SelectedValue = produitId
                 End If
                 MessageBox.Show("Entrée stock enregistrée.")
+                ReinitialiserQuantiteDynamiqueEntree()
                 NettoyerSaisieEntreeApresEnregistrement(produitId, etaitProduitExistant)
             Catch ex As Exception
                 _isSavingEntree = False
@@ -3309,7 +3377,7 @@ Namespace DevCommerc8ak
                     MessageBox.Show("Selectionnez un produit.")
                     Return
                 End If
-                Dim qte As Decimal = LireDecimal(txtQuantitePerte.Text)
+                Dim qte As Decimal = If(_quantitePerteDynamiqueBase > 0D, _quantitePerteDynamiqueBase, LireDecimal(txtQuantitePerte.Text))
                 If qte <= 0D Then
                     MessageBox.Show("Quantite invalide.")
                     Return
@@ -3320,9 +3388,41 @@ Namespace DevCommerc8ak
                 Dim service As StockService = ObtenirStockService()
                 service.EnregistrerPerte(produitId, qte, "base", "PERTE", txtObservationPerte.Text.Trim(), typeP, SessionUtilisateur.UtilisateurId)
                 MessageBox.Show("Perte enregistrée.")
+                ReinitialiserQuantiteDynamiquePerte()
             Catch ex As Exception
                 MessageBox.Show("Erreur perte: " & ex.Message)
             End Try
+        End Sub
+
+        Private Sub OuvrirQuantitesConditionnementsPerte(sender As Object, e As EventArgs)
+            If cmbProduitPerte.SelectedValue Is Nothing OrElse TypeOf cmbProduitPerte.SelectedValue Is DataRowView Then
+                MessageBox.Show("Sélectionnez un produit.", "Conditionnements", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+            Dim produitId As Integer = Convert.ToInt32(cmbProduitPerte.SelectedValue)
+            Dim conditionnements As List(Of ProduitConditionnementDTO) = ObtenirConditionnementsProduit(produitId)
+            If conditionnements.Count = 0 Then
+                MessageBox.Show("Aucun conditionnement dynamique actif n'est configuré pour ce produit.", "Conditionnements", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+
+            Using frm As New FormulaireQuantitesConditionnements(produitId, "Perte par conditionnement", If(_quantitePerteDynamiqueBase > 0D, CType(_quantitePerteDynamiqueBase, Decimal?), CType(Nothing, Decimal?)))
+                If frm.ShowDialog(Me) <> DialogResult.OK Then Return
+                _quantitePerteDynamiqueBase = frm.QuantiteBase
+                _resumePerteDynamique = frm.RepresentationLisible
+                txtQuantitePerte.Text = "0"
+                lblQuantitesConditionnementsPerte.Text = frm.RepresentationLisible
+            End Using
+        End Sub
+
+        Private Sub ProduitPerteChange(sender As Object, e As EventArgs)
+            ReinitialiserQuantiteDynamiquePerte()
+        End Sub
+
+        Private Sub ReinitialiserQuantiteDynamiquePerte()
+            _quantitePerteDynamiqueBase = 0D
+            _resumePerteDynamique = String.Empty
+            If lblQuantitesConditionnementsPerte IsNot Nothing Then lblQuantitesConditionnementsPerte.Text = String.Empty
         End Sub
 
         Private Sub ChargerRapportEntrees(sender As Object, e As EventArgs)
