@@ -58,7 +58,9 @@ Namespace DevCommerc8ak
             End If
 
             conditionnement.ModifiePar = ObtenirUtilisateur()
-            Dim id As Integer = ObtenirRepository().Enregistrer(conditionnement)
+            Dim repo As ProduitConditionnementRepository = ObtenirRepository()
+            Dim id As Integer = repo.Enregistrer(conditionnement)
+            RecalculerDescendants(repo, conditionnement.ProduitId, id, New HashSet(Of Integer)())
             AuditActionService.Enregistrer("Conditionnements", "Configuration conditionnement", "ProduitId=" & conditionnement.ProduitId.ToString() & ", ConditionnementId=" & id.ToString())
             AppEvents.OnProduitModifie()
             AppEvents.OnDataChanged()
@@ -91,6 +93,28 @@ Namespace DevCommerc8ak
                 Dim parentId As Integer = courant.ConditionnementParentId.Value
                 courant = existants.FirstOrDefault(Function(c) c.ProduitConditionnementId = parentId)
             End While
+        End Sub
+
+        Private Shared Sub RecalculerDescendants(repo As ProduitConditionnementRepository, produitId As Integer, parentId As Integer, visites As HashSet(Of Integer))
+            If repo Is Nothing OrElse parentId <= 0 OrElse visites.Contains(parentId) Then Return
+            visites.Add(parentId)
+
+            Dim tous As List(Of ProduitConditionnementDTO) = repo.ListerParProduit(produitId, False)
+            Dim parent As ProduitConditionnementDTO = tous.FirstOrDefault(Function(c) c.ProduitConditionnementId = parentId)
+            If parent Is Nothing Then Return
+
+            For Each enfant As ProduitConditionnementDTO In tous.Where(Function(c) c.EstActif AndAlso c.ConditionnementParentId.HasValue AndAlso c.ConditionnementParentId.Value = parentId).ToList()
+                If Not enfant.FacteurVersParent.HasValue OrElse enfant.FacteurVersParent.Value <= 0D Then Continue For
+
+                ' Quand un niveau intermédiaire change, tous les niveaux qui en dépendent
+                ' doivent recalculer leur facteur cumulé. Les mouvements historiques gardent
+                ' leur QuantiteBase déjà enregistrée ; seule la configuration future est mise à jour.
+                enfant.FacteurVersBase = enfant.FacteurVersParent.Value * parent.FacteurVersBase
+                enfant.Niveau = parent.Niveau + 1
+                enfant.ModifiePar = ObtenirUtilisateur()
+                repo.Enregistrer(enfant)
+                RecalculerDescendants(repo, produitId, enfant.ProduitConditionnementId, visites)
+            Next
         End Sub
 
         Private Shared Sub VerifierAccesTechnique()

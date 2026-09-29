@@ -26,6 +26,8 @@ Namespace DevCommerc8ak
         Private ReadOnly chkVendable As CheckBox
         Private ReadOnly chkFraction As CheckBox
         Private ReadOnly lblApercu As Label
+        Private ReadOnly txtPrevisualisation As TextBox
+        Private ReadOnly _toolTip As New ToolTip()
 
         Private _produits As DataTable
         Private _conditionnements As List(Of ProduitConditionnementDTO)
@@ -48,12 +50,12 @@ Namespace DevCommerc8ak
         Public Sub New()
             Text = "Conditionnements produits"
             BackColor = Color.FromArgb(245, 247, 250)
-            MinimumSize = New Size(980, 650)
+            MinimumSize = New Size(1080, 760)
             AutoScaleMode = AutoScaleMode.Dpi
 
             Dim root As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 3, .Padding = New Padding(18)}
             root.RowStyles.Add(New RowStyle(SizeType.Absolute, 86))
-            root.RowStyles.Add(New RowStyle(SizeType.Absolute, 190))
+            root.RowStyles.Add(New RowStyle(SizeType.Absolute, 305))
             root.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
 
             Dim header As New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.White, .Padding = New Padding(18)}
@@ -62,18 +64,19 @@ Namespace DevCommerc8ak
 
             Dim edition As New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.White, .Padding = New Padding(14)}
             cmbProduit = New ComboBox() With {.Left = 12, .Top = 36, .Width = 330, .DropDownStyle = ComboBoxStyle.DropDownList}
-            cmbUnite = New ComboBox() With {.Left = 360, .Top = 36, .Width = 150, .DropDownStyle = ComboBoxStyle.DropDownList}
-            cmbParent = New ComboBox() With {.Left = 530, .Top = 36, .Width = 190, .DropDownStyle = ComboBoxStyle.DropDownList}
-            txtFacteurParent = New TextBox() With {.Left = 740, .Top = 36, .Width = 90}
-            txtOrdre = New TextBox() With {.Left = 850, .Top = 36, .Width = 70}
+            cmbUnite = New ComboBox() With {.Left = 360, .Top = 36, .Width = 170, .DropDownStyle = ComboBoxStyle.DropDownList}
+            cmbParent = New ComboBox() With {.Left = 550, .Top = 36, .Width = 210, .DropDownStyle = ComboBoxStyle.DropDownList}
+            txtFacteurParent = New TextBox() With {.Left = 780, .Top = 36, .Width = 90}
+            txtOrdre = New TextBox() With {.Left = 890, .Top = 36, .Width = 70}
             chkBase = New CheckBox() With {.Text = "Unité de base", .Left = 12, .Top = 92, .AutoSize = True}
             chkAchetable = New CheckBox() With {.Text = "Achetable", .Left = 150, .Top = 92, .AutoSize = True, .Checked = True}
             chkVendable = New CheckBox() With {.Text = "Vendable", .Left = 260, .Top = 92, .AutoSize = True, .Checked = True}
             chkFraction = New CheckBox() With {.Text = "Fraction autorisée", .Left = 370, .Top = 92, .AutoSize = True}
-            lblApercu = New Label() With {.Left = 530, .Top = 84, .Width = 390, .Height = 48, .ForeColor = Color.FromArgb(14, 116, 144)}
+            lblApercu = New Label() With {.Left = 530, .Top = 84, .Width = 430, .Height = 48, .ForeColor = Color.FromArgb(14, 116, 144)}
             Dim btnNouveau As New Button() With {.Text = "Nouveau", .Left = 12, .Top = 135, .Width = 105, .Height = 34, .BackColor = Color.FromArgb(52, 73, 94), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             Dim btnEnregistrer As New Button() With {.Text = "Enregistrer", .Left = 130, .Top = 135, .Width = 120, .Height = 34, .BackColor = Color.FromArgb(39, 174, 96), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             Dim btnDesactiver As New Button() With {.Text = "Désactiver", .Left = 265, .Top = 135, .Width = 120, .Height = 34, .BackColor = Color.FromArgb(192, 57, 43), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            txtPrevisualisation = New TextBox() With {.Left = 12, .Top = 180, .Width = 950, .Height = 105, .Multiline = True, .ReadOnly = True, .ScrollBars = ScrollBars.Vertical, .BackColor = Color.FromArgb(249, 250, 251), .BorderStyle = BorderStyle.FixedSingle}
             btnNouveau.FlatAppearance.BorderSize = 0
             btnEnregistrer.FlatAppearance.BorderSize = 0
             btnDesactiver.FlatAppearance.BorderSize = 0
@@ -81,27 +84,28 @@ Namespace DevCommerc8ak
             edition.Controls.AddRange(New Control() {
                 New Label() With {.Text = "Produit", .Left = 12, .Top = 14, .AutoSize = True},
                 cmbProduit,
-                New Label() With {.Text = "Unité", .Left = 360, .Top = 14, .AutoSize = True},
+                New Label() With {.Text = "Conditionnement", .Left = 360, .Top = 14, .AutoSize = True},
                 cmbUnite,
-                New Label() With {.Text = "Parent", .Left = 530, .Top = 14, .AutoSize = True},
+                New Label() With {.Text = "Unité contenue", .Left = 550, .Top = 14, .AutoSize = True},
                 cmbParent,
-                New Label() With {.Text = "Qté/parent", .Left = 740, .Top = 14, .AutoSize = True},
+                New Label() With {.Text = "Contient", .Left = 780, .Top = 14, .AutoSize = True},
                 txtFacteurParent,
-                New Label() With {.Text = "Ordre", .Left = 850, .Top = 14, .AutoSize = True},
+                New Label() With {.Text = "Ordre", .Left = 890, .Top = 14, .AutoSize = True},
                 txtOrdre,
-                chkBase, chkAchetable, chkVendable, chkFraction, lblApercu, btnNouveau, btnEnregistrer, btnDesactiver})
+                chkBase, chkAchetable, chkVendable, chkFraction, lblApercu, btnNouveau, btnEnregistrer, btnDesactiver, txtPrevisualisation})
 
             grid = New DataGridView() With {.Dock = DockStyle.Fill, .AutoGenerateColumns = False, .AllowUserToAddRows = False, .AllowUserToDeleteRows = False, .ReadOnly = True, .SelectionMode = DataGridViewSelectionMode.FullRowSelect, .RowHeadersVisible = False, .BackgroundColor = Color.White}
             grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "ProduitConditionnementId", .Name = "ProduitConditionnementId", .Visible = False})
-            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "LibelleUnite", .HeaderText = "Unité", .Width = 150})
-            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "FacteurVersParent", .HeaderText = "Qté/parent", .Width = 100})
-            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "FacteurVersBase", .HeaderText = "Équiv. base", .Width = 110})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "LibelleUnite", .HeaderText = "Conditionnement", .Width = 160})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "FacteurVersParent", .HeaderText = "Contient", .Width = 90})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "FacteurVersBase", .HeaderText = "Équivalent en unité de base", .Width = 170})
             grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "Niveau", .HeaderText = "Niveau", .Width = 70})
-            grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "EstUniteBase", .HeaderText = "Base", .Width = 55})
-            grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "EstAchetable", .HeaderText = "Achat", .Width = 60})
-            grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "EstVendable", .HeaderText = "Vente", .Width = 60})
-            grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "AutoriseFraction", .HeaderText = "Fraction", .Width = 75})
+            grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "EstUniteBase", .HeaderText = "Unité de base", .Width = 95})
+            grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "EstAchetable", .HeaderText = "Achat autorisé", .Width = 105})
+            grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "EstVendable", .HeaderText = "Vente autorisée", .Width = 105})
+            grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "AutoriseFraction", .HeaderText = "Fraction autorisée", .Width = 115})
             grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "EstActif", .HeaderText = "Actif", .Width = 60})
+            ConfigurerAideSaisie()
 
             root.Controls.Add(header, 0, 0)
             root.Controls.Add(edition, 0, 1)
@@ -111,6 +115,7 @@ Namespace DevCommerc8ak
             AddHandler Load, AddressOf FormulaireConditionnementsProduit_Load
             AddHandler cmbProduit.SelectedIndexChanged, AddressOf ProduitSelectionne
             AddHandler grid.SelectionChanged, AddressOf ConditionnementSelectionne
+            AddHandler cmbUnite.SelectedIndexChanged, AddressOf MettreAJourApercu
             AddHandler chkBase.CheckedChanged, AddressOf MettreAJourApercu
             AddHandler cmbParent.SelectedIndexChanged, AddressOf MettreAJourApercu
             AddHandler txtFacteurParent.TextChanged, AddressOf MettreAJourApercu
@@ -149,6 +154,7 @@ Namespace DevCommerc8ak
             grid.DataSource = Nothing
             grid.DataSource = _conditionnements
             RechargerParents()
+            MettreAJourPrevisualisationProduit()
             Nouveau(Nothing, EventArgs.Empty)
         End Sub
 
@@ -156,9 +162,20 @@ Namespace DevCommerc8ak
             cmbParent.Items.Clear()
             cmbParent.Items.Add(New ComboItem(Of Nullable(Of Integer))("Aucun - unité de base", Nothing))
             For Each c As ProduitConditionnementDTO In _conditionnements.Where(Function(x) x.EstActif).OrderByDescending(Function(x) x.FacteurVersBase)
-                cmbParent.Items.Add(New ComboItem(Of Nullable(Of Integer))(c.LibelleUnite & " (" & c.FacteurVersBase.ToString("0.####") & " base)", c.ProduitConditionnementId))
+                cmbParent.Items.Add(New ComboItem(Of Nullable(Of Integer))("Unité contenue : " & LibelleConditionnement(c) & " (" & c.FacteurVersBase.ToString("0.####") & " base)", c.ProduitConditionnementId))
             Next
             cmbParent.SelectedIndex = 0
+        End Sub
+
+        Private Sub ConfigurerAideSaisie()
+            _toolTip.SetToolTip(cmbUnite, "Conditionnement que vous configurez. Exemple : Carton, Paquet, Pièce, Sac, Kg.")
+            _toolTip.SetToolTip(cmbParent, "Unité directement contenue dans le conditionnement. Exemple : 1 Carton contient 24 Paquets.")
+            _toolTip.SetToolTip(txtFacteurParent, "Quantité de l'unité contenue dans 1 conditionnement. Le facteur vers base est calculé automatiquement.")
+            _toolTip.SetToolTip(chkBase, "Une seule unité de base active est autorisée par produit. Toutes les QuantiteBase sont exprimées dans cette unité.")
+            _toolTip.SetToolTip(chkAchetable, "Autorise ce conditionnement dans les entrées de stock / approvisionnements.")
+            _toolTip.SetToolTip(chkVendable, "Autorise ce conditionnement comme base des types de vente.")
+            _toolTip.SetToolTip(chkFraction, "Autorise les quantités décimales pour ce conditionnement quand le métier le permet.")
+            _toolTip.SetToolTip(txtPrevisualisation, "Prévisualisation métier calculée depuis les relations directes. Les anciennes transactions ne sont jamais recalculées.")
         End Sub
 
         Private Sub Nouveau(sender As Object, e As EventArgs)
@@ -204,7 +221,7 @@ Namespace DevCommerc8ak
 
         Private Sub MettreAJourApercu(sender As Object, e As EventArgs)
             If chkBase.Checked Then
-                lblApercu.Text = "Unité de base : facteur vers base = 1."
+                lblApercu.Text = "Unité de base : 1 " & LibelleUniteSelectionnee() & " = 1 " & LibelleUniteSelectionnee() & "."
                 cmbParent.Enabled = False
                 txtFacteurParent.Enabled = False
                 Return
@@ -219,15 +236,92 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            ' Le SuperAdmin saisit la relation directe avec le parent.
-            ' Le facteur vers base est dérivé de toute la hiérarchie pour éviter les incohérences.
-            lblApercu.Text = "Équivalence calculée : " & (facteur * parent.FacteurVersBase).ToString("0.####") & " unités de base."
+            ' Le SuperAdmin saisit uniquement la relation directe :
+            ' "1 conditionnement contient X unités contenues".
+            ' Le facteur vers base est dérivé de la hiérarchie pour éviter les contradictions.
+            lblApercu.Text = "1 " & LibelleUniteSelectionnee() & " contient " & facteur.ToString("0.####") & " " & LibelleConditionnement(parent) &
+                " | Équiv. base calculé : " & (facteur * parent.FacteurVersBase).ToString("0.####")
         End Sub
 
         Private Function ObtenirParent() As ProduitConditionnementDTO
             Dim item As ComboItem(Of Nullable(Of Integer)) = TryCast(cmbParent.SelectedItem, ComboItem(Of Nullable(Of Integer)))
             If item Is Nothing OrElse Not item.Valeur.HasValue Then Return Nothing
             Return _conditionnements.FirstOrDefault(Function(c) c.ProduitConditionnementId = item.Valeur.Value)
+        End Function
+
+        Private Sub MettreAJourPrevisualisationProduit()
+            If txtPrevisualisation Is Nothing Then Return
+            If _conditionnements Is Nothing OrElse _conditionnements.Count = 0 Then
+                txtPrevisualisation.Text = "HIÉRARCHIE DU PRODUIT" & Environment.NewLine & "Aucun conditionnement configuré."
+                Return
+            End If
+
+            Dim actifs As List(Of ProduitConditionnementDTO) = _conditionnements.
+                Where(Function(c) c.EstActif).
+                OrderByDescending(Function(c) c.FacteurVersBase).
+                ToList()
+            Dim baseUnite As ProduitConditionnementDTO = actifs.FirstOrDefault(Function(c) c.EstUniteBase)
+            Dim libelleBase As String = If(baseUnite Is Nothing, "base", LibelleConditionnement(baseUnite))
+            Dim lignes As New List(Of String) From {"HIÉRARCHIE DU PRODUIT"}
+
+            ' Les liens sont stockés du conditionnement vers l'unité contenue.
+            ' Pour l'affichage métier, on part donc des plus grands conditionnements
+            ' puis on descend récursivement vers l'unité de base.
+            Dim racines As List(Of ProduitConditionnementDTO) = actifs.
+                Where(Function(c) Not actifs.Any(Function(x) x.ConditionnementParentId.HasValue AndAlso x.ConditionnementParentId.Value = c.ProduitConditionnementId)).
+                OrderByDescending(Function(c) c.FacteurVersBase).
+                ToList()
+            If racines.Count = 0 Then racines = actifs.Take(1).ToList()
+            For Each racine As ProduitConditionnementDTO In racines
+                AjouterBrancheHierarchie(lignes, racine, 0, actifs, New HashSet(Of Integer)())
+            Next
+
+            lignes.Add(String.Empty)
+            lignes.Add("ÉQUIVALENCES CALCULÉES")
+            For Each c As ProduitConditionnementDTO In actifs.OrderByDescending(Function(x) x.FacteurVersBase)
+                lignes.Add("1 " & LibelleConditionnement(c) & " = " & c.FacteurVersBase.ToString("0.####") & " " & libelleBase)
+            Next
+            txtPrevisualisation.Text = String.Join(Environment.NewLine, lignes)
+        End Sub
+
+        Private Sub AjouterBrancheHierarchie(lignes As List(Of String), courant As ProduitConditionnementDTO, niveau As Integer, actifs As List(Of ProduitConditionnementDTO), visites As HashSet(Of Integer))
+            If courant Is Nothing Then Return
+            If visites.Contains(courant.ProduitConditionnementId) Then
+                lignes.Add(New String(" "c, niveau * 4) & "└─ cycle détecté : configuration à corriger")
+                Return
+            End If
+            visites.Add(courant.ProduitConditionnementId)
+
+            Dim prefixe As String = New String(" "c, niveau * 4)
+            If niveau = 0 Then
+                lignes.Add(prefixe & LibelleConditionnement(courant))
+            End If
+
+            If Not courant.ConditionnementParentId.HasValue Then Return
+            Dim enfant As ProduitConditionnementDTO = actifs.FirstOrDefault(Function(c) c.ProduitConditionnementId = courant.ConditionnementParentId.Value)
+            If enfant Is Nothing Then
+                lignes.Add(prefixe & "    └─ unité contenue inactive ou introuvable")
+                Return
+            End If
+
+            Dim facteur As Decimal = If(courant.FacteurVersParent.HasValue, courant.FacteurVersParent.Value, 0D)
+            lignes.Add(prefixe & "    └─ " & facteur.ToString("0.####") & " " & LibelleConditionnement(enfant) & " par " & LibelleConditionnement(courant))
+            AjouterBrancheHierarchie(lignes, enfant, niveau + 1, actifs, visites)
+        End Sub
+
+        Private Function LibelleUniteSelectionnee() As String
+            Dim unite As UniteMesureDTO = TryCast(cmbUnite.SelectedItem, UniteMesureDTO)
+            If unite Is Nothing Then Return "conditionnement"
+            If Not String.IsNullOrWhiteSpace(unite.Libelle) Then Return unite.Libelle.Trim()
+            If Not String.IsNullOrWhiteSpace(unite.Symbole) Then Return unite.Symbole.Trim()
+            Return If(unite.Code, "conditionnement").Trim()
+        End Function
+
+        Private Shared Function LibelleConditionnement(conditionnement As ProduitConditionnementDTO) As String
+            If conditionnement Is Nothing Then Return "base"
+            If Not String.IsNullOrWhiteSpace(conditionnement.LibelleUnite) Then Return conditionnement.LibelleUnite.Trim()
+            If Not String.IsNullOrWhiteSpace(conditionnement.SymboleUnite) Then Return conditionnement.SymboleUnite.Trim()
+            Return If(conditionnement.CodeUnite, "base").Trim()
         End Function
 
         Private Sub Enregistrer(sender As Object, e As EventArgs)

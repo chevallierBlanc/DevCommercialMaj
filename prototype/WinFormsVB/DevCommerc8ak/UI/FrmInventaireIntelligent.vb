@@ -1459,7 +1459,7 @@ Namespace DevCommerc8ak
                 Dim conditionnements As List(Of ProduitConditionnementDTO) = ObtenirConditionnementsProduit(produitId)
                 If conditionnements.Count > 0 Then
                     Dim libelleProduit As String = LireTexteTable(row, "NomProduit")
-                    Using frm As New FormulaireQuantitesConditionnements(produitId, "Comptage physique - " & libelleProduit, quantiteInitiale)
+                    Using frm As New FormulaireQuantitesConditionnements(produitId, "Comptage physique - " & libelleProduit, quantiteInitiale, stockTheorique)
                         If frm.ShowDialog(Me) <> DialogResult.OK Then Return
 
                         ' Le comptage multi-conditionnement est converti vers

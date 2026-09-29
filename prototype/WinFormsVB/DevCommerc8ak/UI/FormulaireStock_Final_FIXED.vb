@@ -2239,7 +2239,7 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            Using frm As New FormulaireQuantitesConditionnements(produitId, "Entrée stock par conditionnement", If(_quantiteEntreeDynamiqueBase > 0D, CType(_quantiteEntreeDynamiqueBase, Decimal?), CType(Nothing, Decimal?)))
+            Using frm As New FormulaireQuantitesConditionnements(produitId, "Entrée stock par conditionnement", If(_quantiteEntreeDynamiqueBase > 0D, CType(_quantiteEntreeDynamiqueBase, Decimal?), CType(Nothing, Decimal?)), Nothing, True, False)
                 If frm.ShowDialog(Me) <> DialogResult.OK Then Return
                 _quantiteEntreeDynamiqueBase = frm.QuantiteBase
                 _resumeEntreeDynamique = frm.RepresentationLisible

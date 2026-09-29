@@ -112,12 +112,12 @@ Namespace DevCommerc8ak
             Dim panelEdition As New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.White, .Padding = New Padding(12)}
             Dim lblNom As New Label() With {.Text = "Nom", .Left = 10, .Top = 16, .AutoSize = True}
             txtNom = New TextBox() With {.Left = 10, .Top = 36, .Width = 220}
-            Dim lblQuantite As New Label() With {.Text = "Quantité équivalente", .Left = 250, .Top = 16, .AutoSize = True}
+            Dim lblQuantite As New Label() With {.Text = "Quantité commerciale", .Left = 250, .Top = 16, .AutoSize = True}
             txtQuantiteEquivalent = New TextBox() With {.Left = 250, .Top = 36, .Width = 120}
-            Dim lblConditionnement As New Label() With {.Text = "Conditionnement", .Left = 390, .Top = 16, .AutoSize = True}
+            Dim lblConditionnement As New Label() With {.Text = "Basé sur", .Left = 390, .Top = 16, .AutoSize = True}
             cmbConditionnement = New ComboBox() With {.Left = 390, .Top = 36, .Width = 170, .DropDownStyle = ComboBoxStyle.DropDownList}
             ChargerOptionsConditionnements()
-            Dim lblUnite As New Label() With {.Text = "Unité legacy", .Left = 580, .Top = 16, .AutoSize = True}
+            Dim lblUnite As New Label() With {.Text = "Référence historique", .Left = 580, .Top = 16, .AutoSize = True}
             cmbUniteEquivalent = New ComboBox() With {.Left = 580, .Top = 36, .Width = 140, .DropDownStyle = ComboBoxStyle.DropDownList}
             cmbUniteEquivalent.Items.Add(New UniteOption("PRINCIPALE", _unitePrincipale & " — unité principale"))
             cmbUniteEquivalent.Items.Add(New UniteOption("SECONDAIRE", _uniteSecondaire & " — unité secondaire"))
@@ -135,7 +135,7 @@ Namespace DevCommerc8ak
             txtPrixVente = New TextBox() With {.Left = 260, .Top = 102, .Width = 120}
             chkActif = New CheckBox() With {.Text = "Actif", .Left = 400, .Top = 82, .AutoSize = True, .Checked = True}
             chkActif.Top = 104
-            lblAide = New Label() With {.Left = 500, .Top = 82, .Width = 290, .Height = 58, .AutoSize = False, .ForeColor = Color.FromArgb(41, 128, 185)}
+            lblAide = New Label() With {.Left = 500, .Top = 82, .Width = 310, .Height = 82, .AutoSize = False, .ForeColor = Color.FromArgb(41, 128, 185)}
             btnNouveau = New Button() With {.Text = "Nouveau", .Left = 10, .Top = 150, .Width = 110, .Height = 34, .BackColor = Color.FromArgb(52, 73, 94), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             btnEnregistrer = New Button() With {.Text = "Enregistrer", .Left = 135, .Top = 150, .Width = 120, .Height = 34, .BackColor = Color.FromArgb(39, 174, 96), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             btnChangerEtat = New Button() With {.Text = "Désactiver", .Left = 270, .Top = 150, .Width = 120, .Height = 34, .BackColor = Color.FromArgb(192, 57, 43), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
@@ -157,9 +157,9 @@ Namespace DevCommerc8ak
             }
             grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "TypeVenteProduitId", .Name = "TypeVenteProduitId", .Visible = False})
             grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "Nom", .HeaderText = "Nom", .Width = 180})
-            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "QuantiteEquivalent", .HeaderText = "Qté équiv.", .Width = 90})
-            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "UniteEquivalentAffichage", .HeaderText = "Unité", .Width = 120})
-            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "ProduitConditionnementId", .HeaderText = "Cond.", .Width = 70})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "QuantiteEquivalent", .HeaderText = "Quantité", .Width = 90})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "UniteEquivalentAffichage", .HeaderText = "Référence historique", .Width = 140})
+            grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "ProduitConditionnementId", .HeaderText = "Conditionnement", .Width = 115})
             grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "ModePrixAffichage", .HeaderText = "Mode prix", .Width = 130})
             grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixVente", .HeaderText = "Prix vente", .Width = 110})
             grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "Actif", .HeaderText = "Actif", .Width = 60})
@@ -199,10 +199,10 @@ Namespace DevCommerc8ak
 
         Private Sub ChargerOptionsConditionnements()
             cmbConditionnement.Items.Clear()
-            cmbConditionnement.Items.Add(New ConditionnementOption(Nothing, "Legacy - non associé", Nothing))
+            cmbConditionnement.Items.Add(New ConditionnementOption(Nothing, "Mode historique - non rattaché au nouveau conditionnement", Nothing))
             For Each c As ProduitConditionnementDTO In _conditionnements.Where(Function(x) x.EstVendable OrElse x.EstUniteBase).OrderByDescending(Function(x) x.FacteurVersBase)
                 Dim libelle As String = If(String.IsNullOrWhiteSpace(c.LibelleUnite), c.CodeUnite, c.LibelleUnite)
-                cmbConditionnement.Items.Add(New ConditionnementOption(c.ProduitConditionnementId, libelle & " = " & c.FacteurVersBase.ToString("0.####") & " base", c))
+                cmbConditionnement.Items.Add(New ConditionnementOption(c.ProduitConditionnementId, libelle & " — 1 " & libelle & " = " & c.FacteurVersBase.ToString("0.####") & " base", c))
             Next
             cmbConditionnement.SelectedIndex = 0
         End Sub
@@ -227,6 +227,7 @@ Namespace DevCommerc8ak
         Private Sub ConditionnementSelectionne(sender As Object, e As EventArgs)
             Dim dynamique As Boolean = (ObtenirConditionnementSelectionne() IsNot Nothing)
             cmbUniteEquivalent.Enabled = Not dynamique
+            MettreAJourAideType()
             RecalculerPrixDepuisCoefficient(sender, e)
         End Sub
 
@@ -246,6 +247,7 @@ Namespace DevCommerc8ak
             _typeResultat = Nothing
             txtNom.Clear()
             txtQuantiteEquivalent.Clear()
+            SelectionnerConditionnement(Nothing)
             SelectionnerTypeUnite("SECONDAIRE")
             cmbModePrix.SelectedItem = "FIXE"
             txtCoefficient.Clear()
@@ -254,7 +256,7 @@ Namespace DevCommerc8ak
             chkActif.Checked = True
             btnEnregistrer.Text = "Enregistrer"
             btnChangerEtat.Text = "Désactiver"
-            lblAide.Text = "Mode COEFFICIENT : le prix final est calculé sur le coût équivalent de la quantité."
+            MettreAJourAideType()
         End Sub
 
         Private Sub ChargerType(item As TypeVenteProduitDTO)
@@ -274,7 +276,7 @@ Namespace DevCommerc8ak
             chkActif.Checked = item.Actif
             btnEnregistrer.Text = If(_typeSelectionneId <> 0, "Modifier", "Enregistrer")
             btnChangerEtat.Text = If(item.Actif, "Désactiver", "Activer")
-            lblAide.Text = item.ModePrixAffichage
+            MettreAJourAideType()
         End Sub
 
         Private Sub ChargerSelection(sender As Object, e As EventArgs)
@@ -326,19 +328,19 @@ Namespace DevCommerc8ak
             Dim modePrix As String = Convert.ToString(cmbModePrix.SelectedItem)
             txtCoefficient.Enabled = String.Equals(modePrix, "COEFFICIENT", StringComparison.OrdinalIgnoreCase)
             If Not txtCoefficient.Enabled Then
-                lblAide.Text = "Mode FIXE : le prix final saisi sera utilisé tel quel."
+                MettreAJourAideType()
                 Return
             End If
 
             Dim coefficient As Decimal
             If Not TenterLireCoefficient(txtCoefficient.Text, coefficient) Then
-                lblAide.Text = "Saisissez un coefficient direct (1.25) ou un pourcentage (25)."
+                MettreAJourAideType("Saisissez un coefficient direct (1.25) ou un pourcentage (25).")
                 Return
             End If
 
             Dim quantiteEquivalent As Decimal = Math.Max(0D, LireDecimal(txtQuantiteEquivalent.Text))
             If quantiteEquivalent <= 0D Then
-                lblAide.Text = "Saisissez une quantité équivalente supérieure à zéro."
+                MettreAJourAideType("Saisissez une quantité commerciale supérieure à zéro.")
                 Return
             End If
 
@@ -346,7 +348,32 @@ Namespace DevCommerc8ak
             Dim coutEquivalent As Decimal = _prixAchat * (quantiteBase / _conversionUnite)
             Dim prixFinal As Decimal = Math.Round(coutEquivalent * coefficient, 2)
             txtPrixVente.Text = prixFinal.ToString("N2")
-            lblAide.Text = "Retire " & quantiteBase.ToString("0.####") & " base. Prix calculé sur un coût équivalent de " & coutEquivalent.ToString("N2")
+            MettreAJourAideType("Prix calculé sur un coût équivalent de " & coutEquivalent.ToString("N2"))
+        End Sub
+
+        Private Sub MettreAJourAideType(Optional complement As String = Nothing)
+            Dim quantiteEquivalent As Decimal = Math.Max(0D, LireDecimal(txtQuantiteEquivalent.Text))
+            Dim conditionnement As ProduitConditionnementDTO = ObtenirConditionnementSelectionne()
+            Dim lignes As New List(Of String)()
+
+            If conditionnement Is Nothing Then
+                lignes.Add("Mode historique : ce type reste calculé avec l'ancienne configuration du produit.")
+            Else
+                ' Un type de vente est une règle commerciale : demi-carton,
+                ' douzaine, paquet 10+1, promotion, etc. Le conditionnement
+                ' physique sert uniquement de base de calcul vers QuantiteBase.
+                lignes.Add("Basé sur : " & LibelleConditionnement(conditionnement))
+            End If
+
+            If quantiteEquivalent > 0D Then
+                Dim quantiteBase As Decimal = CalculerQuantiteBaseTypeCourant(quantiteEquivalent)
+                lignes.Add("Équivalent calculé : " & quantiteBase.ToString("0.####") & " " & LibelleUniteBase())
+            Else
+                lignes.Add("Saisissez la quantité commerciale du type de vente.")
+            End If
+
+            If Not String.IsNullOrWhiteSpace(complement) Then lignes.Add(complement)
+            lblAide.Text = String.Join(Environment.NewLine, lignes)
         End Sub
 
         Private Function CalculerQuantiteBaseTypeCourant(quantiteEquivalent As Decimal) As Decimal
@@ -367,6 +394,19 @@ Namespace DevCommerc8ak
             End If
 
             Return "SECONDAIRE"
+        End Function
+
+        Private Shared Function LibelleConditionnement(conditionnement As ProduitConditionnementDTO) As String
+            If conditionnement Is Nothing Then Return "conditionnement"
+            If Not String.IsNullOrWhiteSpace(conditionnement.LibelleUnite) Then Return conditionnement.LibelleUnite.Trim()
+            If Not String.IsNullOrWhiteSpace(conditionnement.SymboleUnite) Then Return conditionnement.SymboleUnite.Trim()
+            Return If(conditionnement.CodeUnite, "conditionnement").Trim()
+        End Function
+
+        Private Function LibelleUniteBase() As String
+            Dim baseUnite As ProduitConditionnementDTO = _conditionnements.FirstOrDefault(Function(c) c.EstUniteBase)
+            If baseUnite Is Nothing Then baseUnite = _conditionnements.OrderBy(Function(c) c.FacteurVersBase).FirstOrDefault()
+            Return LibelleConditionnement(baseUnite)
         End Function
 
         Private Sub SelectionnerTypeUnite(typeUnite As String)
