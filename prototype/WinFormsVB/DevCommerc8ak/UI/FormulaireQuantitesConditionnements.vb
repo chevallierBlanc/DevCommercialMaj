@@ -129,9 +129,9 @@ Namespace DevCommerc8ak
                 _labelsSousTotaux(conditionnement.ProduitConditionnementId) = lblSousTotal
 
                 pnlSaisie.RowStyles.Add(New RowStyle(SizeType.Absolute, 34))
-                pnlSaisie.Controls.Add(New Label() With {.Text = Libelle(conditionnement) & " :", .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}, 0, rowIndex)
+                pnlSaisie.Controls.Add(New Label() With {.Text = LibelleConditionnement(conditionnement) & " :", .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}, 0, rowIndex)
                 pnlSaisie.Controls.Add(txt, 1, rowIndex)
-                pnlSaisie.Controls.Add(New Label() With {.Text = "1 " & Libelle(conditionnement) & " = " & FormaterDecimal(conditionnement.FacteurVersBase) & " " & LibelleUniteBase(), .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}, 2, rowIndex)
+                pnlSaisie.Controls.Add(New Label() With {.Text = "1 " & LibelleConditionnement(conditionnement) & " = " & FormaterDecimal(conditionnement.FacteurVersBase) & " " & LibelleUniteBase(), .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}, 2, rowIndex)
                 pnlSaisie.Controls.Add(lblSousTotal, 3, rowIndex)
                 rowIndex += 1
             Next
@@ -237,7 +237,7 @@ Namespace DevCommerc8ak
             Throw New InvalidOperationException("Quantité invalide : " & texte)
         End Function
 
-        Private Shared Function Libelle(conditionnement As ProduitConditionnementDTO) As String
+        Private Shared Function LibelleConditionnement(conditionnement As ProduitConditionnementDTO) As String
             If conditionnement Is Nothing Then Return String.Empty
             If Not String.IsNullOrWhiteSpace(conditionnement.LibelleUnite) Then Return conditionnement.LibelleUnite
             If Not String.IsNullOrWhiteSpace(conditionnement.SymboleUnite) Then Return conditionnement.SymboleUnite
@@ -247,7 +247,10 @@ Namespace DevCommerc8ak
         Private Function LibelleUniteBase() As String
             Dim baseUnite As ProduitConditionnementDTO = _conditionnements.FirstOrDefault(Function(c) c.EstUniteBase)
             If baseUnite Is Nothing Then baseUnite = _conditionnements.OrderBy(Function(c) c.FacteurVersBase).FirstOrDefault()
-            Dim libelle As String = Libelle(baseUnite)
+            ' L'unité de base est déterminée depuis la configuration dynamique
+            ' du produit. On lit son libellé affichable sans modifier la
+            ' QuantiteBase transactionnelle.
+            Dim libelle As String = LibelleConditionnement(baseUnite)
             Return If(String.IsNullOrWhiteSpace(libelle), "base", libelle)
         End Function
 
