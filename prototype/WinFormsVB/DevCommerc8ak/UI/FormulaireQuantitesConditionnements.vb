@@ -26,6 +26,7 @@ Namespace DevCommerc8ak
         Private ReadOnly lblResume As Label
         Private ReadOnly lblTotal As Label
         Private ReadOnly lblEcart As Label
+        Private ReadOnly lblRepartitionEcart As Label
         Private ReadOnly lblResultat As Label
         Private ReadOnly pnlSaisie As TableLayoutPanel
 
@@ -61,7 +62,7 @@ Namespace DevCommerc8ak
             Dim root As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 4, .Padding = New Padding(16)}
             root.RowStyles.Add(New RowStyle(SizeType.Absolute, 58))
             root.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
-            root.RowStyles.Add(New RowStyle(SizeType.Absolute, 132))
+            root.RowStyles.Add(New RowStyle(SizeType.Absolute, 158))
             root.RowStyles.Add(New RowStyle(SizeType.Absolute, 54))
             Controls.Add(root)
 
@@ -80,15 +81,17 @@ Namespace DevCommerc8ak
             pnlSaisie.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25))
             root.Controls.Add(pnlSaisie, 0, 1)
 
-            Dim pnlResume As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 4, .BackColor = Color.White, .Padding = New Padding(14)}
+            Dim pnlResume As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 5, .BackColor = Color.White, .Padding = New Padding(14)}
             lblTotal = New Label() With {.Dock = DockStyle.Fill, .Font = New Font("Segoe UI", 12.0F, FontStyle.Bold), .ForeColor = Color.FromArgb(14, 116, 144)}
             lblResume = New Label() With {.Dock = DockStyle.Fill, .ForeColor = Color.FromArgb(75, 85, 99)}
             lblEcart = New Label() With {.Dock = DockStyle.Fill, .ForeColor = Color.FromArgb(75, 85, 99)}
+            lblRepartitionEcart = New Label() With {.Dock = DockStyle.Fill, .ForeColor = Color.FromArgb(75, 85, 99)}
             lblResultat = New Label() With {.Dock = DockStyle.Fill, .Font = New Font("Segoe UI", 10.0F, FontStyle.Bold), .ForeColor = Color.FromArgb(75, 85, 99)}
             pnlResume.Controls.Add(lblTotal, 0, 0)
             pnlResume.Controls.Add(lblResume, 0, 1)
             pnlResume.Controls.Add(lblEcart, 0, 2)
-            pnlResume.Controls.Add(lblResultat, 0, 3)
+            pnlResume.Controls.Add(lblRepartitionEcart, 0, 3)
+            pnlResume.Controls.Add(lblResultat, 0, 4)
             root.Controls.Add(pnlResume, 0, 2)
 
             Dim pnlActions As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft, .WrapContents = False}
@@ -174,6 +177,7 @@ Namespace DevCommerc8ak
                 lblTotal.Text = "STOCK BASE : saisie invalide"
                 lblResume.Text = ex.Message
                 lblEcart.Text = String.Empty
+                lblRepartitionEcart.Text = String.Empty
                 lblResultat.Text = String.Empty
             End Try
         End Sub
@@ -199,6 +203,7 @@ Namespace DevCommerc8ak
         Private Sub AfficherEcartSiNecessaire()
             If Not _stockReferenceBase.HasValue Then
                 lblEcart.Text = String.Empty
+                lblRepartitionEcart.Text = String.Empty
                 lblResultat.Text = String.Empty
                 Return
             End If
@@ -207,17 +212,38 @@ Namespace DevCommerc8ak
             ' Les cartons, paquets ou sacs ne servent qu'à aider l'utilisateur à compter.
             Dim ecart As Decimal = QuantiteBase - _stockReferenceBase.Value
             lblEcart.Text = "STOCK THÉORIQUE : " & FormaterDecimal(_stockReferenceBase.Value) & " " & LibelleUniteBase() & " | ÉCART : " & FormaterDecimal(ecart) & " " & LibelleUniteBase()
+            lblRepartitionEcart.Text = "RÉPARTITION ÉCART : " & FormaterEcartDynamique(ecart)
             If ecart = 0D Then
                 lblResultat.Text = "RÉSULTAT : CONFORME"
                 lblResultat.ForeColor = Color.FromArgb(34, 197, 94)
+                lblRepartitionEcart.ForeColor = Color.FromArgb(34, 197, 94)
             ElseIf ecart < 0D Then
                 lblResultat.Text = "RÉSULTAT : MANQUE"
                 lblResultat.ForeColor = Color.FromArgb(192, 57, 43)
+                lblRepartitionEcart.ForeColor = Color.FromArgb(192, 57, 43)
             Else
                 lblResultat.Text = "RÉSULTAT : SURPLUS"
                 lblResultat.ForeColor = Color.FromArgb(14, 116, 144)
+                lblRepartitionEcart.ForeColor = Color.FromArgb(14, 116, 144)
             End If
         End Sub
+
+        Private Function FormaterEcartDynamique(ecartBase As Decimal) As String
+            If ecartBase = 0D Then
+                Return "0 " & LibelleUniteBase()
+            End If
+
+            ' L'écart reste calculé en QuantiteBase. Cette méthode ne change
+            ' pas la valeur métier : elle ajoute seulement une lecture humaine
+            ' en utilisant les conditionnements actifs du produit.
+            Dim signe As String = If(ecartBase < 0D, "-", "+")
+            Dim decomposition As String = ConversionUniteService.DecomposerStock(Math.Abs(ecartBase), _conditionnements)
+            If String.IsNullOrWhiteSpace(decomposition) Then
+                Return signe & FormaterDecimal(Math.Abs(ecartBase)) & " " & LibelleUniteBase()
+            End If
+
+            Return signe & decomposition.Replace(" + ", " " & signe)
+        End Function
 
         Private Sub Valider(sender As Object, e As EventArgs)
             Try

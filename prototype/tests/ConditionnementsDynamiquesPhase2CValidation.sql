@@ -31,6 +31,16 @@ DECLARE @SacKg DECIMAL(18,4) = 50 * @Kg;
 IF @SachetKg <> 5 OR @SacKg <> 50
     RAISERROR('CAS D invalide : Sac/Sachet -> Kg.', 16, 1);
 
+DECLARE @SacRiz25 DECIMAL(18,4) = 25 * @Kg;
+DECLARE @SachetRiz5 DECIMAL(18,4) = 5 * @Kg;
+DECLARE @ComptageRiz DECIMAL(18,4) = (10 * @SacRiz25) + (8 * @SachetRiz5);
+DECLARE @StockTheoriqueRiz DECIMAL(18,4) = 315;
+DECLARE @EcartRiz DECIMAL(18,4) = @ComptageRiz - @StockTheoriqueRiz;
+DECLARE @RepartitionEcartSacRiz DECIMAL(18,4) = FLOOR(ABS(@EcartRiz) / @SacRiz25);
+DECLARE @RepartitionEcartResteRiz DECIMAL(18,4) = ABS(@EcartRiz) - (@RepartitionEcartSacRiz * @SacRiz25);
+IF @ComptageRiz <> 290 OR @EcartRiz <> -25 OR @RepartitionEcartSacRiz <> 1 OR @RepartitionEcartResteRiz <> 0
+    RAISERROR('CAS D2 invalide : Riz 10 sacs + 8 sachets doit donner 290 Kg et ecart -1 Sac.', 16, 1);
+
 DECLARE @DemiCarton DECIMAL(18,4) = 0.5 * @Carton288;
 DECLARE @Douzaine DECIMAL(18,4) = 12 * @Piece;
 DECLARE @Paquet10Plus1 DECIMAL(18,4) = 11 * @Paquet12;
@@ -45,6 +55,18 @@ IF @ComptageInventaire <> @StockTheorique
 DECLARE @Approvisionnement DECIMAL(18,4) = 10 * @Carton288;
 IF @Approvisionnement <> 2880
     RAISERROR('CAS G invalide : approvisionnement 10 Cartons.', 16, 1);
+
+DECLARE @ApprovisionnementRiz DECIMAL(18,4) = 10 * @SacRiz25;
+IF @ApprovisionnementRiz <> 250
+    RAISERROR('CAS G2 invalide : approvisionnement 10 Sacs de 25 Kg.', 16, 1);
+
+DECLARE @FractionAutorisee DECIMAL(18,4) = 0.5 * @SacRiz25;
+IF @FractionAutorisee <> 12.5
+    RAISERROR('CAS G3 invalide : 0,5 Sac autorise doit donner 12,5 Kg.', 16, 1);
+
+DECLARE @FractionInterditeEstRefusee BIT = CASE WHEN 0.5 <> FLOOR(0.5) THEN 1 ELSE 0 END;
+IF @FractionInterditeEstRefusee <> 1
+    RAISERROR('CAS G4 invalide : une fraction physique interdite doit etre detectee.', 16, 1);
 
 DECLARE @Sortie DECIMAL(18,4) = 2 * @Paquet12;
 IF @Sortie <> 24

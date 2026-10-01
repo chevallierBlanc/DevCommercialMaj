@@ -32,6 +32,7 @@ Namespace DevCommerc8ak
         Private _produits As DataTable
         Private _conditionnements As List(Of ProduitConditionnementDTO)
         Private _selectionId As Integer
+        Private ReadOnly _produitInitialId As Integer?
 
         Private Class ComboItem(Of T)
             Public Sub New(libelle As String, valeur As T)
@@ -47,7 +48,8 @@ Namespace DevCommerc8ak
             End Function
         End Class
 
-        Public Sub New()
+        Public Sub New(Optional produitInitialId As Integer? = Nothing)
+            _produitInitialId = produitInitialId
             Text = "Conditionnements produits"
             BackColor = Color.FromArgb(245, 247, 250)
             MinimumSize = New Size(1080, 760)
@@ -63,7 +65,9 @@ Namespace DevCommerc8ak
             header.Controls.Add(New Label() With {.Text = "Définir la hiérarchie physique utilisée par le moteur de conversion vers la quantité base.", .Font = New Font("Segoe UI", 10), .ForeColor = Color.FromArgb(107, 114, 128), .AutoSize = True, .Left = 20, .Top = 50})
 
             Dim edition As New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.White, .Padding = New Padding(14)}
-            cmbProduit = New ComboBox() With {.Left = 12, .Top = 36, .Width = 330, .DropDownStyle = ComboBoxStyle.DropDownList}
+            cmbProduit = New ComboBox() With {.Left = 12, .Top = 36, .Width = 330, .DropDownStyle = ComboBoxStyle.DropDown}
+            cmbProduit.AutoCompleteMode = AutoCompleteMode.SuggestAppend
+            cmbProduit.AutoCompleteSource = AutoCompleteSource.CustomSource
             cmbUnite = New ComboBox() With {.Left = 360, .Top = 36, .Width = 170, .DropDownStyle = ComboBoxStyle.DropDownList}
             cmbParent = New ComboBox() With {.Left = 550, .Top = 36, .Width = 210, .DropDownStyle = ComboBoxStyle.DropDownList}
             txtFacteurParent = New TextBox() With {.Left = 780, .Top = 36, .Width = 90}
@@ -105,6 +109,7 @@ Namespace DevCommerc8ak
             grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "EstVendable", .HeaderText = "Vente autorisée", .Width = 105})
             grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "AutoriseFraction", .HeaderText = "Fraction autorisée", .Width = 115})
             grid.Columns.Add(New DataGridViewCheckBoxColumn() With {.DataPropertyName = "EstActif", .HeaderText = "Actif", .Width = 60})
+            AppliquerStyleGrilleCommercialPro(grid)
             ConfigurerAideSaisie()
 
             root.Controls.Add(header, 0, 0)
@@ -135,6 +140,40 @@ Namespace DevCommerc8ak
             cmbProduit.DataSource = _produits
             cmbProduit.DisplayMember = "Libelle"
             cmbProduit.ValueMember = "ProduitId"
+            ConfigurerRechercheProduit()
+            If _produitInitialId.HasValue Then
+                cmbProduit.SelectedValue = _produitInitialId.Value
+            End If
+        End Sub
+
+        Private Sub ConfigurerRechercheProduit()
+            Dim source As New AutoCompleteStringCollection()
+            If _produits IsNot Nothing Then
+                For Each row As DataRow In _produits.Rows
+                    If row IsNot Nothing AndAlso _produits.Columns.Contains("Libelle") AndAlso Not row.IsNull("Libelle") Then
+                        source.Add(Convert.ToString(row("Libelle")))
+                    End If
+                Next
+            End If
+            cmbProduit.AutoCompleteCustomSource = source
+        End Sub
+
+        Private Shared Sub AppliquerStyleGrilleCommercialPro(grille As DataGridView)
+            If grille Is Nothing Then Return
+            grille.BorderStyle = BorderStyle.None
+            grille.EnableHeadersVisualStyles = False
+            grille.GridColor = Color.FromArgb(220, 224, 229)
+            grille.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+            grille.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245)
+            grille.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(31, 41, 55)
+            grille.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
+            grille.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(245, 245, 245)
+            grille.ColumnHeadersHeight = 38
+            grille.DefaultCellStyle.Font = New Font("Segoe UI", 9.5F)
+            grille.DefaultCellStyle.SelectionBackColor = Color.FromArgb(232, 234, 246)
+            grille.DefaultCellStyle.SelectionForeColor = Color.FromArgb(52, 73, 94)
+            grille.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252)
+            grille.RowTemplate.Height = 35
         End Sub
 
         Private Sub ChargerUnites()

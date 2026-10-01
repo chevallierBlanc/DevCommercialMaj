@@ -51,6 +51,7 @@ Namespace DevCommerc8ak
         Private ReadOnly txtQuantiteEntree As TextBox
         Private ReadOnly txtQuantiteSecondaireEntree As TextBox
         Private ReadOnly btnQuantitesConditionnementsEntree As Button
+        Private ReadOnly btnConfigurerConditionnementsEntree As Button
         Private ReadOnly lblQuantitesConditionnementsEntree As Label
         Private ReadOnly lblStockActuel As Label
         Private ReadOnly lblStockActuelPiece As Label
@@ -317,14 +318,15 @@ Namespace DevCommerc8ak
             ' layoutEntree.Controls.Add(cardProduit)
 
             ' Card 2: Unite
-            Dim cardUnite As Panel = CreateCard(600, 235, "UNITÉ & CONVERSION")
+            Dim cardUnite As Panel = CreateCard(600, 235, "ENTRÉE / CONDITIONNEMENTS")
             cmbUniteBase = New ComboBox() With {.Left = 160, .Top = 45, .Width = 150, .DropDownStyle = ComboBoxStyle.DropDownList}
             cmbUniteBase.Items.AddRange(New Object() {"Carton", "Sac", "Paquet", "Farde", "Plateau", "Seau", "Bidon", "Bouteille", "Boîte", "Pièce"})
             txtNbUniteParBase = New TextBox() With {.Left = 160, .Top = 75, .Width = 100}
             txtQuantiteEntree = New TextBox() With {.Left = 160, .Top = 105, .Width = 100}
             txtQuantiteSecondaireEntree = New TextBox() With {.Left = 160, .Top = 135, .Width = 100}
-            btnQuantitesConditionnementsEntree = New Button() With {.Text = "Conditionnements", .Left = 270, .Top = 105, .Width = 140, .Height = 26, .BackColor = ColorSecondary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
-            lblQuantitesConditionnementsEntree = New Label() With {.Left = 270, .Top = 136, .Width = 300, .Height = 32, .ForeColor = ColorSecondary}
+            btnQuantitesConditionnementsEntree = New Button() With {.Text = "SAISIR PAR CONDITIONNEMENTS", .Left = 270, .Top = 105, .Width = 210, .Height = 26, .BackColor = ColorSecondary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            btnConfigurerConditionnementsEntree = New Button() With {.Text = "CONFIGURER LES CONDITIONNEMENTS", .Left = 270, .Top = 135, .Width = 255, .Height = 28, .BackColor = ColorPrimary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            lblQuantitesConditionnementsEntree = New Label() With {.Left = 270, .Top = 166, .Width = 300, .Height = 24, .ForeColor = ColorSecondary}
             cmbTypeGestionStockEntree = New ComboBox() With {.Left = 455, .Top = 45, .Width = 125, .DropDownStyle = ComboBoxStyle.DropDownList}
             cmbTypeGestionStockEntree.Items.AddRange(New Object() {"UNITE", "MESURE"})
             cmbTypeGestionStockEntree.SelectedItem = "UNITE"
@@ -335,18 +337,18 @@ Namespace DevCommerc8ak
             txtContenuUniteSecondaireEntree = New TextBox() With {.Left = 455, .Top = 135, .Width = 125}
             lblStockActuel = New Label() With {.Left = 20, .Top = 170, .AutoSize = True, .ForeColor = ColorSecondary}
             lblStockActuelPiece = New Label() With {.Left = 20, .Top = 190, .AutoSize = True}
-            lblStockApres = New Label() With {.Left = 300, .Top = 170, .AutoSize = True, .ForeColor = ColorAccent}
-            lblStockApresPiece = New Label() With {.Left = 300, .Top = 190, .AutoSize = True}
+            lblStockApres = New Label() With {.Left = 300, .Top = 194, .AutoSize = True, .ForeColor = ColorAccent}
+            lblStockApresPiece = New Label() With {.Left = 300, .Top = 212, .AutoSize = True}
             cardUnite.Controls.AddRange(New Control() {
-                New Label() With {.Text = "Unité base", .Left = 20, .Top = 48, .AutoSize = True},
-                New Label() With {.Text = "Nb unités/base", .Left = 20, .Top = 78, .AutoSize = True},
+                New Label() With {.Text = "Unité achat legacy", .Left = 20, .Top = 48, .AutoSize = True},
+                New Label() With {.Text = "Équiv. legacy", .Left = 20, .Top = 78, .AutoSize = True},
                 New Label() With {.Text = "Quantité entrée", .Left = 20, .Top = 108, .AutoSize = True},
-                New Label() With {.Text = "Qté secondaire bonus", .Left = 20, .Top = 138, .AutoSize = True},
+                New Label() With {.Text = "Qté complément legacy", .Left = 20, .Top = 138, .AutoSize = True},
                 New Label() With {.Text = "Mode stock", .Left = 300, .Top = 48, .AutoSize = True},
                 New Label() With {.Text = "Unité mesure", .Left = 300, .Top = 78, .AutoSize = True},
-                New Label() With {.Text = "Contenu principal", .Left = 300, .Top = 108, .AutoSize = True},
-                New Label() With {.Text = "Contenu secondaire", .Left = 300, .Top = 138, .AutoSize = True},
-                cmbUniteBase, txtNbUniteParBase, txtQuantiteEntree, txtQuantiteSecondaireEntree, btnQuantitesConditionnementsEntree, lblQuantitesConditionnementsEntree, cmbTypeGestionStockEntree, cmbUniteMesureStockEntree, txtContenuUnitePrincipaleEntree, txtContenuUniteSecondaireEntree, lblStockActuel, lblStockActuelPiece, lblStockApres, lblStockApresPiece
+                New Label() With {.Text = "Contenu princ. legacy", .Left = 300, .Top = 108, .AutoSize = True},
+                New Label() With {.Text = "Contenu sec. legacy", .Left = 300, .Top = 138, .AutoSize = True},
+                cmbUniteBase, txtNbUniteParBase, txtQuantiteEntree, txtQuantiteSecondaireEntree, btnQuantitesConditionnementsEntree, btnConfigurerConditionnementsEntree, lblQuantitesConditionnementsEntree, cmbTypeGestionStockEntree, cmbUniteMesureStockEntree, txtContenuUnitePrincipaleEntree, txtContenuUniteSecondaireEntree, lblStockActuel, lblStockActuelPiece, lblStockApres, lblStockApresPiece
             })
             'layoutEntree.Controls.Add(cardUnite)
 
@@ -736,6 +738,7 @@ Namespace DevCommerc8ak
             AddHandler txtQuantiteEntree.TextChanged, AddressOf RecalculerStock
             AddHandler txtQuantiteSecondaireEntree.TextChanged, AddressOf RecalculerStock
             AddHandler btnQuantitesConditionnementsEntree.Click, AddressOf OuvrirQuantitesConditionnementsEntree
+            AddHandler btnConfigurerConditionnementsEntree.Click, AddressOf OuvrirConfigurationConditionnementsEntree
             AddHandler txtPrixAchat.TextChanged, AddressOf RecalculerPrixAuto
             AddHandler cmbDevise.SelectedIndexChanged, AddressOf DeviseOuPrixAchatChange
             AddHandler txtCoefficientInput.TextChanged, AddressOf CoefficientInputChange
@@ -2248,6 +2251,24 @@ Namespace DevCommerc8ak
                 txtQuantiteSecondaireEntree.Text = "0"
                 RecalculerStock(Nothing, EventArgs.Empty)
             End Using
+        End Sub
+
+        Private Sub OuvrirConfigurationConditionnementsEntree(sender As Object, e As EventArgs)
+            Dim produitId As Integer = ObtenirProduitEntreeSelectionneId()
+            If produitId <= 0 Then
+                MessageBox.Show("Sélectionnez un produit existant avant de configurer ses conditionnements.", "Conditionnements", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+
+            ' Stock Entrée reste un écran transactionnel. La structure physique
+            ' permanente du produit est déléguée au formulaire central des
+            ' conditionnements afin de garder une seule source de vérité.
+            Using frm As New FormulaireConditionnementsProduit(produitId)
+                frm.ShowDialog(Me)
+            End Using
+            _conditionnementsCache.Remove(produitId)
+            ReinitialiserQuantiteDynamiqueEntree()
+            RecalculerStock(Nothing, EventArgs.Empty)
         End Sub
 
         Private Sub ReinitialiserQuantiteDynamiqueEntree()
