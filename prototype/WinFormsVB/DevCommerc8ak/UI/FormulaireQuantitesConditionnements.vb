@@ -45,10 +45,19 @@ Namespace DevCommerc8ak
             _stockReferenceBase = stockReferenceBase
             _filtrerAchetable = filtrerAchetable
             _filtrerVendable = filtrerVendable
-            _conditionnements = _service.ListerParProduit(produitId, True).
+            ' Le contexte de l'opération décide des conditionnements proposés :
+            ' achat=achetables, vente=vendables, inventaire/perte=tous les actifs.
+            Dim conditionnementsSource As List(Of ProduitConditionnementDTO)
+            If _filtrerAchetable Then
+                conditionnementsSource = _service.ListerPourAchat(produitId)
+            ElseIf _filtrerVendable Then
+                conditionnementsSource = _service.ListerPourVente(produitId)
+            Else
+                conditionnementsSource = _service.ListerPourOperationPhysique(produitId)
+            End If
+
+            _conditionnements = conditionnementsSource.
                 Where(Function(c) c.EstActif AndAlso c.FacteurVersBase > 0D).
-                Where(Function(c) Not _filtrerAchetable OrElse c.EstAchetable).
-                Where(Function(c) Not _filtrerVendable OrElse c.EstVendable).
                 OrderByDescending(Function(c) c.FacteurVersBase).
                 ToList()
 

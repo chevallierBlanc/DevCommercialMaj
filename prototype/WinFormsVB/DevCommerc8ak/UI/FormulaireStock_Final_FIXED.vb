@@ -1932,7 +1932,13 @@ Namespace DevCommerc8ak
             Dim quantiteEquivalent As Decimal = typeChoisi.QuantiteEquivalent
             ' Conversion centralisée : la sortie manuelle doit retirer la même
             ' quantité base qu'une vente normale pour un même type commercial.
-            Dim quantiteBase As Decimal = ConversionUniteService.CalculerQuantiteBase(qte, typeChoisi)
+            Dim quantiteBase As Decimal
+            Try
+                quantiteBase = ConversionUniteService.CalculerQuantiteBase(qte, typeChoisi)
+            Catch ex As InvalidOperationException
+                MessageBox.Show(ex.Message, "Quantité invalide", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return
+            End Try
             Dim stock As Decimal = service.AfficherQteProduitSelect(produitId)
 
 
@@ -2139,7 +2145,13 @@ Namespace DevCommerc8ak
 
             ' Ne pas recalculer localement les règles Demi/Quart/Douzaine :
             ' TypeVenteDTO porte déjà l'équivalent base fourni par le moteur.
-            Dim quantiteReelle As Decimal = ConversionUniteService.CalculerQuantiteBase(qte, typeChoisi)
+            Dim quantiteReelle As Decimal
+            Try
+                quantiteReelle = ConversionUniteService.CalculerQuantiteBase(qte, typeChoisi)
+            Catch ex As InvalidOperationException
+                lblTotalReel.Text = ex.Message
+                Return
+            End Try
             lblTotalReel.Text = "Total réel: " & FormaterQuantiteReferenceSortie(quantiteReelle) & " " & ObtenirUniteReferenceSortie()
         End Sub
 
@@ -2236,9 +2248,9 @@ Namespace DevCommerc8ak
                 MessageBox.Show("Sélectionnez un produit existant déjà configuré avant d'utiliser les conditionnements dynamiques.", "Conditionnements", MessageBoxButtons.OK, MessageBoxIcon.Information)
                 Return
             End If
-            Dim conditionnements As List(Of ProduitConditionnementDTO) = ObtenirConditionnementsProduit(produitId)
+            Dim conditionnements As List(Of ProduitConditionnementDTO) = _conditionnementService.ListerPourAchat(produitId)
             If conditionnements.Count = 0 Then
-                MessageBox.Show("Aucun conditionnement dynamique actif n'est configuré pour ce produit.", "Conditionnements", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                MessageBox.Show("Aucun conditionnement achetable actif n'est configuré pour ce produit.", "Conditionnements", MessageBoxButtons.OK, MessageBoxIcon.Information)
                 Return
             End If
 
@@ -2280,7 +2292,7 @@ Namespace DevCommerc8ak
         Private Function ObtenirConditionnementsProduit(produitId As Integer) As List(Of ProduitConditionnementDTO)
             If produitId <= 0 Then Return New List(Of ProduitConditionnementDTO)()
             If Not _conditionnementsCache.ContainsKey(produitId) Then
-                _conditionnementsCache(produitId) = _conditionnementService.ListerParProduit(produitId, True)
+                _conditionnementsCache(produitId) = _conditionnementService.ListerPourOperationPhysique(produitId)
             End If
             Return _conditionnementsCache(produitId)
         End Function

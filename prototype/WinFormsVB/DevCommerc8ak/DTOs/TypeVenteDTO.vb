@@ -17,6 +17,7 @@ Namespace DevCommerc8ak
         Public Property Actif As Boolean
         Public Property EstPersonnalise As Boolean
         Public Property LibelleAffichage As String
+        Public Property AutoriseFraction As Boolean = True
 
         Public ReadOnly Property NomAffichage As String
             Get

@@ -53,7 +53,8 @@ Namespace DevCommerc8ak
                     .Coefficient = coeffGros,
                     .PrixVente = prixGros,
                     .Actif = True,
-                    .EstPersonnalise = False
+                    .EstPersonnalise = False,
+                    .AutoriseFraction = True
                 })
             End If
 
@@ -67,7 +68,8 @@ Namespace DevCommerc8ak
                     .Coefficient = coeffGros,
                     .PrixVente = prixDemi,
                     .Actif = True,
-                    .EstPersonnalise = False
+                    .EstPersonnalise = False,
+                    .AutoriseFraction = True
                 })
             End If
 
@@ -81,7 +83,8 @@ Namespace DevCommerc8ak
                     .Coefficient = coeffDetail,
                     .PrixVente = prixQuart,
                     .Actif = True,
-                    .EstPersonnalise = False
+                    .EstPersonnalise = False,
+                    .AutoriseFraction = True
                 })
             End If
 
@@ -96,7 +99,8 @@ Namespace DevCommerc8ak
                     .PrixVente = prixPiece,
                     .Actif = True,
                     .EstPersonnalise = False,
-                    .LibelleAffichage = libelleDetail
+                    .LibelleAffichage = libelleDetail,
+                    .AutoriseFraction = True
                 })
             End If
 
@@ -110,7 +114,8 @@ Namespace DevCommerc8ak
                     .Coefficient = coeffDetail,
                     .PrixVente = prixDouzaine,
                     .Actif = True,
-                    .EstPersonnalise = False
+                    .EstPersonnalise = False,
+                    .AutoriseFraction = True
                 })
             End If
 
@@ -124,7 +129,8 @@ Namespace DevCommerc8ak
                     .Coefficient = CalculerCoefficient(prixAchat, prixSpecial),
                     .PrixVente = prixSpecial,
                     .Actif = True,
-                    .EstPersonnalise = False
+                    .EstPersonnalise = False,
+                    .AutoriseFraction = True
                 })
                 liste.Add(New TypeVenteDTO With {
                     .Nom = "promo",
@@ -135,7 +141,8 @@ Namespace DevCommerc8ak
                     .Coefficient = CalculerCoefficient(prixAchat, prixSpecial),
                     .PrixVente = prixSpecial,
                     .Actif = True,
-                    .EstPersonnalise = False
+                    .EstPersonnalise = False,
+                    .AutoriseFraction = True
                 })
             End If
 
@@ -177,7 +184,7 @@ Namespace DevCommerc8ak
 
             Dim conditionnementsParId As Dictionary(Of Integer, ProduitConditionnementDTO) = Nothing
             If typesPersonnalises.Any(Function(x) x.ProduitConditionnementId.HasValue) Then
-                conditionnementsParId = _produitConditionnementService.ListerParProduit(produitId, True).
+                conditionnementsParId = _produitConditionnementService.ListerPourVente(produitId).
                     ToDictionary(Function(c) c.ProduitConditionnementId)
             End If
 
@@ -192,12 +199,17 @@ Namespace DevCommerc8ak
                 Dim typeQuantite As String = If(String.IsNullOrWhiteSpace(item.TypeQuantiteEquivalent), item.TypeUniteEquivalent, item.TypeQuantiteEquivalent)
                 Dim contenuPrincipal As Decimal = If(contenuUnitePrincipale > 0D, contenuUnitePrincipale, nb)
                 Dim quantiteBaseType As Decimal
+                Dim autoriseFraction As Boolean = True
                 If item.ProduitConditionnementId.HasValue Then
                     Dim conditionnement As ProduitConditionnementDTO = Nothing
                     If conditionnementsParId Is Nothing OrElse Not conditionnementsParId.TryGetValue(item.ProduitConditionnementId.Value, conditionnement) Then
-                        Throw New InvalidOperationException("Le conditionnement du type de vente est introuvable ou inactif.")
+                        ' Un type commercial rattaché à un conditionnement non vendable
+                        ' ne doit pas contourner la règle EstVendable. Il reste stocké
+                        ' pour l'historique/configuration, mais n'est pas proposé.
+                        Continue For
                     End If
                     quantiteBaseType = ConversionUniteService.CalculerQuantiteBase(1D, item, conditionnement)
+                    autoriseFraction = conditionnement.AutoriseFraction
                 Else
                     quantiteBaseType = CalculVenteService.CalculerQuantiteBaseTypeVente(item.QuantiteEquivalent, typeQuantite, nb, contenuPrincipal, contenuUniteSecondaire)
                 End If
@@ -219,7 +231,8 @@ Namespace DevCommerc8ak
                     .Coefficient = coefficient,
                     .PrixVente = prixVente,
                     .Actif = item.Actif,
-                    .EstPersonnalise = True
+                    .EstPersonnalise = True,
+                    .AutoriseFraction = autoriseFraction
                 })
             Next
 

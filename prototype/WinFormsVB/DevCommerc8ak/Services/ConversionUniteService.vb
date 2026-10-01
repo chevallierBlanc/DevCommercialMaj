@@ -45,6 +45,9 @@ Namespace DevCommerc8ak
         Public Shared Function CalculerQuantiteBase(quantiteCommerciale As Decimal, typeVente As TypeVenteDTO) As Decimal
             If typeVente Is Nothing Then Throw New ArgumentNullException("typeVente")
             If quantiteCommerciale < 0D Then Throw New ArgumentOutOfRangeException("quantiteCommerciale", "La quantite ne peut pas etre negative.")
+            If typeVente.ProduitConditionnementId.HasValue AndAlso Not typeVente.AutoriseFraction AndAlso Decimal.Truncate(quantiteCommerciale) <> quantiteCommerciale Then
+                Throw New InvalidOperationException("Ce conditionnement n'autorise pas les quantites fractionnaires.")
+            End If
 
             ' TypeVenteDTO expose déjà l'équivalent en unité de base pour une
             ' unité commerciale. Les formulaires doivent passer ici au lieu de

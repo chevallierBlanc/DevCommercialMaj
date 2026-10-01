@@ -374,15 +374,23 @@ Namespace DevCommerc8ak
             End If
             Dim produitId As Integer
             If Not Integer.TryParse(Convert.ToString(cmbProduit.SelectedValue), produitId) Then
-                lblApercu.Text = "Quantité base : " & FormatageGlobal.FormatQuantitePhysique(ConversionUniteService.CalculerQuantiteBase(qte, typeVente)) & " | Montant : " & FormatageGlobal.FormatMontant(Math.Round(qte * prix, 2))
+                Try
+                    lblApercu.Text = "Quantité base : " & FormatageGlobal.FormatQuantitePhysique(ConversionUniteService.CalculerQuantiteBase(qte, typeVente)) & " | Montant : " & FormatageGlobal.FormatMontant(Math.Round(qte * prix, 2))
+                Catch ex As InvalidOperationException
+                    lblApercu.Text = ex.Message
+                End Try
                 Return
             End If
 
-            Dim apercu As InitialisationVenteLigneDTO = _service.CalculerApercuLigne(produitId, typeVente, qte, prix)
-            lblApercu.Text = "Quantité base : " & apercu.QuantiteBaseAffichage &
-                " | Montant : " & FormatageGlobal.FormatMontant(apercu.MontantLigne) &
-                " | Coût base : " & If(apercu.CoutUnitaireBaseVente.HasValue, FormatageGlobal.FormatMontant(apercu.CoutUnitaireBaseVente.Value), "N/C") &
-                " | Bénéfice estimé : " & If(apercu.BeneficeEstime.HasValue, FormatageGlobal.FormatMontant(apercu.BeneficeEstime.Value), "N/C")
+            Try
+                Dim apercu As InitialisationVenteLigneDTO = _service.CalculerApercuLigne(produitId, typeVente, qte, prix)
+                lblApercu.Text = "Quantité base : " & apercu.QuantiteBaseAffichage &
+                    " | Montant : " & FormatageGlobal.FormatMontant(apercu.MontantLigne) &
+                    " | Coût base : " & If(apercu.CoutUnitaireBaseVente.HasValue, FormatageGlobal.FormatMontant(apercu.CoutUnitaireBaseVente.Value), "N/C") &
+                    " | Bénéfice estimé : " & If(apercu.BeneficeEstime.HasValue, FormatageGlobal.FormatMontant(apercu.BeneficeEstime.Value), "N/C")
+            Catch ex As InvalidOperationException
+                lblApercu.Text = ex.Message
+            End Try
         End Sub
 
         Private Shared Function CreerLabel(texte As String, font As Font, couleur As Color) As Label

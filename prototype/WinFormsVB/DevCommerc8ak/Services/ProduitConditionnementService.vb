@@ -17,6 +17,36 @@ Namespace DevCommerc8ak
             Return ObtenirRepository().ListerParProduit(produitId, actifSeulement)
         End Function
 
+        Public Function ListerPourConfiguration(produitId As Integer) As List(Of ProduitConditionnementDTO)
+            Return ListerParProduit(produitId, False)
+        End Function
+
+        Public Function ListerPourAchat(produitId As Integer) As List(Of ProduitConditionnementDTO)
+            ' Achat autorisé est une règle contextuelle : un conditionnement
+            ' peut rester actif pour l'inventaire ou l'affichage sans être
+            ' proposé dans les approvisionnements.
+            Return ListerParProduit(produitId, True).
+                Where(Function(c) c.EstAchetable).
+                ToList()
+        End Function
+
+        Public Function ListerPourVente(produitId As Integer) As List(Of ProduitConditionnementDTO)
+            ' Vente autorisée filtre uniquement les choix commerciaux futurs.
+            ' Les conditionnements non vendables restent utilisables pour le
+            ' stock physique, la décomposition et l'historique.
+            Return ListerParProduit(produitId, True).
+                Where(Function(c) c.EstVendable).
+                ToList()
+        End Function
+
+        Public Function ListerPourInventaire(produitId As Integer) As List(Of ProduitConditionnementDTO)
+            Return ListerParProduit(produitId, True)
+        End Function
+
+        Public Function ListerPourOperationPhysique(produitId As Integer) As List(Of ProduitConditionnementDTO)
+            Return ListerParProduit(produitId, True)
+        End Function
+
         Public Function ListerUnites(Optional actifSeulement As Boolean = True) As List(Of UniteMesureDTO)
             Return ObtenirRepository().ListerUnites(actifSeulement)
         End Function
@@ -76,7 +106,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Public Function FormaterStock(produitId As Integer, quantiteBase As Decimal, fallback As Func(Of String)) As String
-            Dim conditionnements As List(Of ProduitConditionnementDTO) = ListerParProduit(produitId, True)
+            Dim conditionnements As List(Of ProduitConditionnementDTO) = ListerPourInventaire(produitId)
             If conditionnements.Count > 0 Then
                 Return ConversionUniteService.DecomposerStock(quantiteBase, conditionnements)
             End If

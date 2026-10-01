@@ -975,7 +975,7 @@ Namespace DevCommerc8ak
         Private Function ObtenirConditionnementsProduit(produitId As Integer) As List(Of ProduitConditionnementDTO)
             If produitId <= 0 Then Return New List(Of ProduitConditionnementDTO)()
             If Not _conditionnementsCache.ContainsKey(produitId) Then
-                _conditionnementsCache(produitId) = _conditionnementService.ListerParProduit(produitId, True)
+                _conditionnementsCache(produitId) = _conditionnementService.ListerPourInventaire(produitId)
             End If
             Return _conditionnementsCache(produitId)
         End Function

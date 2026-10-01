@@ -189,7 +189,7 @@ Namespace DevCommerc8ak
 
         Private Function ChargerConditionnementsDisponibles() As List(Of ProduitConditionnementDTO)
             Try
-                Return _conditionnementService.ListerParProduit(_produitId, True)
+                Return _conditionnementService.ListerPourVente(_produitId)
             Catch ex As Exception
                 Dim log As New ProductionLogService()
                 log.Error("FormulaireTypesVenteProduit", "ChargerConditionnementsDisponibles", "Impossible de charger les conditionnements dynamiques. L'écran reste en mode legacy pour préserver la compatibilité.", ex)
@@ -200,7 +200,7 @@ Namespace DevCommerc8ak
         Private Sub ChargerOptionsConditionnements()
             cmbConditionnement.Items.Clear()
             cmbConditionnement.Items.Add(New ConditionnementOption(Nothing, "Mode historique - non rattaché au nouveau conditionnement", Nothing))
-            For Each c As ProduitConditionnementDTO In _conditionnements.Where(Function(x) x.EstVendable OrElse x.EstUniteBase).OrderByDescending(Function(x) x.FacteurVersBase)
+            For Each c As ProduitConditionnementDTO In _conditionnements.OrderByDescending(Function(x) x.FacteurVersBase)
                 Dim libelle As String = If(String.IsNullOrWhiteSpace(c.LibelleUnite), c.CodeUnite, c.LibelleUnite)
                 cmbConditionnement.Items.Add(New ConditionnementOption(c.ProduitConditionnementId, libelle & " — 1 " & libelle & " = " & c.FacteurVersBase.ToString("0.####") & " base", c))
             Next

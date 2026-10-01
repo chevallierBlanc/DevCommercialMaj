@@ -725,7 +725,7 @@ Namespace DevCommerc8ak
                 lblEquivalent.Text = "Equivalent: 0 " & ObtenirUniteReferenceCourante() & " / unité"
             ElseIf typeChoisi.ProduitConditionnementId.HasValue Then
                 Dim produitId As Integer = SafeInteger(CellValueByProperty(gridProduits.CurrentRow, "ProduitId"))
-                Dim conditionnements As List(Of ProduitConditionnementDTO) = _conditionnementService.ListerParProduit(produitId, True)
+                Dim conditionnements As List(Of ProduitConditionnementDTO) = _conditionnementService.ListerPourInventaire(produitId)
                 lblEquivalent.Text = "Equivalent: " & ConversionUniteService.DecrireEquivalentTypeVente(typeChoisi, conditionnements) & " / unité"
             Else
                 lblEquivalent.Text = "Equivalent: " & FormaterQuantiteReferenceCourante(typeChoisi.QuantiteEquivalent) & " " & ObtenirUniteReferenceCourante() & " / unité"
@@ -796,7 +796,13 @@ Namespace DevCommerc8ak
 
             ' Convertit la quantité commerciale choisie par le facturier
             ' vers l'unité de base utilisée par le moteur de stock.
-            Dim quantiteReelle As Decimal = ConversionUniteService.CalculerQuantiteBase(qte, typeChoisi)
+            Dim quantiteReelle As Decimal
+            Try
+                quantiteReelle = ConversionUniteService.CalculerQuantiteBase(qte, typeChoisi)
+            Catch ex As InvalidOperationException
+                lblTotalReel.Text = ex.Message
+                Return
+            End Try
             If typeChoisi.ProduitConditionnementId.HasValue Then
                 Dim produitId As Integer = SafeInteger(CellValueByProperty(gridProduits.CurrentRow, "ProduitId"))
                 lblTotalReel.Text = "Total réel: " & _conditionnementService.FormaterStock(produitId, quantiteReelle, Function() FormaterQuantiteReferenceCourante(quantiteReelle) & " " & ObtenirUniteReferenceCourante())
@@ -858,7 +864,13 @@ Namespace DevCommerc8ak
             Dim quantiteEquivalent As Decimal = typeChoisi.QuantiteEquivalent
             ' Le service central garantit que la même formule est utilisée
             ' par la facturation, l'initialisation des ventes et les futurs flux stock.
-            Dim quantiteBase As Decimal = ConversionUniteService.CalculerQuantiteBase(qte, typeChoisi)
+            Dim quantiteBase As Decimal
+            Try
+                quantiteBase = ConversionUniteService.CalculerQuantiteBase(qte, typeChoisi)
+            Catch ex As InvalidOperationException
+                MessageBox.Show(ex.Message, "Quantité invalide", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return
+            End Try
             Dim stock As Decimal = SafeDecimal(CellValueByProperty(gridProduits.CurrentRow, "QuantiteStock"))
 
             Dim deja As Decimal = 0D
