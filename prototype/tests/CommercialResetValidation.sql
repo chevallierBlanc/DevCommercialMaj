@@ -112,6 +112,19 @@ SELECT ActionAttendue, NomTable, RoleMetier, NombreLignes, Raison
 FROM @Resultats
 ORDER BY CASE WHEN ActionAttendue = N'VIDER' THEN 0 ELSE 1 END, NomTable;
 
+SELECT
+    tbl.name AS TableTransactionnelle,
+    sch.name + N'.' + trg.name AS TriggerDml,
+    CASE WHEN trg.is_disabled = 1 THEN N'DESACTIVE' ELSE N'ACTIF' END AS EtatTrigger
+FROM sys.triggers trg
+INNER JOIN sys.tables tbl ON tbl.object_id = trg.parent_id
+INNER JOIN sys.schemas sch ON sch.schema_id = trg.schema_id
+INNER JOIN @Tables t ON t.NomTable = tbl.name AND t.Conserver = 0
+WHERE trg.parent_class = 1
+  AND trg.is_ms_shipped = 0
+  AND OBJECT_SCHEMA_NAME(tbl.object_id) = N'dbo'
+ORDER BY tbl.name, trg.name;
+
 IF OBJECT_ID(N'dbo.vStockProduit', N'V') IS NOT NULL
 BEGIN
     SELECT COUNT(*) AS ProduitsAvecStockNonZero
@@ -133,6 +146,37 @@ BEGIN
 
     IF OBJECT_ID(N'dbo.Utilisateurs', N'U') IS NULL OR NOT EXISTS (SELECT 1 FROM dbo.Utilisateurs)
         RAISERROR(N'Validation échouée : Utilisateurs absent ou vide.', 16, 1);
+
+    IF OBJECT_ID(N'dbo.Roles', N'U') IS NULL OR NOT EXISTS (SELECT 1 FROM dbo.Roles)
+        RAISERROR(N'Validation échouée : Roles absent ou vide.', 16, 1);
+
+    IF OBJECT_ID(N'dbo.UnitesMesure', N'U') IS NULL OR NOT EXISTS (SELECT 1 FROM dbo.UnitesMesure)
+        RAISERROR(N'Validation échouée : UnitesMesure absent ou vide.', 16, 1);
+
+    IF OBJECT_ID(N'dbo.ProduitConditionnements', N'U') IS NULL
+        RAISERROR(N'Validation échouée : table ProduitConditionnements absente.', 16, 1);
+
+    IF OBJECT_ID(N'dbo.TypesVenteProduit', N'U') IS NULL
+        RAISERROR(N'Validation échouée : table TypesVenteProduit absente.', 16, 1);
+
+    IF OBJECT_ID(N'dbo.Parametres', N'U') IS NULL OR NOT EXISTS (SELECT 1 FROM dbo.Parametres)
+        RAISERROR(N'Validation échouée : Parametres absent ou vide.', 16, 1);
+
+    IF OBJECT_ID(N'dbo.AuditActions', N'U') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM dbo.AuditActions WHERE [Action] = N'COMMERCIAL_RESET_COMPLETED')
+        RAISERROR(N'Validation échouée : audit COMMERCIAL_RESET_COMPLETED introuvable.', 16, 1);
+
+    IF EXISTS (
+        SELECT 1
+        FROM sys.triggers trg
+        INNER JOIN sys.tables tbl ON tbl.object_id = trg.parent_id
+        INNER JOIN @Tables t ON t.NomTable = tbl.name AND t.Conserver = 0
+        WHERE trg.parent_class = 1
+          AND trg.is_ms_shipped = 0
+          AND OBJECT_SCHEMA_NAME(tbl.object_id) = N'dbo'
+          AND trg.is_disabled = 1
+    )
+        RAISERROR(N'Validation échouée : au moins un trigger transactionnel est resté désactivé.', 16, 1);
 
     PRINT N'VALIDATION_COMMERCIAL_RESET_OK';
 END

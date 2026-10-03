@@ -13,7 +13,15 @@ IF OBJECT_ID('dbo.ProduitConditionnements', 'U') IS NULL
     THROW 51000, 'Table dbo.ProduitConditionnements introuvable.', 1;
 
 IF NOT EXISTS (SELECT 1 FROM dbo.UnitesMesure WHERE Code = N'PIECE' AND Libelle = N'Pièce')
+BEGIN
+    SELECT UniteMesureId, Code, Libelle, Symbole, EstActif
+    FROM dbo.UnitesMesure
+    WHERE UPPER(LTRIM(RTRIM(Code))) COLLATE Latin1_General_CI_AI = N'PIECE'
+       OR UPPER(LTRIM(RTRIM(Libelle))) COLLATE Latin1_General_CI_AI = N'PIECE'
+       OR UPPER(LTRIM(RTRIM(Symbole))) COLLATE Latin1_General_CI_AI = N'PIECE';
+
     THROW 51000, 'Unite PIECE non normalisee avec le libelle Pièce.', 1;
+END
 
 IF EXISTS (
     SELECT Code

@@ -37,6 +37,12 @@ Namespace DevCommerc8ak
         Public Property TablesTraitees As List(Of CommercialResetTableVolume)
     End Class
 
+    Friend Class CommercialResetTriggerInfo
+        Public Property TriggerSchema As String
+        Public Property TriggerName As String
+        Public Property TableName As String
+    End Class
+
     Public Class CommercialResetService
         Private Const AppLockName As String = "ERPCommercial_ResetCommercial"
 
@@ -125,6 +131,12 @@ Namespace DevCommerc8ak
                         If produitsAvant <= 0 Then Throw New InvalidOperationException("Réinitialisation refusée : aucun produit référentiel n'a été trouvé.")
                         If utilisateursAvant <= 0 Then Throw New InvalidOperationException("Réinitialisation refusée : aucun utilisateur référentiel n'a été trouvé.")
 
+                        ' Les triggers de protection métier restent indispensables dans
+                        ' l'exploitation normale. Pour le reset commercial global, ils sont
+                        ' désactivés uniquement sur les tables transactionnelles, dans la
+                        ' même transaction, puis réactivés avant le COMMIT.
+                        Dim triggersDesactives As List(Of CommercialResetTriggerInfo) = DesactiverTriggersTransactionnels(cn, tx)
+
                         ' Les tables transactionnelles sont vidées explicitement, enfants avant parents.
                         ' On ne désactive pas les FK : si l'ordre est incomplet, SQL Server force le rollback.
                         For Each tableInfo As CommercialResetTableVolume In _tablesTransactionnelles.OrderBy(Function(t) t.OrdreSuppression)
@@ -139,6 +151,8 @@ Namespace DevCommerc8ak
                             resultat.TablesTraitees.Add(copie)
                         Next
 
+                        ReactiverTriggersTransactionnels(cn, tx, triggersDesactives)
+                        VerifierTriggersReactives(cn, tx, triggersDesactives)
                         VerifierApresReset(cn, tx, produitsAvant, utilisateursAvant, conditionnementsAvant, typesVenteAvant)
                         InsererAuditTransaction(cn, tx, "COMMERCIAL_RESET_COMPLETED", "Réinitialisation commerciale terminée. Sauvegarde : " & sauvegarde.FilePath, "OK")
 
@@ -271,6 +285,71 @@ Namespace DevCommerc8ak
                 cmd.CommandTimeout = 0
                 cmd.ExecuteNonQuery()
             End Using
+        End Sub
+
+        Private Function DesactiverTriggersTransactionnels(cn As SqlConnection, tx As SqlTransaction) As List(Of CommercialResetTriggerInfo)
+            Dim triggers As List(Of CommercialResetTriggerInfo) = LireTriggersTransactionnelsActifs(cn, tx)
+            For Each triggerInfo As CommercialResetTriggerInfo In triggers
+                Using cmd As New SqlCommand("DISABLE TRIGGER " & Quoter(triggerInfo.TriggerSchema) & "." & Quoter(triggerInfo.TriggerName) & " ON dbo." & Quoter(triggerInfo.TableName), cn, tx)
+                    cmd.CommandTimeout = 0
+                    cmd.ExecuteNonQuery()
+                End Using
+            Next
+            Return triggers
+        End Function
+
+        Private Function LireTriggersTransactionnelsActifs(cn As SqlConnection, tx As SqlTransaction) As List(Of CommercialResetTriggerInfo)
+            Dim resultat As New List(Of CommercialResetTriggerInfo)()
+            Dim nomsTables As String = String.Join(",", _tablesTransactionnelles.Select(Function(t) "N'" & t.NomTable.Replace("'", "''") & "'"))
+            If String.IsNullOrWhiteSpace(nomsTables) Then Return resultat
+
+            Dim sql As String =
+                "SELECT sch.name AS TriggerSchema, trg.name AS TriggerName, tbl.name AS TableName " &
+                "FROM sys.triggers trg " &
+                "INNER JOIN sys.tables tbl ON tbl.object_id = trg.parent_id " &
+                "INNER JOIN sys.schemas sch ON sch.schema_id = trg.schema_id " &
+                "WHERE trg.parent_class = 1 " &
+                "AND trg.is_ms_shipped = 0 " &
+                "AND trg.is_disabled = 0 " &
+                "AND OBJECT_SCHEMA_NAME(tbl.object_id) = N'dbo' " &
+                "AND tbl.name IN (" & nomsTables & ")"
+
+            Using cmd As New SqlCommand(sql, cn, tx)
+                Using reader As SqlDataReader = cmd.ExecuteReader()
+                    While reader.Read()
+                        resultat.Add(New CommercialResetTriggerInfo With {
+                            .TriggerSchema = Convert.ToString(reader("TriggerSchema")),
+                            .TriggerName = Convert.ToString(reader("TriggerName")),
+                            .TableName = Convert.ToString(reader("TableName"))
+                        })
+                    End While
+                End Using
+            End Using
+
+            Return resultat
+        End Function
+
+        Private Sub ReactiverTriggersTransactionnels(cn As SqlConnection, tx As SqlTransaction, triggers As List(Of CommercialResetTriggerInfo))
+            If triggers Is Nothing Then Return
+            For Each triggerInfo As CommercialResetTriggerInfo In triggers
+                Using cmd As New SqlCommand("ENABLE TRIGGER " & Quoter(triggerInfo.TriggerSchema) & "." & Quoter(triggerInfo.TriggerName) & " ON dbo." & Quoter(triggerInfo.TableName), cn, tx)
+                    cmd.CommandTimeout = 0
+                    cmd.ExecuteNonQuery()
+                End Using
+            Next
+        End Sub
+
+        Private Sub VerifierTriggersReactives(cn As SqlConnection, tx As SqlTransaction, triggers As List(Of CommercialResetTriggerInfo))
+            If triggers Is Nothing Then Return
+            For Each triggerInfo As CommercialResetTriggerInfo In triggers
+                Using cmd As New SqlCommand("SELECT COUNT(1) FROM sys.triggers trg INNER JOIN sys.schemas sch ON sch.schema_id = trg.schema_id WHERE sch.name=@Schema AND trg.name=@TriggerName AND trg.is_disabled=1", cn, tx)
+                    cmd.Parameters.AddWithValue("@Schema", triggerInfo.TriggerSchema)
+                    cmd.Parameters.AddWithValue("@TriggerName", triggerInfo.TriggerName)
+                    If Convert.ToInt32(cmd.ExecuteScalar()) > 0 Then
+                        Throw New InvalidOperationException("Réinitialisation refusée : le trigger " & triggerInfo.TriggerSchema & "." & triggerInfo.TriggerName & " n'a pas été réactivé.")
+                    End If
+                End Using
+            Next
         End Sub
 
         Private Function Quoter(nomTable As String) As String

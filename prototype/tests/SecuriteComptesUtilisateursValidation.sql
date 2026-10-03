@@ -1,6 +1,7 @@
 SET NOCOUNT ON;
 
 DECLARE @Erreurs TABLE(Message NVARCHAR(400));
+DECLARE @NbNull INT;
 
 IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NULL
 BEGIN
@@ -18,16 +19,37 @@ BEGIN
     IF COL_LENGTH('dbo.Utilisateurs', 'DoitChangerMotDePasse') IS NULL INSERT INTO @Erreurs VALUES (N'Colonne DoitChangerMotDePasse absente.');
 
     IF COL_LENGTH('dbo.Utilisateurs', 'NombreTentativesEchouees') IS NOT NULL
-       AND EXISTS (SELECT 1 FROM dbo.Utilisateurs WHERE NombreTentativesEchouees IS NULL)
-        INSERT INTO @Erreurs VALUES (N'NombreTentativesEchouees contient NULL.');
+    BEGIN
+        SET @NbNull = 0;
+        EXEC sp_executesql
+            N'SELECT @N = COUNT(*) FROM dbo.Utilisateurs WHERE NombreTentativesEchouees IS NULL;',
+            N'@N INT OUTPUT',
+            @N = @NbNull OUTPUT;
+        IF @NbNull > 0 INSERT INTO @Erreurs VALUES (N'NombreTentativesEchouees contient NULL.');
+    END
 
     IF COL_LENGTH('dbo.Utilisateurs', 'EstVerrouille') IS NOT NULL
-       AND EXISTS (SELECT 1 FROM dbo.Utilisateurs WHERE EstVerrouille IS NULL)
-        INSERT INTO @Erreurs VALUES (N'EstVerrouille contient NULL.');
+    BEGIN
+        SET @NbNull = 0;
+        EXEC sp_executesql
+            N'SELECT @N = COUNT(*) FROM dbo.Utilisateurs WHERE EstVerrouille IS NULL;',
+            N'@N INT OUTPUT',
+            @N = @NbNull OUTPUT;
+        IF @NbNull > 0 INSERT INTO @Erreurs VALUES (N'EstVerrouille contient NULL.');
+    END
 
     IF COL_LENGTH('dbo.Utilisateurs', 'DoitChangerMotDePasse') IS NOT NULL
-       AND EXISTS (SELECT 1 FROM dbo.Utilisateurs WHERE DoitChangerMotDePasse IS NULL)
-        INSERT INTO @Erreurs VALUES (N'DoitChangerMotDePasse contient NULL.');
+    BEGIN
+        SET @NbNull = 0;
+        EXEC sp_executesql
+            N'SELECT @N = COUNT(*) FROM dbo.Utilisateurs WHERE DoitChangerMotDePasse IS NULL;',
+            N'@N INT OUTPUT',
+            @N = @NbNull OUTPUT;
+        IF @NbNull > 0 INSERT INTO @Erreurs VALUES (N'DoitChangerMotDePasse contient NULL.');
+    END
+
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_Utilisateurs_Verrouillage' AND object_id = OBJECT_ID(N'dbo.Utilisateurs'))
+        INSERT INTO @Erreurs VALUES (N'Index IX_Utilisateurs_Verrouillage absent.');
 END;
 
 IF EXISTS (SELECT 1 FROM @Erreurs)

@@ -30,6 +30,7 @@ Namespace DevCommerc8ak
                         AppliquerMigration(cn, tx, 2026092601, "Fondation conditionnements produits dynamiques", AddressOf MigrationConditionnementsDynamiques)
                         AppliquerMigration(cn, tx, 2026100301, "Normalisation unites conditionnements phase 3", AddressOf MigrationNormalisationUnitesConditionnementsPhase3)
                         AppliquerMigration(cn, tx, 2026100302, "Securite comptes utilisateurs", AddressOf MigrationSecuriteComptesUtilisateurs)
+                        AssurerSchemaCritiquePostMigrations(cn, tx)
                         tx.Commit()
                     Catch
                         tx.Rollback()
@@ -64,6 +65,15 @@ Namespace DevCommerc8ak
                 cmd.Parameters.AddWithValue("@Description", description)
                 cmd.ExecuteNonQuery()
             End Using
+        End Sub
+
+        Private Shared Sub AssurerSchemaCritiquePostMigrations(cn As SqlConnection, tx As SqlTransaction)
+            ' Certaines bases de production peuvent contenir une ligne SchemaVersion
+            ' créée par une exécution antérieure incomplète. Ces réparations sont
+            ' volontairement idempotentes afin de garantir le schéma attendu même
+            ' lorsque la migration versionnée est déjà marquée appliquée.
+            MigrationNormalisationUnitesConditionnementsPhase3(cn, tx)
+            MigrationSecuriteComptesUtilisateurs(cn, tx)
         End Sub
 
         Private Shared Sub MigrationStockMesure(cn As SqlConnection, tx As SqlTransaction)
@@ -493,13 +503,51 @@ Namespace DevCommerc8ak
             If cn Is Nothing Then Throw New ArgumentNullException("cn")
             If tx Is Nothing Then Throw New ArgumentNullException("tx")
 
-            ' La base peut contenir l'ancien libellé sans accent "Piece".
-            ' On conserve le Code/Id existant afin de ne casser aucune référence,
-            ' mais l'affichage utilisateur devient canonique : "Pièce".
+            ' La base peut contenir plusieurs variantes historiques de Pièce.
+            ' La normalisation conserve un identifiant canonique et redirige les
+            ' conditionnements vers celui-ci pour ne perdre aucune configuration.
             Executer(cn, tx,
                 "IF OBJECT_ID('dbo.UnitesMesure', 'U') IS NOT NULL " &
-                "UPDATE dbo.UnitesMesure SET Libelle=N'Pièce', Symbole=N'Pièce', ModifieLe=SYSDATETIME() " &
-                "WHERE Code=N'PIECE' OR UPPER(REPLACE(REPLACE(Libelle, N'è', N'e'), N'È', N'E'))=N'PIECE'")
+                "BEGIN " &
+                "DECLARE @PieceCanoniqueId INT; " &
+                "SELECT TOP 1 @PieceCanoniqueId = UniteMesureId " &
+                "FROM dbo.UnitesMesure WITH (UPDLOCK, HOLDLOCK) " &
+                "WHERE UPPER(LTRIM(RTRIM(Code))) COLLATE Latin1_General_CI_AI = N'PIECE' " &
+                "OR UPPER(LTRIM(RTRIM(Libelle))) COLLATE Latin1_General_CI_AI = N'PIECE' " &
+                "OR UPPER(LTRIM(RTRIM(Symbole))) COLLATE Latin1_General_CI_AI = N'PIECE' " &
+                "ORDER BY CASE WHEN UPPER(LTRIM(RTRIM(Code))) COLLATE Latin1_General_CI_AI = N'PIECE' THEN 0 ELSE 1 END, UniteMesureId; " &
+                "IF @PieceCanoniqueId IS NULL " &
+                "BEGIN " &
+                "INSERT INTO dbo.UnitesMesure (Code, Libelle, Symbole, CategorieUnite, AutoriseFraction, NombreDecimales) " &
+                "VALUES (N'PIECE', N'Pièce', N'Pièce', N'UNITE', 0, 0); " &
+                "SET @PieceCanoniqueId = SCOPE_IDENTITY(); " &
+                "END " &
+                "DECLARE @DoublonsPiece TABLE(UniteMesureId INT NOT NULL PRIMARY KEY); " &
+                "INSERT INTO @DoublonsPiece(UniteMesureId) " &
+                "SELECT UniteMesureId FROM dbo.UnitesMesure " &
+                "WHERE UniteMesureId <> @PieceCanoniqueId AND (" &
+                "UPPER(LTRIM(RTRIM(Code))) COLLATE Latin1_General_CI_AI = N'PIECE' " &
+                "OR UPPER(LTRIM(RTRIM(Libelle))) COLLATE Latin1_General_CI_AI = N'PIECE' " &
+                "OR UPPER(LTRIM(RTRIM(Symbole))) COLLATE Latin1_General_CI_AI = N'PIECE'); " &
+                "IF OBJECT_ID('dbo.ProduitConditionnements', 'U') IS NOT NULL " &
+                "BEGIN " &
+                ";WITH PieceActifs AS (" &
+                "SELECT pc.ProduitConditionnementId, ROW_NUMBER() OVER (PARTITION BY pc.ProduitId ORDER BY CASE WHEN pc.UniteMesureId = @PieceCanoniqueId THEN 0 ELSE 1 END, pc.ProduitConditionnementId) AS Rn " &
+                "FROM dbo.ProduitConditionnements pc " &
+                "WHERE pc.EstActif = 1 AND (pc.UniteMesureId = @PieceCanoniqueId OR pc.UniteMesureId IN (SELECT UniteMesureId FROM @DoublonsPiece))" &
+                ") " &
+                "UPDATE pc SET EstActif = 0, ModifieLe = SYSDATETIME(), ModifiePar = N'MIGRATION' " &
+                "FROM dbo.ProduitConditionnements pc INNER JOIN PieceActifs pa ON pa.ProduitConditionnementId = pc.ProduitConditionnementId " &
+                "WHERE pa.Rn > 1; " &
+                "UPDATE pc SET UniteMesureId = @PieceCanoniqueId, ModifieLe = SYSDATETIME(), ModifiePar = N'MIGRATION' " &
+                "FROM dbo.ProduitConditionnements pc " &
+                "INNER JOIN @DoublonsPiece d ON d.UniteMesureId = pc.UniteMesureId; " &
+                "END " &
+                "UPDATE dbo.UnitesMesure SET Code = N'PIECE', Libelle = N'Pièce', Symbole = N'Pièce', CategorieUnite = N'UNITE', AutoriseFraction = 0, NombreDecimales = 0, EstActif = 1, ModifieLe = SYSDATETIME() " &
+                "WHERE UniteMesureId = @PieceCanoniqueId; " &
+                "UPDATE u SET Code = LEFT(N'PIECE_DUP_' + CAST(u.UniteMesureId AS NVARCHAR(20)), 30), Libelle = N'Pièce (doublon migré)', Symbole = N'Pièce', EstActif = 0, ModifieLe = SYSDATETIME() " &
+                "FROM dbo.UnitesMesure u INNER JOIN @DoublonsPiece d ON d.UniteMesureId = u.UniteMesureId; " &
+                "END")
 
             InsererUniteSiAbsente(cn, tx, "BALLON", "Ballon", "Ballon", "UNITE", False, 0)
             InsererUniteSiAbsente(cn, tx, "PLAQUETTE", "Plaquette", "Plaquette", "UNITE", False, 0)
@@ -510,7 +558,13 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Shared Sub InsererUniteSiAbsente(cn As SqlConnection, tx As SqlTransaction, code As String, libelle As String, symbole As String, categorie As String, autoriseFraction As Boolean, nombreDecimales As Integer)
-            Using cmd As New SqlCommand("IF NOT EXISTS (SELECT 1 FROM dbo.UnitesMesure WHERE Code=@Code) INSERT INTO dbo.UnitesMesure (Code, Libelle, Symbole, CategorieUnite, AutoriseFraction, NombreDecimales) VALUES (@Code, @Libelle, @Symbole, @CategorieUnite, @AutoriseFraction, @NombreDecimales)", cn, tx)
+            Using cmd As New SqlCommand("IF OBJECT_ID('dbo.UnitesMesure', 'U') IS NOT NULL " &
+                                        "BEGIN " &
+                                        "IF EXISTS (SELECT 1 FROM dbo.UnitesMesure WHERE Code=@Code) " &
+                                        "UPDATE dbo.UnitesMesure SET Libelle=@Libelle, Symbole=@Symbole, CategorieUnite=@CategorieUnite, AutoriseFraction=@AutoriseFraction, NombreDecimales=@NombreDecimales, EstActif=1, ModifieLe=SYSDATETIME() WHERE Code=@Code " &
+                                        "ELSE " &
+                                        "INSERT INTO dbo.UnitesMesure (Code, Libelle, Symbole, CategorieUnite, AutoriseFraction, NombreDecimales) VALUES (@Code, @Libelle, @Symbole, @CategorieUnite, @AutoriseFraction, @NombreDecimales) " &
+                                        "END", cn, tx)
                 cmd.Parameters.AddWithValue("@Code", code)
                 cmd.Parameters.AddWithValue("@Libelle", libelle)
                 cmd.Parameters.AddWithValue("@Symbole", symbole)
