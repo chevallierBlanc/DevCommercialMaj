@@ -28,6 +28,7 @@ Namespace DevCommerc8ak
                         AppliquerMigration(cn, tx, 2026090801, "Sessions initialisation ventes", AddressOf MigrationInitialisationVentes)
                         AppliquerMigration(cn, tx, 2026090802, "Sessions stock initial technique", AddressOf MigrationStockInitialTechnique)
                         AppliquerMigration(cn, tx, 2026092601, "Fondation conditionnements produits dynamiques", AddressOf MigrationConditionnementsDynamiques)
+                        AppliquerMigration(cn, tx, 2026100301, "Normalisation unites conditionnements phase 3", AddressOf MigrationNormalisationUnitesConditionnementsPhase3)
                         tx.Commit()
                     Catch
                         tx.Rollback()
@@ -471,6 +472,26 @@ Namespace DevCommerc8ak
             For Each sql As String In indexSql
                 Executer(cn, tx, sql)
             Next
+        End Sub
+
+        Private Shared Sub MigrationNormalisationUnitesConditionnementsPhase3(cn As SqlConnection, tx As SqlTransaction)
+            If cn Is Nothing Then Throw New ArgumentNullException("cn")
+            If tx Is Nothing Then Throw New ArgumentNullException("tx")
+
+            ' La base peut contenir l'ancien libellé sans accent "Piece".
+            ' On conserve le Code/Id existant afin de ne casser aucune référence,
+            ' mais l'affichage utilisateur devient canonique : "Pièce".
+            Executer(cn, tx,
+                "IF OBJECT_ID('dbo.UnitesMesure', 'U') IS NOT NULL " &
+                "UPDATE dbo.UnitesMesure SET Libelle=N'Pièce', Symbole=N'Pièce', ModifieLe=SYSDATETIME() " &
+                "WHERE Code=N'PIECE' OR UPPER(REPLACE(REPLACE(Libelle, N'è', N'e'), N'È', N'E'))=N'PIECE'")
+
+            InsererUniteSiAbsente(cn, tx, "BALLON", "Ballon", "Ballon", "UNITE", False, 0)
+            InsererUniteSiAbsente(cn, tx, "PLAQUETTE", "Plaquette", "Plaquette", "UNITE", False, 0)
+            InsererUniteSiAbsente(cn, tx, "CHAINE", "Chaîne", "Chaîne", "UNITE", False, 0)
+            InsererUniteSiAbsente(cn, tx, "SEAU", "Seau", "Seau", "UNITE", False, 0)
+            InsererUniteSiAbsente(cn, tx, "PEAU", "Peau", "Peau", "UNITE", False, 0)
+            InsererUniteSiAbsente(cn, tx, "DEMI_SACHET", "Demi-sachet", "Demi-sachet", "UNITE", False, 0)
         End Sub
 
         Private Shared Sub InsererUniteSiAbsente(cn As SqlConnection, tx As SqlTransaction, code As String, libelle As String, symbole As String, categorie As String, autoriseFraction As Boolean, nombreDecimales As Integer)

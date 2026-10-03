@@ -105,6 +105,31 @@ Namespace DevCommerc8ak
             AppEvents.OnDataChanged()
         End Sub
 
+        Public Sub Activer(produitConditionnementId As Integer)
+            VerifierAccesTechnique()
+            Dim repo As ProduitConditionnementRepository = ObtenirRepository()
+            Dim cible As ProduitConditionnementDTO = repo.ObtenirParId(produitConditionnementId)
+            If cible Is Nothing Then Throw New InvalidOperationException("Conditionnement introuvable.")
+
+            Dim existants As List(Of ProduitConditionnementDTO) = repo.ListerParProduit(cible.ProduitId, False)
+            If cible.EstUniteBase AndAlso existants.Any(Function(c) c.EstActif AndAlso c.EstUniteBase AndAlso c.ProduitConditionnementId <> cible.ProduitConditionnementId) Then
+                Throw New InvalidOperationException("Ce produit possède déjà une unité de base active.")
+            End If
+            If existants.Any(Function(c) c.EstActif AndAlso c.UniteMesureId = cible.UniteMesureId AndAlso c.ProduitConditionnementId <> cible.ProduitConditionnementId) Then
+                Throw New InvalidOperationException("Un conditionnement actif existe déjà pour cette unité.")
+            End If
+            If Not cible.EstUniteBase AndAlso (Not cible.ConditionnementParentId.HasValue OrElse Not existants.Any(Function(c) c.EstActif AndAlso c.ProduitConditionnementId = cible.ConditionnementParentId.Value)) Then
+                Throw New InvalidOperationException("Réactivez d'abord l'unité contenue par ce conditionnement.")
+            End If
+
+            ' La réactivation restaure uniquement la disponibilité future de ce
+            ' conditionnement. Les QuantiteBase historiques restent immuables.
+            repo.Activer(produitConditionnementId, ObtenirUtilisateur())
+            AuditActionService.Enregistrer("Conditionnements", "Activation conditionnement", "ConditionnementId=" & produitConditionnementId.ToString())
+            AppEvents.OnProduitModifie()
+            AppEvents.OnDataChanged()
+        End Sub
+
         Public Function FormaterStock(produitId As Integer, quantiteBase As Decimal, fallback As Func(Of String)) As String
             Dim conditionnements As List(Of ProduitConditionnementDTO) = ListerPourInventaire(produitId)
             If conditionnements.Count > 0 Then

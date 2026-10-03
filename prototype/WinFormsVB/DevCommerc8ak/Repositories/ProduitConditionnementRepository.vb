@@ -100,6 +100,15 @@ Namespace DevCommerc8ak
             _dal.ExecuterNonRequete(sql, CommandType.Text, p)
         End Sub
 
+        Public Sub Activer(produitConditionnementId As Integer, modifiePar As String)
+            Dim sql As String = "UPDATE dbo.ProduitConditionnements SET EstActif=1, ModifieLe=SYSDATETIME(), ModifiePar=@ModifiePar WHERE ProduitConditionnementId=@Id"
+            Dim p As New List(Of SqlParameter) From {
+                New SqlParameter("@Id", produitConditionnementId),
+                New SqlParameter("@ModifiePar", If(String.IsNullOrWhiteSpace(modifiePar), "SYSTEM", modifiePar.Trim()))
+            }
+            _dal.ExecuterNonRequete(sql, CommandType.Text, p)
+        End Sub
+
         Private Shared Function ConstruireParametres(conditionnement As ProduitConditionnementDTO) As List(Of SqlParameter)
             Return New List(Of SqlParameter) From {
                 New SqlParameter("@ProduitConditionnementId", conditionnement.ProduitConditionnementId),

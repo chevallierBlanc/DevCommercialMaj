@@ -53,6 +53,7 @@ Namespace DevCommerc8ak
         Private ReadOnly btnQuantitesConditionnementsEntree As Button
         Private ReadOnly btnConfigurerConditionnementsEntree As Button
         Private ReadOnly lblQuantitesConditionnementsEntree As Label
+        Private ReadOnly lblModeSaisieEntree As Label
         Private ReadOnly lblStockActuel As Label
         Private ReadOnly lblStockActuelPiece As Label
         Private ReadOnly lblStockApres As Label
@@ -309,11 +310,12 @@ Namespace DevCommerc8ak
             txtNomProduit = New TextBox() With {.Left = 160, .Top = 75, .Width = 250}
             cmbCategorie = New ComboBox() With {.Left = 160, .Top = 105, .Width = 150}
             txtReference = New TextBox() With {.Left = 160, .Top = 135, .Width = 250, .ReadOnly = True}
+            lblModeSaisieEntree = New Label() With {.Left = 160, .Top = 200, .Width = 410, .Height = 18, .ForeColor = ColorSecondary, .Font = New Font("Segoe UI", 8.5F, FontStyle.Bold), .Text = "MODE CLASSIQUE"}
             cardProduit.Controls.AddRange(New Control() {
                 New Label() With {.Text = "Nom produit", .Left = 20, .Top = 78, .AutoSize = True},
                 New Label() With {.Text = "Categorie", .Left = 20, .Top = 108, .AutoSize = True},
                 New Label() With {.Text = "Reference", .Left = 20, .Top = 138, .AutoSize = True},
-                chkProduitExistant, cmbProduitExistant, txtNomProduit, cmbCategorie, txtReference
+                chkProduitExistant, cmbProduitExistant, txtNomProduit, cmbCategorie, txtReference, lblModeSaisieEntree
             })
             ' layoutEntree.Controls.Add(cardProduit)
 
@@ -324,9 +326,10 @@ Namespace DevCommerc8ak
             txtNbUniteParBase = New TextBox() With {.Left = 160, .Top = 75, .Width = 100}
             txtQuantiteEntree = New TextBox() With {.Left = 160, .Top = 105, .Width = 100}
             txtQuantiteSecondaireEntree = New TextBox() With {.Left = 160, .Top = 135, .Width = 100}
-            btnQuantitesConditionnementsEntree = New Button() With {.Text = "SAISIR PAR CONDITIONNEMENTS", .Left = 270, .Top = 105, .Width = 210, .Height = 26, .BackColor = ColorSecondary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
-            btnConfigurerConditionnementsEntree = New Button() With {.Text = "CONFIGURER LES CONDITIONNEMENTS", .Left = 270, .Top = 135, .Width = 255, .Height = 28, .BackColor = ColorPrimary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
-            lblQuantitesConditionnementsEntree = New Label() With {.Left = 270, .Top = 166, .Width = 300, .Height = 24, .ForeColor = ColorSecondary}
+            btnQuantitesConditionnementsEntree = New Button() With {.Text = "SAISIR PAR CONDITIONNEMENTS", .Left = 160, .Top = 165, .Width = 185, .Height = 28, .BackColor = ColorSecondary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            btnConfigurerConditionnementsEntree = New Button() With {.Text = "CONFIGURER LES CONDITIONNEMENTS", .Left = 355, .Top = 165, .Width = 220, .Height = 28, .BackColor = ColorPrimary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            lblQuantitesConditionnementsEntree = New Label() With {.Left = 20, .Top = 168, .Width = 550, .Height = 24, .ForeColor = ColorSecondary}
+            cardProduit.Controls.AddRange(New Control() {btnQuantitesConditionnementsEntree, btnConfigurerConditionnementsEntree})
             cmbTypeGestionStockEntree = New ComboBox() With {.Left = 455, .Top = 45, .Width = 125, .DropDownStyle = ComboBoxStyle.DropDownList}
             cmbTypeGestionStockEntree.Items.AddRange(New Object() {"UNITE", "MESURE"})
             cmbTypeGestionStockEntree.SelectedItem = "UNITE"
@@ -340,15 +343,15 @@ Namespace DevCommerc8ak
             lblStockApres = New Label() With {.Left = 300, .Top = 194, .AutoSize = True, .ForeColor = ColorAccent}
             lblStockApresPiece = New Label() With {.Left = 300, .Top = 212, .AutoSize = True}
             cardUnite.Controls.AddRange(New Control() {
-                New Label() With {.Text = "Unité achat legacy", .Left = 20, .Top = 48, .AutoSize = True},
-                New Label() With {.Text = "Équiv. legacy", .Left = 20, .Top = 78, .AutoSize = True},
+                New Label() With {.Text = "Unité d'achat", .Left = 20, .Top = 48, .AutoSize = True},
+                New Label() With {.Text = "Équiv. en base", .Left = 20, .Top = 78, .AutoSize = True},
                 New Label() With {.Text = "Quantité entrée", .Left = 20, .Top = 108, .AutoSize = True},
-                New Label() With {.Text = "Qté complément legacy", .Left = 20, .Top = 138, .AutoSize = True},
+                New Label() With {.Text = "Qté complémentaire", .Left = 20, .Top = 138, .AutoSize = True},
                 New Label() With {.Text = "Mode stock", .Left = 300, .Top = 48, .AutoSize = True},
                 New Label() With {.Text = "Unité mesure", .Left = 300, .Top = 78, .AutoSize = True},
-                New Label() With {.Text = "Contenu princ. legacy", .Left = 300, .Top = 108, .AutoSize = True},
-                New Label() With {.Text = "Contenu sec. legacy", .Left = 300, .Top = 138, .AutoSize = True},
-                cmbUniteBase, txtNbUniteParBase, txtQuantiteEntree, txtQuantiteSecondaireEntree, btnQuantitesConditionnementsEntree, btnConfigurerConditionnementsEntree, lblQuantitesConditionnementsEntree, cmbTypeGestionStockEntree, cmbUniteMesureStockEntree, txtContenuUnitePrincipaleEntree, txtContenuUniteSecondaireEntree, lblStockActuel, lblStockActuelPiece, lblStockApres, lblStockApresPiece
+                New Label() With {.Text = "Contenu principal", .Left = 300, .Top = 108, .AutoSize = True},
+                New Label() With {.Text = "Contenu secondaire", .Left = 300, .Top = 138, .AutoSize = True},
+                cmbUniteBase, txtNbUniteParBase, txtQuantiteEntree, txtQuantiteSecondaireEntree, lblQuantitesConditionnementsEntree, cmbTypeGestionStockEntree, cmbUniteMesureStockEntree, txtContenuUnitePrincipaleEntree, txtContenuUniteSecondaireEntree, lblStockActuel, lblStockActuelPiece, lblStockApres, lblStockApresPiece
             })
             'layoutEntree.Controls.Add(cardUnite)
 
@@ -2197,6 +2200,7 @@ Namespace DevCommerc8ak
         '    End If
         'End Sub
         Private Sub RecalculerStock(sender As Object, e As EventArgs)
+            ActualiserModeSaisieEntree()
             Dim nb As Decimal = LireDecimal(txtNbUniteParBase.Text)
             Dim quantiteEntree As Decimal = LireDecimal(txtQuantiteEntree.Text)
             Dim quantiteSecondaire As Decimal = LireDecimal(txtQuantiteSecondaireEntree.Text)
@@ -2261,6 +2265,7 @@ Namespace DevCommerc8ak
                 lblQuantitesConditionnementsEntree.Text = frm.RepresentationLisible
                 txtQuantiteEntree.Text = "0"
                 txtQuantiteSecondaireEntree.Text = "0"
+                ActualiserModeSaisieEntree()
                 RecalculerStock(Nothing, EventArgs.Empty)
             End Using
         End Sub
@@ -2287,6 +2292,20 @@ Namespace DevCommerc8ak
             _quantiteEntreeDynamiqueBase = 0D
             _resumeEntreeDynamique = String.Empty
             If lblQuantitesConditionnementsEntree IsNot Nothing Then lblQuantitesConditionnementsEntree.Text = String.Empty
+            ActualiserModeSaisieEntree()
+        End Sub
+
+        Private Sub ActualiserModeSaisieEntree()
+            Dim modeDynamique As Boolean = _quantiteEntreeDynamiqueBase > 0D
+            If lblModeSaisieEntree IsNot Nothing Then
+                lblModeSaisieEntree.Text = If(modeDynamique, "MODE CONDITIONNEMENTS DYNAMIQUES", "MODE CLASSIQUE")
+                lblModeSaisieEntree.ForeColor = If(modeDynamique, ColorAccent, ColorSecondary)
+            End If
+
+            If txtQuantiteEntree IsNot Nothing Then txtQuantiteEntree.Enabled = Not modeDynamique
+            If txtQuantiteSecondaireEntree IsNot Nothing Then txtQuantiteSecondaireEntree.Enabled = Not modeDynamique
+            If txtNbUniteParBase IsNot Nothing Then txtNbUniteParBase.Enabled = Not modeDynamique
+            If cmbUniteBase IsNot Nothing Then cmbUniteBase.Enabled = Not modeDynamique
         End Sub
 
         Private Function ObtenirConditionnementsProduit(produitId As Integer) As List(Of ProduitConditionnementDTO)

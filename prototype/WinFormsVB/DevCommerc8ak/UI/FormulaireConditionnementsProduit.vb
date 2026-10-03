@@ -26,6 +26,9 @@ Namespace DevCommerc8ak
         Private ReadOnly chkVendable As CheckBox
         Private ReadOnly chkFraction As CheckBox
         Private ReadOnly lblApercu As Label
+        Private ReadOnly lblModeEdition As Label
+        Private ReadOnly btnEnregistrer As Button
+        Private ReadOnly btnDesactiver As Button
         Private ReadOnly txtPrevisualisation As TextBox
         Private ReadOnly _toolTip As New ToolTip()
 
@@ -77,9 +80,10 @@ Namespace DevCommerc8ak
             chkVendable = New CheckBox() With {.Text = "Vendable", .Left = 260, .Top = 92, .AutoSize = True, .Checked = True}
             chkFraction = New CheckBox() With {.Text = "Fraction autorisée", .Left = 370, .Top = 92, .AutoSize = True}
             lblApercu = New Label() With {.Left = 530, .Top = 84, .Width = 430, .Height = 48, .ForeColor = Color.FromArgb(14, 116, 144)}
+            lblModeEdition = New Label() With {.Text = "MODE : NOUVEAU", .Left = 405, .Top = 141, .Width = 230, .Height = 22, .ForeColor = Color.FromArgb(52, 73, 94), .Font = New Font("Segoe UI", 9.0F, FontStyle.Bold)}
             Dim btnNouveau As New Button() With {.Text = "Nouveau", .Left = 12, .Top = 135, .Width = 105, .Height = 34, .BackColor = Color.FromArgb(52, 73, 94), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
-            Dim btnEnregistrer As New Button() With {.Text = "Enregistrer", .Left = 130, .Top = 135, .Width = 120, .Height = 34, .BackColor = Color.FromArgb(39, 174, 96), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
-            Dim btnDesactiver As New Button() With {.Text = "Désactiver", .Left = 265, .Top = 135, .Width = 120, .Height = 34, .BackColor = Color.FromArgb(192, 57, 43), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            btnEnregistrer = New Button() With {.Text = "ENREGISTRER", .Left = 130, .Top = 135, .Width = 120, .Height = 34, .BackColor = Color.FromArgb(39, 174, 96), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            btnDesactiver = New Button() With {.Text = "DÉSACTIVER", .Left = 265, .Top = 135, .Width = 120, .Height = 34, .BackColor = Color.FromArgb(192, 57, 43), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             txtPrevisualisation = New TextBox() With {.Left = 12, .Top = 180, .Width = 950, .Height = 105, .Multiline = True, .ReadOnly = True, .ScrollBars = ScrollBars.Vertical, .BackColor = Color.FromArgb(249, 250, 251), .BorderStyle = BorderStyle.FixedSingle}
             btnNouveau.FlatAppearance.BorderSize = 0
             btnEnregistrer.FlatAppearance.BorderSize = 0
@@ -94,9 +98,9 @@ Namespace DevCommerc8ak
                 cmbParent,
                 New Label() With {.Text = "Contient", .Left = 780, .Top = 14, .AutoSize = True},
                 txtFacteurParent,
-                New Label() With {.Text = "Ordre", .Left = 890, .Top = 14, .AutoSize = True},
+                New Label() With {.Text = "Ordre d'affichage", .Left = 875, .Top = 14, .AutoSize = True},
                 txtOrdre,
-                chkBase, chkAchetable, chkVendable, chkFraction, lblApercu, btnNouveau, btnEnregistrer, btnDesactiver, txtPrevisualisation})
+                chkBase, chkAchetable, chkVendable, chkFraction, lblApercu, btnNouveau, btnEnregistrer, btnDesactiver, lblModeEdition, txtPrevisualisation})
 
             grid = New DataGridView() With {.Dock = DockStyle.Fill, .AutoGenerateColumns = False, .AllowUserToAddRows = False, .AllowUserToDeleteRows = False, .ReadOnly = True, .SelectionMode = DataGridViewSelectionMode.FullRowSelect, .RowHeadersVisible = False, .BackgroundColor = Color.White}
             grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "ProduitConditionnementId", .Name = "ProduitConditionnementId", .Visible = False})
@@ -210,6 +214,7 @@ Namespace DevCommerc8ak
             _toolTip.SetToolTip(cmbUnite, "Conditionnement que vous configurez. Exemple : Carton, Paquet, Pièce, Sac, Kg.")
             _toolTip.SetToolTip(cmbParent, "Unité directement contenue dans le conditionnement. Exemple : 1 Carton contient 24 Paquets.")
             _toolTip.SetToolTip(txtFacteurParent, "Quantité de l'unité contenue dans 1 conditionnement. Le facteur vers base est calculé automatiquement.")
+            _toolTip.SetToolTip(txtOrdre, "Détermine l'ordre dans lequel les conditionnements sont présentés. Une valeur plus petite est affichée en premier.")
             _toolTip.SetToolTip(chkBase, "Une seule unité de base active est autorisée par produit. Toutes les QuantiteBase sont exprimées dans cette unité.")
             _toolTip.SetToolTip(chkAchetable, "Autorise ce conditionnement dans les entrées de stock / approvisionnements.")
             _toolTip.SetToolTip(chkVendable, "Autorise ce conditionnement comme base des types de vente.")
@@ -227,6 +232,10 @@ Namespace DevCommerc8ak
             chkAchetable.Checked = True
             chkVendable.Checked = True
             chkFraction.Checked = False
+            btnEnregistrer.Text = "ENREGISTRER"
+            btnDesactiver.Text = "DÉSACTIVER"
+            btnDesactiver.BackColor = Color.FromArgb(192, 57, 43)
+            lblModeEdition.Text = "MODE : NOUVEAU"
             MettreAJourApercu(Nothing, EventArgs.Empty)
         End Sub
 
@@ -243,6 +252,10 @@ Namespace DevCommerc8ak
             chkAchetable.Checked = item.EstAchetable
             chkVendable.Checked = item.EstVendable
             chkFraction.Checked = item.AutoriseFraction
+            btnEnregistrer.Text = "ENREGISTRER LES MODIFICATIONS"
+            btnDesactiver.Text = If(item.EstActif, "DÉSACTIVER", "RÉACTIVER")
+            btnDesactiver.BackColor = If(item.EstActif, Color.FromArgb(192, 57, 43), Color.FromArgb(39, 174, 96))
+            lblModeEdition.Text = If(item.EstActif, "MODE : MODIFICATION", "MODE : MODIFICATION D'UN INACTIF")
             MettreAJourApercu(Nothing, EventArgs.Empty)
         End Sub
 
@@ -395,8 +408,15 @@ Namespace DevCommerc8ak
 
         Private Sub Desactiver(sender As Object, e As EventArgs)
             If _selectionId <= 0 Then Return
-            If MessageBox.Show("Désactiver ce conditionnement ? Les anciennes transactions resteront inchangées.", "Conditionnements", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) <> DialogResult.Yes Then Return
-            _service.Desactiver(_selectionId)
+            Dim item As ProduitConditionnementDTO = If(_conditionnements, New List(Of ProduitConditionnementDTO)()).FirstOrDefault(Function(c) c.ProduitConditionnementId = _selectionId)
+            If item Is Nothing Then Return
+            If item.EstActif Then
+                If MessageBox.Show("Désactiver ce conditionnement ? Les anciennes transactions resteront inchangées.", "Conditionnements", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) <> DialogResult.Yes Then Return
+                _service.Desactiver(_selectionId)
+            Else
+                If MessageBox.Show("Réactiver ce conditionnement existant ? Les anciennes transactions resteront inchangées.", "Conditionnements", MessageBoxButtons.YesNo, MessageBoxIcon.Question) <> DialogResult.Yes Then Return
+                _service.Activer(_selectionId)
+            End If
             RechargerConditionnements()
         End Sub
 

@@ -457,6 +457,19 @@ Namespace DevCommerc8ak
                 grid.Columns("Libelle").Width = Math.Max(grid.Columns("Libelle").Width, 240)
                 grid.Columns("Libelle").ToolTipText = "Produit"
             End If
+
+            If grid.Columns.Contains("colConditionnementsDynamiques") Then
+                Dim prochainIndex As Integer = 0
+                If grid.Columns.Contains("CodeBarres") Then prochainIndex = Math.Max(prochainIndex, grid.Columns("CodeBarres").DisplayIndex + 1)
+                If grid.Columns.Contains("Libelle") Then prochainIndex = Math.Max(prochainIndex, grid.Columns("Libelle").DisplayIndex + 1)
+
+                ' Les colonnes figées doivent occuper les premiers DisplayIndex.
+                ' On positionne donc NIVEAUX immédiatement après PRODUIT pour éviter
+                ' l'exception WinForms "Frozen column" lors du défilement horizontal.
+                grid.Columns("colConditionnementsDynamiques").DisplayIndex = prochainIndex
+                grid.Columns("colConditionnementsDynamiques").Frozen = True
+                grid.Columns("colConditionnementsDynamiques").Width = Math.Max(grid.Columns("colConditionnementsDynamiques").Width, 90)
+            End If
         End Sub
 
         Private Sub AjouterColonneConditionnements()
