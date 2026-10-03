@@ -390,21 +390,108 @@ Namespace DevCommerc8ak
         Private Sub VoirFacture(factureId As Integer, numero As String, client As String, tel As String)
             Try
                 Dim repo As New LigneFactureVenteRepository(ObtenirDAL())
-                Dim dt As DataTable = repo.ListerDetailsParFacture(factureId) ' nom de colonne modifier 
-                Dim lignes As New List(Of String)()
-                For Each r As DataRow In dt.Rows
-                    lignes.Add(Convert.ToString(r("Libelle")) & " x" & Convert.ToDecimal(r("Quantite")).ToString() & " = " & Convert.ToDecimal(r("MontantLigne")).ToString())
-                Next
-                Dim details As String = "Facture: " & numero & Environment.NewLine &
-                    "Client: " & client & Environment.NewLine &
-                    "Telephone: " & tel & Environment.NewLine &
-                    "Lignes:" & Environment.NewLine & String.Join(Environment.NewLine, lignes)
-                MessageBox.Show(details, "Apercu facture")
+                Dim dt As DataTable = repo.ListerDetailsParFacture(factureId)
+                Dim entete As DataRow = ChargerEnteteFacture(factureId)
+                Using apercu As New FormApercuFacture(numero, client, tel, entete, dt)
+                    apercu.ShowDialog(Me)
+                End Using
             Catch ex As Exception
                 MessageBox.Show("Erreur affichage facture: " & ex.Message)
             End Try
 
         End Sub
+
+        Private Function ChargerEnteteFacture(factureId As Integer) As DataRow
+            Dim sql As String =
+                "SELECT f.NumeroFacture, f.SousTotal, f.MontantRemise, f.MontantTotal, f.Statut, f.CreeLe, " &
+                "ISNULL(c.NomClient,'') AS ClientNom, ISNULL(c.Telephone,'') AS Telephone, ISNULL(f.ModifierPar,'') AS Facturier " &
+                "FROM FacturesVente f LEFT JOIN Clients c ON c.ClientId=f.ClientId WHERE f.FactureVenteId=@Id"
+            Dim p As New List(Of System.Data.SqlClient.SqlParameter) From {New System.Data.SqlClient.SqlParameter("@Id", factureId)}
+            Dim dt As DataTable = ObtenirDAL().ExecuterTable(sql, CommandType.Text, p)
+            If dt.Rows.Count = 0 Then Return Nothing
+            Return dt.Rows(0)
+        End Function
+
+        Private NotInheritable Class FormApercuFacture
+            Inherits Form
+
+            Private ReadOnly ColorPrimary As Color = Color.FromArgb(41, 128, 185)
+            Private ReadOnly ColorDanger As Color = Color.FromArgb(192, 57, 43)
+
+            Public Sub New(numero As String, client As String, telephone As String, entete As DataRow, lignes As DataTable)
+                Text = "Aperçu facture"
+                StartPosition = FormStartPosition.CenterParent
+                MinimumSize = New Size(850, 620)
+                Size = New Size(980, 700)
+                BackColor = Color.FromArgb(245, 247, 250)
+
+                Dim statut As String = If(entete Is Nothing, String.Empty, Convert.ToString(entete("Statut")))
+                Dim titre As String = If(String.Equals(statut, "EN_ATTENTE", StringComparison.OrdinalIgnoreCase), "PROFORMA", "FACTURE")
+                Dim header As New Panel() With {.Dock = DockStyle.Top, .Height = 138, .BackColor = Color.White, .Padding = New Padding(22)}
+                Dim lblTitre As New Label() With {.Text = titre & " " & numero, .Font = New Font("Segoe UI", 16, FontStyle.Bold), .ForeColor = ColorPrimary, .AutoSize = True, .Left = 22, .Top = 16}
+                Dim lblInfos As New Label() With {
+                    .Text = "Date : " & If(entete Is Nothing, Date.Now.ToString("dd/MM/yyyy HH:mm"), Convert.ToDateTime(entete("CreeLe")).ToString("dd/MM/yyyy HH:mm")) & Environment.NewLine &
+                            "Client : " & If(String.IsNullOrWhiteSpace(client), "CLIENT", client) & Environment.NewLine &
+                            "Téléphone : " & telephone & Environment.NewLine &
+                            "Facturier : " & If(entete Is Nothing, String.Empty, Convert.ToString(entete("Facturier"))),
+                    .Font = New Font("Segoe UI", 9.5F),
+                    .ForeColor = Color.FromArgb(52, 73, 94),
+                    .Left = 24,
+                    .Top = 50,
+                    .Width = 620,
+                    .Height = 78
+                }
+                header.Controls.AddRange(New Control() {lblTitre, lblInfos})
+
+                If String.Equals(statut, "ANNULEE", StringComparison.OrdinalIgnoreCase) Then
+                    Dim lblAnnulee As New Label() With {.Text = "FACTURE ANNULÉE", .Font = New Font("Segoe UI", 12, FontStyle.Bold), .ForeColor = Color.White, .BackColor = ColorDanger, .TextAlign = ContentAlignment.MiddleCenter, .Left = 690, .Top = 28, .Width = 220, .Height = 42}
+                    header.Controls.Add(lblAnnulee)
+                End If
+
+                Dim grid As New DataGridView() With {
+                    .Dock = DockStyle.Fill,
+                    .ReadOnly = True,
+                    .AllowUserToAddRows = False,
+                    .AllowUserToDeleteRows = False,
+                    .AutoGenerateColumns = False,
+                    .RowHeadersVisible = False,
+                    .BackgroundColor = Color.White,
+                    .SelectionMode = DataGridViewSelectionMode.FullRowSelect
+                }
+                grid.EnableHeadersVisualStyles = False
+                grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245)
+                grid.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
+                grid.ColumnHeadersHeight = 38
+                grid.DefaultCellStyle.Font = New Font("Segoe UI", 9.5F)
+                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "Libelle", .HeaderText = "Produit", .Width = 260})
+                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "TypeVente", .HeaderText = "Conditionnement", .Width = 145})
+                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "QuantiteSaisie", .HeaderText = "Quantité", .Width = 90})
+                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixUnitaire", .HeaderText = "Prix unitaire", .Width = 120, .DefaultCellStyle = New DataGridViewCellStyle() With {.Format = "N0", .Alignment = DataGridViewContentAlignment.MiddleRight}})
+                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "MontantLigne", .HeaderText = "Total", .Width = 120, .DefaultCellStyle = New DataGridViewCellStyle() With {.Format = "N0", .Alignment = DataGridViewContentAlignment.MiddleRight}})
+                grid.DataSource = lignes
+
+                Dim footer As New Panel() With {.Dock = DockStyle.Bottom, .Height = 92, .BackColor = Color.White, .Padding = New Padding(20)}
+                Dim sousTotal As Decimal = If(entete Is Nothing OrElse entete.IsNull("SousTotal"), CalculerSommeLignes(lignes), Convert.ToDecimal(entete("SousTotal")))
+                Dim remise As Decimal = If(entete Is Nothing OrElse entete.IsNull("MontantRemise"), 0D, Convert.ToDecimal(entete("MontantRemise")))
+                Dim total As Decimal = If(entete Is Nothing OrElse entete.IsNull("MontantTotal"), sousTotal - remise, Convert.ToDecimal(entete("MontantTotal")))
+                footer.Controls.Add(New Label() With {.Text = "Sous-total : " & sousTotal.ToString("N0") & " FC", .AutoSize = True, .Left = 620, .Top = 16, .Font = New Font("Segoe UI", 9.5F)})
+                footer.Controls.Add(New Label() With {.Text = "Remise : " & remise.ToString("N0") & " FC", .AutoSize = True, .Left = 620, .Top = 38, .Font = New Font("Segoe UI", 9.5F)})
+                footer.Controls.Add(New Label() With {.Text = "TOTAL : " & total.ToString("N0") & " FC", .AutoSize = True, .Left = 620, .Top = 60, .Font = New Font("Segoe UI", 11, FontStyle.Bold), .ForeColor = ColorPrimary})
+
+                Controls.Add(grid)
+                Controls.Add(footer)
+                Controls.Add(header)
+            End Sub
+
+            Private Shared Function CalculerSommeLignes(lignes As DataTable) As Decimal
+                Dim total As Decimal = 0D
+                If lignes Is Nothing Then Return total
+                For Each r As DataRow In lignes.Rows
+                    If Not r.IsNull("MontantLigne") Then total += Convert.ToDecimal(r("MontantLigne"))
+                Next
+                Return total
+            End Function
+        End Class
 
         Private Sub ImprimerFacture(factureId As Integer, numero As String, client As String, tel As String)
             Try

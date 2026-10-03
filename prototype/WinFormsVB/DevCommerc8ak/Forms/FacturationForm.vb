@@ -74,6 +74,7 @@ Namespace DevCommerc8ak
         Private _suppressSelectionEvents As Boolean
         Private _dataMonitor As DataChangeMonitorService
         Private _normalisationTelephoneEnCours As Boolean
+        Private _proformaA4Index As Integer
         Private ReadOnly _prefixesTelephoneRdc As String() = {"081", "082", "083", "084", "085", "089", "097", "098", "099"}
 
         Private Class PanierLigne
@@ -324,7 +325,7 @@ Namespace DevCommerc8ak
             }
 
             btnValider = New Button() With {.Text = "VALIDER LA VENTE", .Width = 210, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorAccent, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
-            btnImprimer = New Button() With {.Text = "IMPRIMER A4", .Width = 140, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
+            btnImprimer = New Button() With {.Text = "IMPRIMER", .Width = 140, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
             btnPdf = New Button() With {.Text = "PDF", .Width = 100, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
 
             btnHistorique = New Button() With {.Text = "HISTORIQUE", .Width = 150, .Height = 40, .FlatStyle = FlatStyle.Flat, .BackColor = ColorPrimary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
@@ -1241,17 +1242,15 @@ Namespace DevCommerc8ak
                     MessageBox.Show("Panier vide.")
                     Return
                 End If
-                Dim doc As New Printing.PrintDocument()
-                _parametres = PrintConfigurationHelper.ConfigurerDocumentA4(doc, Me, "FacturationForm", "ImprimerA4")
-                AddHandler doc.PrintPage, AddressOf ImprimerPage
 
-                If _parametres IsNot Nothing AndAlso _parametres.ApercuAvantImpression Then
-                    Dim preview As New PrintPreviewDialog()
-                    preview.Document = doc
-                    preview.ShowDialog()
-                Else
-                    doc.Print()
-                End If
+                Using choix As New FormChoixImpressionProforma()
+                    If choix.ShowDialog(Me) <> DialogResult.OK Then Return
+                    If choix.FormatSelectionne = "THERMIQUE" Then
+                        ImprimerProformaThermique()
+                    Else
+                        ImprimerProformaA4()
+                    End If
+                End Using
             Catch ex As Exception
                 MessageBox.Show("Erreur impression: " & ex.Message)
             End Try
@@ -1263,17 +1262,23 @@ Namespace DevCommerc8ak
                     MessageBox.Show("Panier vide.")
                     Return
                 End If
-                Dim sfd As New SaveFileDialog() With {.Filter = "PDF (*.pdf)|*.pdf"}
-                If sfd.ShowDialog() <> DialogResult.OK Then Return
-                _parametres = PrintConfigurationHelper.ChargerParametres()
-                Using doc As New Printing.PrintDocument()
-                    doc.DefaultPageSettings.PaperSize = New Printing.PaperSize("A4", 827, 1169)
-                    doc.DefaultPageSettings.Margins = New Printing.Margins(30, 30, 30, 30)
-                    doc.DefaultPageSettings.Color = If(_parametres IsNot Nothing, _parametres.ImpressionCouleur, True)
-                    AddHandler doc.PrintPage, AddressOf ImprimerPage
-                    PdfHelper.GenererPdfDepuisPrintDocument(sfd.FileName, doc)
+
+                Using sfd As New SaveFileDialog()
+                    sfd.Filter = "PDF (*.pdf)|*.pdf"
+                    sfd.FileName = ConstruireNomPdfProforma()
+                    If sfd.ShowDialog(Me) <> DialogResult.OK Then Return
+
+                    _parametres = PrintConfigurationHelper.ChargerParametres()
+                    _proformaA4Index = 0
+                    Using doc As New Printing.PrintDocument()
+                        doc.DefaultPageSettings.PaperSize = New Printing.PaperSize("A4", 827, 1169)
+                        doc.DefaultPageSettings.Margins = New Printing.Margins(30, 30, 30, 30)
+                        doc.DefaultPageSettings.Color = If(_parametres IsNot Nothing, _parametres.ImpressionCouleur, True)
+                        AddHandler doc.PrintPage, AddressOf ImprimerPage
+                        Dim cheminPdf As String = PdfHelper.GenererPdfDepuisPrintDocumentEtRetournerChemin(sfd.FileName, doc)
+                        MessageBox.Show("PDF généré avec succès." & Environment.NewLine & Environment.NewLine & "Fichier :" & Environment.NewLine & cheminPdf, "Export PDF", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    End Using
                 End Using
-                MessageBox.Show("PDF genere.")
             Catch ex As Exception
                 MessageBox.Show("Erreur PDF: " & ex.Message)
             End Try
@@ -1346,61 +1351,388 @@ Namespace DevCommerc8ak
         End Function
 
         Private Sub ImprimerPage(sender As Object, e As Printing.PrintPageEventArgs)
-            Dim y As Integer = 20
-            Dim x As Integer = 20
+            DessinerProformaA4(e)
+        End Sub
 
-            If _parametres IsNot Nothing AndAlso _parametres.LogoPath <> "" AndAlso File.Exists(_parametres.LogoPath) Then
-                Using img As Image = Image.FromFile(_parametres.LogoPath)
-                    e.Graphics.DrawImage(img, x, y, 60, 60)
+        Private Sub ImprimerProformaA4()
+            Using doc As New Printing.PrintDocument()
+                _parametres = PrintConfigurationHelper.ConfigurerDocumentA4(doc, Me, "FacturationForm", "ImprimerProformaA4")
+                _proformaA4Index = 0
+                AddHandler doc.PrintPage, AddressOf ImprimerPage
+
+                If _parametres IsNot Nothing AndAlso _parametres.ApercuAvantImpression Then
+                    Using preview As New PrintPreviewDialog()
+                        preview.Document = doc
+                        preview.ShowDialog(Me)
+                    End Using
+                Else
+                    doc.Print()
+                End If
+            End Using
+        End Sub
+
+        Private Sub ImprimerProformaThermique()
+            Using doc As New Printing.PrintDocument()
+                _parametres = PrintConfigurationHelper.ChargerParametres()
+                Dim hauteur As Integer = CalculerHauteurProformaThermique(315)
+                _parametres = PrintConfigurationHelper.ConfigurerDocumentThermique(doc, Me, "FacturationForm", "ImprimerProformaThermique", 315, hauteur)
+                AddHandler doc.PrintPage, AddressOf ImprimerPageProformaThermique
+                Using preview As New FormApercuTicket(doc, Sub() doc.Print())
+                    preview.ShowDialog(Me)
                 End Using
-                x += 70
+            End Using
+        End Sub
+
+        Private Sub DessinerProformaA4(e As Printing.PrintPageEventArgs)
+            e.Graphics.PageUnit = GraphicsUnit.Display
+            Dim printable As RectangleF = e.MarginBounds
+            Dim reportWidth As Single = printable.Width * 0.93F
+            Dim reportLeft As Single = printable.Left + ((printable.Width - reportWidth) / 2.0F)
+            Dim reportRight As Single = reportLeft + reportWidth
+            Dim y As Single = printable.Top
+            Dim footerHeight As Single = 24.0F
+
+            Using fontTitle As New Font("Segoe UI", 16, FontStyle.Bold),
+                  fontHeader As New Font("Segoe UI", 10, FontStyle.Bold),
+                  fontNormal As New Font("Segoe UI", 9),
+                  fontSmall As New Font("Segoe UI", 8),
+                  blueBrush As New SolidBrush(Color.FromArgb(41, 128, 185)),
+                  grayBrush As New SolidBrush(Color.FromArgb(107, 114, 128)),
+                  headerBrush As New SolidBrush(Color.FromArgb(41, 128, 185)),
+                  lightBrush As New SolidBrush(Color.FromArgb(239, 246, 255))
+
+                y = DessinerEnteteProformaA4(e.Graphics, reportLeft, y, reportWidth, fontTitle, fontNormal, blueBrush, grayBrush)
+
+                e.Graphics.FillRectangle(headerBrush, reportLeft, y, reportWidth, 34)
+                DessinerTexteCentreA4(e.Graphics, "PROFORMA", fontTitle, Brushes.White, New RectangleF(reportLeft, y + 4, reportWidth, 26))
+                y += 46
+
+                Dim infoHeight As Single = 82
+                e.Graphics.FillRectangle(lightBrush, reportLeft, y, reportWidth, infoHeight)
+                DessinerLibelleValeurA4(e.Graphics, "N°", txtNumeroFacture.Text.Trim(), fontHeader, fontNormal, reportLeft + 12, y + 10, reportWidth * 0.48F)
+                DessinerLibelleValeurA4(e.Graphics, "Date", Date.Now.ToString("dd/MM/yyyy HH:mm"), fontHeader, fontNormal, reportLeft + 12, y + 34, reportWidth * 0.48F)
+                DessinerLibelleValeurA4(e.Graphics, "Facturier", If(String.IsNullOrWhiteSpace(SessionUtilisateur.NomUtilisateur), "SYSTEM", SessionUtilisateur.NomUtilisateur), fontHeader, fontNormal, reportLeft + 12, y + 58, reportWidth * 0.48F)
+                DessinerLibelleValeurA4(e.Graphics, "Client", If(txtClientNom.Text.Trim() = "", "CLIENT", txtClientNom.Text.Trim()), fontHeader, fontNormal, reportLeft + reportWidth * 0.52F, y + 10, reportWidth * 0.46F)
+                DessinerLibelleValeurA4(e.Graphics, "Téléphone", txtClientTel.Text.Trim(), fontHeader, fontNormal, reportLeft + reportWidth * 0.52F, y + 34, reportWidth * 0.46F)
+                y += infoHeight + 18
+
+                Dim widths As Single() = {reportWidth * 0.36F, reportWidth * 0.18F, reportWidth * 0.12F, reportWidth * 0.17F, reportWidth * 0.17F}
+                Dim headers As String() = {"Désignation", "Conditionnement", "Quantité", "Prix unitaire", "Montant"}
+                y = DessinerEnteteTableProforma(e.Graphics, reportLeft, y, widths, headers, fontHeader, headerBrush)
+
+                Dim tableBottom As Single = printable.Bottom - footerHeight
+                While _proformaA4Index < _panier.Count
+                    Dim ligne As PanierLigne = _panier(_proformaA4Index)
+                    Dim rowHeight As Single = MesurerHauteurLigneProforma(e.Graphics, ligne, widths, fontNormal)
+                    If y + rowHeight > tableBottom Then
+                        DessinerFooterProformaA4(e.Graphics, reportLeft, reportWidth, printable.Bottom - 16, fontSmall)
+                        e.HasMorePages = True
+                        Return
+                    End If
+                    DessinerLigneProformaA4(e.Graphics, reportLeft, y, widths, rowHeight, ligne, fontNormal)
+                    y += rowHeight
+                    _proformaA4Index += 1
+                End While
+
+                Dim sousTotal As Decimal = CalculerSousTotalPanier()
+                Dim remiseMontant As Decimal = CalculerRemiseMontant(sousTotal)
+                Dim total As Decimal = sousTotal - remiseMontant
+                y += 14
+                Dim totalLeft As Single = reportRight - 230
+                DessinerTotalA4(e.Graphics, "Sous-total", sousTotal, fontNormal, totalLeft, y, 230)
+                y += 24
+                DessinerTotalA4(e.Graphics, "Remise", remiseMontant, fontNormal, totalLeft, y, 230)
+                y += 26
+                DessinerTotalA4(e.Graphics, "TOTAL", total, fontHeader, totalLeft, y, 230)
+                y += 34
+                Using fmtCentre As New StringFormat()
+                    fmtCentre.Alignment = StringAlignment.Center
+                    e.Graphics.DrawString("DOCUMENT PROFORMA — NON ACQUITTÉ", fontHeader, blueBrush, New RectangleF(reportLeft, y, reportWidth, 24), fmtCentre)
+                End Using
+
+                DessinerFooterProformaA4(e.Graphics, reportLeft, reportWidth, printable.Bottom - 16, fontSmall)
+                _proformaA4Index = 0
+                e.HasMorePages = False
+            End Using
+        End Sub
+
+        Private Function DessinerEnteteProformaA4(g As Graphics, left As Single, y As Single, width As Single, fontTitle As Font, fontNormal As Font, blueBrush As Brush, grayBrush As Brush) As Single
+            Dim xText As Single = left
+            Dim logoPath As String = If(_parametres Is Nothing, String.Empty, LogoPathHelper.GetLogoPath(_parametres))
+            If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
+                Using img As Image = Image.FromFile(logoPath)
+                    g.DrawImage(img, left, y, 58, 58)
+                End Using
+                xText += 70
             End If
+            g.DrawString(If(_parametres IsNot Nothing AndAlso _parametres.NomMagasin <> "", _parametres.NomMagasin, "COMMERCIAL PRO"), fontTitle, blueBrush, xText, y)
+            g.DrawString(If(_parametres Is Nothing, String.Empty, _parametres.AdresseMagasin), fontNormal, grayBrush, xText, y + 26)
+            g.DrawString(If(_parametres Is Nothing, String.Empty, _parametres.TelephoneMagasin), fontNormal, grayBrush, xText, y + 46)
+            Return y + 72
+        End Function
 
-            Dim nomMag As String = If(_parametres IsNot Nothing, _parametres.NomMagasin, "")
-            Dim adr As String = If(_parametres IsNot Nothing, _parametres.AdresseMagasin, "")
-            Dim tel As String = If(_parametres IsNot Nothing, _parametres.TelephoneMagasin, "")
+        Private Shared Sub DessinerTexteCentreA4(g As Graphics, texte As String, font As Font, brush As Brush, rect As RectangleF)
+            Using fmt As New StringFormat()
+                fmt.Alignment = StringAlignment.Center
+                fmt.LineAlignment = StringAlignment.Center
+                g.DrawString(If(texte, String.Empty), font, brush, rect, fmt)
+            End Using
+        End Sub
 
-            e.Graphics.DrawString(nomMag, New Font("Segoe UI", 14, FontStyle.Bold), Brushes.Black, x, y)
-            y += 24
-            e.Graphics.DrawString(adr, New Font("Segoe UI", 10), Brushes.Black, x, y)
-            y += 18
-            e.Graphics.DrawString(tel, New Font("Segoe UI", 10), Brushes.Black, x, y)
-            y += 26
+        Private Shared Sub DessinerLibelleValeurA4(g As Graphics, libelle As String, valeur As String, fontLibelle As Font, fontValeur As Font, x As Single, y As Single, width As Single)
+            g.DrawString(libelle & " :", fontLibelle, Brushes.Black, New RectangleF(x, y, 85, 20))
+            g.DrawString(If(valeur, String.Empty), fontValeur, Brushes.Black, New RectangleF(x + 90, y, width - 90, 22))
+        End Sub
 
-            e.Graphics.DrawString("Facture: " & txtNumeroFacture.Text.Trim(), New Font("Segoe UI", 10, FontStyle.Bold), Brushes.Black, 20, y)
-            y += 18
-            e.Graphics.DrawString("Date: " & Date.Now.ToString("dd/MM/yyyy HH:mm"), New Font("Segoe UI", 10), Brushes.Black, 20, y)
-            y += 18
-            e.Graphics.DrawString("Client: " & txtClientNom.Text.Trim(), New Font("Segoe UI", 10), Brushes.Black, 20, y)
-            y += 18
-            e.Graphics.DrawString("Telephone: " & txtClientTel.Text.Trim(), New Font("Segoe UI", 10), Brushes.Black, 20, y)
-            y += 24
-
-            e.Graphics.DrawString("DETAILS", New Font("Segoe UI", 11, FontStyle.Bold), Brushes.Black, 20, y)
-            y += 20
-
-            For Each l As PanierLigne In _panier
-                Dim line As String = l.Libelle & " " & l.Unite & " x" & l.Quantite.ToString() & " = " & l.Total.ToString()
-                e.Graphics.DrawString(line, New Font("Segoe UI", 10), Brushes.Black, 20, y)
-                y += 18
+        Private Shared Function DessinerEnteteTableProforma(g As Graphics, left As Single, y As Single, widths As Single(), headers As String(), font As Font, brush As Brush) As Single
+            Dim x As Single = left
+            For i As Integer = 0 To headers.Length - 1
+                g.FillRectangle(brush, x, y, widths(i), 28)
+                g.DrawString(headers(i), font, Brushes.White, New RectangleF(x + 4, y + 6, widths(i) - 8, 18))
+                x += widths(i)
             Next
+            Return y + 28
+        End Function
 
-            Dim sousTotal As Decimal = 0D
-            For Each l As PanierLigne In _panier
-                sousTotal += l.Total
+        Private Shared Function MesurerHauteurLigneProforma(g As Graphics, ligne As PanierLigne, widths As Single(), font As Font) As Single
+            Dim valeurs As String() = {
+                ligne.Libelle,
+                ligne.Unite,
+                FormaterQuantiteProforma(ligne.Quantite),
+                FormatMontantProforma(ligne.PrixUnitaire),
+                FormatMontantProforma(ligne.Total)
+            }
+            Dim hauteur As Single = 28
+            For i As Integer = 0 To valeurs.Length - 1
+                Dim size As SizeF = g.MeasureString(If(valeurs(i), String.Empty), font, New SizeF(widths(i) - 8, 500))
+                hauteur = Math.Max(hauteur, CSng(Math.Ceiling(size.Height)) + 10)
             Next
+            Return hauteur
+        End Function
+
+        Private Shared Sub DessinerLigneProformaA4(g As Graphics, left As Single, y As Single, widths As Single(), height As Single, ligne As PanierLigne, font As Font)
+            Dim valeurs As String() = {
+                ligne.Libelle,
+                ligne.Unite,
+                FormaterQuantiteProforma(ligne.Quantite),
+                FormatMontantProforma(ligne.PrixUnitaire),
+                FormatMontantProforma(ligne.Total)
+            }
+            Dim x As Single = left
+            For i As Integer = 0 To valeurs.Length - 1
+                g.DrawRectangle(Pens.LightGray, x, y, widths(i), height)
+                Using fmt As New StringFormat()
+                    fmt.Alignment = If(i >= 2, StringAlignment.Far, StringAlignment.Near)
+                    fmt.LineAlignment = StringAlignment.Center
+                    g.DrawString(valeurs(i), font, Brushes.Black, New RectangleF(x + 4, y + 3, widths(i) - 8, height - 6), fmt)
+                End Using
+                x += widths(i)
+            Next
+        End Sub
+
+        Private Shared Sub DessinerTotalA4(g As Graphics, libelle As String, montant As Decimal, font As Font, x As Single, y As Single, width As Single)
+            g.DrawString(libelle & " :", font, Brushes.Black, New RectangleF(x, y, width * 0.45F, 22))
+            Using fmt As New StringFormat()
+                fmt.Alignment = StringAlignment.Far
+                g.DrawString(FormatMontantProforma(montant), font, Brushes.Black, New RectangleF(x + width * 0.45F, y, width * 0.55F, 22), fmt)
+            End Using
+        End Sub
+
+        Private Shared Sub DessinerFooterProformaA4(g As Graphics, left As Single, width As Single, y As Single, font As Font)
+            Dim texte As String = "Impression professionnelle générée depuis COMMERCIAL PRO - " & Date.Now.ToString("dd/MM/yyyy HH:mm")
+            Using fmtCentre As New StringFormat()
+                fmtCentre.Alignment = StringAlignment.Center
+                g.DrawString(texte, font, Brushes.Gray, New RectangleF(left, y, width, 18), fmtCentre)
+            End Using
+        End Sub
+
+        Private Function CalculerHauteurProformaThermique(largeurPapier As Integer) As Integer
+            Using bmp As New Bitmap(1, 1),
+                  g As Graphics = Graphics.FromImage(bmp),
+                  fontTitre As New Font("Segoe UI", 10, FontStyle.Bold),
+                  fontSection As New Font("Segoe UI", 7.5F, FontStyle.Bold),
+                  fontLigne As New Font("Segoe UI", 7.5F),
+                  fontTotal As New Font("Segoe UI", 8.5F, FontStyle.Bold)
+
+                Dim largeur As Integer = Math.Max(200, largeurPapier - 28)
+                Dim hauteur As Integer = 8
+                If LogoProformaDisponible() Then hauteur += 48
+
+                ' La hauteur thermique est calculée sur le contenu réel afin que
+                ' le pied proforma ne tombe pas dans la zone de coupe de l'imprimante.
+                hauteur += HauteurTexteTicket(g, If(_parametres IsNot Nothing AndAlso _parametres.NomMagasin <> "", _parametres.NomMagasin, "COMMERCIAL PRO"), fontTitre, largeur)
+                If _parametres IsNot Nothing AndAlso _parametres.AdresseMagasin <> "" Then hauteur += HauteurTexteTicket(g, _parametres.AdresseMagasin, fontLigne, largeur)
+                If _parametres IsNot Nothing AndAlso _parametres.TelephoneMagasin <> "" Then hauteur += HauteurTexteTicket(g, _parametres.TelephoneMagasin, fontLigne, largeur)
+                hauteur += HauteurTexteTicket(g, "PROFORMA", fontSection, largeur) + 10
+                hauteur += 18 * 5 + 20
+
+                For Each ligne As PanierLigne In _panier
+                    hauteur += HauteurTexteTicket(g, ligne.Libelle, fontSection, largeur)
+                    hauteur += HauteurTexteTicket(g, FormaterQuantiteProforma(ligne.Quantite) & " " & ligne.Unite & " x " & FormatMontantProforma(ligne.PrixUnitaire) & " = " & FormatMontantProforma(ligne.Total), fontLigne, largeur - 4)
+                Next
+
+                hauteur += 10 + (18 * 3) + 10
+                hauteur += HauteurTexteTicket(g, "DOCUMENT PROFORMA - NON ACQUITTE", fontSection, largeur)
+                hauteur += HauteurTexteTicket(g, Application.ProductName & " - v" & PrintConfigurationHelper.ObtenirVersionApplication(), fontLigne, largeur)
+                hauteur += HauteurTexteTicket(g, "Développé par : Andy Ntanta", fontLigne, largeur)
+                Return Math.Max(420, hauteur + 44)
+            End Using
+        End Function
+
+        Private Function LogoProformaDisponible() As Boolean
+            Dim logoPath As String = If(_parametres Is Nothing, String.Empty, LogoPathHelper.GetLogoPath(_parametres))
+            Return Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath)
+        End Function
+
+        Private Shared Function HauteurTexteTicket(g As Graphics, texte As String, font As Font, largeur As Integer) As Integer
+            Dim size As SizeF = g.MeasureString(If(texte, String.Empty), font, New SizeF(largeur, 1000))
+            Return CInt(Math.Ceiling(size.Height)) + 2
+        End Function
+
+        Private Sub ImprimerPageProformaThermique(sender As Object, e As Printing.PrintPageEventArgs)
+            Dim gauche As Integer = e.MarginBounds.Left + 4
+            Dim largeur As Integer = Math.Max(200, e.MarginBounds.Width - 8)
+            Dim y As Integer = e.MarginBounds.Top + 2
+            Using fontTitre As New Font("Segoe UI", 10, FontStyle.Bold),
+                  fontSection As New Font("Segoe UI", 7.5F, FontStyle.Bold),
+                  fontLigne As New Font("Segoe UI", 7.5F),
+                  fontTotal As New Font("Segoe UI", 8.5F, FontStyle.Bold)
+
+                Dim logoPath As String = If(_parametres Is Nothing, String.Empty, LogoPathHelper.GetLogoPath(_parametres))
+                If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
+                    Using img As Image = Image.FromFile(logoPath)
+                        e.Graphics.DrawImage(img, gauche + ((largeur - 42) \ 2), y, 42, 42)
+                    End Using
+                    y += 46
+                End If
+
+                y = DessinerTexteCentreTicketProforma(e.Graphics, If(_parametres IsNot Nothing AndAlso _parametres.NomMagasin <> "", _parametres.NomMagasin, "COMMERCIAL PRO"), fontTitre, gauche, largeur, y)
+                If _parametres IsNot Nothing AndAlso _parametres.AdresseMagasin <> "" Then y = DessinerTexteCentreTicketProforma(e.Graphics, _parametres.AdresseMagasin, fontLigne, gauche, largeur, y)
+                If _parametres IsNot Nothing AndAlso _parametres.TelephoneMagasin <> "" Then y = DessinerTexteCentreTicketProforma(e.Graphics, _parametres.TelephoneMagasin, fontLigne, gauche, largeur, y)
+                y = DessinerTexteCentreTicketProforma(e.Graphics, "PROFORMA", fontSection, gauche, largeur, y + 4)
+                y = DessinerSeparateurTicketProforma(e.Graphics, gauche, largeur, y)
+                y = DessinerPaireTicketProforma(e.Graphics, "N°", txtNumeroFacture.Text.Trim(), fontLigne, gauche, largeur, y)
+                y = DessinerPaireTicketProforma(e.Graphics, "Date", Date.Now.ToString("dd/MM/yyyy HH:mm"), fontLigne, gauche, largeur, y)
+                y = DessinerPaireTicketProforma(e.Graphics, "Client", If(txtClientNom.Text.Trim() = "", "CLIENT", txtClientNom.Text.Trim()), fontLigne, gauche, largeur, y)
+                If txtClientTel.Text.Trim() <> "" Then y = DessinerPaireTicketProforma(e.Graphics, "Téléphone", txtClientTel.Text.Trim(), fontLigne, gauche, largeur, y)
+                y = DessinerPaireTicketProforma(e.Graphics, "Facturier", If(String.IsNullOrWhiteSpace(SessionUtilisateur.NomUtilisateur), "SYSTEM", SessionUtilisateur.NomUtilisateur), fontLigne, gauche, largeur, y)
+                y = DessinerSeparateurTicketProforma(e.Graphics, gauche, largeur, y)
+
+                For Each ligne As PanierLigne In _panier
+                    y = DessinerTexteGaucheTicketProforma(e.Graphics, ligne.Libelle, fontSection, gauche, largeur, y)
+                    y = DessinerTexteGaucheTicketProforma(e.Graphics, FormaterQuantiteProforma(ligne.Quantite) & " " & ligne.Unite & " x " & FormatMontantProforma(ligne.PrixUnitaire) & " = " & FormatMontantProforma(ligne.Total), fontLigne, gauche + 4, largeur - 4, y)
+                Next
+
+                Dim sousTotal As Decimal = CalculerSousTotalPanier()
+                Dim remiseMontant As Decimal = CalculerRemiseMontant(sousTotal)
+                Dim total As Decimal = sousTotal - remiseMontant
+                y = DessinerSeparateurTicketProforma(e.Graphics, gauche, largeur, y)
+                y = DessinerPaireTicketProforma(e.Graphics, "Sous-total", FormatMontantProforma(sousTotal), fontLigne, gauche, largeur, y)
+                y = DessinerPaireTicketProforma(e.Graphics, "Remise", FormatMontantProforma(remiseMontant), fontLigne, gauche, largeur, y)
+                y = DessinerPaireTicketProforma(e.Graphics, "TOTAL", FormatMontantProforma(total), fontTotal, gauche, largeur, y)
+                y = DessinerSeparateurTicketProforma(e.Graphics, gauche, largeur, y)
+                y = DessinerTexteCentreTicketProforma(e.Graphics, "DOCUMENT PROFORMA - NON ACQUITTE", fontSection, gauche, largeur, y)
+                y = DessinerTexteCentreTicketProforma(e.Graphics, Application.ProductName & " - v" & PrintConfigurationHelper.ObtenirVersionApplication(), fontLigne, gauche, largeur, y)
+                y = DessinerTexteCentreTicketProforma(e.Graphics, "Développé par : Andy Ntanta", fontLigne, gauche, largeur, y)
+            End Using
+        End Sub
+
+        Private Shared Function DessinerTexteCentreTicketProforma(g As Graphics, texte As String, font As Font, x As Integer, largeur As Integer, y As Integer) As Integer
+            Dim size As SizeF = g.MeasureString(If(texte, String.Empty), font, New SizeF(largeur, 1000))
+            Using fmtCentre As New StringFormat()
+                fmtCentre.Alignment = StringAlignment.Center
+                g.DrawString(If(texte, String.Empty), font, Brushes.Black, New RectangleF(x, y, largeur, size.Height), fmtCentre)
+            End Using
+            Return y + CInt(Math.Ceiling(size.Height)) + 2
+        End Function
+
+        Private Shared Function DessinerTexteGaucheTicketProforma(g As Graphics, texte As String, font As Font, x As Integer, largeur As Integer, y As Integer) As Integer
+            Dim size As SizeF = g.MeasureString(If(texte, String.Empty), font, New SizeF(largeur, 1000))
+            g.DrawString(If(texte, String.Empty), font, Brushes.Black, New RectangleF(x, y, largeur, size.Height))
+            Return y + CInt(Math.Ceiling(size.Height)) + 2
+        End Function
+
+        Private Shared Function DessinerPaireTicketProforma(g As Graphics, libelle As String, valeur As String, font As Font, x As Integer, largeur As Integer, y As Integer) As Integer
+            Dim largeurLibelle As Integer = Math.Min(78, CInt(largeur * 0.38F))
+            g.DrawString(libelle & " :", font, Brushes.Black, New RectangleF(x, y, largeurLibelle, 18))
+            Using fmtDroite As New StringFormat()
+                fmtDroite.Alignment = StringAlignment.Far
+                g.DrawString(If(valeur, String.Empty), font, Brushes.Black, New RectangleF(x + largeurLibelle, y, largeur - largeurLibelle, 34), fmtDroite)
+            End Using
+            Return y + 18
+        End Function
+
+        Private Shared Function DessinerSeparateurTicketProforma(g As Graphics, x As Integer, largeur As Integer, y As Integer) As Integer
+            g.DrawLine(Pens.Black, x, y + 4, x + largeur - 1, y + 4)
+            Return y + 10
+        End Function
+
+        Private Function CalculerSousTotalPanier() As Decimal
+            Return _panier.Sum(Function(l) l.Total)
+        End Function
+
+        Private Function CalculerRemiseMontant(sousTotal As Decimal) As Decimal
             Dim remisePourcent As Decimal
             Decimal.TryParse(txtRemise.Text.Trim(), remisePourcent)
-            Dim remiseMontant As Decimal = sousTotal * remisePourcent / 100D
-            Dim total As Decimal = sousTotal - remiseMontant
+            Return sousTotal * remisePourcent / 100D
+        End Function
 
-            y += 10
-            e.Graphics.DrawString("Sous-total: " & sousTotal.ToString(), New Font("Segoe UI", 10), Brushes.Black, 20, y)
-            y += 18
-            e.Graphics.DrawString("Remise: " & remiseMontant.ToString(), New Font("Segoe UI", 10), Brushes.Black, 20, y)
-            y += 18
-            e.Graphics.DrawString("Total: " & total.ToString(), New Font("Segoe UI", 11, FontStyle.Bold), Brushes.Black, 20, y)
-        End Sub
+        Private Shared Function FormatMontantProforma(montant As Decimal) As String
+            Return montant.ToString("N0") & " FC"
+        End Function
+
+        Private Shared Function FormaterQuantiteProforma(qte As Decimal) As String
+            If Decimal.Truncate(qte) = qte Then Return qte.ToString("N0")
+            Return qte.ToString("0.####")
+        End Function
+
+        Private Function ConstruireNomPdfProforma() As String
+            Dim numero As String = NettoyerNomFichier(txtNumeroFacture.Text.Trim())
+            If numero = "" Then numero = "SANS_NUMERO"
+            Dim client As String = NettoyerNomFichier(txtClientNom.Text.Trim())
+            If client = "" Then client = "CLIENT"
+            Return "PROFORMA_" & numero & "_" & client & ".pdf"
+        End Function
+
+        Private Shared Function NettoyerNomFichier(valeur As String) As String
+            Dim texte As String = If(valeur, String.Empty).Trim()
+            For Each c As Char In Path.GetInvalidFileNameChars()
+                texte = texte.Replace(c, "_"c)
+            Next
+            texte = texte.Replace(" "c, "_"c)
+            Return texte
+        End Function
+
+        Private NotInheritable Class FormChoixImpressionProforma
+            Inherits Form
+
+            Public Property FormatSelectionne As String = String.Empty
+
+            Public Sub New()
+                Text = "Imprimer le proforma"
+                StartPosition = FormStartPosition.CenterParent
+                FormBorderStyle = FormBorderStyle.FixedDialog
+                MinimizeBox = False
+                MaximizeBox = False
+                ClientSize = New Size(360, 210)
+                BackColor = Color.White
+
+                Dim titre As New Label() With {.Text = "IMPRIMER LE PROFORMA", .Dock = DockStyle.Top, .Height = 54, .TextAlign = ContentAlignment.MiddleCenter, .Font = New Font("Segoe UI", 12, FontStyle.Bold), .ForeColor = Color.FromArgb(52, 73, 94)}
+                Dim btnTicket As New Button() With {.Text = "Ticket thermique 80 mm", .Left = 55, .Top = 70, .Width = 250, .Height = 34, .BackColor = Color.FromArgb(52, 73, 94), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+                Dim btnA4 As New Button() With {.Text = "Proforma A4", .Left = 55, .Top = 112, .Width = 250, .Height = 34, .BackColor = Color.FromArgb(41, 128, 185), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+                Dim btnAnnuler As New Button() With {.Text = "Annuler", .Left = 55, .Top = 154, .Width = 250, .Height = 30, .DialogResult = DialogResult.Cancel}
+                AddHandler btnTicket.Click, Sub()
+                                                FormatSelectionne = "THERMIQUE"
+                                                DialogResult = DialogResult.OK
+                                            End Sub
+                AddHandler btnA4.Click, Sub()
+                                            FormatSelectionne = "A4"
+                                            DialogResult = DialogResult.OK
+                                        End Sub
+                Controls.AddRange(New Control() {titre, btnTicket, btnA4, btnAnnuler})
+                CancelButton = btnAnnuler
+            End Sub
+        End Class
 
         Private Sub OuvrirHistorique(sender As Object, e As EventArgs)
             Dim f As New FormulaireFactures()
