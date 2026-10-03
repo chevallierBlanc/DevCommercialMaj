@@ -194,7 +194,7 @@ Namespace DevCommerc8ak
                   fontLigne As New Font("Segoe UI", 7.5F),
                   fontTotal As New Font("Segoe UI", 8.5F, FontStyle.Bold)
 
-                Dim largeur As Integer = Math.Max(200, largeurPapier - 28)
+                Dim largeur As Integer = Math.Max(220, largeurPapier - 16)
                 Dim hauteur As Integer = 8
                 If LogoDisponible(param) Then hauteur += 48
                 hauteur += HauteurTexte(g, If(param IsNot Nothing AndAlso param.NomMagasin <> "", param.NomMagasin, "COMMERCIAL PRO"), fontTitre, largeur)
@@ -217,10 +217,11 @@ Namespace DevCommerc8ak
 
         Private Shared Sub DessinerThermique(e As PrintPageEventArgs, data As FacturePrintData, param As ParametreDTO)
             e.Graphics.PageUnit = GraphicsUnit.Display
-            Dim printable As RectangleF = e.MarginBounds
-            Dim contentLeft As Single = printable.Left + 4
-            Dim contentWidth As Single = Math.Max(200.0F, printable.Width - 8)
-            Dim y As Single = printable.Top + 2
+            Dim page As RectangleF = e.PageBounds
+            Dim contentMargin As Single = 8.0F
+            Dim contentLeft As Single = page.Left + contentMargin
+            Dim contentWidth As Single = Math.Max(220.0F, page.Width - (2.0F * contentMargin))
+            Dim y As Single = page.Top + 6.0F
 
             Using fontTitre As New Font("Segoe UI", 10, FontStyle.Bold),
                   fontSection As New Font("Segoe UI", 7.5F, FontStyle.Bold),

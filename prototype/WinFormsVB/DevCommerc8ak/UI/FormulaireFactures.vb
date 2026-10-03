@@ -203,18 +203,18 @@ Namespace DevCommerc8ak
             Dim colId As New DataGridViewTextBoxColumn() With {.DataPropertyName = "FactureVenteId", .Name = "FactureVenteId", .Visible = False}
             Dim colStatutDb As New DataGridViewTextBoxColumn() With {.DataPropertyName = "Statut", .Name = "Statut", .Visible = False}
 
-            Dim colNumero As New DataGridViewTextBoxColumn() With {.DataPropertyName = "NumeroFacture", .HeaderText = "N° FACTURE", .Width = 130}
-            Dim colClient As New DataGridViewTextBoxColumn() With {.DataPropertyName = "ClientNom", .HeaderText = "CLIENT", .Width = 180}
-            Dim colTel As New DataGridViewTextBoxColumn() With {.DataPropertyName = "Telephone", .HeaderText = "TÉLÉPHONE", .Width = 120}
-            Dim colDate As New DataGridViewTextBoxColumn() With {.DataPropertyName = "CreeLe", .HeaderText = "DATE", .Width = 130}
-            Dim colMontant As New DataGridViewTextBoxColumn() With {.DataPropertyName = "MontantTotal", .HeaderText = "MONTANT TOTAL", .Width = 130}
-            Dim colStatut As New DataGridViewTextBoxColumn() With {.DataPropertyName = "StatutAffichage", .HeaderText = "STATUT", .Width = 110}
+            Dim colNumero As New DataGridViewTextBoxColumn() With {.DataPropertyName = "NumeroFacture", .HeaderText = "N° FACTURE", .Width = 145, .MinimumWidth = 135}
+            Dim colClient As New DataGridViewTextBoxColumn() With {.DataPropertyName = "ClientNom", .HeaderText = "CLIENT", .Width = 190, .MinimumWidth = 150}
+            Dim colTel As New DataGridViewTextBoxColumn() With {.DataPropertyName = "Telephone", .HeaderText = "TÉLÉPHONE", .Width = 125, .MinimumWidth = 115}
+            Dim colDate As New DataGridViewTextBoxColumn() With {.DataPropertyName = "CreeLe", .HeaderText = "DATE", .Width = 145, .MinimumWidth = 135}
+            Dim colMontant As New DataGridViewTextBoxColumn() With {.DataPropertyName = "MontantTotal", .HeaderText = "MONTANT TOTAL", .Width = 140, .MinimumWidth = 130}
+            Dim colStatut As New DataGridViewTextBoxColumn() With {.DataPropertyName = "StatutAffichage", .HeaderText = "STATUT", .Width = 105, .MinimumWidth = 95}
 
             ' Boutons d'action stylisés
-            Dim colVoir As New DataGridViewButtonColumn() With {.Name = "ActionVoir", .HeaderText = "", .Text = "VOIR", .UseColumnTextForButtonValue = True, .Width = 70}
-            Dim colModifier As New DataGridViewButtonColumn() With {.Name = "ActionModifier", .HeaderText = "", .Text = "ÉDITER", .UseColumnTextForButtonValue = True, .Width = 70}
-            Dim colAnnuler As New DataGridViewButtonColumn() With {.Name = "ActionAnnuler", .HeaderText = "", .Text = "ANNULER", .UseColumnTextForButtonValue = True, .Width = 80}
-            Dim colImprimer As New DataGridViewButtonColumn() With {.Name = "ActionImprimer", .HeaderText = "", .Text = "IMPRIMER", .UseColumnTextForButtonValue = True, .Width = 85}
+            Dim colVoir As New DataGridViewButtonColumn() With {.Name = "ActionVoir", .HeaderText = "", .Text = "VOIR", .UseColumnTextForButtonValue = True, .Width = 78}
+            Dim colModifier As New DataGridViewButtonColumn() With {.Name = "ActionModifier", .HeaderText = "", .Text = "ÉDITER", .UseColumnTextForButtonValue = True, .Width = 78}
+            Dim colAnnuler As New DataGridViewButtonColumn() With {.Name = "ActionAnnuler", .HeaderText = "", .Text = "ANNULER", .UseColumnTextForButtonValue = True, .Width = 86}
+            Dim colImprimer As New DataGridViewButtonColumn() With {.Name = "ActionImprimer", .HeaderText = "", .Text = "IMPRIMER", .UseColumnTextForButtonValue = True, .Width = 96}
 
             gridFactures.Columns.AddRange(New DataGridViewColumn() {colId, colStatutDb, colNumero, colClient, colTel, colDate, colMontant, colStatut, colVoir, colModifier, colAnnuler, colImprimer})
 
@@ -223,22 +223,30 @@ Namespace DevCommerc8ak
             gridFactures.ScrollBars = ScrollBars.Both
             gridFactures.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
             gridFactures.GridColor = Color.FromArgb(229, 231, 235)
-            gridFactures.DefaultCellStyle.SelectionBackColor = Color.FromArgb(219, 234, 254)
-            gridFactures.DefaultCellStyle.SelectionForeColor = ColorTextPrimary
+            gridFactures.DefaultCellStyle.SelectionBackColor = Color.FromArgb(232, 234, 246)
+            gridFactures.DefaultCellStyle.SelectionForeColor = ColorPrimary
             gridFactures.DefaultCellStyle.Padding = New Padding(4, 0, 4, 0)
             gridFactures.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft
             gridFactures.RowTemplate.Height = 46
             gridFactures.EnableHeadersVisualStyles = False
             gridFactures.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(52, 73, 94)
             gridFactures.ColumnHeadersDefaultCellStyle.ForeColor = Color.White
-            gridFactures.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI", 8.5F, FontStyle.Bold)
+            gridFactures.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
             gridFactures.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
             gridFactures.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None
+            gridFactures.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(52, 73, 94)
+            colNumero.AutoSizeMode = DataGridViewAutoSizeColumnMode.None
             colClient.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
-            colClient.MinimumWidth = 180
+            colClient.FillWeight = 34
+            colTel.AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+            colDate.AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+            colMontant.AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+            colStatut.AutoSizeMode = DataGridViewAutoSizeColumnMode.None
             colMontant.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
             colMontant.DefaultCellStyle.Format = "N0"
+            colDate.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
             colDate.DefaultCellStyle.Format = "dd/MM/yyyy HH:mm"
+            colStatut.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
             For Each col As DataGridViewColumn In New DataGridViewColumn() {colVoir, colModifier, colAnnuler, colImprimer}
                 col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
             Next
@@ -445,9 +453,24 @@ Namespace DevCommerc8ak
                 BackColor = Color.FromArgb(245, 247, 250)
 
                 Dim statut As String = If(entete Is Nothing, String.Empty, Convert.ToString(entete("Statut")))
+                Dim nombreLignes As Integer = If(lignes Is Nothing, 0, lignes.Rows.Count)
+                Dim hauteurGrille As Integer = Math.Min(360, Math.Max(155, 44 + (Math.Max(1, nombreLignes) * 42)))
+                Dim root As New TableLayoutPanel() With {
+                    .Dock = DockStyle.Fill,
+                    .BackColor = Color.FromArgb(245, 247, 250),
+                    .ColumnCount = 1,
+                    .RowCount = 4,
+                    .Padding = New Padding(18)
+                }
+                root.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
+                root.RowStyles.Add(New RowStyle(SizeType.Absolute, 154))
+                root.RowStyles.Add(New RowStyle(SizeType.Absolute, hauteurGrille))
+                root.RowStyles.Add(New RowStyle(SizeType.Absolute, 112))
+                root.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+
                 Dim titre As String = If(String.Equals(statut, "EN_ATTENTE", StringComparison.OrdinalIgnoreCase), "PROFORMA", "FACTURE")
                 If String.Equals(statut, "ANNULEE", StringComparison.OrdinalIgnoreCase) Then titre = "FACTURE ANNULÉE"
-                Dim header As New Panel() With {.Dock = DockStyle.Top, .Height = 154, .BackColor = Color.White, .Padding = New Padding(22)}
+                Dim header As New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.White, .Padding = New Padding(22), .Margin = New Padding(0, 0, 0, 10)}
                 Dim lblTitre As New Label() With {.Text = titre & " " & numero, .Font = New Font("Segoe UI", 16, FontStyle.Bold), .ForeColor = ColorPrimary, .AutoSize = True, .Left = 22, .Top = 16}
                 Dim lblInfos As New Label() With {
                     .Text = "Date : " & If(entete Is Nothing, Date.Now.ToString("dd/MM/yyyy HH:mm"), Convert.ToDateTime(entete("CreeLe")).ToString("dd/MM/yyyy HH:mm")) & Environment.NewLine &
@@ -477,30 +500,33 @@ Namespace DevCommerc8ak
                     .RowHeadersVisible = False,
                     .BackgroundColor = Color.White,
                     .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                    .ScrollBars = ScrollBars.Both,
                     .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
                     .CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
                     .GridColor = Color.FromArgb(229, 231, 235),
+                    .Margin = New Padding(0, 0, 0, 10),
                     .RowTemplate = New DataGridViewRow() With {.Height = 42}
                 }
                 grid.EnableHeadersVisualStyles = False
                 grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(52, 73, 94)
                 grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.White
-                grid.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI", 9.5F, FontStyle.Bold)
+                grid.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
                 grid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+                grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(52, 73, 94)
                 grid.ColumnHeadersHeight = 40
                 grid.DefaultCellStyle.Font = New Font("Segoe UI", 9.5F)
                 grid.DefaultCellStyle.Padding = New Padding(5, 0, 5, 0)
-                grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(219, 234, 254)
-                grid.DefaultCellStyle.SelectionForeColor = Color.FromArgb(31, 41, 55)
-                Dim colProduit As New DataGridViewTextBoxColumn() With {.DataPropertyName = "Libelle", .HeaderText = "Produit", .MinimumWidth = 260, .AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill}
+                grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(232, 234, 246)
+                grid.DefaultCellStyle.SelectionForeColor = ColorPrimary
+                Dim colProduit As New DataGridViewTextBoxColumn() With {.DataPropertyName = "Libelle", .HeaderText = "Produit", .MinimumWidth = 260, .AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, .FillWeight = 48}
                 grid.Columns.Add(colProduit)
-                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "TypeVente", .HeaderText = "Conditionnement", .Width = 170})
-                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "QuantiteSaisie", .HeaderText = "Quantité", .Width = 95, .DefaultCellStyle = New DataGridViewCellStyle() With {.Format = "N2", .Alignment = DataGridViewContentAlignment.MiddleRight}})
-                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixUnitaire", .HeaderText = "Prix unitaire", .Width = 120, .DefaultCellStyle = New DataGridViewCellStyle() With {.Format = "N0", .Alignment = DataGridViewContentAlignment.MiddleRight}})
-                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "MontantLigne", .HeaderText = "Total", .Width = 120, .DefaultCellStyle = New DataGridViewCellStyle() With {.Format = "N0", .Alignment = DataGridViewContentAlignment.MiddleRight}})
+                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "TypeVente", .HeaderText = "Conditionnement", .Width = 175, .MinimumWidth = 150})
+                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "QuantiteSaisie", .HeaderText = "Quantité", .Width = 95, .MinimumWidth = 85, .DefaultCellStyle = New DataGridViewCellStyle() With {.Format = "N2", .Alignment = DataGridViewContentAlignment.MiddleRight}})
+                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixUnitaire", .HeaderText = "Prix unitaire", .Width = 130, .MinimumWidth = 115, .DefaultCellStyle = New DataGridViewCellStyle() With {.Format = "N0", .Alignment = DataGridViewContentAlignment.MiddleRight}})
+                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "MontantLigne", .HeaderText = "Total", .Width = 130, .MinimumWidth = 115, .DefaultCellStyle = New DataGridViewCellStyle() With {.Format = "N0", .Alignment = DataGridViewContentAlignment.MiddleRight}})
                 grid.DataSource = lignes
 
-                Dim footer As New Panel() With {.Dock = DockStyle.Bottom, .Height = 112, .BackColor = Color.White, .Padding = New Padding(20)}
+                Dim footer As New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.White, .Padding = New Padding(20), .Margin = New Padding(0)}
                 Dim sousTotal As Decimal = If(entete Is Nothing OrElse entete.IsNull("SousTotal"), CalculerSommeLignes(lignes), Convert.ToDecimal(entete("SousTotal")))
                 Dim remise As Decimal = If(entete Is Nothing OrElse entete.IsNull("MontantRemise"), 0D, Convert.ToDecimal(entete("MontantRemise")))
                 Dim total As Decimal = If(entete Is Nothing OrElse entete.IsNull("MontantTotal"), sousTotal - remise, Convert.ToDecimal(entete("MontantTotal")))
@@ -512,9 +538,10 @@ Namespace DevCommerc8ak
                 AjouterTotalPreview(pnlTotaux, "TOTAL", total, New Font("Segoe UI", 11, FontStyle.Bold), ColorPrimary, 2)
                 footer.Controls.Add(pnlTotaux)
 
-                Controls.Add(grid)
-                Controls.Add(footer)
-                Controls.Add(header)
+                root.Controls.Add(header, 0, 0)
+                root.Controls.Add(grid, 0, 1)
+                root.Controls.Add(footer, 0, 2)
+                Controls.Add(root)
             End Sub
 
             Private Sub AjouterTotalPreview(panel As TableLayoutPanel, libelle As String, montant As Decimal, font As Font, couleur As Color, row As Integer)
