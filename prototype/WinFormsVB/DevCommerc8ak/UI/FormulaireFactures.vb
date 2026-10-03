@@ -219,11 +219,29 @@ Namespace DevCommerc8ak
             gridFactures.Columns.AddRange(New DataGridViewColumn() {colId, colStatutDb, colNumero, colClient, colTel, colDate, colMontant, colStatut, colVoir, colModifier, colAnnuler, colImprimer})
 
             ' Style des en-têtes
+            gridFactures.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+            gridFactures.ScrollBars = ScrollBars.Both
+            gridFactures.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
+            gridFactures.GridColor = Color.FromArgb(229, 231, 235)
+            gridFactures.DefaultCellStyle.SelectionBackColor = Color.FromArgb(219, 234, 254)
+            gridFactures.DefaultCellStyle.SelectionForeColor = ColorTextPrimary
+            gridFactures.DefaultCellStyle.Padding = New Padding(4, 0, 4, 0)
+            gridFactures.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft
+            gridFactures.RowTemplate.Height = 46
             gridFactures.EnableHeadersVisualStyles = False
-            gridFactures.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(248, 249, 250)
-            gridFactures.ColumnHeadersDefaultCellStyle.ForeColor = ColorTextSecondary
-            gridFactures.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI", 8, FontStyle.Bold)
+            gridFactures.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(52, 73, 94)
+            gridFactures.ColumnHeadersDefaultCellStyle.ForeColor = Color.White
+            gridFactures.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI", 8.5F, FontStyle.Bold)
+            gridFactures.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
             gridFactures.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None
+            colClient.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+            colClient.MinimumWidth = 180
+            colMontant.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+            colMontant.DefaultCellStyle.Format = "N0"
+            colDate.DefaultCellStyle.Format = "dd/MM/yyyy HH:mm"
+            For Each col As DataGridViewColumn In New DataGridViewColumn() {colVoir, colModifier, colAnnuler, colImprimer}
+                col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+            Next
         End Sub
 
         ' --- Logique Métier (Réintégrée et Fonctionnelle) ---
@@ -389,8 +407,7 @@ Namespace DevCommerc8ak
         End Sub
         Private Sub VoirFacture(factureId As Integer, numero As String, client As String, tel As String)
             Try
-                Dim repo As New LigneFactureVenteRepository(ObtenirDAL())
-                Dim dt As DataTable = repo.ListerDetailsParFacture(factureId)
+                Dim dt As DataTable = New LigneFactureVenteRepository(ObtenirDAL()).ListerDetailsParFacture(factureId)
                 Dim entete As DataRow = ChargerEnteteFacture(factureId)
                 Using apercu As New FormApercuFacture(numero, client, tel, entete, dt)
                     apercu.ShowDialog(Me)
@@ -417,6 +434,8 @@ Namespace DevCommerc8ak
 
             Private ReadOnly ColorPrimary As Color = Color.FromArgb(41, 128, 185)
             Private ReadOnly ColorDanger As Color = Color.FromArgb(192, 57, 43)
+            Private ReadOnly ColorSuccess As Color = Color.FromArgb(16, 185, 129)
+            Private ReadOnly ColorWarning As Color = Color.FromArgb(245, 158, 11)
 
             Public Sub New(numero As String, client As String, telephone As String, entete As DataRow, lignes As DataTable)
                 Text = "Aperçu facture"
@@ -427,26 +446,27 @@ Namespace DevCommerc8ak
 
                 Dim statut As String = If(entete Is Nothing, String.Empty, Convert.ToString(entete("Statut")))
                 Dim titre As String = If(String.Equals(statut, "EN_ATTENTE", StringComparison.OrdinalIgnoreCase), "PROFORMA", "FACTURE")
-                Dim header As New Panel() With {.Dock = DockStyle.Top, .Height = 138, .BackColor = Color.White, .Padding = New Padding(22)}
+                If String.Equals(statut, "ANNULEE", StringComparison.OrdinalIgnoreCase) Then titre = "FACTURE ANNULÉE"
+                Dim header As New Panel() With {.Dock = DockStyle.Top, .Height = 154, .BackColor = Color.White, .Padding = New Padding(22)}
                 Dim lblTitre As New Label() With {.Text = titre & " " & numero, .Font = New Font("Segoe UI", 16, FontStyle.Bold), .ForeColor = ColorPrimary, .AutoSize = True, .Left = 22, .Top = 16}
                 Dim lblInfos As New Label() With {
                     .Text = "Date : " & If(entete Is Nothing, Date.Now.ToString("dd/MM/yyyy HH:mm"), Convert.ToDateTime(entete("CreeLe")).ToString("dd/MM/yyyy HH:mm")) & Environment.NewLine &
                             "Client : " & If(String.IsNullOrWhiteSpace(client), "CLIENT", client) & Environment.NewLine &
                             "Téléphone : " & telephone & Environment.NewLine &
-                            "Facturier : " & If(entete Is Nothing, String.Empty, Convert.ToString(entete("Facturier"))),
+                            "Facturier : " & If(entete Is Nothing, String.Empty, Convert.ToString(entete("Facturier"))) & Environment.NewLine &
+                            "Statut : " & FacturePrintRenderer.StatutAffichage(statut),
                     .Font = New Font("Segoe UI", 9.5F),
                     .ForeColor = Color.FromArgb(52, 73, 94),
                     .Left = 24,
                     .Top = 50,
                     .Width = 620,
-                    .Height = 78
+                    .Height = 96
                 }
                 header.Controls.AddRange(New Control() {lblTitre, lblInfos})
 
-                If String.Equals(statut, "ANNULEE", StringComparison.OrdinalIgnoreCase) Then
-                    Dim lblAnnulee As New Label() With {.Text = "FACTURE ANNULÉE", .Font = New Font("Segoe UI", 12, FontStyle.Bold), .ForeColor = Color.White, .BackColor = ColorDanger, .TextAlign = ContentAlignment.MiddleCenter, .Left = 690, .Top = 28, .Width = 220, .Height = 42}
-                    header.Controls.Add(lblAnnulee)
-                End If
+                Dim statutColor As Color = CouleurStatut(statut)
+                Dim lblStatut As New Label() With {.Text = FacturePrintRenderer.StatutAffichage(statut), .Font = New Font("Segoe UI", 12, FontStyle.Bold), .ForeColor = Color.White, .BackColor = statutColor, .TextAlign = ContentAlignment.MiddleCenter, .Anchor = AnchorStyles.Top Or AnchorStyles.Right, .Left = 690, .Top = 28, .Width = 220, .Height = 42}
+                header.Controls.Add(lblStatut)
 
                 Dim grid As New DataGridView() With {
                     .Dock = DockStyle.Fill,
@@ -456,32 +476,65 @@ Namespace DevCommerc8ak
                     .AutoGenerateColumns = False,
                     .RowHeadersVisible = False,
                     .BackgroundColor = Color.White,
-                    .SelectionMode = DataGridViewSelectionMode.FullRowSelect
+                    .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                    .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+                    .CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+                    .GridColor = Color.FromArgb(229, 231, 235),
+                    .RowTemplate = New DataGridViewRow() With {.Height = 42}
                 }
                 grid.EnableHeadersVisualStyles = False
-                grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245)
-                grid.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
-                grid.ColumnHeadersHeight = 38
+                grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(52, 73, 94)
+                grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.White
+                grid.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI", 9.5F, FontStyle.Bold)
+                grid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+                grid.ColumnHeadersHeight = 40
                 grid.DefaultCellStyle.Font = New Font("Segoe UI", 9.5F)
-                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "Libelle", .HeaderText = "Produit", .Width = 260})
-                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "TypeVente", .HeaderText = "Conditionnement", .Width = 145})
-                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "QuantiteSaisie", .HeaderText = "Quantité", .Width = 90})
+                grid.DefaultCellStyle.Padding = New Padding(5, 0, 5, 0)
+                grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(219, 234, 254)
+                grid.DefaultCellStyle.SelectionForeColor = Color.FromArgb(31, 41, 55)
+                Dim colProduit As New DataGridViewTextBoxColumn() With {.DataPropertyName = "Libelle", .HeaderText = "Produit", .MinimumWidth = 260, .AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill}
+                grid.Columns.Add(colProduit)
+                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "TypeVente", .HeaderText = "Conditionnement", .Width = 170})
+                grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "QuantiteSaisie", .HeaderText = "Quantité", .Width = 95, .DefaultCellStyle = New DataGridViewCellStyle() With {.Format = "N2", .Alignment = DataGridViewContentAlignment.MiddleRight}})
                 grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "PrixUnitaire", .HeaderText = "Prix unitaire", .Width = 120, .DefaultCellStyle = New DataGridViewCellStyle() With {.Format = "N0", .Alignment = DataGridViewContentAlignment.MiddleRight}})
                 grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "MontantLigne", .HeaderText = "Total", .Width = 120, .DefaultCellStyle = New DataGridViewCellStyle() With {.Format = "N0", .Alignment = DataGridViewContentAlignment.MiddleRight}})
                 grid.DataSource = lignes
 
-                Dim footer As New Panel() With {.Dock = DockStyle.Bottom, .Height = 92, .BackColor = Color.White, .Padding = New Padding(20)}
+                Dim footer As New Panel() With {.Dock = DockStyle.Bottom, .Height = 112, .BackColor = Color.White, .Padding = New Padding(20)}
                 Dim sousTotal As Decimal = If(entete Is Nothing OrElse entete.IsNull("SousTotal"), CalculerSommeLignes(lignes), Convert.ToDecimal(entete("SousTotal")))
                 Dim remise As Decimal = If(entete Is Nothing OrElse entete.IsNull("MontantRemise"), 0D, Convert.ToDecimal(entete("MontantRemise")))
                 Dim total As Decimal = If(entete Is Nothing OrElse entete.IsNull("MontantTotal"), sousTotal - remise, Convert.ToDecimal(entete("MontantTotal")))
-                footer.Controls.Add(New Label() With {.Text = "Sous-total : " & sousTotal.ToString("N0") & " FC", .AutoSize = True, .Left = 620, .Top = 16, .Font = New Font("Segoe UI", 9.5F)})
-                footer.Controls.Add(New Label() With {.Text = "Remise : " & remise.ToString("N0") & " FC", .AutoSize = True, .Left = 620, .Top = 38, .Font = New Font("Segoe UI", 9.5F)})
-                footer.Controls.Add(New Label() With {.Text = "TOTAL : " & total.ToString("N0") & " FC", .AutoSize = True, .Left = 620, .Top = 60, .Font = New Font("Segoe UI", 11, FontStyle.Bold), .ForeColor = ColorPrimary})
+                Dim pnlTotaux As New TableLayoutPanel() With {.Dock = DockStyle.Right, .Width = 300, .ColumnCount = 2, .RowCount = 3}
+                pnlTotaux.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 46))
+                pnlTotaux.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 54))
+                AjouterTotalPreview(pnlTotaux, "Sous-total", sousTotal, New Font("Segoe UI", 9.5F), Color.FromArgb(31, 41, 55), 0)
+                AjouterTotalPreview(pnlTotaux, "Remise", remise, New Font("Segoe UI", 9.5F), Color.FromArgb(31, 41, 55), 1)
+                AjouterTotalPreview(pnlTotaux, "TOTAL", total, New Font("Segoe UI", 11, FontStyle.Bold), ColorPrimary, 2)
+                footer.Controls.Add(pnlTotaux)
 
                 Controls.Add(grid)
                 Controls.Add(footer)
                 Controls.Add(header)
             End Sub
+
+            Private Sub AjouterTotalPreview(panel As TableLayoutPanel, libelle As String, montant As Decimal, font As Font, couleur As Color, row As Integer)
+                panel.RowStyles.Add(New RowStyle(SizeType.Absolute, 30))
+                panel.Controls.Add(New Label() With {.Text = libelle & " :", .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft, .Font = font, .ForeColor = couleur}, 0, row)
+                panel.Controls.Add(New Label() With {.Text = montant.ToString("N0") & " FC", .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleRight, .Font = font, .ForeColor = couleur}, 1, row)
+            End Sub
+
+            Private Function CouleurStatut(statut As String) As Color
+                Select Case If(statut, String.Empty).Trim().ToUpperInvariant()
+                    Case "ANNULEE"
+                        Return ColorDanger
+                    Case "PAYEE"
+                        Return ColorSuccess
+                    Case "EN_ATTENTE"
+                        Return ColorWarning
+                    Case Else
+                        Return ColorPrimary
+                End Select
+            End Function
 
             Private Shared Function CalculerSommeLignes(lignes As DataTable) As Decimal
                 Dim total As Decimal = 0D
@@ -495,64 +548,55 @@ Namespace DevCommerc8ak
 
         Private Sub ImprimerFacture(factureId As Integer, numero As String, client As String, tel As String)
             Try
-                Dim dal As DAL = ObtenirDAL()
-                Dim repo As New LigneFactureVenteRepository(dal)
-                Dim dt As DataTable = repo.ListerDetailsParFacture(factureId)
+                Dim data As FacturePrintData = ConstruireDonneesFacture(factureId, numero, client, tel)
+                Dim param As ParametreDTO = PrintConfigurationHelper.ChargerParametres()
+                Using doc As Printing.PrintDocument = FacturePrintRenderer.CreerDocumentA4(data, param)
+                    param = PrintConfigurationHelper.ConfigurerDocumentA4(doc, Me, "FormulaireFactures", "ImprimerFacture")
 
-                Dim doc As New Printing.PrintDocument()
-                Dim param As ParametreDTO = PrintConfigurationHelper.ConfigurerDocumentA4(doc, Me, "FormulaireFactures", "ImprimerFacture")
-
-                AddHandler doc.PrintPage,
-                    Sub(s, e)
-                        Dim y As Integer = 20
-                        Dim x As Integer = 20
-                        If param IsNot Nothing AndAlso param.LogoPath <> "" AndAlso File.Exists(param.LogoPath) Then
-                            Using img As Image = Image.FromFile(param.LogoPath)
-                                e.Graphics.DrawImage(img, x, y, 60, 60)
-                            End Using
-                            x += 70
-                        End If
-
-                        Dim nomMag As String = If(param IsNot Nothing, param.NomMagasin, "")
-                        Dim adr As String = If(param IsNot Nothing, param.AdresseMagasin, "")
-                        Dim telMag As String = If(param IsNot Nothing, param.TelephoneMagasin, "")
-                        e.Graphics.DrawString(nomMag, New Font("Segoe UI", 14, FontStyle.Bold), Brushes.Black, x, y)
-                        y += 24
-                        e.Graphics.DrawString(adr, New Font("Segoe UI", 10), Brushes.Black, x, y)
-                        y += 18
-                        e.Graphics.DrawString(telMag, New Font("Segoe UI", 10), Brushes.Black, x, y)
-                        y += 26
-
-                        e.Graphics.DrawString("Facture: " & numero, New Font("Segoe UI", 10, FontStyle.Bold), Brushes.Black, 20, y)
-                        y += 18
-                        e.Graphics.DrawString("Date: " & Date.Now.ToString("dd/MM/yyyy HH:mm"), New Font("Segoe UI", 10), Brushes.Black, 20, y)
-                        y += 18
-                        e.Graphics.DrawString("Client: " & client, New Font("Segoe UI", 10), Brushes.Black, 20, y)
-                        y += 18
-                        e.Graphics.DrawString("Telephone: " & tel, New Font("Segoe UI", 10), Brushes.Black, 20, y)
-                        y += 24
-
-                        e.Graphics.DrawString("DETAILS", New Font("Segoe UI", 11, FontStyle.Bold), Brushes.Black, 20, y)
-                        y += 20
-
-                        For Each r As DataRow In dt.Rows
-                            Dim line As String = Convert.ToString(r("Libelle")) & " x" & Convert.ToDecimal(r("Quantite")).ToString() & " = " & Convert.ToDecimal(r("MontantLigne")).ToString()
-                            e.Graphics.DrawString(line, New Font("Segoe UI", 10), Brushes.Black, 20, y)
-                            y += 18
-                        Next
-                    End Sub
-
-                If param IsNot Nothing AndAlso param.ApercuAvantImpression Then
-                    Dim preview As New PrintPreviewDialog()
-                    preview.Document = doc
-                    preview.ShowDialog()
-                Else
-                    doc.Print()
-                End If
+                    If param IsNot Nothing AndAlso param.ApercuAvantImpression Then
+                        Using preview As New PrintPreviewDialog()
+                            preview.Document = doc
+                            preview.ShowDialog(Me)
+                        End Using
+                    Else
+                        doc.Print()
+                    End If
+                End Using
             Catch ex As Exception
                 MessageBox.Show("Erreur impression facture: " & ex.Message)
             End Try
         End Sub
+
+        Private Function ConstruireDonneesFacture(factureId As Integer, numero As String, client As String, tel As String) As FacturePrintData
+            Dim entete As DataRow = ChargerEnteteFacture(factureId)
+            If entete Is Nothing Then Throw New InvalidOperationException("Facture introuvable.")
+
+            Dim lignesTable As DataTable = New LigneFactureVenteRepository(ObtenirDAL()).ListerDetailsParFacture(factureId)
+            Dim lignes As New List(Of FacturePrintLine)()
+            For Each row As DataRow In lignesTable.Rows
+                Dim quantite As Decimal = If(row.IsNull("QuantiteSaisie"), Convert.ToDecimal(row("Quantite")), Convert.ToDecimal(row("QuantiteSaisie")))
+                lignes.Add(New FacturePrintLine With {
+                    .Produit = Convert.ToString(row("Libelle")),
+                    .Conditionnement = Convert.ToString(row("TypeVente")),
+                    .Quantite = quantite,
+                    .PrixUnitaire = Convert.ToDecimal(row("PrixUnitaire")),
+                    .Montant = Convert.ToDecimal(row("MontantLigne"))
+                })
+            Next
+
+            Return New FacturePrintData With {
+                .Numero = Convert.ToString(entete("NumeroFacture")),
+                .DateDocument = Convert.ToDateTime(entete("CreeLe")),
+                .Client = If(String.IsNullOrWhiteSpace(Convert.ToString(entete("ClientNom"))), client, Convert.ToString(entete("ClientNom"))),
+                .Telephone = If(String.IsNullOrWhiteSpace(Convert.ToString(entete("Telephone"))), tel, Convert.ToString(entete("Telephone"))),
+                .Facturier = Convert.ToString(entete("Facturier")),
+                .Statut = Convert.ToString(entete("Statut")),
+                .SousTotal = Convert.ToDecimal(entete("SousTotal")),
+                .Remise = Convert.ToDecimal(entete("MontantRemise")),
+                .Total = Convert.ToDecimal(entete("MontantTotal")),
+                .Lignes = lignes
+            }
+        End Function
 
         Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
             RemoveHandler AppEvents.DataChanged, AddressOf RafraichirDepuisEvenement

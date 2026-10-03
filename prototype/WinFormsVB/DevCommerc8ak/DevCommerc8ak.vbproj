@@ -141,6 +141,7 @@
     <Compile Include="Services\StockUnitConversionService.vb" />
     <Compile Include="Services\ConversionUniteService.vb" />
     <Compile Include="Services\PdfHelper.vb" />
+    <Compile Include="Services\FacturePrintRenderer.vb" />
     <Compile Include="Services\FormatageGlobal.vb" />
     <Compile Include="Services\ProductionLogService.vb" />
     <Compile Include="Services\AuditActionService.vb" />
