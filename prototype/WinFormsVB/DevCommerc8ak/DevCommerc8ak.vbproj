@@ -136,6 +136,7 @@
     <Compile Include="Services\ApprovisionnementService.vb" />
     <Compile Include="Services\BackupService.vb" />
     <Compile Include="Services\CalculVenteService.vb" />
+    <Compile Include="Services\CommercialResetService.vb" />
     <Compile Include="Services\SchemaMigrationService.vb" />
     <Compile Include="Services\StockUnitConversionService.vb" />
     <Compile Include="Services\ConversionUniteService.vb" />

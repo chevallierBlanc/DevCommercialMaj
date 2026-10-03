@@ -26,6 +26,7 @@ Namespace DevCommerc8ak
         Private grid As DataGridView
         Private btnRecharger As Button
         Private btnEnregistrer As Button
+        Private btnResetCommercial As Button
         Private lblTitle As Label
         Private lblSubtitle As Label
         Private txtRecherche As TextBox
@@ -118,6 +119,20 @@ Namespace DevCommerc8ak
             }
 
             pnlHeader.Controls.AddRange({lblTitle, lblSubtitle})
+            btnResetCommercial = New Button() With {
+                .Text = "RÉINITIALISER LES DONNÉES",
+                .Size = New Size(230, 38),
+                .Visible = String.Equals(If(SessionUtilisateur.Role, String.Empty), "SUPERADMIN", StringComparison.OrdinalIgnoreCase)
+            }
+            StyliserBouton(btnResetCommercial, ColorDanger, Color.White, False)
+            btnResetCommercial.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+            btnResetCommercial.Location = New Point(pnlHeader.Width - btnResetCommercial.Width - 30, 31)
+            Dim resetToolTip As New ToolTip()
+            resetToolTip.SetToolTip(btnResetCommercial, "Remettre à zéro toutes les données commerciales tout en conservant les produits, conditionnements, configurations et utilisateurs.")
+            pnlHeader.Controls.Add(btnResetCommercial)
+            AddHandler pnlHeader.Resize, Sub()
+                                             btnResetCommercial.Location = New Point(pnlHeader.Width - btnResetCommercial.Width - 30, 31)
+                                         End Sub
             rootLayout.Controls.Add(pnlHeader, 0, 0)
 
             Dim pnlMain As New Panel() With {
@@ -258,6 +273,7 @@ Namespace DevCommerc8ak
 
             AddHandler btnRecharger.Click, AddressOf Recharger
             AddHandler btnEnregistrer.Click, AddressOf EnregistrerStockInitial
+            AddHandler btnResetCommercial.Click, AddressOf OuvrirResetCommercial
             AddHandler grid.CellValueChanged, AddressOf Grid_CellValueChanged
             AddHandler grid.CellContentClick, AddressOf Grid_CellContentClick
             AddHandler grid.CurrentCellDirtyStateChanged, AddressOf Grid_CurrentCellDirtyStateChanged
@@ -1201,6 +1217,217 @@ Namespace DevCommerc8ak
 
             Return resultat
         End Function
+
+        Private Sub OuvrirResetCommercial(sender As Object, e As EventArgs)
+            Try
+                If Not String.Equals(If(SessionUtilisateur.Role, String.Empty), "SUPERADMIN", StringComparison.OrdinalIgnoreCase) Then
+                    MessageBox.Show("Cette opération est réservée au SUPERADMIN.", "Réinitialisation commerciale", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    Return
+                End If
+
+                Dim resetService As New CommercialResetService()
+                Dim preview As CommercialResetPreview = resetService.Previsualiser()
+                Using dlg As New FormResetCommercial(preview, resetService, ColorPrimary, ColorDanger, ColorTextPrimary, ColorTextSecondary, ColorBorder)
+                    If dlg.ShowDialog(Me) = DialogResult.OK Then
+                        Recharger(Nothing, EventArgs.Empty)
+                    End If
+                End Using
+            Catch ex As Exception
+                _log.Error("FormulaireStockInitialTechnique", "OuvrirResetCommercial", "Ouverture reset commercial impossible.", ex)
+                MessageBox.Show("Impossible d'ouvrir la réinitialisation commerciale : " & ex.Message, "Réinitialisation commerciale", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
+        End Sub
+
+        Private Class FormResetCommercial
+            Inherits Form
+
+            Private ReadOnly _preview As CommercialResetPreview
+            Private ReadOnly _service As CommercialResetService
+            Private ReadOnly _colorPrimary As Color
+            Private ReadOnly _colorDanger As Color
+            Private ReadOnly _colorTextPrimary As Color
+            Private ReadOnly _colorTextSecondary As Color
+            Private ReadOnly _colorBorder As Color
+
+            Private ReadOnly chkCompris As CheckBox
+            Private ReadOnly txtConfirmation As TextBox
+            Private ReadOnly txtMotDePasse As TextBox
+            Private ReadOnly btnExecuter As Button
+            Private ReadOnly lblEtat As Label
+
+            Public Sub New(preview As CommercialResetPreview, service As CommercialResetService, colorPrimary As Color, colorDanger As Color, colorTextPrimary As Color, colorTextSecondary As Color, colorBorder As Color)
+                _preview = preview
+                _service = service
+                _colorPrimary = colorPrimary
+                _colorDanger = colorDanger
+                _colorTextPrimary = colorTextPrimary
+                _colorTextSecondary = colorTextSecondary
+                _colorBorder = colorBorder
+
+                Me.Text = "Réinitialisation commerciale"
+                Me.Size = New Size(980, 720)
+                Me.MinimumSize = New Size(900, 640)
+                Me.StartPosition = FormStartPosition.CenterParent
+                Me.BackColor = Color.FromArgb(240, 242, 245)
+                Me.Font = New Font("Segoe UI", 9.0F)
+
+                Dim root As New TableLayoutPanel() With {
+                    .Dock = DockStyle.Fill,
+                    .ColumnCount = 1,
+                    .RowCount = 4,
+                    .Padding = New Padding(24)
+                }
+                root.RowStyles.Add(New RowStyle(SizeType.Absolute, 118))
+                root.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+                root.RowStyles.Add(New RowStyle(SizeType.Absolute, 166))
+                root.RowStyles.Add(New RowStyle(SizeType.Absolute, 54))
+
+                Dim pnlIntro As New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.White, .Padding = New Padding(18)}
+                Dim lblTitre As New Label() With {
+                    .Text = "RÉINITIALISATION COMMERCIALE",
+                    .Font = New Font("Segoe UI", 14.0F, FontStyle.Bold),
+                    .ForeColor = _colorDanger,
+                    .AutoSize = True,
+                    .Location = New Point(18, 14)
+                }
+                Dim lblTexte As New Label() With {
+                    .Text = "Cette opération supprimera définitivement les données commerciales : stocks, entrées, sorties, ventes, factures, paiements, caisse, dépenses, inventaires et historiques opérationnels." & Environment.NewLine &
+                            "Les produits, configurations, conditionnements, types de vente, utilisateurs, paramètres et journaux d'audit seront conservés. Une sauvegarde SQL vérifiée est obligatoire avant toute suppression.",
+                    .ForeColor = _colorTextPrimary,
+                    .AutoSize = False,
+                    .Location = New Point(18, 46),
+                    .Size = New Size(880, 58)
+                }
+                pnlIntro.Controls.AddRange({lblTitre, lblTexte})
+
+                Dim gridPreview As New DataGridView() With {
+                    .Dock = DockStyle.Fill,
+                    .ReadOnly = True,
+                    .AllowUserToAddRows = False,
+                    .AllowUserToDeleteRows = False,
+                    .RowHeadersVisible = False,
+                    .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                    .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                    .BackgroundColor = Color.White,
+                    .BorderStyle = BorderStyle.None,
+                    .EnableHeadersVisualStyles = False
+                }
+                gridPreview.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(248, 249, 251)
+                gridPreview.ColumnHeadersDefaultCellStyle.ForeColor = _colorTextPrimary
+                gridPreview.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold)
+                gridPreview.DefaultCellStyle.SelectionBackColor = Color.FromArgb(232, 240, 254)
+                gridPreview.DefaultCellStyle.SelectionForeColor = _colorPrimary
+                gridPreview.DataSource = ConstruireTablePreview()
+                If gridPreview.Columns.Contains("Action") Then gridPreview.Columns("Action").Width = 95
+                If gridPreview.Columns.Contains("Lignes") Then
+                    gridPreview.Columns("Lignes").Width = 90
+                    gridPreview.Columns("Lignes").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+                End If
+
+                Dim pnlConfirm As New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.White, .Padding = New Padding(18)}
+                Dim lblResume As New Label() With {
+                    .Text = "Lignes transactionnelles détectées : " & _preview.TotalLignesTransactionnelles.ToString("N0", CultureInfo.CurrentCulture) &
+                            " | Dossier sauvegarde : " & If(_preview.DossierSauvegarde, String.Empty),
+                    .AutoSize = False,
+                    .Location = New Point(18, 12),
+                    .Size = New Size(880, 24),
+                    .ForeColor = _colorTextSecondary
+                }
+                chkCompris = New CheckBox() With {
+                    .Text = "Je comprends que cette opération est irréversible sans restauration de la sauvegarde.",
+                    .AutoSize = True,
+                    .Location = New Point(18, 44),
+                    .ForeColor = _colorTextPrimary
+                }
+                Dim lblMotCle As New Label() With {.Text = "Saisir exactement REINITIALISER", .AutoSize = True, .Location = New Point(18, 78), .ForeColor = _colorTextSecondary}
+                txtConfirmation = New TextBox() With {.Location = New Point(250, 74), .Width = 180}
+                Dim lblPwd As New Label() With {.Text = "Mot de passe SUPERADMIN courant", .AutoSize = True, .Location = New Point(18, 114), .ForeColor = _colorTextSecondary}
+                txtMotDePasse = New TextBox() With {.Location = New Point(250, 110), .Width = 220, .UseSystemPasswordChar = True}
+                lblEtat = New Label() With {.Text = String.Empty, .AutoSize = False, .Location = New Point(490, 72), .Size = New Size(380, 58), .ForeColor = _colorDanger}
+                pnlConfirm.Controls.AddRange({lblResume, chkCompris, lblMotCle, txtConfirmation, lblPwd, txtMotDePasse, lblEtat})
+
+                Dim pnlActions As New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.White}
+                Dim btnAnnuler As New Button() With {.Text = "ANNULER", .Size = New Size(120, 36), .Location = New Point(660, 9)}
+                btnExecuter = New Button() With {.Text = "RÉINITIALISER", .Size = New Size(150, 36), .Location = New Point(792, 9), .Enabled = False}
+                StyliserBoutonLocal(btnAnnuler, Color.White, _colorTextSecondary, True)
+                StyliserBoutonLocal(btnExecuter, _colorDanger, Color.White, False)
+                pnlActions.Controls.AddRange({btnAnnuler, btnExecuter})
+
+                root.Controls.Add(pnlIntro, 0, 0)
+                root.Controls.Add(gridPreview, 0, 1)
+                root.Controls.Add(pnlConfirm, 0, 2)
+                root.Controls.Add(pnlActions, 0, 3)
+                Me.Controls.Add(root)
+
+                AddHandler chkCompris.CheckedChanged, AddressOf EtatConfirmationChanged
+                AddHandler txtConfirmation.TextChanged, AddressOf EtatConfirmationChanged
+                AddHandler txtMotDePasse.TextChanged, AddressOf EtatConfirmationChanged
+                AddHandler btnAnnuler.Click, Sub()
+                                                 Me.DialogResult = DialogResult.Cancel
+                                                 Me.Close()
+                                             End Sub
+                AddHandler btnExecuter.Click, AddressOf ExecuterReset
+            End Sub
+
+            Private Function ConstruireTablePreview() As DataTable
+                Dim dt As New DataTable()
+                dt.Columns.Add("Action", GetType(String))
+                dt.Columns.Add("Table", GetType(String))
+                dt.Columns.Add("Rôle", GetType(String))
+                dt.Columns.Add("Lignes", GetType(Long))
+                dt.Columns.Add("Raison", GetType(String))
+
+                For Each item As CommercialResetTableVolume In _preview.Tables.OrderBy(Function(t) If(t.Conserver, 1, 0)).ThenBy(Function(t) t.OrdreSuppression).ThenBy(Function(t) t.NomTable)
+                    dt.Rows.Add(If(item.Conserver, "CONSERVER", "VIDER"), item.NomTable, item.RoleMetier, item.NombreLignes, item.Raison)
+                Next
+                Return dt
+            End Function
+
+            Private Sub EtatConfirmationChanged(sender As Object, e As EventArgs)
+                btnExecuter.Enabled = chkCompris.Checked AndAlso
+                                      String.Equals(txtConfirmation.Text.Trim(), "REINITIALISER", StringComparison.Ordinal) AndAlso
+                                      Not String.IsNullOrWhiteSpace(txtMotDePasse.Text)
+            End Sub
+
+            Private Sub ExecuterReset(sender As Object, e As EventArgs)
+                btnExecuter.Enabled = False
+                lblEtat.Text = "Sauvegarde SQL et réinitialisation en cours..."
+                Me.Cursor = Cursors.WaitCursor
+
+                Try
+                    ' Le formulaire ne calcule ni stock ni suppression : il délègue
+                    ' au service transactionnel qui protège QuantiteBase et l'audit.
+                    Dim resultat As CommercialResetResult = _service.ExecuterReset(txtMotDePasse.Text)
+                    If Not resultat.Success Then
+                        Throw New InvalidOperationException(resultat.Message)
+                    End If
+
+                    Dim lignes As Long = resultat.TablesTraitees.Sum(Function(t) t.NombreLignes)
+                    MessageBox.Show("Réinitialisation commerciale terminée avec succès." & Environment.NewLine & Environment.NewLine &
+                                    "Sauvegarde :" & Environment.NewLine & resultat.BackupFilePath & Environment.NewLine & Environment.NewLine &
+                                    "Lignes supprimées : " & lignes.ToString("N0", CultureInfo.CurrentCulture),
+                                    "Réinitialisation commerciale", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    Me.DialogResult = DialogResult.OK
+                    Me.Close()
+                Catch ex As Exception
+                    lblEtat.Text = ex.Message
+                    MessageBox.Show("Réinitialisation commerciale refusée ou échouée : " & ex.Message, "Réinitialisation commerciale", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                    btnExecuter.Enabled = True
+                Finally
+                    Me.Cursor = Cursors.Default
+                End Try
+            End Sub
+
+            Private Sub StyliserBoutonLocal(btn As Button, bgColor As Color, fgColor As Color, hasBorder As Boolean)
+                btn.FlatStyle = FlatStyle.Flat
+                btn.BackColor = bgColor
+                btn.ForeColor = fgColor
+                btn.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold)
+                btn.Cursor = Cursors.Hand
+                btn.FlatAppearance.BorderSize = If(hasBorder, 1, 0)
+                If hasBorder Then btn.FlatAppearance.BorderColor = _colorBorder
+            End Sub
+        End Class
         'Private Function SafeNullableInteger(value As Object) As Integer?
         '    Dim resultat As Integer = SafeInteger(value)
         '    If resultat <= 0 Then
