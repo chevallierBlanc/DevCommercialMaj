@@ -12,6 +12,7 @@ Namespace DevCommerc8ak
 
         Public Sub New(dal As DAL)
             _dal = dal
+            AssurerSecuriteComptesInfrastructure()
         End Sub
 
         ' Cree un utilisateur et retourne son identifiant.
@@ -84,7 +85,10 @@ Namespace DevCommerc8ak
 
         ' Recupere un utilisateur par nom.
         Public Function ObtenirParNom(nomUtilisateur As String) As Utilisateur
-            Dim sql As String = "SELECT UtilisateurId, NomUtilisateur, MotDePasseHash, MotDePasseSel, EstActif, CreeLe " &
+            AssurerSecuriteComptesInfrastructure()
+            Dim sql As String = "SELECT UtilisateurId, NomUtilisateur, MotDePasseHash, MotDePasseSel, EstActif, CreeLe, " &
+                                "ISNULL(NombreTentativesEchouees,0) AS NombreTentativesEchouees, ISNULL(EstVerrouille,0) AS EstVerrouille, DateVerrouillage, " &
+                                "ResetPasswordHash, ResetPasswordSel, ResetPasswordExpireAt, ResetPasswordUsedAt, ISNULL(DoitChangerMotDePasse,0) AS DoitChangerMotDePasse " &
                                 "FROM Utilisateurs WHERE NomUtilisateur = @NomUtilisateur"
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@NomUtilisateur", nomUtilisateur)}
             Dim dt As DataTable = _dal.ExecuterTable(sql, CommandType.Text, p)
@@ -97,15 +101,25 @@ Namespace DevCommerc8ak
                 .MotDePasseHash = CType(row("MotDePasseHash"), Byte()),
                 .MotDePasseSel = CType(row("MotDePasseSel"), Byte()),
                 .EstActif = Convert.ToBoolean(row("EstActif")),
-                .CreeLe = Convert.ToDateTime(row("CreeLe"))
+                .CreeLe = Convert.ToDateTime(row("CreeLe")),
+                .NombreTentativesEchouees = Convert.ToInt32(row("NombreTentativesEchouees")),
+                .EstVerrouille = Convert.ToBoolean(row("EstVerrouille")),
+                .DateVerrouillage = If(row.IsNull("DateVerrouillage"), CType(Nothing, Date?), CType(Convert.ToDateTime(row("DateVerrouillage")), Date?)),
+                .ResetPasswordHash = If(row.IsNull("ResetPasswordHash"), Nothing, CType(row("ResetPasswordHash"), Byte())),
+                .ResetPasswordSel = If(row.IsNull("ResetPasswordSel"), Nothing, CType(row("ResetPasswordSel"), Byte())),
+                .ResetPasswordExpireAt = If(row.IsNull("ResetPasswordExpireAt"), CType(Nothing, Date?), CType(Convert.ToDateTime(row("ResetPasswordExpireAt")), Date?)),
+                .ResetPasswordUsedAt = If(row.IsNull("ResetPasswordUsedAt"), CType(Nothing, Date?), CType(Convert.ToDateTime(row("ResetPasswordUsedAt")), Date?)),
+                .DoitChangerMotDePasse = Convert.ToBoolean(row("DoitChangerMotDePasse"))
             }
         End Function
 
         ' Liste des utilisateurs avec role.
         Public Function Lister() As List(Of UtilisateurDTO)
             AssurerUtilisateurRolesInfrastructure()
+            AssurerSecuriteComptesInfrastructure()
             Dim sql As String = "" &
-                "SELECT u.UtilisateurId, u.NomUtilisateur, u.EstActif, " &
+                "SELECT u.UtilisateurId, u.NomUtilisateur, u.EstActif, ISNULL(u.NombreTentativesEchouees,0) AS NombreTentativesEchouees, " &
+                "ISNULL(u.EstVerrouille,0) AS EstVerrouille, u.DateVerrouillage, ISNULL(u.DoitChangerMotDePasse,0) AS DoitChangerMotDePasse, " &
                 "STUFF((SELECT ', ' + r2.NomRole " &
                 "       FROM UtilisateurRoles ur2 " &
                 "       INNER JOIN Roles r2 ON r2.RoleId = ur2.RoleId " &
@@ -121,7 +135,11 @@ Namespace DevCommerc8ak
                     .UtilisateurId = Convert.ToInt32(row("UtilisateurId")),
                     .NomUtilisateur = Convert.ToString(row("NomUtilisateur")),
                     .EstActif = Convert.ToBoolean(row("EstActif")),
-                    .Role = If(row.IsNull("NomRole"), "", Convert.ToString(row("NomRole")))
+                    .Role = If(row.IsNull("NomRole"), "", Convert.ToString(row("NomRole"))),
+                    .NombreTentativesEchouees = Convert.ToInt32(row("NombreTentativesEchouees")),
+                    .EstVerrouille = Convert.ToBoolean(row("EstVerrouille")),
+                    .DateVerrouillage = If(row.IsNull("DateVerrouillage"), CType(Nothing, Date?), CType(Convert.ToDateTime(row("DateVerrouillage")), Date?)),
+                    .DoitChangerMotDePasse = Convert.ToBoolean(row("DoitChangerMotDePasse"))
                 })
             Next
             Return liste
@@ -141,7 +159,7 @@ Namespace DevCommerc8ak
         ' Met a jour le mot de passe.
         Public Sub MettreAJourMotDePasse(utilisateurId As Integer, hash As Byte(), sel As Byte())
             VerifierModificationCompteProtege(utilisateurId, True, Nothing, True)
-            Dim sql As String = "UPDATE Utilisateurs SET MotDePasseHash=@MotDePasseHash, MotDePasseSel=@MotDePasseSel WHERE UtilisateurId=@UtilisateurId"
+            Dim sql As String = "UPDATE Utilisateurs SET MotDePasseHash=@MotDePasseHash, MotDePasseSel=@MotDePasseSel, DoitChangerMotDePasse=0 WHERE UtilisateurId=@UtilisateurId"
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@MotDePasseHash", hash),
                 New SqlParameter("@MotDePasseSel", sel),
@@ -149,6 +167,101 @@ Namespace DevCommerc8ak
             }
             _dal.ExecuterNonRequete(sql, CommandType.Text, p)
         End Sub
+
+        Public Function EnregistrerEchecConnexion(utilisateurId As Integer, seuilVerrouillage As Integer) As Integer
+            AssurerSecuriteComptesInfrastructure()
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction(IsolationLevel.Serializable)
+                    Try
+                        Using cmd As New SqlCommand("SELECT NombreTentativesEchouees, EstVerrouille FROM dbo.Utilisateurs WITH (UPDLOCK, HOLDLOCK) WHERE UtilisateurId=@UtilisateurId", cn, tx)
+                            cmd.Parameters.AddWithValue("@UtilisateurId", utilisateurId)
+                            Using reader As SqlDataReader = cmd.ExecuteReader()
+                                If Not reader.Read() Then Throw New InvalidOperationException("Utilisateur introuvable.")
+                                If Convert.ToBoolean(reader("EstVerrouille")) Then
+                                    tx.Commit()
+                                    Return seuilVerrouillage
+                                End If
+                            End Using
+                        End Using
+
+                        Using cmdUpdate As New SqlCommand("UPDATE dbo.Utilisateurs SET NombreTentativesEchouees = ISNULL(NombreTentativesEchouees,0) + 1, EstVerrouille = CASE WHEN ISNULL(NombreTentativesEchouees,0) + 1 >= @Seuil THEN 1 ELSE EstVerrouille END, DateVerrouillage = CASE WHEN ISNULL(NombreTentativesEchouees,0) + 1 >= @Seuil THEN SYSDATETIME() ELSE DateVerrouillage END WHERE UtilisateurId=@UtilisateurId; SELECT ISNULL(NombreTentativesEchouees,0) FROM dbo.Utilisateurs WHERE UtilisateurId=@UtilisateurId", cn, tx)
+                            cmdUpdate.Parameters.AddWithValue("@UtilisateurId", utilisateurId)
+                            cmdUpdate.Parameters.AddWithValue("@Seuil", seuilVerrouillage)
+                            Dim total As Integer = Convert.ToInt32(cmdUpdate.ExecuteScalar())
+                            tx.Commit()
+                            Return total
+                        End Using
+                    Catch
+                        tx.Rollback()
+                        Throw
+                    End Try
+                End Using
+            End Using
+        End Function
+
+        Public Sub ReinitialiserEchecsEtVerrouillage(utilisateurId As Integer)
+            AssurerSecuriteComptesInfrastructure()
+            Dim sql As String = "UPDATE dbo.Utilisateurs SET NombreTentativesEchouees=0, EstVerrouille=0, DateVerrouillage=NULL WHERE UtilisateurId=@UtilisateurId"
+            _dal.ExecuterNonRequete(sql, CommandType.Text, New List(Of SqlParameter) From {New SqlParameter("@UtilisateurId", utilisateurId)})
+        End Sub
+
+        Public Sub EnregistrerResetTemporaire(utilisateurId As Integer, hash As Byte(), sel As Byte(), expiration As Date)
+            AssurerSecuriteComptesInfrastructure()
+            VerifierModificationCompteProtege(utilisateurId, True, Nothing, True)
+            Dim sql As String =
+                "UPDATE dbo.Utilisateurs SET ResetPasswordHash=@Hash, ResetPasswordSel=@Sel, ResetPasswordExpireAt=@Expiration, ResetPasswordUsedAt=NULL, DoitChangerMotDePasse=1 " &
+                "WHERE UtilisateurId=@UtilisateurId"
+            Dim p As New List(Of SqlParameter) From {
+                New SqlParameter("@Hash", hash),
+                New SqlParameter("@Sel", sel),
+                New SqlParameter("@Expiration", expiration),
+                New SqlParameter("@UtilisateurId", utilisateurId)
+            }
+            _dal.ExecuterNonRequete(sql, CommandType.Text, p)
+        End Sub
+
+        Public Sub MarquerResetUtiliseEtChangerMotDePasse(utilisateurId As Integer, hash As Byte(), sel As Byte())
+            AssurerSecuriteComptesInfrastructure()
+            Dim sql As String =
+                "UPDATE dbo.Utilisateurs SET MotDePasseHash=@Hash, MotDePasseSel=@Sel, ResetPasswordUsedAt=SYSDATETIME(), ResetPasswordHash=NULL, ResetPasswordSel=NULL, " &
+                "ResetPasswordExpireAt=NULL, DoitChangerMotDePasse=0, NombreTentativesEchouees=0, EstVerrouille=0, DateVerrouillage=NULL WHERE UtilisateurId=@UtilisateurId"
+            Dim p As New List(Of SqlParameter) From {
+                New SqlParameter("@Hash", hash),
+                New SqlParameter("@Sel", sel),
+                New SqlParameter("@UtilisateurId", utilisateurId)
+            }
+            _dal.ExecuterNonRequete(sql, CommandType.Text, p)
+        End Sub
+
+        Public Function ObtenirEtatReset(utilisateurId As Integer) As EtatResetMotDePasse
+            AssurerSecuriteComptesInfrastructure()
+            Dim sql As String = "SELECT ResetPasswordExpireAt, ResetPasswordUsedAt, ResetPasswordHash FROM dbo.Utilisateurs WHERE UtilisateurId=@UtilisateurId"
+            Dim dt As DataTable = _dal.ExecuterTable(sql, CommandType.Text, New List(Of SqlParameter) From {New SqlParameter("@UtilisateurId", utilisateurId)})
+            If dt.Rows.Count = 0 Then Return EtatResetMotDePasse.Inexistant
+            Dim row As DataRow = dt.Rows(0)
+            If Not row.IsNull("ResetPasswordUsedAt") Then Return EtatResetMotDePasse.Utilise
+            If row.IsNull("ResetPasswordHash") OrElse row.IsNull("ResetPasswordExpireAt") Then Return EtatResetMotDePasse.Inexistant
+            If Convert.ToDateTime(row("ResetPasswordExpireAt")) <= Date.Now Then Return EtatResetMotDePasse.Expire
+            Return EtatResetMotDePasse.Actif
+        End Function
+
+        Public Function CompterSuperAdminActifs(Optional utilisateurIdExclu As Integer = 0) As Integer
+            AssurerUtilisateurRolesInfrastructure()
+            Dim sql As String =
+                "SELECT COUNT(DISTINCT u.UtilisateurId) FROM dbo.Utilisateurs u " &
+                "INNER JOIN dbo.UtilisateurRoles ur ON ur.UtilisateurId=u.UtilisateurId AND ISNULL(ur.EstActif,1)=1 " &
+                "INNER JOIN dbo.Roles r ON r.RoleId=ur.RoleId " &
+                "WHERE ISNULL(u.EstActif,1)=1 AND ISNULL(u.EstVerrouille,0)=0 AND UPPER(LTRIM(RTRIM(r.NomRole)))='SUPERADMIN' " &
+                "AND (@Exclu <= 0 OR u.UtilisateurId <> @Exclu)"
+            Return Convert.ToInt32(_dal.ExecuterScalaire(sql, CommandType.Text, New List(Of SqlParameter) From {New SqlParameter("@Exclu", utilisateurIdExclu)}))
+        End Function
+
+        Public Function NomUtilisateurParId(utilisateurId As Integer) As String
+            Dim sql As String = "SELECT NomUtilisateur FROM dbo.Utilisateurs WHERE UtilisateurId=@UtilisateurId"
+            Dim o As Object = _dal.ExecuterScalaire(sql, CommandType.Text, New List(Of SqlParameter) From {New SqlParameter("@UtilisateurId", utilisateurId)})
+            Return If(o Is Nothing OrElse Convert.IsDBNull(o), String.Empty, Convert.ToString(o))
+        End Function
 
         ' Retourne le role d'un utilisateur.
         Public Function ObtenirRole(utilisateurId As Integer) As String
@@ -271,6 +384,19 @@ Namespace DevCommerc8ak
             _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
         End Sub
 
+        Public Sub AssurerSecuriteComptesInfrastructure()
+            Dim sql As String =
+                "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND COL_LENGTH('dbo.Utilisateurs', 'NombreTentativesEchouees') IS NULL ALTER TABLE dbo.Utilisateurs ADD NombreTentativesEchouees INT NOT NULL CONSTRAINT DF_Utilisateurs_Tentatives DEFAULT(0); " &
+                "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND COL_LENGTH('dbo.Utilisateurs', 'EstVerrouille') IS NULL ALTER TABLE dbo.Utilisateurs ADD EstVerrouille BIT NOT NULL CONSTRAINT DF_Utilisateurs_Verrouille DEFAULT(0); " &
+                "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND COL_LENGTH('dbo.Utilisateurs', 'DateVerrouillage') IS NULL ALTER TABLE dbo.Utilisateurs ADD DateVerrouillage DATETIME2 NULL; " &
+                "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND COL_LENGTH('dbo.Utilisateurs', 'ResetPasswordHash') IS NULL ALTER TABLE dbo.Utilisateurs ADD ResetPasswordHash VARBINARY(64) NULL; " &
+                "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND COL_LENGTH('dbo.Utilisateurs', 'ResetPasswordSel') IS NULL ALTER TABLE dbo.Utilisateurs ADD ResetPasswordSel VARBINARY(32) NULL; " &
+                "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND COL_LENGTH('dbo.Utilisateurs', 'ResetPasswordExpireAt') IS NULL ALTER TABLE dbo.Utilisateurs ADD ResetPasswordExpireAt DATETIME2 NULL; " &
+                "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND COL_LENGTH('dbo.Utilisateurs', 'ResetPasswordUsedAt') IS NULL ALTER TABLE dbo.Utilisateurs ADD ResetPasswordUsedAt DATETIME2 NULL; " &
+                "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND COL_LENGTH('dbo.Utilisateurs', 'DoitChangerMotDePasse') IS NULL ALTER TABLE dbo.Utilisateurs ADD DoitChangerMotDePasse BIT NOT NULL CONSTRAINT DF_Utilisateurs_ChangerMdp DEFAULT(0);"
+            _dal.ExecuterNonRequete(sql, CommandType.Text, Nothing)
+        End Sub
+
         Private Sub VerifierAssignationRoleProtege(roleId As Integer)
             If roleId <= 0 OrElse Not RoleIdEstSuperAdmin(roleId) Then Return
             If OperationSystemeInitialisationAutorisee() OrElse SessionCouranteSuperAdmin() Then Return
@@ -280,7 +406,7 @@ Namespace DevCommerc8ak
         Private Sub VerifierModificationCompteProtege(utilisateurId As Integer, estActif As Boolean, roleIds As IEnumerable(Of Integer), modifieMotDePasse As Boolean)
             If utilisateurId <= 0 OrElse Not EstDansRole(utilisateurId, "SUPERADMIN") Then Return
             If OperationSystemeInitialisationAutorisee() OrElse SessionCouranteSuperAdmin() Then
-                If Not estActif Then
+                If Not estActif AndAlso CompterSuperAdminActifs(utilisateurId) = 0 Then
                     Throw New InvalidOperationException("Le compte SUPERADMIN ne peut pas être désactivé.")
                 End If
                 If roleIds IsNot Nothing AndAlso Not ContientRoleSuperAdmin(roleIds) Then

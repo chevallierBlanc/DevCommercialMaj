@@ -55,6 +55,8 @@ Namespace DevCommerc8ak
         Private ReadOnly btnModifier As Button
         Private ReadOnly btnDesactiver As Button
         Private ReadOnly btnResetMdp As Button
+        Private ReadOnly btnDeverrouiller As Button
+        Private ReadOnly btnSupprimer As Button
         Private ReadOnly btnRafraichir As Button
         Private _utilisateurSelectionneId As Integer = -1
 
@@ -166,9 +168,11 @@ Namespace DevCommerc8ak
             btnModifier = CreateStyledButton("Modifier", ColorAccent)
             btnDesactiver = CreateStyledButton("Désactiver", ColorDanger)
             btnResetMdp = CreateStyledButton("Reset MDP", ColorSecondary)
+            btnDeverrouiller = CreateStyledButton("Déverrouiller", ColorAccent)
+            btnSupprimer = CreateStyledButton("Supprimer", ColorDanger)
             btnRafraichir = CreateStyledButton("Rafraîchir", Color.Gray)
 
-            flowButtons.Controls.AddRange(New Control() {btnAjouter, btnModifier, btnDesactiver, btnResetMdp, btnRafraichir})
+            flowButtons.Controls.AddRange(New Control() {btnAjouter, btnModifier, btnDesactiver, btnResetMdp, btnDeverrouiller, btnSupprimer, btnRafraichir})
 
             ' --- Grilles (Split Vertical) ---
             splitGrids = New TableLayoutPanel() With {
@@ -207,6 +211,8 @@ Namespace DevCommerc8ak
             AddHandler btnModifier.Click, AddressOf Modifier
             AddHandler btnDesactiver.Click, AddressOf DesactiverUtilisateur
             AddHandler btnResetMdp.Click, AddressOf ResetMdp
+            AddHandler btnDeverrouiller.Click, AddressOf DeverrouillerUtilisateur
+            AddHandler btnSupprimer.Click, AddressOf SupprimerUtilisateur
             AddHandler btnRafraichir.Click, AddressOf Charger
             AddHandler grid.SelectionChanged, AddressOf ChargerSelectionUtilisateur
             AddHandler grid.CellClick, AddressOf Grid_CellClick
@@ -296,6 +302,22 @@ Namespace DevCommerc8ak
             If grid.Columns.Contains("EstActif") Then
                 grid.Columns("EstActif").HeaderText = "Compte actif"
             End If
+            If grid.Columns.Contains("EtatCompte") Then
+                grid.Columns("EtatCompte").HeaderText = "État"
+                grid.Columns("EtatCompte").DisplayIndex = 2
+            End If
+            If grid.Columns.Contains("EstVerrouille") Then
+                grid.Columns("EstVerrouille").Visible = False
+            End If
+            If grid.Columns.Contains("NombreTentativesEchouees") Then
+                grid.Columns("NombreTentativesEchouees").HeaderText = "Échecs"
+            End If
+            If grid.Columns.Contains("DateVerrouillage") Then
+                grid.Columns("DateVerrouillage").HeaderText = "Verrouillé le"
+            End If
+            If grid.Columns.Contains("DoitChangerMotDePasse") Then
+                grid.Columns("DoitChangerMotDePasse").Visible = False
+            End If
             If grid.Columns.Contains("Role") Then
                 grid.Columns("Role").HeaderText = "Rôle"
             End If
@@ -360,6 +382,7 @@ Namespace DevCommerc8ak
                 grid.DataSource = utilisateurs
                 ConfigurerGrilleUtilisateurs()
                 ChargerSelectionUtilisateur(Nothing, EventArgs.Empty)
+                AppliquerDroitsActions()
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement utilisateurs: " & ex.Message)
             Finally
@@ -460,17 +483,57 @@ Namespace DevCommerc8ak
                     MessageBox.Show("Selectionnez un utilisateur.")
                     Return
                 End If
-                If txtMotDePasse.Text.Trim() = "" Then
-                    MessageBox.Show("Entrez un nouveau mot de passe.")
-                    Return
-                End If
 
                 Dim id As Integer = Convert.ToInt32(grid.CurrentRow.Cells("UtilisateurId").Value)
                 Dim service As UtilisateurService = ObtenirService()
-                service.ReinitialiserMotDePasse(id, txtMotDePasse.Text.Trim())
-                MessageBox.Show("Mot de passe mis a jour.")
+                Dim reset As ResetMotDePasseTemporaireDTO = service.CreerCodeResetMotDePasse(id)
+                Using frm As New FormResetMotDePasseTemporaire(reset, service)
+                    frm.ShowDialog(Me)
+                End Using
+                Charger(sender, e)
             Catch ex As Exception
                 MessageBox.Show("Erreur reset mot de passe: " & ex.Message)
+            End Try
+        End Sub
+
+        Private Sub DeverrouillerUtilisateur(sender As Object, e As EventArgs)
+            Try
+                If grid.CurrentRow Is Nothing Then
+                    MessageBox.Show("Sélectionnez un utilisateur.")
+                    Return
+                End If
+                Dim id As Integer = Convert.ToInt32(grid.CurrentRow.Cells("UtilisateurId").Value)
+                Dim service As UtilisateurService = ObtenirService()
+                service.DeverrouillerUtilisateur(id)
+                MessageBox.Show("Compte déverrouillé.")
+                Charger(sender, e)
+            Catch ex As Exception
+                MessageBox.Show("Erreur déverrouillage: " & ex.Message)
+            End Try
+        End Sub
+
+        Private Sub SupprimerUtilisateur(sender As Object, e As EventArgs)
+            Try
+                If grid.CurrentRow Is Nothing Then
+                    MessageBox.Show("Sélectionnez un utilisateur.")
+                    Return
+                End If
+                Dim id As Integer = Convert.ToInt32(grid.CurrentRow.Cells("UtilisateurId").Value)
+                Dim nom As String = Convert.ToString(grid.CurrentRow.Cells("NomUtilisateur").Value)
+                Dim rep As DialogResult = MessageBox.Show(
+                    "Voulez-vous supprimer/désactiver le compte '" & nom & "' ?" & Environment.NewLine &
+                    "Son historique commercial sera conservé.",
+                    "Suppression utilisateur",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning)
+                If rep <> DialogResult.Yes Then Return
+
+                Dim service As UtilisateurService = ObtenirService()
+                service.SupprimerUtilisateurLogiquement(id, nom)
+                MessageBox.Show("Compte désactivé. L'historique reste conservé.")
+                Charger(sender, e)
+            Catch ex As Exception
+                MessageBox.Show("Erreur suppression utilisateur: " & ex.Message)
             End Try
         End Sub
 
@@ -527,9 +590,95 @@ Namespace DevCommerc8ak
                 End If
                 ChargerRolesAutorisesUtilisateur(_utilisateurSelectionneId)
                 txtMotDePasse.Text = ""
+                If btnDeverrouiller IsNot Nothing AndAlso grid.Columns.Contains("EstVerrouille") Then
+                    Dim v As Object = grid.CurrentRow.Cells("EstVerrouille").Value
+                    btnDeverrouiller.Enabled = v IsNot Nothing AndAlso Not Convert.IsDBNull(v) AndAlso Convert.ToBoolean(v)
+                End If
             Catch
             End Try
         End Sub
+
+        Private Sub AppliquerDroitsActions()
+            Dim autorise As Boolean = String.Equals(SessionUtilisateur.Role, "ADMIN", StringComparison.OrdinalIgnoreCase) OrElse
+                                      String.Equals(SessionUtilisateur.Role, "SUPERADMIN", StringComparison.OrdinalIgnoreCase)
+            btnResetMdp.Visible = autorise
+            btnDeverrouiller.Visible = autorise
+            btnSupprimer.Visible = autorise
+            btnDeverrouiller.Enabled = False
+        End Sub
+
+        Private NotInheritable Class FormResetMotDePasseTemporaire
+            Inherits Form
+
+            Private ReadOnly _reset As ResetMotDePasseTemporaireDTO
+            Private ReadOnly _service As UtilisateurService
+            Private ReadOnly lblEtat As Label
+            Private ReadOnly timer As Timer
+
+            Public Sub New(reset As ResetMotDePasseTemporaireDTO, service As UtilisateurService)
+                _reset = reset
+                _service = service
+                Text = "Réinitialisation du mot de passe"
+                StartPosition = FormStartPosition.CenterParent
+                FormBorderStyle = FormBorderStyle.FixedDialog
+                MinimizeBox = False
+                MaximizeBox = False
+                ClientSize = New Size(430, 250)
+                BackColor = Color.White
+
+                Dim lblTitre As New Label() With {.Text = "RÉINITIALISATION DU MOT DE PASSE", .Dock = DockStyle.Top, .Height = 52, .TextAlign = ContentAlignment.MiddleCenter, .Font = New Font("Segoe UI", 11.5F, FontStyle.Bold), .ForeColor = Color.FromArgb(52, 73, 94)}
+                Dim lblUtilisateur As New Label() With {.Text = "Utilisateur : " & reset.NomUtilisateur, .Left = 28, .Top = 68, .AutoSize = True, .Font = New Font("Segoe UI", 10)}
+                Dim lblCode As New Label() With {.Text = "Code temporaire : " & reset.CodeTemporaire, .Left = 28, .Top = 104, .AutoSize = True, .Font = New Font("Segoe UI", 16, FontStyle.Bold), .ForeColor = Color.FromArgb(41, 128, 185)}
+                lblEtat = New Label() With {.Text = "", .Left = 28, .Top = 148, .Width = 360, .Height = 28, .Font = New Font("Segoe UI", 10, FontStyle.Bold), .ForeColor = Color.FromArgb(52, 73, 94)}
+
+                Dim btnCopier As New Button() With {.Text = "Copier le code", .Left = 28, .Top = 190, .Width = 130, .Height = 32}
+                Dim btnFermer As New Button() With {.Text = "Fermer", .Left = 285, .Top = 190, .Width = 100, .Height = 32, .DialogResult = DialogResult.OK}
+                AddHandler btnCopier.Click, Sub()
+                                                Clipboard.SetText(reset.CodeTemporaire)
+                                            End Sub
+
+                Controls.AddRange(New Control() {lblTitre, lblUtilisateur, lblCode, lblEtat, btnCopier, btnFermer})
+                AcceptButton = btnFermer
+
+                timer = New Timer() With {.Interval = 3000}
+                AddHandler timer.Tick, AddressOf VerifierEtat
+                AddHandler Me.Load, Sub()
+                                        VerifierEtat(Nothing, EventArgs.Empty)
+                                        timer.Start()
+                                    End Sub
+                AddHandler Me.FormClosed, Sub()
+                                              timer.Stop()
+                                              timer.Dispose()
+                                          End Sub
+            End Sub
+
+            Private Sub VerifierEtat(sender As Object, e As EventArgs)
+                Dim etat As EtatResetMotDePasse = _service.ObtenirEtatResetMotDePasse(_reset.UtilisateurId)
+                If etat = EtatResetMotDePasse.Utilise Then
+                    lblEtat.Text = "UTILISÉ - mot de passe réinitialisé avec succès."
+                    lblEtat.ForeColor = Color.FromArgb(39, 174, 96)
+                    timer.Stop()
+                    Dim fermeture As New Timer() With {.Interval = 2500}
+                    AddHandler fermeture.Tick, Sub()
+                                                   fermeture.Stop()
+                                                   fermeture.Dispose()
+                                                   DialogResult = DialogResult.OK
+                                               End Sub
+                    fermeture.Start()
+                    Return
+                End If
+
+                If etat = EtatResetMotDePasse.Expire OrElse Date.Now >= _reset.Expiration Then
+                    lblEtat.Text = "EXPIRÉ"
+                    lblEtat.ForeColor = Color.FromArgb(192, 57, 43)
+                    timer.Stop()
+                    Return
+                End If
+
+                Dim restant As TimeSpan = _reset.Expiration - Date.Now
+                lblEtat.Text = "Expire dans : " & Math.Max(0, CInt(Math.Floor(restant.TotalMinutes))).ToString("00") & ":" & restant.Seconds.ToString("00")
+            End Sub
+        End Class
 
         Private Function ObtenirRolesCochesAvecPrincipal() As List(Of String)
             Dim roles As New List(Of String)()

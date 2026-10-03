@@ -16,5 +16,13 @@ Namespace DevCommerc8ak
         Public Property MotDePasseSel As Byte()
         Public Property EstActif As Boolean
         Public Property CreeLe As Date
+        Public Property NombreTentativesEchouees As Integer
+        Public Property EstVerrouille As Boolean
+        Public Property DateVerrouillage As Date?
+        Public Property ResetPasswordHash As Byte()
+        Public Property ResetPasswordSel As Byte()
+        Public Property ResetPasswordExpireAt As Date?
+        Public Property ResetPasswordUsedAt As Date?
+        Public Property DoitChangerMotDePasse As Boolean
     End Class
 End Namespace

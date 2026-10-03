@@ -29,6 +29,7 @@ Namespace DevCommerc8ak
                         AppliquerMigration(cn, tx, 2026090802, "Sessions stock initial technique", AddressOf MigrationStockInitialTechnique)
                         AppliquerMigration(cn, tx, 2026092601, "Fondation conditionnements produits dynamiques", AddressOf MigrationConditionnementsDynamiques)
                         AppliquerMigration(cn, tx, 2026100301, "Normalisation unites conditionnements phase 3", AddressOf MigrationNormalisationUnitesConditionnementsPhase3)
+                        AppliquerMigration(cn, tx, 2026100302, "Securite comptes utilisateurs", AddressOf MigrationSecuriteComptesUtilisateurs)
                         tx.Commit()
                     Catch
                         tx.Rollback()
@@ -472,6 +473,20 @@ Namespace DevCommerc8ak
             For Each sql As String In indexSql
                 Executer(cn, tx, sql)
             Next
+        End Sub
+
+        Private Shared Sub MigrationSecuriteComptesUtilisateurs(cn As SqlConnection, tx As SqlTransaction)
+            ' Migration additive : les comptes existants restent utilisables.
+            ' Les colonnes ajoutées portent uniquement l'état de sécurité courant.
+            Executer(cn, tx, "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND COL_LENGTH('dbo.Utilisateurs', 'NombreTentativesEchouees') IS NULL ALTER TABLE dbo.Utilisateurs ADD NombreTentativesEchouees INT NOT NULL CONSTRAINT DF_Utilisateurs_Tentatives DEFAULT(0)")
+            Executer(cn, tx, "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND COL_LENGTH('dbo.Utilisateurs', 'EstVerrouille') IS NULL ALTER TABLE dbo.Utilisateurs ADD EstVerrouille BIT NOT NULL CONSTRAINT DF_Utilisateurs_Verrouille DEFAULT(0)")
+            Executer(cn, tx, "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND COL_LENGTH('dbo.Utilisateurs', 'DateVerrouillage') IS NULL ALTER TABLE dbo.Utilisateurs ADD DateVerrouillage DATETIME2 NULL")
+            Executer(cn, tx, "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND COL_LENGTH('dbo.Utilisateurs', 'ResetPasswordHash') IS NULL ALTER TABLE dbo.Utilisateurs ADD ResetPasswordHash VARBINARY(64) NULL")
+            Executer(cn, tx, "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND COL_LENGTH('dbo.Utilisateurs', 'ResetPasswordSel') IS NULL ALTER TABLE dbo.Utilisateurs ADD ResetPasswordSel VARBINARY(32) NULL")
+            Executer(cn, tx, "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND COL_LENGTH('dbo.Utilisateurs', 'ResetPasswordExpireAt') IS NULL ALTER TABLE dbo.Utilisateurs ADD ResetPasswordExpireAt DATETIME2 NULL")
+            Executer(cn, tx, "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND COL_LENGTH('dbo.Utilisateurs', 'ResetPasswordUsedAt') IS NULL ALTER TABLE dbo.Utilisateurs ADD ResetPasswordUsedAt DATETIME2 NULL")
+            Executer(cn, tx, "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND COL_LENGTH('dbo.Utilisateurs', 'DoitChangerMotDePasse') IS NULL ALTER TABLE dbo.Utilisateurs ADD DoitChangerMotDePasse BIT NOT NULL CONSTRAINT DF_Utilisateurs_ChangerMdp DEFAULT(0)")
+            Executer(cn, tx, "IF OBJECT_ID('dbo.Utilisateurs', 'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_Utilisateurs_Verrouillage' AND object_id=OBJECT_ID('dbo.Utilisateurs')) CREATE INDEX IX_Utilisateurs_Verrouillage ON dbo.Utilisateurs(EstActif, EstVerrouille)")
         End Sub
 
         Private Shared Sub MigrationNormalisationUnitesConditionnementsPhase3(cn As SqlConnection, tx As SqlTransaction)

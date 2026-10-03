@@ -5,6 +5,9 @@ Imports System.Drawing.Drawing2D
 Imports Microsoft.VisualBasic
 Imports System
 Imports System.Collections.Generic
+Imports System.IO
+Imports System.Security.Cryptography
+Imports System.Text
 
 Namespace DevCommerc8ak
     Public Class LoginForm
@@ -27,6 +30,7 @@ Namespace DevCommerc8ak
         Private ReadOnly txtUser As Guna.UI2.WinForms.Guna2TextBox
         Private ReadOnly txtPass As Guna.UI2.WinForms.Guna2TextBox
         Private ReadOnly chkAfficherMotDePasse As CheckBox
+        Private ReadOnly chkSeSouvenir As CheckBox
         Private ReadOnly btnLogin As Button
         Private ReadOnly lblStatus As Label
 
@@ -174,7 +178,16 @@ Namespace DevCommerc8ak
                                                                   txtPass.UseSystemPasswordChar = Not chkAfficherMotDePasse.Checked
                                                               End Sub
 
-            pnlInputs.Controls.AddRange({chkAfficherMotDePasse, txtPass, lblPass, pnlSpace1, txtUser, lblUser})
+            chkSeSouvenir = New CheckBox() With {
+                .Text = "Se souvenir de moi",
+                .Dock = DockStyle.Top,
+                .Height = 26,
+                .Font = New Font("Segoe UI", 8),
+                .ForeColor = ColorTextSecondary,
+                .Checked = False
+            }
+
+            pnlInputs.Controls.AddRange({chkSeSouvenir, chkAfficherMotDePasse, txtPass, lblPass, pnlSpace1, txtUser, lblUser})
 
             ' Bouton de connexion
             Dim pnlAction As New Panel() With {.Dock = DockStyle.Top, .Height = 80, .Padding = New Padding(40, 10, 40, 0)}
@@ -192,6 +205,7 @@ Namespace DevCommerc8ak
             pnlAction.Controls.Add(btnLogin)
             Me.AcceptButton = btnLogin
             AddHandler Me.KeyDown, AddressOf LoginForm_KeyDown
+            ChargerUtilisateurMemorise()
 
             ' Statut Serveur
             lblStatus = New Label() With {
@@ -275,6 +289,7 @@ Namespace DevCommerc8ak
             End If
 
             log.Info("LoginForm", "OnLogin", "Login réussi pour l'utilisateur: " & txtUser.Text.Trim())
+            EnregistrerUtilisateurMemorise()
             Dim apiOk As Boolean = RemoteApiSession.Authentifier(txtUser.Text.Trim(), txtPass.Text)
             lblStatus.Text = If(apiOk, "Etat serveur: API connectee", "Etat serveur: API indisponible, mode local")
 
@@ -301,13 +316,28 @@ Namespace DevCommerc8ak
                 Dim roleRepo As New RoleRepository(dal)
                 Dim sessionRepo As New SessionRepository(dal)
                 Dim service As New UtilisateurService(utilisateurRepo, roleRepo, sessionRepo)
-                Dim utilisateur As Utilisateur = service.VerifierIdentifiants(nomUtilisateur, motDePasse)
-                If utilisateur Is Nothing Then
+                Dim resultat As AuthentificationResultat = service.AuthentifierCompte(nomUtilisateur, motDePasse)
+                If resultat Is Nothing Then
                     Return False
                 End If
 
+                If resultat.Statut = AuthentificationStatut.CodeTemporaireValide Then
+                    If Not ChangerMotDePasseTemporaire(service, resultat.Utilisateur) Then
+                        Return False
+                    End If
+                    txtPass.Text = LireNouveauMotDePasseValide
+                    resultat = service.AuthentifierCompte(nomUtilisateur, LireNouveauMotDePasseValide)
+                End If
+
+                If resultat.Statut <> AuthentificationStatut.Succes Then
+                    MessageBox.Show(resultat.Message, "Connexion", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    Return False
+                End If
+
+                Dim utilisateur As Utilisateur = resultat.Utilisateur
                 Dim roles As List(Of RoleSessionInfo) = service.ListerRolesActifs(utilisateur.UtilisateurId)
                 If roles.Count = 0 Then
+                    MessageBox.Show("Aucun rôle actif n'est associé à ce compte.", "Connexion", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                     Return False
                 End If
 
@@ -321,7 +351,11 @@ Namespace DevCommerc8ak
                     End Using
                 End If
 
-                service.DemarrerSession(utilisateur, roleChoisi)
+                Dim demarrage As AuthentificationResultat = service.DemarrerSessionApresAuthentification(utilisateur, roleChoisi)
+                If demarrage.Statut <> AuthentificationStatut.Succes Then
+                    MessageBox.Show(demarrage.Message, "Connexion", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    Return False
+                End If
                 Return True
             Catch ex As Exception
                 Dim log As New ProductionLogService()
@@ -330,6 +364,119 @@ Namespace DevCommerc8ak
                 Return False
             End Try
         End Function
+
+        Private _nouveauMotDePasseValide As String = String.Empty
+        Private ReadOnly Property LireNouveauMotDePasseValide As String
+            Get
+                Return _nouveauMotDePasseValide
+            End Get
+        End Property
+
+        Private Function ChangerMotDePasseTemporaire(service As UtilisateurService, utilisateur As Utilisateur) As Boolean
+            Using frm As New FormChangementMotDePasseReset()
+                If frm.ShowDialog(Me) <> DialogResult.OK Then Return False
+                service.ChangerMotDePasseApresReset(utilisateur.UtilisateurId, frm.NouveauMotDePasse)
+                _nouveauMotDePasseValide = frm.NouveauMotDePasse
+                Return True
+            End Using
+        End Function
+
+        Private Sub ChargerUtilisateurMemorise()
+            Try
+                Dim chemin As String = CheminRememberMe()
+                If Not File.Exists(chemin) Then Return
+                Dim protege As Byte() = File.ReadAllBytes(chemin)
+                Dim clair As Byte() = ProtectedData.Unprotect(protege, Nothing, DataProtectionScope.CurrentUser)
+                txtUser.Text = Encoding.UTF8.GetString(clair)
+                chkSeSouvenir.Checked = txtUser.Text.Trim() <> String.Empty
+            Catch
+            End Try
+        End Sub
+
+        Private Sub EnregistrerUtilisateurMemorise()
+            Try
+                Dim chemin As String = CheminRememberMe()
+                Dim dossier As String = Path.GetDirectoryName(chemin)
+                If Not Directory.Exists(dossier) Then Directory.CreateDirectory(dossier)
+                If Not chkSeSouvenir.Checked Then
+                    If File.Exists(chemin) Then File.Delete(chemin)
+                    Return
+                End If
+
+                ' Seul le nom utilisateur est mémorisé, protégé par DPAPI Windows.
+                ' Aucun mot de passe ni code temporaire n'est stocké localement.
+                Dim clair As Byte() = Encoding.UTF8.GetBytes(txtUser.Text.Trim())
+                Dim protege As Byte() = ProtectedData.Protect(clair, Nothing, DataProtectionScope.CurrentUser)
+                File.WriteAllBytes(chemin, protege)
+            Catch
+            End Try
+        End Sub
+
+        Private Shared Function CheminRememberMe() As String
+            Dim dossier As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CommercialPro")
+            Return Path.Combine(dossier, "remember-user.bin")
+        End Function
+
+        Private NotInheritable Class FormChangementMotDePasseReset
+            Inherits Form
+
+            Private ReadOnly txtNouveau As TextBox
+            Private ReadOnly txtConfirmation As TextBox
+            Private ReadOnly chkAfficher As CheckBox
+            Public Property NouveauMotDePasse As String
+
+            Public Sub New()
+                Text = "Changer votre mot de passe"
+                StartPosition = FormStartPosition.CenterParent
+                FormBorderStyle = FormBorderStyle.FixedDialog
+                MinimizeBox = False
+                MaximizeBox = False
+                ClientSize = New Size(420, 260)
+                BackColor = Color.White
+
+                Dim lblTitre As New Label() With {.Text = "CHANGER VOTRE MOT DE PASSE", .Dock = DockStyle.Top, .Height = 56, .TextAlign = ContentAlignment.MiddleCenter, .Font = New Font("Segoe UI", 12, FontStyle.Bold), .ForeColor = Color.FromArgb(52, 73, 94)}
+                Dim pnl As New TableLayoutPanel() With {.Dock = DockStyle.Fill, .ColumnCount = 2, .RowCount = 4, .Padding = New Padding(22)}
+                pnl.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 140))
+                pnl.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
+                txtNouveau = New TextBox() With {.Dock = DockStyle.Fill, .UseSystemPasswordChar = True}
+                txtConfirmation = New TextBox() With {.Dock = DockStyle.Fill, .UseSystemPasswordChar = True}
+                chkAfficher = New CheckBox() With {.Text = "Afficher / masquer", .Dock = DockStyle.Fill}
+                AddHandler chkAfficher.CheckedChanged, Sub()
+                                                           txtNouveau.UseSystemPasswordChar = Not chkAfficher.Checked
+                                                           txtConfirmation.UseSystemPasswordChar = Not chkAfficher.Checked
+                                                       End Sub
+                pnl.Controls.Add(New Label() With {.Text = "Nouveau mot de passe", .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}, 0, 0)
+                pnl.Controls.Add(txtNouveau, 1, 0)
+                pnl.Controls.Add(New Label() With {.Text = "Confirmation", .Dock = DockStyle.Fill, .TextAlign = ContentAlignment.MiddleLeft}, 0, 1)
+                pnl.Controls.Add(txtConfirmation, 1, 1)
+                pnl.Controls.Add(chkAfficher, 1, 2)
+
+                Dim actions As New FlowLayoutPanel() With {.Dock = DockStyle.Bottom, .Height = 55, .FlowDirection = FlowDirection.RightToLeft, .Padding = New Padding(10)}
+                Dim btnSave As New Button() With {.Text = "Enregistrer", .Width = 120, .Height = 32, .BackColor = Color.FromArgb(41, 128, 185), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+                Dim btnCancel As New Button() With {.Text = "Annuler", .Width = 90, .Height = 32, .DialogResult = DialogResult.Cancel}
+                AddHandler btnSave.Click, AddressOf Valider
+                actions.Controls.AddRange(New Control() {btnSave, btnCancel})
+
+                Controls.Add(pnl)
+                Controls.Add(actions)
+                Controls.Add(lblTitre)
+                AcceptButton = btnSave
+                CancelButton = btnCancel
+            End Sub
+
+            Private Sub Valider(sender As Object, e As EventArgs)
+                If txtNouveau.Text.Length < 4 Then
+                    MessageBox.Show(Me, "Le mot de passe doit contenir au moins 4 caractères.", "Mot de passe", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    Return
+                End If
+                If txtNouveau.Text <> txtConfirmation.Text Then
+                    MessageBox.Show(Me, "La confirmation ne correspond pas.", "Mot de passe", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    Return
+                End If
+                NouveauMotDePasse = txtNouveau.Text
+                DialogResult = DialogResult.OK
+            End Sub
+        End Class
 
         Private NotInheritable Class FormChoixRoleSession
             Inherits Form
