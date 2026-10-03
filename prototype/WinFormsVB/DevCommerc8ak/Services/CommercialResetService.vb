@@ -306,8 +306,9 @@ Namespace DevCommerc8ak
             Dim sql As String =
                 "SELECT sch.name AS TriggerSchema, trg.name AS TriggerName, tbl.name AS TableName " &
                 "FROM sys.triggers trg " &
+                "INNER JOIN sys.objects obj ON obj.object_id = trg.object_id " &
                 "INNER JOIN sys.tables tbl ON tbl.object_id = trg.parent_id " &
-                "INNER JOIN sys.schemas sch ON sch.schema_id = trg.schema_id " &
+                "INNER JOIN sys.schemas sch ON sch.schema_id = obj.schema_id " &
                 "WHERE trg.parent_class = 1 " &
                 "AND trg.is_ms_shipped = 0 " &
                 "AND trg.is_disabled = 0 " &
@@ -342,7 +343,7 @@ Namespace DevCommerc8ak
         Private Sub VerifierTriggersReactives(cn As SqlConnection, tx As SqlTransaction, triggers As List(Of CommercialResetTriggerInfo))
             If triggers Is Nothing Then Return
             For Each triggerInfo As CommercialResetTriggerInfo In triggers
-                Using cmd As New SqlCommand("SELECT COUNT(1) FROM sys.triggers trg INNER JOIN sys.schemas sch ON sch.schema_id = trg.schema_id WHERE sch.name=@Schema AND trg.name=@TriggerName AND trg.is_disabled=1", cn, tx)
+                Using cmd As New SqlCommand("SELECT COUNT(1) FROM sys.triggers trg INNER JOIN sys.objects obj ON obj.object_id = trg.object_id INNER JOIN sys.schemas sch ON sch.schema_id = obj.schema_id WHERE sch.name=@Schema AND trg.name=@TriggerName AND trg.is_disabled=1", cn, tx)
                     cmd.Parameters.AddWithValue("@Schema", triggerInfo.TriggerSchema)
                     cmd.Parameters.AddWithValue("@TriggerName", triggerInfo.TriggerName)
                     If Convert.ToInt32(cmd.ExecuteScalar()) > 0 Then

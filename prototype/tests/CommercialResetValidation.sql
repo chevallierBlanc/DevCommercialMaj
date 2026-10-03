@@ -117,8 +117,9 @@ SELECT
     sch.name + N'.' + trg.name AS TriggerDml,
     CASE WHEN trg.is_disabled = 1 THEN N'DESACTIVE' ELSE N'ACTIF' END AS EtatTrigger
 FROM sys.triggers trg
+INNER JOIN sys.objects obj ON obj.object_id = trg.object_id
 INNER JOIN sys.tables tbl ON tbl.object_id = trg.parent_id
-INNER JOIN sys.schemas sch ON sch.schema_id = trg.schema_id
+INNER JOIN sys.schemas sch ON sch.schema_id = obj.schema_id
 INNER JOIN @Tables t ON t.NomTable = tbl.name AND t.Conserver = 0
 WHERE trg.parent_class = 1
   AND trg.is_ms_shipped = 0
