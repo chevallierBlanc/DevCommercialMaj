@@ -20,7 +20,7 @@ Namespace DevCommerc8ak
         End Sub
 
         ' Cree un client et retourne son identifiant.
-        Public Function Ajouter(client As Client) As Integer
+        Public Function Ajouter(client As Client, Optional cn As SqlConnection = Nothing, Optional tx As SqlTransaction = Nothing) As Integer
             Dim sql As String = "INSERT INTO Clients (NomClient, Telephone, Email, Adresse, LimiteCredit, EstActif, ModifierPar) " &
                                 "VALUES (@NomClient, @Telephone, @Email, @Adresse, @LimiteCredit, @EstActif, @ModifierPar); " &
                                 "SELECT CAST(SCOPE_IDENTITY() AS INT);"
@@ -35,7 +35,15 @@ Namespace DevCommerc8ak
                 New SqlParameter("@ModifierPar", SessionUtilisateur.NomUtilisateur)
             }
 
-            Dim id As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
+            Dim id As Object
+            If cn Is Nothing Then
+                id = _dal.ExecuterScalaire(sql, CommandType.Text, p)
+            Else
+                Using cmd As New SqlCommand(sql, cn, tx)
+                    cmd.Parameters.AddRange(p.ToArray())
+                    id = cmd.ExecuteScalar()
+                End Using
+            End If
             Return Convert.ToInt32(id)
         End Function
 

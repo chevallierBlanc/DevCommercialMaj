@@ -49,7 +49,8 @@ Namespace DevCommerc8ak.Services
             If dto.MontantRegularise < 0D Then Throw New ArgumentException("Le montant régularisé ne peut pas être négatif.")
 
             _repo.RegulariserCloture(dto, SessionUtilisateur.UtilisateurId, SessionUtilisateur.NomUtilisateur, SessionUtilisateur.Role)
-            AuditActionService.Enregistrer("Analyse caisse physique", "Régularisation", "Clôture " & dto.ClotureCaisseId.ToString() & " passée au statut " & dto.NouveauStatut & ".")
+            ' La trace métier est désormais écrite par la transaction existante
+            ' de régularisation, pas après un commit déjà irréversible.
             AppEvents.OnCaissePhysiqueModifiee()
             AppEvents.OnCaisseModifiee()
             AppEvents.OnDataChanged()

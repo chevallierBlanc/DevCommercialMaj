@@ -196,6 +196,7 @@ Namespace DevCommerc8ak
 
         ' Met a jour un produit.
         Public Function MettreAJour(produit As Produit) As Integer
+            If SessionUtilisateur.UtilisateurId <= 0 Then Throw New UnauthorizedAccessException("Utilisateur authentifié obligatoire pour modifier un produit.")
             AssurerColonnes()
             Dim ancienPrixAchat As Decimal = 0D
             Dim ancienPrixDetail As Decimal = 0D
@@ -290,7 +291,7 @@ Namespace DevCommerc8ak
                                         "VALUES (" &
                                         "@ProduitId, @AncienPrixAchat, @NouveauPrixAchat, @AncienPrixDetail, @NouveauPrixDetail, @AncienPrixDemi, @NouveauPrixDemi, " &
                                         "@AncienPrixQuart, @NouveauPrixQuart, @AncienPrixDouzaine, @NouveauPrixDouzaine, @AncienPrixGros, @NouveauPrixGros, " &
-                                        "@AncienPrixSpecial, @NouveauPrixSpecial, 1, GETDATE(), @IdStock)"
+                                        "@AncienPrixSpecial, @NouveauPrixSpecial, @ModifiePar, GETDATE(), @IdStock)"
                 Dim pHist As New List(Of SqlParameter) From {
                     New SqlParameter("@ProduitId", produit.ProduitId),
                     New SqlParameter("@AncienPrixAchat", ancienPrixAchat),
@@ -307,6 +308,7 @@ Namespace DevCommerc8ak
                     New SqlParameter("@NouveauPrixGros", produit.PrixGros),
                     New SqlParameter("@AncienPrixSpecial", ancienPrixSpecial),
                     New SqlParameter("@NouveauPrixSpecial", produit.PrixSpecial),
+                    New SqlParameter("@ModifiePar", SessionUtilisateur.UtilisateurId),
                     New SqlParameter("@IdStock", DBNull.Value)
                 }
                 _dal.ExecuterNonRequete(sqlHist, CommandType.Text, pHist)
@@ -316,6 +318,7 @@ Namespace DevCommerc8ak
         End Function
 
         Public Function MettreAJourAvecMigrationUniteVersMesure(produit As Produit, ancienStockBase As Decimal, nouveauStockBase As Decimal, effectuePar As Integer) As Integer
+            If SessionUtilisateur.UtilisateurId <= 0 Then Throw New UnauthorizedAccessException("Utilisateur authentifié obligatoire pour modifier un produit.")
             AssurerColonnes()
 
             Using cn As SqlConnection = _dal.CreerConnexion()
@@ -510,7 +513,10 @@ Namespace DevCommerc8ak
                ancienPrixGros = produit.PrixGros AndAlso
                ancienPrixSpecial = produit.PrixSpecial Then Return
 
-            Using cmdHist As New SqlCommand("INSERT INTO HistoriquePrixProduits (ProduitId, AncienPrixAchat, NouveauPrixAchat, AncienPrixDetail, NouveauPrixDetail, AncienPrixDemi, NouveauPrixDemi, AncienPrixQuart, NouveauPrixQuart, AncienPrixDouzaine, NouveauPrixDouzaine, AncienPrixGros, NouveauPrixGros, AncienPrixSpecial, NouveauPrixSpecial, ModifiePar, ModifieLe, IdStock) VALUES (@ProduitId, @AncienPrixAchat, @NouveauPrixAchat, @AncienPrixDetail, @NouveauPrixDetail, @AncienPrixDemi, @NouveauPrixDemi, @AncienPrixQuart, @NouveauPrixQuart, @AncienPrixDouzaine, @NouveauPrixDouzaine, @AncienPrixGros, @NouveauPrixGros, @AncienPrixSpecial, @NouveauPrixSpecial, 1, GETDATE(), @IdStock)", cn, tx)
+            ' L'auteur réel est enregistré pour les nouvelles écritures seulement.
+            ' Les anciens historiques ne sont jamais réattribués artificiellement.
+            Using cmdHist As New SqlCommand("INSERT INTO HistoriquePrixProduits (ProduitId, AncienPrixAchat, NouveauPrixAchat, AncienPrixDetail, NouveauPrixDetail, AncienPrixDemi, NouveauPrixDemi, AncienPrixQuart, NouveauPrixQuart, AncienPrixDouzaine, NouveauPrixDouzaine, AncienPrixGros, NouveauPrixGros, AncienPrixSpecial, NouveauPrixSpecial, ModifiePar, ModifieLe, IdStock) VALUES (@ProduitId, @AncienPrixAchat, @NouveauPrixAchat, @AncienPrixDetail, @NouveauPrixDetail, @AncienPrixDemi, @NouveauPrixDemi, @AncienPrixQuart, @NouveauPrixQuart, @AncienPrixDouzaine, @NouveauPrixDouzaine, @AncienPrixGros, @NouveauPrixGros, @AncienPrixSpecial, @NouveauPrixSpecial, @ModifiePar, GETDATE(), @IdStock)", cn, tx)
+                cmdHist.Parameters.AddWithValue("@ModifiePar", SessionUtilisateur.UtilisateurId)
                 cmdHist.Parameters.AddWithValue("@ProduitId", produit.ProduitId)
                 cmdHist.Parameters.AddWithValue("@AncienPrixAchat", ancienPrixAchat)
                 cmdHist.Parameters.AddWithValue("@NouveauPrixAchat", produit.PrixAchat)

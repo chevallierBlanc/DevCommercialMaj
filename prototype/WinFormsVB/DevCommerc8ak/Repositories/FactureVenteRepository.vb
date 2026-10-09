@@ -49,7 +49,7 @@ Namespace DevCommerc8ak
         End Function
 
         ' Cree une facture de vente et retourne son identifiant.
-        Public Function Ajouter(facture As FactureVente) As Integer
+        Public Function Ajouter(facture As FactureVente, Optional cn As SqlConnection = Nothing, Optional tx As SqlTransaction = Nothing) As Integer
             Dim sql As String = "INSERT INTO FacturesVente (NumeroFacture, ClientId, SousTotal, MontantRemise, MontantTaxe, MontantTotal, Statut, CreePar, ModifierPar) " &
                                 "VALUES (@NumeroFacture, @ClientId, @SousTotal, @MontantRemise, @MontantTaxe, @MontantTotal, @Statut, @CreePar, @ModifierPar); " &
                                 "SELECT CAST(SCOPE_IDENTITY() AS INT);"
@@ -66,7 +66,15 @@ Namespace DevCommerc8ak
                 New SqlParameter("@ModifierPar", SessionUtilisateur.NomUtilisateur)
             }
 
-            Dim id As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
+            Dim id As Object
+            If cn Is Nothing Then
+                id = _dal.ExecuterScalaire(sql, CommandType.Text, p)
+            Else
+                Using cmd As New SqlCommand(sql, cn, tx)
+                    cmd.Parameters.AddRange(p.ToArray())
+                    id = cmd.ExecuteScalar()
+                End Using
+            End If
             Return Convert.ToInt32(id)
         End Function
 
@@ -107,7 +115,7 @@ Namespace DevCommerc8ak
         End Function
 
         ' Met a jour une facture.
-        Public Function MettreAJour(facture As FactureVente) As Integer
+        Public Function MettreAJour(facture As FactureVente, Optional cn As SqlConnection = Nothing, Optional tx As SqlTransaction = Nothing) As Integer
             Dim sql As String = "UPDATE FacturesVente SET NumeroFacture=@NumeroFacture, ClientId=@ClientId, SousTotal=@SousTotal, " &
                                 "MontantRemise=@MontantRemise, MontantTaxe=@MontantTaxe, MontantTotal=@MontantTotal, Statut=@Statut, ModifierPar=@ModifierPar " &
                                 "WHERE FactureVenteId=@FactureVenteId"
@@ -123,7 +131,11 @@ Namespace DevCommerc8ak
                 New SqlParameter("@ModifierPar", SessionUtilisateur.NomUtilisateur)
             }
 
-            Return _dal.ExecuterNonRequete(sql, CommandType.Text, p)
+            If cn Is Nothing Then Return _dal.ExecuterNonRequete(sql, CommandType.Text, p)
+            Using cmd As New SqlCommand(sql, cn, tx)
+                cmd.Parameters.AddRange(p.ToArray())
+                Return cmd.ExecuteNonQuery()
+            End Using
         End Function
 
         ' Met a jour le statut d'une facture.

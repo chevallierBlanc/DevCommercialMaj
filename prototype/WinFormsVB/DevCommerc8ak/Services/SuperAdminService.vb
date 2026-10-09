@@ -196,11 +196,13 @@ Namespace DevCommerc8ak
         Public Function ListerActionsUtilisateur(dateDebut As Date?, dateFin As Date?, utilisateur As String, role As String, moduleName As String, actionName As String, typeAction As String) As List(Of AuditLogEntryDTO)
             Try
                 Dim dtAudit As DataTable = ObtenirRepository().ListerAuditActions(dateDebut, dateFin, utilisateur, role, moduleName, actionName, typeAction)
-                If dtAudit IsNot Nothing AndAlso dtAudit.Rows.Count > 0 Then
+                If dtAudit IsNot Nothing Then
                     Dim audits As New List(Of AuditLogEntryDTO)()
                     For Each row As DataRow In dtAudit.Rows
                         audits.Add(New AuditLogEntryDTO With {
-                            .DateAction = If(row.IsNull("CreeLe"), Date.MinValue, Convert.ToDateTime(row("CreeLe"))),
+                            .DateAction = If(row.IsNull("CreeLe"), Date.MinValue,
+                                If(Convert.ToString(row("Provenance")) = "AuditActions", Convert.ToDateTime(row("CreeLe")),
+                                   Date.SpecifyKind(Convert.ToDateTime(row("CreeLe")), DateTimeKind.Utc).ToLocalTime())),
                             .Utilisateur = If(row.IsNull("Utilisateur"), "SYSTEM", Convert.ToString(row("Utilisateur"))),
                             .Role = If(row.IsNull("Role"), "N/A", Convert.ToString(row("Role"))),
                             .Modul = If(row.IsNull("Module"), String.Empty, Convert.ToString(row("Module"))),
@@ -208,12 +210,19 @@ Namespace DevCommerc8ak
                             .Description = If(row.IsNull("Description"), String.Empty, Convert.ToString(row("Description"))),
                             .Machine = If(row.IsNull("Machine"), String.Empty, Convert.ToString(row("Machine"))),
                             .Statut = If(row.IsNull("Statut"), String.Empty, Convert.ToString(row("Statut"))),
-                            .Niveau = If(row.IsNull("Statut"), String.Empty, Convert.ToString(row("Statut")))
+                            .Niveau = If(row.IsNull("Statut"), String.Empty, Convert.ToString(row("Statut"))),
+                            .Provenance = Convert.ToString(row("Provenance")), .Avant = Convert.ToString(row("Avant")),
+                            .Apres = Convert.ToString(row("Apres")), .Motif = Convert.ToString(row("Motif")),
+                            .SessionId = If(row.IsNull("SessionId"), CType(Nothing, Integer?), Convert.ToInt32(row("SessionId"))),
+                            .ModeActif = Convert.ToString(row("ModeActif"))
                         })
                     Next
-                    Return audits
+                    Return audits.OrderByDescending(Function(x) x.DateAction).ToList()
                 End If
-            Catch
+            Catch ex As UnauthorizedAccessException
+                Throw
+            Catch ex As SqlException
+                Throw
             End Try
 
             Dim entries As New List(Of AuditLogEntryDTO)()

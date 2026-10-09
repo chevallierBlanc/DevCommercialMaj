@@ -1201,8 +1201,10 @@ Namespace DevCommerc8ak
 
                 Dim factureId As Integer = SafeIntegerCell(CellValueByProperty(gridFactures.CurrentRow, "FactureVenteId"))
                 Dim dal As New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)
-                Dim repo As New FactureVenteRepository(dal)
-                repo.MettreAJourStatut(factureId, "ANNULEE")
+                Dim motif As String = DialogueMotifOperation.Demander(Me, "Annulation de la facture")
+                If motif Is Nothing Then Return
+                Dim operations As New FactureOperationService(dal)
+                operations.Annuler(factureId, motif, True)
                 AppDataVersionService.Touch("FACTURES")
                 AppEvents.OnDataChanged()
 

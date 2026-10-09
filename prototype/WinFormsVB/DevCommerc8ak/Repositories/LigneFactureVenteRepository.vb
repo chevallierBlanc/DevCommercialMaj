@@ -23,7 +23,7 @@ Namespace DevCommerc8ak
         End Sub
 
         ' Cree une ligne de facture et retourne son identifiant.
-        Public Function Ajouter(ligne As LigneFactureVente) As Integer
+        Public Function Ajouter(ligne As LigneFactureVente, Optional cn As SqlConnection = Nothing, Optional tx As SqlTransaction = Nothing) As Integer
             Dim sql As String = "INSERT INTO LignesFactureVente (FactureVenteId, ProduitId, Quantite,QuantiteBase,TypeVente, PrixUnitaire, MontantRemise, MontantLigne, QuantiteSaisie, CoutUnitaireBaseVente) " &
                                 "VALUES (@FactureVenteId, @ProduitId, @Quantite,@QuantiteBase, @TypeVente, @PrixUnitaire, @MontantRemise, @MontantLigne, @QuantiteSaisie, @CoutUnitaireBaseVente); " &
                                 "SELECT CAST(SCOPE_IDENTITY() AS INT);"
@@ -41,7 +41,15 @@ Namespace DevCommerc8ak
                 New SqlParameter("@CoutUnitaireBaseVente", If(ligne.CoutUnitaireBaseVente.HasValue, CType(ligne.CoutUnitaireBaseVente.Value, Object), DBNull.Value))
             }
 
-            Dim id As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
+            Dim id As Object
+            If cn Is Nothing Then
+                id = _dal.ExecuterScalaire(sql, CommandType.Text, p)
+            Else
+                Using cmd As New SqlCommand(sql, cn, tx)
+                    cmd.Parameters.AddRange(p.ToArray())
+                    id = cmd.ExecuteScalar()
+                End Using
+            End If
             Return Convert.ToInt32(id)
         End Function
 

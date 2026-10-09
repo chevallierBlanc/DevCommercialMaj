@@ -385,8 +385,15 @@ Namespace DevCommerc8ak
                         Return
                     End If
                     If MessageBox.Show("Confirmer l'annulation de la facture ?", "Annuler", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
-                        Dim repo As New FactureVenteRepository(ObtenirDAL())
-                        repo.MettreAJourStatut(factureId, "ANNULEE")
+                        Dim motif As String = DialogueMotifOperation.Demander(Me, "Annulation de la facture")
+                        If motif Is Nothing Then Return
+                        Try
+                            Dim operations As New FactureOperationService(ObtenirDAL())
+                            operations.Annuler(factureId, motif)
+                        Catch ex As Exception
+                            MessageBox.Show(ex.Message, "Annulation refusée", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                            Return
+                        End Try
                         AppEvents.OnDataChanged()
                         ChargerFactures(Nothing, EventArgs.Empty)
                     End If

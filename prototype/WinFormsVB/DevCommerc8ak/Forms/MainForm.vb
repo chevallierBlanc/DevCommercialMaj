@@ -531,10 +531,6 @@ Namespace DevCommerc8ak
         ''' </summary>
         Private Function VerifierPermission(fonctionnalite As String) As Boolean
             Dim role As String = If(SessionUtilisateur.Role, String.Empty).Trim().ToUpperInvariant()
-            If role = "SUPERADMIN" Then
-                Return True
-            End If
-
             Dim codePermission As String = MapperCodePermission(fonctionnalite)
             Dim permissionBase As Boolean?
 
@@ -545,48 +541,9 @@ Namespace DevCommerc8ak
                 End If
             End If
 
-            Select Case role
-                Case "ADMIN"
-                    Return True
-                Case "SUPERADMIN"
-                    Return True
-
-                Case "PASTEUR"
-                    Return True
-
-                Case "FACTURIER"
-                    Select Case fonctionnalite
-                        Case "Facturier"
-                            Return True
-                        Case "HistoriqueFactures"
-                            Return True
-                        Case Else
-                            Return False
-                    End Select
-
-                Case "CAISSIERE"
-                    Select Case fonctionnalite
-                        Case "Caisse"
-                            Return True
-                        Case "Finance"
-                            Return True
-                        Case Else
-                            Return False
-                    End Select
-
-                Case "CAISSIER"
-                    Select Case fonctionnalite
-                        Case "Caisse"
-                            Return True
-                        Case "Finance"
-                            Return True
-                        Case Else
-                            Return False
-                    End Select
-
-                Case Else
-                    Return False
-            End Select
+            ' Un écran non référencé ou une session sans rôle ne doit jamais
+            ' hériter de droits codés en dur à partir d'un simple nom de rôle.
+            Return False
         End Function
 
         Private Function MapperCodePermission(fonctionnalite As String) As String
@@ -645,7 +602,7 @@ Namespace DevCommerc8ak
                 Dim repo As New SuperAdminRepository(New DAL(cs))
                 repo.AssurerInfrastructure()
                 If Not repo.RoleUtilisePermissions(role) Then
-                    Return Nothing
+                    Return False
                 End If
 
                 Dim autorise As Boolean = repo.RoleAutoriseInterface(role, codePermission)
@@ -654,7 +611,7 @@ Namespace DevCommerc8ak
             Catch ex As Exception
                 Dim log As New ProductionLogService()
                 log.Warn("MainForm", "LirePermissionDepuisBase", "Permission base indisponible pour " & codePermission & " : " & ex.Message)
-                Return Nothing
+                Return False
             End Try
         End Function
 

@@ -30,12 +30,24 @@ Namespace DevCommerc8ak
                         AppliquerMigration(cn, tx, 2026092601, "Fondation conditionnements produits dynamiques", AddressOf MigrationConditionnementsDynamiques)
                         AppliquerMigration(cn, tx, 2026100301, "Normalisation unites conditionnements phase 3", AddressOf MigrationNormalisationUnitesConditionnementsPhase3)
                         AppliquerMigration(cn, tx, 2026100302, "Securite comptes utilisateurs", AddressOf MigrationSecuriteComptesUtilisateurs)
+                        AppliquerMigration(cn, tx, 2026100901, "Fondations autorisations et journal metier", AddressOf MigrationAuditMetier)
                         AssurerSchemaCritiquePostMigrations(cn, tx)
                         tx.Commit()
                     Catch
                         tx.Rollback()
                         Throw
                     End Try
+                End Using
+            End Using
+        End Sub
+
+        Private Shared Sub MigrationAuditMetier(cn As SqlConnection, tx As SqlTransaction)
+            ' Une ressource embarquée unique évite toute divergence entre SSMS
+            ' et la migration exécutée automatiquement au démarrage.
+            Using stream As System.IO.Stream = GetType(SchemaMigrationService).Assembly.GetManifestResourceStream("AuditMetierMigration.sql")
+                If stream Is Nothing Then Throw New InvalidOperationException("Migration audit metier embarquee absente.")
+                Using reader As New System.IO.StreamReader(stream)
+                    Executer(cn, tx, reader.ReadToEnd())
                 End Using
             End Using
         End Sub

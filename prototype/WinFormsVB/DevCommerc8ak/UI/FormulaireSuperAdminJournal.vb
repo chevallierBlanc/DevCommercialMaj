@@ -66,6 +66,7 @@ Namespace DevCommerc8ak
             AddHandler Me.Load, AddressOf FormulaireSuperAdminJournal_Load
             AddHandler btnFiltrer.Click, AddressOf ChargerJournal
             AddHandler btnExporter.Click, AddressOf ExporterCsv
+            AddHandler grid.CellDoubleClick, AddressOf VoirTraceMetier
         End Sub
 
         Private Sub BuildUi()
@@ -140,7 +141,7 @@ Namespace DevCommerc8ak
                 .DropDownStyle = ComboBoxStyle.DropDownList,
                 .FlatStyle = FlatStyle.Flat
             }
-            cmbType.Items.AddRange(New Object() {"TOUS", "OK", "INFO", "WARN", "ERROR"})
+            cmbType.Items.AddRange(New Object() {"TOUS", "SUCCES", "REFUS", "ECHEC", "HISTORIQUE", "OK", "INFO", "WARN", "ERROR"})
             cmbType.SelectedIndex = 0
 
             btnFiltrer = New Button() With {
@@ -293,6 +294,12 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
+        Private Sub VoirTraceMetier(sender As Object, e As DataGridViewCellEventArgs)
+            If e.RowIndex < 0 Then Return
+            Dim trace As AuditLogEntryDTO = TryCast(grid.Rows(e.RowIndex).DataBoundItem, AuditLogEntryDTO)
+            If trace IsNot Nothing Then DialogueAuditMetier.Afficher(Me, trace)
+        End Sub
+
         Private Sub ConfigurerColonnes()
             If grid.Columns.Count = 0 Then Return
 
@@ -314,6 +321,9 @@ Namespace DevCommerc8ak
             Next
 
             If grid.Columns.Contains("Niveau") Then grid.Columns("Niveau").Visible = False
+            For Each colonne As String In {"Avant", "Apres", "Motif", "SessionId"}
+                If grid.Columns.Contains(colonne) Then grid.Columns(colonne).Visible = False
+            Next
             
             ' Ajustement des largeurs
             If grid.Columns.Contains("DateAction") Then grid.Columns("DateAction").Width = 140

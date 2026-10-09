@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace></RootNamespace>
+    <OptionStrict>On</OptionStrict>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AuditDifferenceService.vb" Link="AuditDifferenceService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AuditMetierRegles.vb" Link="AuditMetierRegles.vb" />
+  </ItemGroup>
+</Project>

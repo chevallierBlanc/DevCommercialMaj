@@ -70,6 +70,7 @@ Namespace DevCommerc8ak
         Private _parametres As ParametreDTO
         Private _typesVenteCourants As List(Of TypeVenteDTO) 'nouveau
         Private _factureEnEditionId As Integer?
+        Private _versionFactureEdition As Byte()
         Private _isRefreshingFromEvent As Boolean
         Private _suppressSelectionEvents As Boolean
         Private _dataMonitor As DataChangeMonitorService
@@ -1000,6 +1001,7 @@ Namespace DevCommerc8ak
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
                 Dim factureRepo As New FactureVenteRepository(dal)
+                _versionFactureEdition = New FactureOperationService(dal).LireVersion(factureVenteId)
                 Dim facture As FactureVenteDTO = factureRepo.ObtenirParId(factureVenteId)
                 If facture Is Nothing OrElse facture.Statut <> "EN_ATTENTE" Then
                     MessageBox.Show("Seules les factures brouillon peuvent être modifiees.")
@@ -1066,7 +1068,6 @@ Namespace DevCommerc8ak
                 Me.UseWaitCursor = True
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
-                Dim service As New FacturationService(dal)
                 Dim factureRepo As New FactureVenteRepository(dal)
                 Dim clientService As New ClientService(New ClientRepository(dal))
 
@@ -1089,6 +1090,7 @@ Namespace DevCommerc8ak
                 Dim total As Decimal = sousTotal - remiseMontant
 
                 Dim clientId As Integer? = Nothing
+                Dim clientNouveau As Client = Nothing
                 Dim tel As String = NettoyerTelephone(txtClientTel.Text)
                 Dim nom As String = txtClientNom.Text.Trim()
                 If tel <> "" AndAlso Not NumeroTelephoneValide(tel) Then
@@ -1115,7 +1117,7 @@ Namespace DevCommerc8ak
                             .LimiteCredit = 0D,
                             .EstActif = True
                         }
-                        clientId = clientService.Ajouter(nouveau)
+                        clientNouveau = nouveau
                     End If
                 ElseIf nom <> "" Then
                     Dim nouveau As New Client With {
@@ -1126,37 +1128,26 @@ Namespace DevCommerc8ak
                         .LimiteCredit = 0D,
                         .EstActif = True
                     }
-                    clientId = clientService.Ajouter(nouveau)
+                    clientNouveau = nouveau
                 End If
 
-                Dim factureId As Integer
+                Dim motif As String = String.Empty
                 If _factureEnEditionId.HasValue Then
-                    factureId = _factureEnEditionId.Value
-                    Dim ligneRepo As New LigneFactureVenteRepository(dal)
-
-                    Dim factureMaj As New FactureVente With {
-                        .FactureVenteId = factureId,
-                        .NumeroFacture = numeroFacture,
-                        .ClientId = clientId,
-                        .SousTotal = sousTotal,
-                        .MontantRemise = remiseMontant,
-                        .MontantTaxe = 0D,
-                        .MontantTotal = total,
-                        .Statut = "EN_ATTENTE"
-                    }
-                    factureRepo.MettreAJour(factureMaj)
-
-                    Dim lignesExistantes As List(Of LigneFactureVenteDTO) = ligneRepo.ListerParFacture(factureId)
-                    For Each ligneExistante As LigneFactureVenteDTO In lignesExistantes
-                        ligneRepo.Supprimer(ligneExistante.LigneFactureVenteId)
-                    Next
-                Else
-                    factureId = service.CreerFacture(numeroFacture, clientId, sousTotal, remiseMontant, 0D, total, SessionUtilisateur.UtilisateurId)
+                    motif = DialogueMotifOperation.Demander(Me, "Modification de la facture")
+                    If motif Is Nothing Then Return
                 End If
-
+                Dim factureMaj As New FactureVente With {
+                    .FactureVenteId = If(_factureEnEditionId.HasValue, _factureEnEditionId.Value, 0),
+                    .NumeroFacture = numeroFacture, .ClientId = clientId, .SousTotal = sousTotal,
+                    .MontantRemise = remiseMontant, .MontantTaxe = 0D, .MontantTotal = total, .Statut = "EN_ATTENTE"
+                }
+                Dim lignes As New List(Of LigneFactureVente)()
                 For Each l As PanierLigne In _panier
-                    service.AjouterLigne(factureId, l.ProduitId, l.Quantite, l.QuantiteBase, l.Unite, l.PrixUnitaire, 0D, l.Quantite)
+                    lignes.Add(New LigneFactureVente With {.ProduitId = l.ProduitId, .Quantite = l.Quantite,
+                        .QuantiteBase = l.QuantiteBase, .TypeVente = l.Unite, .PrixUnitaire = l.PrixUnitaire,
+                        .MontantRemise = 0D, .QteSaisie = l.Quantite})
                 Next
+                Dim factureId As Integer = New FactureOperationService(dal).Enregistrer(factureMaj, lignes, motif, _versionFactureEdition, clientNouveau)
 
                 AppDataVersionService.Touch("FACTURES")
                 AppEvents.OnDataChanged()

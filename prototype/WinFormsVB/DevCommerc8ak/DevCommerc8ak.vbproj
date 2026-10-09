@@ -53,6 +53,9 @@
   <ItemGroup>
     <Compile Include="DTOs\FinanceDTOs.vb" />
     <Compile Include="Program.vb" />
+    <EmbeddedResource Include="Migrations\2026100901_AuditMetier.sql">
+      <LogicalName>AuditMetierMigration.sql</LogicalName>
+    </EmbeddedResource>
     <Compile Include="DAL\DAL.vb" />
     <Compile Include="Entities\Client.vb" />
     <Compile Include="Entities\Produit.vb" />
@@ -145,6 +148,13 @@
     <Compile Include="Services\FormatageGlobal.vb" />
     <Compile Include="Services\ProductionLogService.vb" />
     <Compile Include="Services\AuditActionService.vb" />
+    <Compile Include="Services\AutorisationActionService.vb" />
+    <Compile Include="Services\AuditMetierService.vb" />
+    <Compile Include="Services\AuditDifferenceService.vb" />
+    <Compile Include="Services\AuditMetierRegles.vb" />
+    <Compile Include="Services\FactureOperationService.vb" />
+    <Compile Include="UI\DialogueMotifOperation.vb" />
+    <Compile Include="UI\DialogueAuditMetier.vb" />
     <Compile Include="Services\AppEvents.vb" />
     <Compile Include="Services\AppDataVersionService.vb" />
     <Compile Include="Services\DataChangeMonitorService.vb" />

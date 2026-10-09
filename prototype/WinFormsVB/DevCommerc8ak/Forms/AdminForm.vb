@@ -191,10 +191,6 @@ Namespace DevCommerc8ak
 
         Private Function VerifierPermission(fonctionnalite As String) As Boolean
             Dim role As String = If(SessionUtilisateur.Role, String.Empty).Trim().ToUpperInvariant()
-            If role = "SUPERADMIN" Then
-                Return True
-            End If
-
             Dim codePermission As String = fonctionnalite.Trim().ToUpperInvariant()
             Try
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
@@ -204,9 +200,10 @@ Namespace DevCommerc8ak
                     Return repo.RoleAutoriseInterface(role, codePermission)
                 End If
             Catch
+                Return False
             End Try
 
-            Return role = "ADMIN"
+            Return False
         End Function
     End Class
 End Namespace

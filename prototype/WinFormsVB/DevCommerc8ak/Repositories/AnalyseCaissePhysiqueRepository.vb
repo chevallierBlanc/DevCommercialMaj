@@ -119,10 +119,18 @@ Namespace DevCommerc8ak
             If dto Is Nothing OrElse dto.ClotureCaisseId <= 0 Then Throw New ArgumentException("Clôture invalide.")
             If String.IsNullOrWhiteSpace(dto.NouveauStatut) Then Throw New ArgumentException("Statut requis.")
 
+            Dim correlation As Guid = Guid.NewGuid()
             Using cn As SqlConnection = _dal.CreerConnexion()
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
                     Try
+                        AutorisationActionService.Exiger(cn, tx, "CAISSE_REGULARISER", "ANALYSE_CAISSE_PHYSIQUE")
+                        If utilisateurId <> SessionUtilisateur.UtilisateurId Then Throw New UnauthorizedAccessException("Auteur de régularisation invalide.")
+                        If dto.MontantRegularise < 0D Then Throw New ArgumentException("Le montant régularisé ne peut pas être négatif.")
+                        dto.Motif = AuditMetierService.ValiderMotif(dto.Motif)
+                        ' Les colonnes métier existantes sont limitées à 250 caractères.
+                        ' Refuser le dépassement plutôt que tronquer le motif enregistré.
+                        If dto.Motif.Length > 250 Then Throw New ArgumentException("Le motif de régularisation est limité à 250 caractères.")
                         Dim ancienStatut As String = String.Empty
                         Dim ecart As Decimal = 0D
                         Dim nomResponsable As String = String.Empty
@@ -184,9 +192,15 @@ Namespace DevCommerc8ak
                             cmdHist.ExecuteNonQuery()
                         End Using
 
+                        AuditMetierService.Enregistrer(cn, tx, "CAISSE_ECART_REGULARISE", "CAISSE", "ClotureCaisse", dto.ClotureCaisseId,
+                            dto.ClotureCaisseId.ToString(Globalization.CultureInfo.InvariantCulture),
+                            New With {.Statut = ancienStatut, .Ecart = ecart, .TotalRegularise = totalRegularise - dto.MontantRegularise},
+                            New With {.Statut = dto.NouveauStatut.Trim().ToUpperInvariant(), .Ecart = ecart, .TotalRegularise = totalRegularise, .Restant = restant},
+                            dto.Motif, correlation)
                         tx.Commit()
-                    Catch
-                        tx.Rollback()
+                    Catch ex As Exception
+                        If tx.Connection IsNot Nothing Then tx.Rollback()
+                        AuditMetierService.Echec(_dal, "CAISSE_REGULARISATION_REFUSEE", dto.ClotureCaisseId, correlation, ex, "ClotureCaisse")
                         Throw
                     End Try
                 End Using

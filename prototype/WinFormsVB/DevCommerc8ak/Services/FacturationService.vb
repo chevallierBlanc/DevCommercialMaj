@@ -27,17 +27,25 @@ Namespace DevCommerc8ak
                 .Statut = "EN_ATTENTE",
                 .CreePar = creePar
             }
-            Dim factureId As Integer = repo.Ajouter(f)
-            If factureId > 0 Then
-                AuditActionService.Enregistrer("Facturation", "Création facture", "Facture " & numeroFacture & " créée en attente.")
-                AppEvents.OnVenteCreee()
-                AppEvents.OnDataChanged()
-            End If
+            Dim factureId As Integer
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    AutorisationActionService.Exiger(cn, tx, "FACTURE_CREER", "FACTURIER")
+                    If creePar <> SessionUtilisateur.UtilisateurId Then Throw New UnauthorizedAccessException("Auteur de facture invalide.")
+                    factureId = repo.Ajouter(f, cn, tx)
+                    AuditMetierService.Enregistrer(cn, tx, "FACTURE_CREEE", "FACTURATION", "Facture", factureId, numeroFacture,
+                        Nothing, FactureOperationService.Snapshot(cn, tx, factureId), String.Empty, Guid.NewGuid())
+                    tx.Commit()
+                End Using
+            End Using
+            AppEvents.OnVenteCreee()
+            AppEvents.OnDataChanged()
             Return factureId
         End Function
 
         ' Ajoute une ligne a une facture.
-        Public Function AjouterLigne(factureVenteId As Integer, produitId As Integer, quantite As Decimal, QuantiteBase As Decimal, TypeVente As String, prixUnitaire As Decimal, montantRemise As Decimal, Optional quantiteFacturee As Decimal? = Nothing) As Integer
+        Public Function AjouterLigne(factureVenteId As Integer, produitId As Integer, quantite As Decimal, QuantiteBase As Decimal, TypeVente As String, prixUnitaire As Decimal, montantRemise As Decimal, Optional quantiteFacturee As Decimal? = Nothing, Optional motif As String = Nothing) As Integer
             Dim repo As New LigneFactureVenteRepository(_dal)
             Dim quantiteMontant As Decimal = If(quantiteFacturee.HasValue, quantiteFacturee.Value, quantite)
             Dim montantLigne As Decimal = (quantiteMontant * prixUnitaire) - montantRemise
@@ -54,17 +62,50 @@ Namespace DevCommerc8ak
                 .QteSaisie = quantiteFacturee,
                 .CoutUnitaireBaseVente = coutUnitaireBase
             }
-            Return repo.Ajouter(ligne)
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    AutorisationActionService.Exiger(cn, tx, "FACTURE_MODIFIER", "FACTURIER")
+                    motif = AuditMetierService.ValiderMotif(motif)
+                    Using cmd As New SqlCommand("SELECT Statut FROM dbo.FacturesVente WITH (UPDLOCK,HOLDLOCK) WHERE FactureVenteId=@id", cn, tx)
+                        cmd.Parameters.AddWithValue("@id", factureVenteId)
+                        If Convert.ToString(cmd.ExecuteScalar()) <> "EN_ATTENTE" Then Throw New InvalidOperationException("Seul un brouillon peut recevoir une ligne.")
+                    End Using
+                    Dim avant As Object = FactureOperationService.Snapshot(cn, tx, factureVenteId)
+                    Dim id As Integer = repo.Ajouter(ligne, cn, tx)
+                    ' L'ajout isolé invalide aussi la version ouverte sur un autre poste.
+                    Using cmd As New SqlCommand("UPDATE dbo.FacturesVente SET ModifierPar=@user WHERE FactureVenteId=@id", cn, tx)
+                        cmd.Parameters.AddWithValue("@id", factureVenteId)
+                        cmd.Parameters.AddWithValue("@user", SessionUtilisateur.NomUtilisateur)
+                        cmd.ExecuteNonQuery()
+                    End Using
+                    AuditMetierService.Enregistrer(cn, tx, "FACTURE_MODIFIEE", "FACTURATION", "Facture", factureVenteId, String.Empty,
+                        avant, FactureOperationService.Snapshot(cn, tx, factureVenteId), motif, Guid.NewGuid())
+                    tx.Commit()
+                    Return id
+                End Using
+            End Using
         End Function
 
-        Private Function ObtenirCoutUnitaireBaseVente(produitId As Integer) As Decimal?
+        Friend Function ObtenirCoutUnitaireBaseVente(produitId As Integer, Optional cn As SqlConnection = Nothing, Optional tx As SqlTransaction = Nothing) As Decimal?
             If produitId <= 0 Then
                 Return Nothing
             End If
 
             Dim sql As String = "SELECT PrixAchat, ConversionUnite, ISNULL(TypeGestionStock,'UNITE') AS TypeGestionStock, ISNULL(ContenuUnitePrincipale, ISNULL(ConversionUnite,1)) AS ContenuUnitePrincipale FROM Produits WHERE ProduitId=@ProduitId"
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@ProduitId", produitId)}
-            Dim dt As DataTable = _dal.ExecuterTable(sql, CommandType.Text, p)
+            Dim dt As DataTable
+            If cn Is Nothing Then
+                dt = _dal.ExecuterTable(sql, CommandType.Text, p)
+            Else
+                dt = New DataTable()
+                Using cmd As New SqlCommand(sql, cn, tx)
+                    cmd.Parameters.AddRange(p.ToArray())
+                    Using r As SqlDataReader = cmd.ExecuteReader()
+                        dt.Load(r)
+                    End Using
+                End Using
+            End If
             If dt Is Nothing OrElse dt.Rows.Count = 0 Then
                 Return Nothing
             End If
@@ -87,7 +128,26 @@ Namespace DevCommerc8ak
                 New SqlParameter("@PayePar", payePar)
             }
 
-            Dim resultat As Integer = _dal.ExecuterNonRequete("sp_valider_paiement", CommandType.StoredProcedure, p)
+            Dim resultat As Integer
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    AutorisationActionService.Exiger(cn, tx, "ENCAISSEMENT_CREER", "CAISSE")
+                    If payePar <> SessionUtilisateur.UtilisateurId Then Throw New UnauthorizedAccessException("Auteur de paiement invalide.")
+                    Using lockCmd As New SqlCommand("SELECT Statut FROM dbo.FacturesVente WITH (UPDLOCK,HOLDLOCK) WHERE FactureVenteId=@id", cn, tx)
+                        lockCmd.Parameters.AddWithValue("@id", factureVenteId)
+                        If Convert.ToString(lockCmd.ExecuteScalar()) <> "EN_ATTENTE" Then Throw New InvalidOperationException("Facture déjà payée ou invalide.")
+                    End Using
+                    Using cmd As New SqlCommand("sp_valider_paiement", cn, tx)
+                        cmd.CommandType = CommandType.StoredProcedure
+                        cmd.Parameters.AddRange(p.ToArray())
+                        resultat = cmd.ExecuteNonQuery()
+                    End Using
+                    AuditMetierService.Enregistrer(cn, tx, "ENCAISSEMENT_VALIDE", "CAISSE", "Facture", factureVenteId, String.Empty,
+                        Nothing, New With {.Montant = montant, .EncaissePar = payePar}, String.Empty, Guid.NewGuid())
+                    tx.Commit()
+                End Using
+            End Using
             If resultat > 0 Then
                 AppEvents.OnPaiementValide()
                 AppEvents.OnCaisseModifiee()
@@ -99,10 +159,13 @@ Namespace DevCommerc8ak
 
         ' Encaissement avec transaction: paiement + stock + statut facture.
         Public Sub EncaisserFacture(factureVenteId As Integer, modePaiement As String, referencePaiement As String, montantRecuFc As Decimal, monnaieRendueFc As Decimal, devise As String, payePar As Integer)
+            Dim correlation As Guid = Guid.NewGuid()
             Using cn As SqlConnection = _dal.CreerConnexion()
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
                     Try
+                        AutorisationActionService.Exiger(cn, tx, "ENCAISSEMENT_CREER", "CAISSE")
+                        If payePar <> SessionUtilisateur.UtilisateurId Then Throw New UnauthorizedAccessException("L'auteur du paiement doit être l'utilisateur connecté.")
                         Dim total As Decimal = 0D
                         Dim statut As String = ""
                         Dim numeroFacture As String = ""
@@ -186,20 +249,33 @@ Namespace DevCommerc8ak
                             End If
                         End Using
 
+                        ' Paiement et audit sont validés ensemble : un échec
+                        ' d'écriture du journal annule toute la transaction.
+                        AuditMetierService.Enregistrer(cn, tx, "ENCAISSEMENT_VALIDE", "CAISSE", "Facture", factureVenteId, numeroFacture,
+                            New With {.Statut = statut}, New With {.Statut = "PAYEE", .Montant = total, .ModePaiement = modePaiement, .Devise = devise, .FactureCreePar = LireAuteurFacture(cn, tx, factureVenteId), .EncaissePar = payePar}, String.Empty, correlation)
                         tx.Commit()
-                        AuditActionService.Enregistrer("Caisse", "Validation paiement", "Paiement validé pour la facture " & numeroFacture & ".")
-                        AppEvents.OnVenteValidee()
-                        AppEvents.OnPaiementValide()
-                        AppEvents.OnStockModifie()
-                        AppEvents.OnCaisseModifiee()
-                        AppEvents.OnAnalyseVenteModifiee()
-                        AppEvents.OnDataChanged()
-                    Catch
-                        tx.Rollback()
+                    Catch ex As Exception
+                        If tx.Connection IsNot Nothing Then tx.Rollback()
+                        AuditMetierService.Echec(_dal, "ENCAISSEMENT_REFUSE", factureVenteId, correlation, ex)
                         Throw
                     End Try
                 End Using
             End Using
+            ' Les notifications UI sont émises après la transaction : une
+            ' erreur d'affichage ne doit pas être classée comme un rollback SQL.
+            AppEvents.OnVenteValidee()
+            AppEvents.OnPaiementValide()
+            AppEvents.OnStockModifie()
+            AppEvents.OnCaisseModifiee()
+            AppEvents.OnAnalyseVenteModifiee()
+            AppEvents.OnDataChanged()
         End Sub
+
+        Private Shared Function LireAuteurFacture(cn As SqlConnection, tx As SqlTransaction, id As Integer) As Integer
+            Using cmd As New SqlCommand("SELECT CreePar FROM dbo.FacturesVente WHERE FactureVenteId=@id", cn, tx)
+                cmd.Parameters.AddWithValue("@id", id)
+                Return Convert.ToInt32(cmd.ExecuteScalar())
+            End Using
+        End Function
     End Class
 End Namespace

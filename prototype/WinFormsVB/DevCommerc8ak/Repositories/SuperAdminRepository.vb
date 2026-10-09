@@ -93,12 +93,12 @@ Namespace DevCommerc8ak
             AssurerInterface("SUPERADMIN_ROLES", "Rôles et privilèges", True)
             AssurerInterface("SUPERADMIN_AUDIT", "Journal actions utilisateurs", True)
 
-            AssurerPermissionsParDefaut()
+            ' Les droits initiaux sont amorcés une seule fois par migration.
+            ' Une lecture ne doit jamais réattribuer une permission retirée.
         End Sub
 
         Private Sub AssurerRole(nomRole As String)
-            Dim sql As String = "IF NOT EXISTS (SELECT 1 FROM dbo.Roles WHERE NomRole=@NomRole) INSERT INTO dbo.Roles (NomRole) VALUES (@NomRole); " &
-                                "UPDATE dbo.Roles SET EstActif = 1 WHERE NomRole=@NomRole AND (EstActif IS NULL OR EstActif = 0);"
+            Dim sql As String = "IF NOT EXISTS (SELECT 1 FROM dbo.Roles WHERE NomRole=@NomRole) INSERT INTO dbo.Roles (NomRole) VALUES (@NomRole);"
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@NomRole", nomRole)}
             _dal.ExecuterNonRequete(sql, CommandType.Text, p)
         End Sub
@@ -106,52 +106,13 @@ Namespace DevCommerc8ak
         Private Sub AssurerInterface(codeInterface As String, libelle As String, estTechnique As Boolean)
             Dim sql As String =
                 "IF NOT EXISTS (SELECT 1 FROM dbo.InterfacesApplication WHERE CodeInterface=@CodeInterface) " &
-                "INSERT INTO dbo.InterfacesApplication (CodeInterface, Libelle, EstTechnique, EstActif) VALUES (@CodeInterface, @Libelle, @EstTechnique, 1) " &
-                "ELSE UPDATE dbo.InterfacesApplication SET Libelle=@Libelle, EstTechnique=@EstTechnique, EstActif=1 WHERE CodeInterface=@CodeInterface"
+                "INSERT INTO dbo.InterfacesApplication (CodeInterface, Libelle, EstTechnique, EstActif) VALUES (@CodeInterface, @Libelle, @EstTechnique, 1)"
             Dim p As New List(Of SqlParameter) From {
                 New SqlParameter("@CodeInterface", codeInterface),
                 New SqlParameter("@Libelle", libelle),
                 New SqlParameter("@EstTechnique", estTechnique)
             }
             _dal.ExecuterNonRequete(sql, CommandType.Text, p)
-        End Sub
-
-        Private Sub AssurerPermissionsParDefaut()
-            AssurerRoleInterfacesSiVide("FACTURIER", New String() {"FACTURIER", "HISTORIQUE_FACTURES"})
-            AssurerRoleInterfacesSiVide("CAISSIER", New String() {"CAISSE", "FINANCE"})
-            AssurerRoleInterfacesSiVide("CAISSIERE", New String() {"CAISSE", "FINANCE"})
-            AssurerRoleInterfacesSiVide("ADMIN", New String() {"FACTURIER", "HISTORIQUE_FACTURES", "CAISSE", "FINANCE", "ADMINISTRATION", "ANALYSE_CAISSE_PHYSIQUE", "STOCK_INVENTAIRE", "ANALYSE_VENTES", "INVENTAIRE", "PARAMETRES"})
-            AssurerRoleInterfacesSiVide("SUPERADMIN", New String() {"FACTURIER", "HISTORIQUE_FACTURES", "CAISSE", "FINANCE", "ADMINISTRATION", "ANALYSE_CAISSE_PHYSIQUE", "STOCK_INVENTAIRE", "ANALYSE_VENTES", "INVENTAIRE", "PARAMETRES", "SUPERADMIN_TECH", "SUPERADMIN_STOCK_INITIAL", "SUPERADMIN_INIT_VENTES", "SUPERADMIN_ROLES", "SUPERADMIN_AUDIT"})
-            AssurerRoleInterfaces("ADMIN", New String() {"ANALYSE_CAISSE_PHYSIQUE"})
-            AssurerRoleInterfaces("SUPERADMIN", New String() {"ANALYSE_CAISSE_PHYSIQUE", "SUPERADMIN_INIT_VENTES"})
-        End Sub
-
-        Private Sub AssurerRoleInterfacesSiVide(nomRole As String, codesInterfaces As IEnumerable(Of String))
-            If RoleUtilisePermissionsInterne(nomRole) Then
-                Return
-            End If
-
-            AssurerRoleInterfaces(nomRole, codesInterfaces)
-        End Sub
-
-        Private Sub AssurerRoleInterfaces(nomRole As String, codesInterfaces As IEnumerable(Of String))
-            If codesInterfaces Is Nothing Then
-                Return
-            End If
-
-            For Each code As String In codesInterfaces
-                Dim sql As String =
-                    "INSERT INTO dbo.RoleInterfaces (RoleId, InterfaceId) " &
-                    "SELECT r.RoleId, i.InterfaceId " &
-                    "FROM dbo.Roles r CROSS JOIN dbo.InterfacesApplication i " &
-                    "WHERE r.NomRole=@NomRole AND i.CodeInterface=@CodeInterface " &
-                    "AND NOT EXISTS (SELECT 1 FROM dbo.RoleInterfaces ri WHERE ri.RoleId=r.RoleId AND ri.InterfaceId=i.InterfaceId)"
-                Dim p As New List(Of SqlParameter) From {
-                    New SqlParameter("@NomRole", nomRole),
-                    New SqlParameter("@CodeInterface", code)
-                }
-                _dal.ExecuterNonRequete(sql, CommandType.Text, p)
-            Next
         End Sub
 
         Public Function ListerRoles() As DataTable
@@ -183,10 +144,9 @@ Namespace DevCommerc8ak
         End Function
 
         Private Function RoleUtilisePermissionsInterne(nomRole As String) As Boolean
-            Dim sql As String =
-                "SELECT COUNT(*) FROM dbo.RoleInterfaces ri " &
-                "INNER JOIN dbo.Roles r ON r.RoleId = ri.RoleId " &
-                "WHERE r.NomRole = @NomRole"
+            ' Un rôle sans droits reste administré : zéro association signifie
+            ' zéro autorisation, jamais un retour aux droits codés en dur.
+            Dim sql As String = "SELECT COUNT(*) FROM dbo.Roles WHERE NomRole=@NomRole"
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@NomRole", nomRole)}
             Return Convert.ToInt32(_dal.ExecuterScalaire(sql, CommandType.Text, p)) > 0
         End Function
@@ -336,18 +296,34 @@ Namespace DevCommerc8ak
 
         Public Function ListerAuditActions(dateDebut As Date?, dateFin As Date?, utilisateur As String, role As String, moduleName As String, actionName As String, statut As String) As DataTable
             AssurerInfrastructure()
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    AutorisationActionService.Exiger(cn, tx, "AUDIT_CONSULTER", "SUPERADMIN_AUDIT")
+                    tx.Commit()
+                End Using
+            End Using
+            ' Une seule consultation réunit les deux sources sans copier ni
+            ' réécrire leurs anciennes lignes. La provenance reste explicite.
             Dim sql As String =
-                "SELECT AuditActionId, Utilisateur, [Role], Module, [Action], [Description], Machine, [Statut], CreeLe " &
-                "FROM dbo.AuditActions WHERE 1=1 "
+                "SELECT TOP (1000) * FROM (" &
+                "SELECT AuditActionId, Utilisateur, [Role], Module, [Action], [Description], Machine, [Statut], CreeLe, " &
+                "CAST('AuditActions' AS NVARCHAR(40)) AS Provenance, CAST(NULL AS NVARCHAR(MAX)) AS Avant, CAST(NULL AS NVARCHAR(MAX)) AS Apres, CAST(NULL AS NVARCHAR(1000)) AS Motif, CAST(NULL AS INT) AS SessionId, CAST(NULL AS NVARCHAR(40)) AS ModeActif FROM dbo.AuditActions " &
+                "UNION ALL SELECT j.AuditId, COALESCE(j.UtilisateurNom,u.NomUtilisateur), COALESCE(j.RoleActif,''), COALESCE(j.Categorie,j.Entite), j.[Action], j.Details, j.Poste, COALESCE(j.Resultat,'HISTORIQUE'), j.EffectueLe, COALESCE(j.Provenance,'JournalAudit'), j.AnciennesValeurs,j.NouvellesValeurs,j.Motif,j.SessionId,j.ModeActif " &
+                "FROM dbo.JournalAudit j LEFT JOIN dbo.Utilisateurs u ON u.UtilisateurId=j.EffectuePar) Journal WHERE 1=1 "
             Dim p As New List(Of SqlParameter)()
 
             If dateDebut.HasValue Then
-                sql &= "AND CreeLe >= @DateDebut "
+                ' AuditActions utilisait l'heure locale ; JournalAudit utilise UTC.
+                ' On conserve les dates sources et adapte seulement les bornes de consultation.
+                sql &= "AND CreeLe >= CASE WHEN Provenance='AuditActions' THEN @DateDebut ELSE @DateDebutUtc END "
                 p.Add(New SqlParameter("@DateDebut", dateDebut.Value.Date))
+                p.Add(New SqlParameter("@DateDebutUtc", dateDebut.Value.Date.ToUniversalTime()))
             End If
             If dateFin.HasValue Then
-                sql &= "AND CreeLe < @DateFinExclusive "
+                sql &= "AND CreeLe < CASE WHEN Provenance='AuditActions' THEN @DateFinExclusive ELSE @DateFinUtc END "
                 p.Add(New SqlParameter("@DateFinExclusive", dateFin.Value.Date.AddDays(1)))
+                p.Add(New SqlParameter("@DateFinUtc", dateFin.Value.Date.AddDays(1).ToUniversalTime()))
             End If
             If Not String.IsNullOrWhiteSpace(utilisateur) Then
                 sql &= "AND ISNULL(Utilisateur,'') LIKE @Utilisateur "

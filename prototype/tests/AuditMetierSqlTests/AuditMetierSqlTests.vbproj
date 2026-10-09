@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <RootNamespace>DevCommerc8ak</RootNamespace>
+    <OptionStrict>On</OptionStrict>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Web.Extensions" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/DAL/DAL.vb" Link="DAL.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AutorisationActionService.vb" Link="AutorisationActionService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AuditMetierService.vb" Link="AuditMetierService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AuditMetierRegles.vb" Link="AuditMetierRegles.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AuditDifferenceService.vb" Link="AuditDifferenceService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/AuditLogEntryDTO.vb" Link="AuditLogEntryDTO.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueAuditMetier.vb" Link="DialogueAuditMetier.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueMotifOperation.vb" Link="DialogueMotifOperation.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/FactureOperationService.vb" Link="FactureOperationService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/FacturationService.vb" Link="FacturationService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/SessionUtilisateur.vb" Link="SessionUtilisateur.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ProductionLogService.vb" Link="ProductionLogService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AppEvents.vb" Link="AppEvents.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AppDataVersionService.vb" Link="AppDataVersionService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AuditActionService.vb" Link="AuditActionService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/CalculVenteService.vb" Link="CalculVenteService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/StockUnitConversionService.vb" Link="StockUnitConversionService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Repositories/FactureVenteRepository.vb" Link="FactureVenteRepository.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Repositories/LigneFactureVenteRepository.vb" Link="LigneFactureVenteRepository.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Repositories/ClientRepository.vb" Link="ClientRepository.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Repositories/SuperAdminRepository.vb" Link="SuperAdminRepository.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Repositories/AnalyseCaissePhysiqueRepository.vb" Link="AnalyseCaissePhysiqueRepository.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AnalyseCaissePhysiqueService.vb" Link="AnalyseCaissePhysiqueService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/AnalyseCaissePhysiqueDTOs.vb" Link="AnalyseCaissePhysiqueDTOs.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Entities/FactureVente.vb" Link="FactureVente.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Entities/LigneFactureVente.vb" Link="LigneFactureVente.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Entities/Client.vb" Link="Client.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/FactureVenteDTO.vb" Link="FactureVenteDTO.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/LigneFactureVenteDTO.vb" Link="LigneFactureVenteDTO.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/ClientDTO.vb" Link="ClientDTO.vb" />
+  </ItemGroup>
+</Project>
