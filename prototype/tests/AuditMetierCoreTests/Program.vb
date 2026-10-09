@@ -35,6 +35,40 @@ Module Program
         compte += 1
         Refuse(Of InvalidOperationException)(Sub() AuditMetierRegles.VerifierEditionCompatible(1D, False))
         Refuse(Of InvalidOperationException)(Sub() AuditMetierRegles.VerifierEditionCompatible(0D, True))
+        EncaissementAuditRegles.Verifier(56000D, 0D, 60000D, 4000D)
+        compte += 1
+        Refuse(Of ArgumentException)(Sub() EncaissementAuditRegles.Verifier(56000D, 0D, 60000D, 0D))
+        Refuse(Of ArgumentException)(Sub() EncaissementAuditRegles.Verifier(56000D, 0D, 55000D, 0D))
+        Refuse(Of InvalidOperationException)(Sub() EncaissementAuditRegles.Verifier(56000D, 1000D, 60000D, 4000D))
+        Dim paiement As Dictionary(Of String, Object) = EncaissementAuditRegles.Snapshot(56000D, 0D, 56000D, 60000D, 4000D, "ESPECES", "REF")
+        Verifie(CDec(paiement("MontantAffecte")) = 56000D AndAlso CDec(paiement("ResteApres")) = 0D, "Monnaie non comptée comme recette")
+        Verifie(EncaissementAuditRegles.Snapshot(10D, 0D, 10D, Nothing, Nothing, "", "")("MonnaieRendue") Is Nothing, "Historique inconnu non inventé")
+        Dim noms As New Dictionary(Of Integer, String) From {{5, "NOM ACTUEL"}}
+        Dim snapshotNoms As New Dictionary(Of String, String) From {{"EncaisseParNom", "NOM HISTORIQUE"}}
+        Verifie(AuditPresentationService.AfficherValeur("EncaissePar", "5", snapshotNoms, noms).Contains("NOM HISTORIQUE"), "Instantané historique prioritaire")
+        Verifie(AuditPresentationService.AfficherValeur("EncaissePar", "8", snapshotNoms, noms).Contains("ID 8"), "Identifiant historique conservé")
+        Verifie(AuditPresentationService.Libelle("Entete.MontantTotal", snapshotNoms) = "Montant total", "Libellé financier")
+        Verifie(AuditPresentationService.Libelle("Lignes[2].Quantite", snapshotNoms).Contains("ligne 3"), "Numérotation métier")
+        snapshotNoms.Add("Lignes[2].Produit", "RIZ BB 25 KG")
+        Verifie(AuditPresentationService.Libelle("Lignes[2].PrixUnitaire", snapshotNoms).Contains("RIZ BB 25 KG"), "Désignation snapshot")
+        Verifie(ModeTravailRegles.AutoriseEcran("FACTURATION", "FACTURIER"), "Mode facturation")
+        Verifie(Not ModeTravailRegles.AutoriseEcran("FACTURATION", "CAISSE"), "Caisse interdite au mode facturation")
+        Verifie(Not ModeTravailRegles.AutoriseEcran("CAISSE", "FACTURIER"), "Facturation interdite au mode caisse")
+        Verifie(ModeTravailRegles.AutoriseEcran("FACTURATION_ET_CAISSE", "FACTURIER") AndAlso ModeTravailRegles.AutoriseEcran("FACTURATION_ET_CAISSE", "CAISSE"), "Mode combiné unique")
+        Refuse(Of UnauthorizedAccessException)(Sub() ModeTravailRegles.Permission("FACTURIER+CAISSIER"))
+        Verifie(DelegationPrixRegles.NecessiteApprobation(100D, 120D, 60D, 10D, 0D), "Variation requiert approbation")
+        Verifie(Not DelegationPrixRegles.NecessiteApprobation(100D, 105D, 60D, 10D, 0D), "Variation dans seuil")
+        Verifie(DelegationPrixRegles.NecessiteApprobation(100D, 90D, 85D, 20D, 10D), "Marge minimale comparable")
+        Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.VerifierPrix(0D))
+        Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.VerifierPrix(1.001D))
+        Refuse(Of InvalidOperationException)(Sub() DelegationPrixRegles.NecessiteApprobation(100D, 105D, 0D, 10D, 0D))
+        Refuse(Of ArgumentException)(Sub() EncaissementAuditRegles.Verifier(100D, 0D, 100.0001D, 0.0001D))
+        Verifie(CalculVenteService.CalculerCoutEquivalentCoefficient(250D, 5D, 25D) = 50D, "Coût du type à coefficient inchangé")
+        Verifie(AuditPresentationService.AfficherValeur("MontantRecu", "60000", New Dictionary(Of String, String) From {{"DeviseMontants", "FC"}}, noms).EndsWith("FC"), "Devise explicite du montant reçu")
+        DelegationPrixRegles.VerifierTotauxException(21D, 21D, 1D, 0D, 20D)
+        compte += 1
+        Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.VerifierTotauxException(21D, 20D, 0D, 0D, 20D))
+        Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.VerifierTotauxException(21D, 21D, 0D, 0D, 20D))
         Console.WriteLine("PASS : " & compte.ToString() & " contrôles métier réels, sans connexion SQL.")
     End Sub
 

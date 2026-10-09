@@ -15,6 +15,38 @@ Namespace DevCommerc8ak
             Return AuditMetierRegles.ValiderMotif(motif)
         End Function
 
+        Public Shared Function LireNomUtilisateur(cn As SqlConnection, tx As SqlTransaction, id As Integer) As String
+            ' Le nom est lu pour cet ID historique, jamais remplace par celui
+            ' de la session courante. L'ID reste present dans le snapshot.
+            Using cmd As New SqlCommand("SELECT NomUtilisateur FROM dbo.Utilisateurs WHERE UtilisateurId=@id", cn, tx)
+                cmd.Parameters.AddWithValue("@id", id)
+                Dim valeur As Object = cmd.ExecuteScalar()
+                Return If(valeur Is Nothing OrElse valeur Is DBNull.Value, "Compte indisponible (ID " & id.ToString() & ")", Convert.ToString(valeur))
+            End Using
+        End Function
+
+        Public Shared Function ChargerIdentites(dal As DAL, avant As Object, apres As Object) As IDictionary(Of Integer, String)
+            Dim ids As New HashSet(Of Integer)()
+            For Each snapshot As Object In New Object() {avant, apres}
+                For Each champ As KeyValuePair(Of String, String) In AuditDifferenceService.Valeurs(snapshot)
+                    Dim id As Integer
+                    If AuditPresentationService.EstAuteur(champ.Key) AndAlso Integer.TryParse(champ.Value, id) Then ids.Add(id)
+                Next
+            Next
+            Dim noms As New Dictionary(Of Integer, String)()
+            Using cn As SqlConnection = dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    AutorisationActionService.Exiger(cn, tx, "AUDIT_CONSULTER", "SUPERADMIN_AUDIT")
+                    For Each id As Integer In ids
+                        noms.Add(id, LireNomUtilisateur(cn, tx, id))
+                    Next
+                    tx.Commit()
+                End Using
+            End Using
+            Return noms
+        End Function
+
         Public Shared Sub Enregistrer(cn As SqlConnection, tx As SqlTransaction, evenement As String, categorie As String,
                                       entite As String, id As Integer, reference As String, avant As Object, apres As Object,
                                       motif As String, correlation As Guid, Optional resultat As String = "SUCCES")

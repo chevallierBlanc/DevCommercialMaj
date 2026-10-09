@@ -38,6 +38,12 @@ Namespace DevCommerc8ak
             Return result
         End Function
 
+        Public Shared Function Valeurs(snapshot As Object) As IDictionary(Of String, String)
+            Dim result As New SortedDictionary(Of String, String)(StringComparer.Ordinal)
+            Aplatir(snapshot, String.Empty, result)
+            Return result
+        End Function
+
         Private Shared Sub Aplatir(valeur As Object, chemin As String, result As IDictionary(Of String, String))
             Dim dictionnaire As IDictionary(Of String, Object) = TryCast(valeur, IDictionary(Of String, Object))
             If dictionnaire IsNot Nothing Then

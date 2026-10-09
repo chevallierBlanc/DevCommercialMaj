@@ -88,6 +88,7 @@ Namespace DevCommerc8ak
             Public Property Libelle As String
             Public Property Unite As String
             Public Property PrixUnitaire As Decimal
+            Public Property MotifPrixException As String
             Public Property Quantite As Decimal
             Public Property QuantiteBase As Decimal
             Public Property QuantiteEquivalente As Decimal 'nouveau 
@@ -249,6 +250,30 @@ Namespace DevCommerc8ak
             btnRetirer.FlatAppearance.BorderSize = 0
 
             grpProduits.Controls.AddRange({lblRecherche, txtRecherche, btnActualiser, gridProduits, lblQuantite, txtQuantite, lblUnite, cmbUnite, lblPrix, txtPrixUnitaire, lblStock, lblEquivalent, lblTotalReel, btnAjouter, btnRetirer})
+            btnRetirer.Width = 110
+            Dim btnPrixDelegue As New Button With {.Text = "MODIFIER PRIX", .Left = 400, .Top = 477, .Width = 120, .Height = 45, .FlatStyle = FlatStyle.Flat, .BackColor = ColorPrimary, .ForeColor = ColorWhite}
+            grpProduits.Controls.Add(btnPrixDelegue)
+            AddHandler btnPrixDelegue.Click, AddressOf ModifierPrixDelegue
+            Dim menuPrix As New ContextMenuStrip()
+            Dim mesDemandes As New ToolStripMenuItem("Mes demandes de prix")
+            menuPrix.Items.Add(mesDemandes)
+            btnPrixDelegue.ContextMenuStrip = menuPrix
+            AddHandler mesDemandes.Click, Sub()
+                                             Try
+                                                 DialogueDelegationPrix.Demandes(Me, New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)), "FACTURIER")
+                                             Catch ex As Exception
+                                                 MessageBox.Show(ex.Message, "Mes demandes de prix", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                                             End Try
+                                         End Sub
+            AddHandler Me.Shown, Sub()
+                                     Try
+                                         btnPrixDelegue.Visible = New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)).Autorise("PRIX_CONSULTER", "FACTURIER")
+                                     Catch ex As Exception
+                                         btnPrixDelegue.Visible = False
+                                         Dim log As New ProductionLogService()
+                                         log.Warn("FacturationForm", "DelegationPrix", "Autorisation de consultation des prix indisponible.")
+                                     End Try
+                                 End Sub
 
             pnlLeft.Controls.Add(grpProduits)
             pnlLeft.Controls.Add(grpClient)
@@ -740,6 +765,33 @@ Namespace DevCommerc8ak
             MiseAJourIndicateursQuantite(Nothing, EventArgs.Empty)
         End Sub
 
+        Private Sub ModifierPrixDelegue(sender As Object, e As EventArgs)
+            Try
+                If gridProduits.CurrentRow Is Nothing Then Return
+                Dim type As TypeVenteDTO = ObtenirTypeVenteSelectionne()
+                If type Is Nothing Then Return
+                Dim id As Integer = SafeInteger(CellValueByProperty(gridProduits.CurrentRow, "ProduitId"))
+                Dim exception As ResultatPrixException = DialogueDelegationPrix.Afficher(Me, New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)), id, type.Nom)
+                If exception IsNot Nothing Then
+                    Dim ligne As PanierLigne = _panier.Find(Function(l) l.ProduitId = id AndAlso l.Unite = type.Nom)
+                    If ligne Is Nothing Then
+                        MessageBox.Show("Ajoutez d'abord cet article au panier, puis appliquez son prix exceptionnel.")
+                        Return
+                    End If
+                    ligne.PrixUnitaire = exception.Prix
+                    ligne.MotifPrixException = exception.Motif
+                    ligne.Total = ligne.Quantite * ligne.PrixUnitaire
+                    RafraichirPanier()
+                Else
+                    ' Rafraichissement volontaire des tarifs disponibles seulement.
+                    ' Les prix du panier deja saisi ne sont jamais remplaces.
+                    ChargerProduits()
+                End If
+            Catch ex As Exception
+                MessageBox.Show(ex.Message, "Modification de prix refusée", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            End Try
+        End Sub
+
         Private Sub ColorerStockCritique(sender As Object, e As DataGridViewRowPrePaintEventArgs)
             Dim row As DataGridViewRow = gridProduits.Rows(e.RowIndex)
             Dim stock As Decimal = SafeDecimal(CellValueByProperty(row, "QuantiteStock"))
@@ -1161,7 +1213,7 @@ Namespace DevCommerc8ak
                 For Each l As PanierLigne In _panier
                     lignes.Add(New LigneFactureVente With {.ProduitId = l.ProduitId, .Quantite = l.Quantite,
                         .QuantiteBase = l.QuantiteBase, .TypeVente = l.Unite, .PrixUnitaire = l.PrixUnitaire,
-                        .MontantRemise = 0D, .QteSaisie = l.Quantite})
+                        .MontantRemise = 0D, .QteSaisie = l.Quantite, .MotifPrixException = l.MotifPrixException})
                 Next
                 Dim factureId As Integer = New FactureOperationService(dal).Enregistrer(factureMaj, lignes, motif, _versionFactureEdition, clientNouveau)
 

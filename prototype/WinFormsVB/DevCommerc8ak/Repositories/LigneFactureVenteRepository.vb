@@ -24,8 +24,8 @@ Namespace DevCommerc8ak
 
         ' Cree une ligne de facture et retourne son identifiant.
         Public Function Ajouter(ligne As LigneFactureVente, Optional cn As SqlConnection = Nothing, Optional tx As SqlTransaction = Nothing) As Integer
-            Dim sql As String = "INSERT INTO LignesFactureVente (FactureVenteId, ProduitId, Quantite,QuantiteBase,TypeVente, PrixUnitaire, MontantRemise, MontantLigne, QuantiteSaisie, CoutUnitaireBaseVente) " &
-                                "VALUES (@FactureVenteId, @ProduitId, @Quantite,@QuantiteBase, @TypeVente, @PrixUnitaire, @MontantRemise, @MontantLigne, @QuantiteSaisie, @CoutUnitaireBaseVente); " &
+            Dim sql As String = "INSERT INTO LignesFactureVente (FactureVenteId, ProduitId, Quantite,QuantiteBase,TypeVente, PrixUnitaire, MontantRemise, MontantLigne, QuantiteSaisie, CoutUnitaireBaseVente,MotifPrixException) " &
+                                "VALUES (@FactureVenteId, @ProduitId, @Quantite,@QuantiteBase, @TypeVente, @PrixUnitaire, @MontantRemise, @MontantLigne, @QuantiteSaisie, @CoutUnitaireBaseVente,@MotifPrixException); " &
                                 "SELECT CAST(SCOPE_IDENTITY() AS INT);"
 
             Dim p As New List(Of SqlParameter) From {
@@ -38,7 +38,8 @@ Namespace DevCommerc8ak
                 New SqlParameter("@MontantRemise", ligne.MontantRemise),
                 New SqlParameter("@MontantLigne", ligne.MontantLigne),
                 New SqlParameter("@QuantiteSaisie", If(ligne.QteSaisie.HasValue, CType(ligne.QteSaisie.Value, Object), DBNull.Value)),
-                New SqlParameter("@CoutUnitaireBaseVente", If(ligne.CoutUnitaireBaseVente.HasValue, CType(ligne.CoutUnitaireBaseVente.Value, Object), DBNull.Value))
+                New SqlParameter("@CoutUnitaireBaseVente", If(ligne.CoutUnitaireBaseVente.HasValue, CType(ligne.CoutUnitaireBaseVente.Value, Object), DBNull.Value)),
+                New SqlParameter("@MotifPrixException", If(String.IsNullOrWhiteSpace(ligne.MotifPrixException), CType(DBNull.Value, Object), ligne.MotifPrixException))
             }
 
             Dim id As Object

@@ -308,8 +308,8 @@ Namespace DevCommerc8ak
             Dim sql As String =
                 "SELECT TOP (1000) * FROM (" &
                 "SELECT AuditActionId, Utilisateur, [Role], Module, [Action], [Description], Machine, [Statut], CreeLe, " &
-                "CAST('AuditActions' AS NVARCHAR(40)) AS Provenance, CAST(NULL AS NVARCHAR(MAX)) AS Avant, CAST(NULL AS NVARCHAR(MAX)) AS Apres, CAST(NULL AS NVARCHAR(1000)) AS Motif, CAST(NULL AS INT) AS SessionId, CAST(NULL AS NVARCHAR(40)) AS ModeActif FROM dbo.AuditActions " &
-                "UNION ALL SELECT j.AuditId, COALESCE(j.UtilisateurNom,u.NomUtilisateur), COALESCE(j.RoleActif,''), COALESCE(j.Categorie,j.Entite), j.[Action], j.Details, j.Poste, COALESCE(j.Resultat,'HISTORIQUE'), j.EffectueLe, COALESCE(j.Provenance,'JournalAudit'), j.AnciennesValeurs,j.NouvellesValeurs,j.Motif,j.SessionId,j.ModeActif " &
+                "CAST('AuditActions' AS NVARCHAR(40)) AS Provenance, CAST(NULL AS NVARCHAR(MAX)) AS Avant, CAST(NULL AS NVARCHAR(MAX)) AS Apres, CAST(NULL AS NVARCHAR(1000)) AS Motif, CAST(NULL AS INT) AS SessionId, CAST(NULL AS NVARCHAR(40)) AS ModeActif, CAST(NULL AS NVARCHAR(100)) AS ReferenceDocument FROM dbo.AuditActions " &
+                "UNION ALL SELECT j.AuditId, COALESCE(j.UtilisateurNom,u.NomUtilisateur), COALESCE(j.RoleActif,''), COALESCE(j.Categorie,j.Entite), j.[Action], j.Details, j.Poste, COALESCE(j.Resultat,'HISTORIQUE'), j.EffectueLe, COALESCE(j.Provenance,'JournalAudit'), j.AnciennesValeurs,j.NouvellesValeurs,j.Motif,j.SessionId,j.ModeActif,j.ReferenceDocument " &
                 "FROM dbo.JournalAudit j LEFT JOIN dbo.Utilisateurs u ON u.UtilisateurId=j.EffectuePar) Journal WHERE 1=1 "
             Dim p As New List(Of SqlParameter)()
 

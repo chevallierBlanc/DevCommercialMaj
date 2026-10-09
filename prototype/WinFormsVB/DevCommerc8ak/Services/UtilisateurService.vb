@@ -35,6 +35,7 @@ Namespace DevCommerc8ak
             SessionUtilisateur.RoleIdActif = roleActif.RoleId
             SessionUtilisateur.NomRoleActif = roleActif.NomRole
             SessionUtilisateur.DateConnexion = Date.Now
+            SessionUtilisateur.ModeActif = String.Empty
             SessionUtilisateur.Poste = Environment.MachineName
             SessionUtilisateur.SessionId = _sessionRepo.DemarrerSession(user.UtilisateurId, roleActif.RoleId, roleActif.NomRole)
             Return True
@@ -111,6 +112,7 @@ Namespace DevCommerc8ak
             SessionUtilisateur.RoleIdActif = roleSession.RoleId
             SessionUtilisateur.NomRoleActif = roleSession.NomRole
             SessionUtilisateur.DateConnexion = Date.Now
+            SessionUtilisateur.ModeActif = String.Empty
             SessionUtilisateur.Poste = Environment.MachineName
             SessionUtilisateur.SessionId = _sessionRepo.DemarrerSession(user.UtilisateurId, roleSession.RoleId, roleSession.NomRole)
         End Sub

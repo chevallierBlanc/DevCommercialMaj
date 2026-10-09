@@ -70,12 +70,16 @@ Namespace DevCommerc8ak
                             End If
                             For Each ligne As LigneFactureVente In lignes
                                 ligne.FactureVenteId = id
+                                DelegationPrixService.ValiderLigne(cn, tx, ligne, avant, id, facture.NumeroFacture)
                                 ' Le calcul existant est conservé ; aucune quantité
                                 ' historique n'est recalculée lors d'une consultation.
                                 ligne.MontantLigne = If(ligne.QteSaisie.HasValue, ligne.QteSaisie.Value, ligne.Quantite) * ligne.PrixUnitaire - ligne.MontantRemise
                                 ligne.CoutUnitaireBaseVente = New FacturationService(_dal).ObtenirCoutUnitaireBaseVente(ligne.ProduitId, cn, tx)
                                 ligneRepo.Ajouter(ligne, cn, tx)
                             Next
+                            If lignes.Any(Function(l) Not String.IsNullOrWhiteSpace(l.MotifPrixException)) Then
+                                DelegationPrixRegles.VerifierTotauxException(lignes.Sum(Function(l) l.MontantLigne), facture.SousTotal, facture.MontantRemise, facture.MontantTaxe, facture.MontantTotal)
+                            End If
                             Dim apres As Dictionary(Of String, Object) = Snapshot(cn, tx, id)
                             AuditMetierService.Enregistrer(cn, tx, If(avant Is Nothing, "FACTURE_CREEE", "FACTURE_MODIFIEE"), "FACTURATION", "Facture", id,
                                 Convert.ToString(DirectCast(apres("Entete"), Dictionary(Of String, Object))("NumeroFacture")), avant, apres, motif, correlation)
@@ -143,12 +147,12 @@ Namespace DevCommerc8ak
         Public Shared Function Snapshot(cn As SqlConnection, tx As SqlTransaction, id As Integer) As Dictionary(Of String, Object)
             Dim result As New Dictionary(Of String, Object)()
             Dim entete As List(Of Dictionary(Of String, Object)) = Lire(cn, tx,
-                "SELECT f.NumeroFacture,f.ClientId,c.NomClient,c.Telephone,f.SousTotal,f.MontantRemise,f.MontantTaxe,f.MontantTotal,f.Statut FROM dbo.FacturesVente f LEFT JOIN dbo.Clients c ON c.ClientId=f.ClientId WHERE f.FactureVenteId=@id", id)
+                "SELECT f.NumeroFacture,f.ClientId,c.NomClient,c.Telephone,f.SousTotal,f.MontantRemise,f.MontantTaxe,f.MontantTotal,f.Statut,f.CreePar AS FactureCreePar,u.NomUtilisateur AS FactureCreeParNom FROM dbo.FacturesVente f LEFT JOIN dbo.Clients c ON c.ClientId=f.ClientId LEFT JOIN dbo.Utilisateurs u ON u.UtilisateurId=f.CreePar WHERE f.FactureVenteId=@id", id)
             If entete.Count <> 1 Then Throw New InvalidOperationException("Facture introuvable.")
             result.Add("Entete", entete(0))
             ' Les ID techniques recréés ne sont pas une différence commerciale.
             ' Les articles et leur ordre sont conservés pour comparer les vraies valeurs.
-            result.Add("Lignes", Lire(cn, tx, "SELECT ProduitId,TypeVente,Quantite,QuantiteSaisie,QuantiteBase,PrixUnitaire,MontantRemise,MontantLigne,CoutUnitaireBaseVente FROM dbo.LignesFactureVente WHERE FactureVenteId=@id ORDER BY LigneFactureVenteId", id))
+            result.Add("Lignes", Lire(cn, tx, "SELECT l.ProduitId,p.Libelle AS Produit,l.TypeVente,l.Quantite,l.QuantiteSaisie,l.QuantiteBase,l.PrixUnitaire,l.MontantRemise,l.MontantLigne,l.CoutUnitaireBaseVente,l.MotifPrixException FROM dbo.LignesFactureVente l LEFT JOIN dbo.Produits p ON p.ProduitId=l.ProduitId WHERE l.FactureVenteId=@id ORDER BY l.LigneFactureVenteId", id))
             Return result
         End Function
 

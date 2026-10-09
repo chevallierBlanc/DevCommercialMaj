@@ -30,6 +30,7 @@ Module Program
         ' Aucun fichier de connexion de production ne doit être repris par le banc.
         If ConfigurationManager.ConnectionStrings("CommercialMagDB") IsNot Nothing Then Throw New InvalidOperationException("Ne pas copier app.config de production dans le banc de tests.")
         dal = New DAL(cs)
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.Parametres WHERE GestionModesActive=0 AND DelegationPrixActive=0") = 1, "Copie de test en parcours classique, migrations 0902/0903/0904 requises")
         Dim suffix As String = Guid.NewGuid().ToString("N").Substring(0, 12)
         Dim role As Integer = Scalar("INSERT dbo.Roles(NomRole,EstActif) VALUES('TEST_' + @s,1); SELECT CAST(SCOPE_IDENTITY() AS INT)", suffix)
         Dim user As Integer = Scalar("INSERT dbo.Utilisateurs(NomUtilisateur,MotDePasseHash,MotDePasseSel,EstActif) SELECT TOP(1) 'TEST_' + @s,MotDePasseHash,MotDePasseSel,1 FROM dbo.Utilisateurs; SELECT CAST(SCOPE_IDENTITY() AS INT)", suffix)
@@ -200,9 +201,124 @@ Module Program
         infrastructure.AssurerInfrastructure()
         Verifier(Scalar("SELECT COUNT(*) FROM dbo.RoleInterfaces WHERE RoleId=" & roleFacturier.ToString()) = 0, "Rôle intégré vidé : aucun droit rétabli")
         Verifier(infrastructure.RoleUtilisePermissions("FACTURIER"), "Rôle intégré sans droits toujours administré")
+        TesterPhase2(role, user, suffix)
         SessionUtilisateur.Reinitialiser()
         Refus(Of UnauthorizedAccessException)(Sub() operations.Enregistrer(NouvelleFacture(Guid.NewGuid().ToString("N")), Lignes(1D), String.Empty, Nothing))
         Console.WriteLine("PASS SQL : " & compteur.ToString() & " scénarios. Les fixtures et audits restent dans la copie de test.")
+    End Sub
+
+    Private Sub TesterPhase2(role As Integer, user As Integer, suffix As String)
+        Dim prix As New DelegationPrixService(dal)
+        Dim modes As New ModeTravailService(dal)
+        Dim configModes As New ConfigurationModesService(dal)
+        Dim produitPrix As Integer = Scalar("INSERT dbo.Produits(CodeBarres,Libelle,PrixDetail,PrixGros,PrixAchat,ConversionUnite,TypeGestionStock,ContenuUnitePrincipale,ContenuUniteSecondaire,VenteGros) VALUES('PRIX_' + @s,'PRIX TEST',15,150,100,10,'UNITE',10,1,1); SELECT CAST(SCOPE_IDENTITY() AS int)", suffix)
+        Refus(Of UnauthorizedAccessException)(Sub() prix.Consulter(produitPrix, "piece"))
+        Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & role.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface IN('PRIX_CONSULTER','PRIX_TARIF_MODIFIER','PRIX_DEMANDER','PRIX_APPROUVER','PRIX_REFUSER','PRIX_FACTURE_EXCEPTION','PARAMETRES','PARAMETRES_PRIX','PARAMETRES_SECURITE','MODE_FACTURATION')")
+        Dim initialPrix As ConfigurationPrix = prix.Configuration()
+        Dim initialModes As ConfigurationModes = configModes.Charger()
+        Dim sessionInitiale As Integer = SessionUtilisateur.SessionId
+        Try
+            prix.Configurer(New ConfigurationPrix With {.Active = True, .Demandes = True, .Immediate = True, .Variation = 10D}, initialPrix, "Configuration de fixture isolée")
+            Dim t As TarifDelegue = prix.Consulter(produitPrix, "piece")
+            Verifier(t.Prix = 15D AndAlso t.Cout = 10D AndAlso t.QuantiteBase = 1D, "Coût et tarif comparés dans la même unité")
+            Refus(Of ArgumentException)(Sub() prix.Modifier(t, 16D, "  ", False))
+            Refus(Of UnauthorizedAccessException)(Sub() prix.Modifier(t, 9D, "Sous coût interdit", True))
+            prix.Modifier(t, 16.5D, "Variation autorisée", False)
+            Verifier(prix.Consulter(produitPrix, "piece").Prix = 16.5D, "Tarif officiel persisté")
+            Refus(Of DBConcurrencyException)(Sub() prix.Modifier(t, 16D, "Tarif obsolète", False))
+            t = prix.Consulter(produitPrix, "piece")
+            Dim gagnants As Integer = 0
+            Dim perdants As Integer = 0
+            Parallel.For(0, 2, Sub(i)
+                                  Try
+                                      prix.Modifier(t, 17D + CDec(i) / 100D, "Modification concurrente", False)
+                                      Interlocked.Increment(gagnants)
+                                  Catch ex As DBConcurrencyException
+                                      Interlocked.Increment(perdants)
+                                  End Try
+                              End Sub)
+            Verifier(gagnants = 1 AndAlso perdants = 1, "Tarifs concurrents : aucun écrasement silencieux")
+            t = prix.Consulter(produitPrix, "piece")
+            Refus(Of UnauthorizedAccessException)(Sub() prix.Modifier(t, 20D, "Variation hors seuil", False))
+            prix.Modifier(t, 20D, "Demande à approuver", True)
+            Dim demande As Integer = Scalar("SELECT MAX(DemandeId) FROM dbo.DemandesModificationPrix WHERE ProduitId=" & produitPrix.ToString())
+            Verifier(prix.Consulter(produitPrix, "piece").Prix = t.Prix, "Une demande ne change pas le tarif actif")
+            Refus(Of UnauthorizedAccessException)(Sub() prix.Decider(demande, True, "Auto-approbation interdite"))
+            Dim reviewer As Integer = Scalar("INSERT dbo.Utilisateurs(NomUtilisateur,MotDePasseHash,MotDePasseSel,EstActif) SELECT TOP(1) 'REV_' + @s,MotDePasseHash,MotDePasseSel,1 FROM dbo.Utilisateurs; SELECT CAST(SCOPE_IDENTITY() AS int)", suffix)
+            Exec("INSERT dbo.UtilisateurRoles(UtilisateurId,RoleId,EstActif,EstRolePrincipal) VALUES(" & reviewer.ToString() & "," & role.ToString() & ",1,1)")
+            SessionUtilisateur.UtilisateurId = reviewer
+            SessionUtilisateur.NomUtilisateur = "REV_" & suffix
+            SessionUtilisateur.SessionId = Scalar("INSERT dbo.UtilisateurSessions(UtilisateurId,RoleIdActif,RoleSession,Poste) VALUES(" & reviewer.ToString() & "," & role.ToString() & ",'TEST','TEST'); SELECT CAST(SCOPE_IDENTITY() AS int)")
+            gagnants = 0 : perdants = 0
+            Parallel.For(0, 2, Sub(i)
+                                  Try
+                                      prix.Decider(demande, True, "Approbation par un autre utilisateur")
+                                      Interlocked.Increment(gagnants)
+                                  Catch ex As DBConcurrencyException
+                                      Interlocked.Increment(perdants)
+                                  End Try
+                              End Sub)
+            Verifier(gagnants = 1 AndAlso perdants = 1, "Une seule approbation concurrente")
+            Verifier(prix.Consulter(produitPrix, "piece").Prix = 20D, "Prix approuvé appliqué")
+            Refus(Of DBConcurrencyException)(Sub() prix.Decider(demande, True, "Double approbation"))
+            SessionUtilisateur.UtilisateurId = user
+            SessionUtilisateur.NomUtilisateur = "TEST_" & suffix
+            SessionUtilisateur.SessionId = sessionInitiale
+            t = prix.Consulter(produitPrix, "piece")
+            prix.Modifier(t, 21D, "Demande qui va expirer", True)
+            Dim expiree As Integer = Scalar("SELECT MAX(DemandeId) FROM dbo.DemandesModificationPrix WHERE ProduitId=" & produitPrix.ToString())
+            Exec("UPDATE dbo.DemandesModificationPrix SET DemandeLe=DATEADD(DAY,-2,SYSUTCDATETIME()),ExpireLe=DATEADD(DAY,-1,SYSUTCDATETIME()) WHERE DemandeId=" & expiree.ToString())
+            prix.Decider(expiree, True, "Expiration vérifiée")
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.DemandesModificationPrix WHERE DemandeId=" & expiree.ToString() & " AND Etat='EXPIREE'") = 1 AndAlso prix.Consulter(produitPrix, "piece").Prix = 20D, "Demande expirée : aucun prix appliqué")
+            Exec("CREATE TRIGGER dbo.TR_TEST_AuditFailure ON dbo.JournalAudit AFTER INSERT AS BEGIN THROW 51001, 'Panne audit simulée', 1; END")
+            Try
+                Refus(Of SqlException)(Sub() prix.Modifier(t, 21D, "Panne audit", False))
+            Finally
+                Exec("DROP TRIGGER dbo.TR_TEST_AuditFailure")
+            End Try
+            Verifier(prix.Consulter(produitPrix, "piece").Prix = 20D, "Échec d'audit : rollback du tarif et de son historique")
+            configModes.Enregistrer(New ConfigurationModes With {.Active = True, .Facturation = True, .Caisse = True, .Combine = True}, initialModes, "Modes de la fixture")
+            Dim autorises As List(Of String) = modes.Lister(user, role)
+            Verifier(autorises.Count = 1 AndAlso autorises(0) = "FACTURATION", "Mode combiné absent sans attribution explicite")
+            Refus(Of UnauthorizedAccessException)(Sub() modes.Activer("FACTURATION_ET_CAISSE"))
+            modes.Activer("FACTURATION")
+            Using cn As SqlConnection = dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    Refus(Of UnauthorizedAccessException)(Sub() AutorisationActionService.Exiger(cn, tx, "ENCAISSEMENT_CREER", "CAISSE"))
+                    tx.Rollback()
+                End Using
+            End Using
+            Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & role.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface='MODE_COMBINE'")
+            ' Une nouvelle session choisit le mode : jamais de cumul dans l'ancienne.
+            Exec("UPDATE dbo.UtilisateurSessions SET Fin=SYSUTCDATETIME() WHERE SessionId=" & sessionInitiale.ToString())
+            SessionUtilisateur.SessionId = Scalar("INSERT dbo.UtilisateurSessions(UtilisateurId,RoleIdActif,RoleSession,Poste) VALUES(" & user.ToString() & "," & role.ToString() & ",'TEST','TEST'); SELECT CAST(SCOPE_IDENTITY() AS int)")
+            SessionUtilisateur.ModeActif = ""
+            modes.Activer("FACTURATION_ET_CAISSE")
+            Exec("INSERT dbo.StockEntree(IdStock,ProduitId,QuantiteSaisie,QuantiteBase,Unite,PrixAchat,CreePar) VALUES('PRIX_" & suffix & "'," & produitPrix.ToString() & ",10,10,'base',100," & user.ToString() & ")")
+            Dim ligne As New LigneFactureVente With {.ProduitId = produitPrix, .TypeVente = "piece", .Quantite = 1D, .QteSaisie = 1D, .QuantiteBase = 1D, .PrixUnitaire = 21D, .MotifPrixException = "Exception sur cette facture"}
+            Dim incoherente As FactureVente = NouvelleFacture("TOTAL_INCOHERENT_" & suffix)
+            Dim operationsException As New FactureOperationService(dal)
+            Refus(Of ArgumentException)(Sub() operationsException.Enregistrer(incoherente, New List(Of LigneFactureVente) From {ligne}, String.Empty, Nothing))
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.FacturesVente WHERE NumeroFacture='TEST-TOTAL_INCOHERENT_" & suffix & "'") = 0, "Exception de prix : en-tete incoherent annule integralement")
+            Dim facture As FactureVente = NouvelleFacture("COMBINE_" & suffix)
+            facture.SousTotal = 21D : facture.MontantTotal = 21D
+            Dim factureId As Integer = New FactureOperationService(dal).Enregistrer(facture, New List(Of LigneFactureVente) From {ligne}, "", Nothing)
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.Paiements WHERE FactureVenteId=" & factureId.ToString()) = 0, "Mode combiné : création distincte de l'encaissement")
+            Dim caisseCombinee As New FacturationService(dal)
+            caisseCombinee.EncaisserFacture(factureId, "ESPECES", "REF_" & suffix, 25D, 4D, "FC", user, 25D, 1D)
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.Paiements WHERE FactureVenteId=" & factureId.ToString() & " AND Montant=21 AND MontantRecu=25 AND MonnaieRendue=4 AND MontantRecuOrigine=25 AND TauxConversionApplique=1 AND DeviseMontants='FC'") = 1, "Paiement : reçu, affecté et rendu persistés séparément")
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE EntiteId='" & factureId.ToString() & "' AND [Action]='ENCAISSEMENT_VALIDE' AND ModeActif='FACTURATION_ET_CAISSE' AND NouvellesValeurs LIKE '%EncaisseParNom%'") = 1, "Audit du mode combiné et des identités instantanées")
+            Verifier(prix.Consulter(produitPrix, "piece").Prix = 20D, "L'exception facture ne modifie pas le tarif officiel")
+        Finally
+            SessionUtilisateur.UtilisateurId = user
+            SessionUtilisateur.NomUtilisateur = "TEST_" & suffix
+            Dim actuel As ConfigurationPrix = prix.Configuration()
+            prix.Configurer(initialPrix, actuel, "Restaurer les paramètres de la copie")
+            Dim actuels As ConfigurationModes = configModes.Charger()
+            configModes.Enregistrer(initialModes, actuels, "Restaurer les modes de la copie")
+            SessionUtilisateur.ModeActif = ""
+        End Try
     End Sub
 
     Private Function NouvelleFacture(suffix As String) As FactureVente

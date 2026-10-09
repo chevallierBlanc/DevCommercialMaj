@@ -73,6 +73,7 @@ Namespace DevCommerc8ak
                         If Convert.ToString(cmd.ExecuteScalar()) <> "EN_ATTENTE" Then Throw New InvalidOperationException("Seul un brouillon peut recevoir une ligne.")
                     End Using
                     Dim avant As Dictionary(Of String, Object) = FactureOperationService.Snapshot(cn, tx, factureVenteId)
+                    DelegationPrixService.ValiderLigne(cn, tx, ligne, Nothing, factureVenteId, Convert.ToString(DirectCast(avant("Entete"), Dictionary(Of String, Object))("NumeroFacture")))
                     Dim id As Integer = repo.Ajouter(ligne, cn, tx)
                     ' L'ajout isolé invalide aussi la version ouverte sur un autre poste.
                     Using cmd As New SqlCommand("UPDATE dbo.FacturesVente SET ModifierPar=@user WHERE FactureVenteId=@id", cn, tx)
@@ -142,6 +143,11 @@ Namespace DevCommerc8ak
                     End Using
                     Dim avant As Dictionary(Of String, Object) = FactureOperationService.Snapshot(cn, tx, factureVenteId)
                     Using cmd As New SqlCommand("sp_valider_paiement", cn, tx)
+                        Dim totalFacture As Decimal = CDec(DirectCast(avant("Entete"), Dictionary(Of String, Object))("MontantTotal"))
+                        Using deja As New SqlCommand("SELECT COUNT(*) FROM dbo.Paiements WITH(UPDLOCK,HOLDLOCK) WHERE FactureVenteId=@id", cn, tx)
+                            deja.Parameters.AddWithValue("@id", factureVenteId)
+                            If CInt(deja.ExecuteScalar()) <> 0 OrElse montant <= 0D OrElse montant <> totalFacture Then Throw New InvalidOperationException("Ce flux solde une facture sans paiement précédent. Montant affecté invalide.")
+                        End Using
                         cmd.CommandType = CommandType.StoredProcedure
                         cmd.Parameters.AddRange(p.ToArray())
                         resultat = cmd.ExecuteNonQuery()
@@ -155,7 +161,12 @@ Namespace DevCommerc8ak
                         If Convert.ToInt32(cmd.ExecuteScalar()) <> 1 Then Throw New InvalidOperationException("Le paiement n'a pas été validé : opération annulée.")
                     End Using
                     Dim apres As Dictionary(Of String, Object) = FactureOperationService.Snapshot(cn, tx, factureVenteId)
-                    apres.Add("Paiement", New Dictionary(Of String, Object) From {{"Montant", montant}, {"EncaissePar", payePar}})
+                    ' Cette ancienne API ne reçoit pas le montant remis : ces
+                    ' informations restent inconnues, même si le net est connu.
+                    Dim reglement As Dictionary(Of String, Object) = EncaissementAuditRegles.Snapshot(CDec(DirectCast(avant("Entete"), Dictionary(Of String, Object))("MontantTotal")), 0D, montant, Nothing, Nothing, modePaiement, referencePaiement)
+                    reglement.Add("EncaissePar", payePar)
+                    reglement.Add("EncaisseParNom", AuditMetierService.LireNomUtilisateur(cn, tx, payePar))
+                    apres.Add("Paiement", reglement)
                     AuditMetierService.Enregistrer(cn, tx, "ENCAISSEMENT_VALIDE", "CAISSE", "Facture", factureVenteId,
                         Convert.ToString(DirectCast(avant("Entete"), Dictionary(Of String, Object))("NumeroFacture")),
                         avant, apres, String.Empty, Guid.NewGuid())
@@ -170,7 +181,7 @@ Namespace DevCommerc8ak
         End Function
 
         ' Encaissement avec transaction: paiement + stock + statut facture.
-        Public Sub EncaisserFacture(factureVenteId As Integer, modePaiement As String, referencePaiement As String, montantRecuFc As Decimal, monnaieRendueFc As Decimal, devise As String, payePar As Integer)
+        Public Sub EncaisserFacture(factureVenteId As Integer, modePaiement As String, referencePaiement As String, montantRecuFc As Decimal, monnaieRendueFc As Decimal, devise As String, payePar As Integer, Optional montantRecuOrigine As Decimal? = Nothing, Optional tauxConversion As Decimal? = Nothing)
             Dim correlation As Guid = Guid.NewGuid()
             Using cn As SqlConnection = _dal.CreerConnexion()
                 cn.Open()
@@ -196,6 +207,17 @@ Namespace DevCommerc8ak
                         If statut <> "EN_ATTENTE" Then
                             Throw New Exception("Facture deja payee ou invalide.")
                         End If
+
+                        Dim dejaPaye As Decimal
+                        Using cmd As New SqlCommand("SELECT ISNULL(SUM(Montant),0) FROM dbo.Paiements WITH (UPDLOCK,HOLDLOCK) WHERE FactureVenteId=@id", cn, tx)
+                            cmd.Parameters.AddWithValue("@id", factureVenteId)
+                            dejaPaye = Convert.ToDecimal(cmd.ExecuteScalar())
+                        End Using
+                        EncaissementAuditRegles.Verifier(total, dejaPaye, montantRecuFc, monnaieRendueFc)
+                        If montantRecuOrigine.HasValue <> tauxConversion.HasValue Then Throw New ArgumentException("Montant d'origine et taux doivent être renseignés ensemble.")
+                        If tauxConversion.HasValue AndAlso (tauxConversion.Value <= 0D OrElse montantRecuOrigine.Value * tauxConversion.Value <> montantRecuFc) Then Throw New ArgumentException("Conversion du montant reçu incohérente.")
+                        If montantRecuOrigine.HasValue AndAlso (Decimal.Round(montantRecuOrigine.Value, 8) <> montantRecuOrigine.Value OrElse Decimal.Round(tauxConversion.Value, 8) <> tauxConversion.Value) Then Throw New ArgumentException("La précision du montant d'origine ou du taux dépasse huit décimales.")
+                        If String.IsNullOrWhiteSpace(modePaiement) Then Throw New ArgumentException("Mode de paiement obligatoire.")
 
                         Dim lignes As New List(Of Tuple(Of Integer, Decimal))()
                         Using cmdL As New SqlCommand("SELECT ProduitId, ISNULL(QuantiteBase, Quantite) AS QuantiteBase FROM LignesFactureVente WHERE FactureVenteId=@id", cn, tx)
@@ -244,8 +266,9 @@ Namespace DevCommerc8ak
                             End Using
                         Next
 
-                        Using cmdP As New SqlCommand("INSERT INTO Paiements (FactureVenteId, ModePaiement, ReferencePaiement, Montant, MontantRecu, MonnaieRendue, Devise, PayePar, ModifierPar) " &
-                                                     "VALUES (@FactureVenteId, @ModePaiement, @ReferencePaiement, @Montant, @MontantRecu, @MonnaieRendue, @Devise, @PayePar, @ModifierPar)", cn, tx)
+                        Dim paiementId As Integer
+                        Using cmdP As New SqlCommand("INSERT INTO Paiements (FactureVenteId, ModePaiement, ReferencePaiement, Montant, MontantRecu, MonnaieRendue, Devise, PayePar, ModifierPar,MontantRecuOrigine,TauxConversionApplique,DeviseMontants) " &
+                                                     "VALUES (@FactureVenteId, @ModePaiement, @ReferencePaiement, @Montant, @MontantRecu, @MonnaieRendue, @Devise, @PayePar, @ModifierPar,@origine,@taux,'FC'); SELECT CAST(SCOPE_IDENTITY() AS int);", cn, tx)
                             cmdP.Parameters.AddWithValue("@FactureVenteId", factureVenteId)
                             cmdP.Parameters.AddWithValue("@ModePaiement", modePaiement)
                             cmdP.Parameters.AddWithValue("@ReferencePaiement", If(referencePaiement, CType(DBNull.Value, Object)))
@@ -255,7 +278,9 @@ Namespace DevCommerc8ak
                             cmdP.Parameters.AddWithValue("@Devise", If(devise, CType(DBNull.Value, Object)))
                             cmdP.Parameters.AddWithValue("@PayePar", payePar)
                             cmdP.Parameters.AddWithValue("@ModifierPar", SessionUtilisateur.NomUtilisateur)
-                            cmdP.ExecuteNonQuery()
+                            cmdP.Parameters.AddWithValue("@origine", If(montantRecuOrigine.HasValue, CType(montantRecuOrigine.Value, Object), DBNull.Value))
+                            cmdP.Parameters.AddWithValue("@taux", If(tauxConversion.HasValue, CType(tauxConversion.Value, Object), DBNull.Value))
+                            paiementId = Convert.ToInt32(cmdP.ExecuteScalar())
                         End Using
 
                         Using cmdF As New SqlCommand("UPDATE FacturesVente SET Statut='PAYEE', ValideLe=GETDATE(), ModifierPar=@ModifierPar WHERE FactureVenteId=@id AND Statut='EN_ATTENTE'", cn, tx)
@@ -268,8 +293,20 @@ Namespace DevCommerc8ak
 
                         ' Paiement et audit sont validés ensemble : un échec
                         ' d'écriture du journal annule toute la transaction.
+                        Dim apres As Dictionary(Of String, Object) = EncaissementAuditRegles.Snapshot(total, dejaPaye, total, montantRecuFc, monnaieRendueFc, modePaiement, referencePaiement)
+                        apres.Add("PaiementId", paiementId)
+                        apres.Add("Statut", "PAYEE")
+                        apres.Add("DeviseSaisie", devise)
+                        apres.Add("MontantRecuOrigine", If(montantRecuOrigine.HasValue, CType(montantRecuOrigine.Value, Object), Nothing))
+                        apres.Add("TauxConversionApplique", If(tauxConversion.HasValue, CType(tauxConversion.Value, Object), Nothing))
+                        Dim auteur As Integer = LireAuteurFacture(cn, tx, factureVenteId)
+                        apres.Add("FactureCreePar", auteur)
+                        apres.Add("FactureCreeParNom", AuditMetierService.LireNomUtilisateur(cn, tx, auteur))
+                        apres.Add("EncaissePar", payePar)
+                        apres.Add("EncaisseParNom", AuditMetierService.LireNomUtilisateur(cn, tx, payePar))
+                        Dim avant As New Dictionary(Of String, Object) From {{"Statut", statut}, {"TotalFacture", total}, {"DejaPayeAvant", dejaPaye}, {"ResteAvant", total - dejaPaye}, {"DeviseMontants", "FC"}}
                         AuditMetierService.Enregistrer(cn, tx, "ENCAISSEMENT_VALIDE", "CAISSE", "Facture", factureVenteId, numeroFacture,
-                            New With {.Statut = statut}, New With {.Statut = "PAYEE", .Montant = total, .ModePaiement = modePaiement, .Devise = devise, .FactureCreePar = LireAuteurFacture(cn, tx, factureVenteId), .EncaissePar = payePar}, String.Empty, correlation)
+                            avant, apres, String.Empty, correlation)
                         tx.Commit()
                     Catch ex As Exception
                         If tx.Connection IsNot Nothing Then tx.Rollback()

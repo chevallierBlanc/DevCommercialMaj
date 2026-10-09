@@ -21,5 +21,6 @@ Namespace DevCommerc8ak
         Public Property MontantRemise As Decimal
         Public Property MontantLigne As Decimal
         Public Property CoutUnitaireBaseVente As Decimal?
+        Public Property MotifPrixException As String
     End Class
 End Namespace

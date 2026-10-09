@@ -8,6 +8,13 @@ Namespace DevCommerc8ak
         Private Sub New()
         End Sub
 
+        Public Shared Function CalculerCoutEquivalentCoefficient(prixAchat As Decimal, quantiteBase As Decimal, contenuPrincipal As Decimal) As Decimal
+            ' Reference tarifaire existante des types a coefficient. Elle est
+            ' partagee entre affichage et delegation, sans changer son calcul.
+            If contenuPrincipal <= 0D Then Throw New ArgumentOutOfRangeException("contenuPrincipal")
+            Return prixAchat * (quantiteBase / contenuPrincipal)
+        End Function
+
         Public Shared Function CalculerCoutUnitaireBase(prixAchat As Decimal, conversionUnite As Decimal) As Decimal?
             Return StockUnitConversionService.CalculerCoutUnitaireStock(prixAchat, conversionUnite, "UNITE", 0D)
         End Function

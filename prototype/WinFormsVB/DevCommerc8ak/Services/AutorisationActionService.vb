@@ -10,6 +10,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Public Shared Sub Exiger(cn As SqlConnection, tx As SqlTransaction, action As String, ecran As String)
+            ModeTravailService.VerifierAction(cn, tx, ecran)
             ' Les droits sont relus dans la même transaction. Le nom du rôle
             ' ne constitue jamais un privilège implicite, même pour SUPERADMIN.
             Dim sql As String = "SELECT COUNT(*) FROM dbo.Utilisateurs u WITH (HOLDLOCK) " &

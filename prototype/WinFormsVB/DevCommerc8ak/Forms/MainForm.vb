@@ -250,11 +250,11 @@ Namespace DevCommerc8ak
                 .TextAlign = ContentAlignment.MiddleLeft
             }
             Dim lblUserRole As New Label() With {
-                .Text = SessionUtilisateur.Role,
+                .Text = SessionUtilisateur.Role & If(String.IsNullOrWhiteSpace(SessionUtilisateur.ModeActif), "", Environment.NewLine & SessionUtilisateur.ModeActif.Replace("_ET_", " + ")),
                 .ForeColor = Color.FromArgb(145, 158, 171),
                 .Font = New Font("Segoe UI", 9),
                 .Dock = DockStyle.Top,
-                .Height = 20,
+                .Height = If(String.IsNullOrWhiteSpace(SessionUtilisateur.ModeActif), 20, 44),
                 .TextAlign = ContentAlignment.MiddleLeft
             }
             pnlUser.Controls.AddRange({lblUserRole, lblUserName})
@@ -386,7 +386,11 @@ Namespace DevCommerc8ak
 
             _moduleInitialCharge = True
 
-            If String.Equals(SessionUtilisateur.Role, "FACTURIER", StringComparison.OrdinalIgnoreCase) Then
+            If SessionUtilisateur.ModeActif = "FACTURATION" OrElse SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE" Then
+                LoadForm(New FacturationForm())
+            ElseIf SessionUtilisateur.ModeActif = "CAISSE" Then
+                LoadForm(New CaisseForm())
+            ElseIf String.Equals(SessionUtilisateur.Role, "FACTURIER", StringComparison.OrdinalIgnoreCase) Then
                 LoadForm(New FacturationForm())
             ElseIf String.Equals(SessionUtilisateur.Role, "CAISSIERE", StringComparison.OrdinalIgnoreCase) OrElse
                    String.Equals(SessionUtilisateur.Role, "CAISSIER", StringComparison.OrdinalIgnoreCase) Then
@@ -532,6 +536,7 @@ Namespace DevCommerc8ak
         Private Function VerifierPermission(fonctionnalite As String) As Boolean
             Dim role As String = If(SessionUtilisateur.Role, String.Empty).Trim().ToUpperInvariant()
             Dim codePermission As String = MapperCodePermission(fonctionnalite)
+            If Not ModeTravailRegles.AutoriseEcran(SessionUtilisateur.ModeActif, codePermission) Then Return False
             Dim permissionBase As Boolean?
 
             If codePermission <> String.Empty Then

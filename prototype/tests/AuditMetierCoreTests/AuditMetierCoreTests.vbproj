@@ -6,6 +6,12 @@
     <OptionStrict>On</OptionStrict>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ModeTravailRegles.vb" Link="ModeTravailRegles.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/DelegationPrixRegles.vb" Link="DelegationPrixRegles.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/CalculVenteService.vb" Link="CalculVenteService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/StockUnitConversionService.vb" Link="StockUnitConversionService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AuditPresentationService.vb" Link="AuditPresentationService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/EncaissementAuditRegles.vb" Link="EncaissementAuditRegles.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AuditDifferenceService.vb" Link="AuditDifferenceService.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AuditMetierRegles.vb" Link="AuditMetierRegles.vb" />
   </ItemGroup>

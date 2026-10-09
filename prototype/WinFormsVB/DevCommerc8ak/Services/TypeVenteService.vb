@@ -214,7 +214,7 @@ Namespace DevCommerc8ak
                     quantiteBaseType = CalculVenteService.CalculerQuantiteBaseTypeVente(item.QuantiteEquivalent, typeQuantite, nb, contenuPrincipal, contenuUniteSecondaire)
                 End If
                 If String.Equals(item.ModePrix, "COEFFICIENT", StringComparison.OrdinalIgnoreCase) AndAlso coefficient > 0D Then
-                    Dim coutEquivalent As Decimal = prixAchat * (quantiteBaseType / contenuPrincipal)
+                    Dim coutEquivalent As Decimal = CalculVenteService.CalculerCoutEquivalentCoefficient(prixAchat, quantiteBaseType, contenuPrincipal)
                     If coutEquivalent > 0D Then
                         prixVente = Math.Round(coutEquivalent * coefficient, 2)
                     End If

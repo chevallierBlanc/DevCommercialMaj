@@ -18,6 +18,7 @@ Namespace DevCommerc8ak
         Public Property SessionId As Integer
         Public Property DateConnexion As Date
         Public Property Poste As String
+        Public Property ModeActif As String
 
         Public Sub Reinitialiser()
             UtilisateurId = 0
@@ -28,6 +29,7 @@ Namespace DevCommerc8ak
             SessionId = 0
             DateConnexion = Date.MinValue
             Poste = String.Empty
+            ModeActif = String.Empty
         End Sub
     End Module
 End Namespace

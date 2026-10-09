@@ -16,6 +16,20 @@
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AuditMetierService.vb" Link="AuditMetierService.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AuditMetierRegles.vb" Link="AuditMetierRegles.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AuditDifferenceService.vb" Link="AuditDifferenceService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AuditPresentationService.vb" Link="AuditPresentationService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/EncaissementAuditRegles.vb" Link="EncaissementAuditRegles.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ModeTravailRegles.vb" Link="ModeTravailRegles.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ModeTravailService.vb" Link="ModeTravailService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/DelegationPrixRegles.vb" Link="DelegationPrixRegles.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/DelegationPrixService.vb" Link="DelegationPrixService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ConversionUniteService.vb" Link="ConversionUniteService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/TypeVenteProduitDTO.vb" Link="TypeVenteProduitDTO.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/TypeVenteDTO.vb" Link="TypeVenteDTO.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/ProduitConditionnementDTO.vb" Link="ProduitConditionnementDTO.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueDelegationPrix.vb" Link="DialogueDelegationPrix.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ConfigurationModesService.vb" Link="ConfigurationModesService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueModeTravail.vb" Link="DialogueModeTravail.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueConfigurationModes.vb" Link="DialogueConfigurationModes.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/AuditLogEntryDTO.vb" Link="AuditLogEntryDTO.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueAuditMetier.vb" Link="DialogueAuditMetier.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueMotifOperation.vb" Link="DialogueMotifOperation.vb" />

@@ -31,6 +31,9 @@ Namespace DevCommerc8ak
                         AppliquerMigration(cn, tx, 2026100301, "Normalisation unites conditionnements phase 3", AddressOf MigrationNormalisationUnitesConditionnementsPhase3)
                         AppliquerMigration(cn, tx, 2026100302, "Securite comptes utilisateurs", AddressOf MigrationSecuriteComptesUtilisateurs)
                         AppliquerMigration(cn, tx, 2026100901, "Fondations autorisations et journal metier", AddressOf MigrationAuditMetier)
+                        AppliquerMigration(cn, tx, 2026100902, "Tracabilite montants paiements", AddressOf MigrationTracabilitePaiements)
+                        AppliquerMigration(cn, tx, 2026100903, "Modes travail explicites", AddressOf MigrationModesTravail)
+                        AppliquerMigration(cn, tx, 2026100904, "Delegation tarifs et exceptions facture", AddressOf MigrationDelegationPrix)
                         AssurerSchemaCritiquePostMigrations(cn, tx)
                         tx.Commit()
                     Catch
@@ -46,6 +49,33 @@ Namespace DevCommerc8ak
             ' et la migration exécutée automatiquement au démarrage.
             Using stream As System.IO.Stream = GetType(SchemaMigrationService).Assembly.GetManifestResourceStream("AuditMetierMigration.sql")
                 If stream Is Nothing Then Throw New InvalidOperationException("Migration audit metier embarquee absente.")
+                Using reader As New System.IO.StreamReader(stream)
+                    Executer(cn, tx, reader.ReadToEnd())
+                End Using
+            End Using
+        End Sub
+
+        Private Shared Sub MigrationTracabilitePaiements(cn As SqlConnection, tx As SqlTransaction)
+            Using stream As System.IO.Stream = GetType(SchemaMigrationService).Assembly.GetManifestResourceStream("TracabilitePaiementsMigration.sql")
+                If stream Is Nothing Then Throw New InvalidOperationException("Migration paiements embarquee absente.")
+                Using reader As New System.IO.StreamReader(stream)
+                    Executer(cn, tx, reader.ReadToEnd())
+                End Using
+            End Using
+        End Sub
+
+        Private Shared Sub MigrationModesTravail(cn As SqlConnection, tx As SqlTransaction)
+            Using stream As System.IO.Stream = GetType(SchemaMigrationService).Assembly.GetManifestResourceStream("ModesTravailMigration.sql")
+                If stream Is Nothing Then Throw New InvalidOperationException("Migration modes embarquee absente.")
+                Using reader As New System.IO.StreamReader(stream)
+                    Executer(cn, tx, reader.ReadToEnd())
+                End Using
+            End Using
+        End Sub
+
+        Private Shared Sub MigrationDelegationPrix(cn As SqlConnection, tx As SqlTransaction)
+            Using stream As System.IO.Stream = GetType(SchemaMigrationService).Assembly.GetManifestResourceStream("DelegationPrixMigration.sql")
+                If stream Is Nothing Then Throw New InvalidOperationException("Migration delegation embarquee absente.")
                 Using reader As New System.IO.StreamReader(stream)
                     Executer(cn, tx, reader.ReadToEnd())
                 End Using

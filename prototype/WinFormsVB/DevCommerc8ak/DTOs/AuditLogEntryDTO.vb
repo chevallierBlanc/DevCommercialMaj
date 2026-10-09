@@ -20,5 +20,6 @@ Namespace DevCommerc8ak
         Public Property Motif As String
         Public Property SessionId As Integer?
         Public Property ModeActif As String
+        Public Property ReferenceDocument As String
     End Class
 End Namespace

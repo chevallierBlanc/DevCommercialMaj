@@ -57,6 +57,25 @@
     <EmbeddedResource Include="Migrations\2026100901_AuditMetier.sql">
       <LogicalName>AuditMetierMigration.sql</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="Migrations\2026100902_TracabilitePaiements.sql">
+      <LogicalName>TracabilitePaiementsMigration.sql</LogicalName>
+    </EmbeddedResource>
+    <Compile Include="Services\EncaissementAuditRegles.vb" />
+    <Compile Include="Services\AuditPresentationService.vb" />
+    <Compile Include="Services\ModeTravailRegles.vb" />
+    <Compile Include="Services\ModeTravailService.vb" />
+    <Compile Include="UI\DialogueModeTravail.vb" />
+    <Compile Include="Services\ConfigurationModesService.vb" />
+    <Compile Include="UI\DialogueConfigurationModes.vb" />
+    <Compile Include="Services\DelegationPrixRegles.vb" />
+    <Compile Include="Services\DelegationPrixService.vb" />
+    <Compile Include="UI\DialogueDelegationPrix.vb" />
+    <EmbeddedResource Include="Migrations\2026100904_DelegationPrix.sql">
+      <LogicalName>DelegationPrixMigration.sql</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Migrations\2026100903_ModesTravail.sql">
+      <LogicalName>ModesTravailMigration.sql</LogicalName>
+    </EmbeddedResource>
     <Compile Include="DAL\DAL.vb" />
     <Compile Include="Entities\Client.vb" />
     <Compile Include="Entities\Produit.vb" />

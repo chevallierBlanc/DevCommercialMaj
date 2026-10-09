@@ -92,6 +92,37 @@ Namespace DevCommerc8ak
             Dim tabScan As New TabPage("Scanner IP") With {.BackColor = ColorBackground}
 
             tabs.TabPages.AddRange({tabGeneral, tabProduits, tabImprimantes, tabMonnaie, tabScan})
+            Dim tabSecurite As New TabPage("Sécurité et autorisations") With {.BackColor = ColorBackground}
+            Dim configModes As Button = CreateStyledButton("Configurer les modes de travail", ColorPrimary, 320, 40)
+            configModes.Location = New Point(24, 24)
+            AddHandler configModes.Click, Sub()
+                                              Try
+                                                  DialogueConfigurationModes.Afficher(Me, New ConfigurationModesService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)))
+                                              Catch ex As Exception
+                                                  MessageBox.Show(Me, ex.Message, "Modes de travail", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                                              End Try
+                                          End Sub
+            tabSecurite.Controls.Add(configModes)
+            Dim configPrix As Button = CreateStyledButton("Configurer la délégation des prix", ColorPrimary, 320, 40)
+            configPrix.Location = New Point(24, 82)
+            AddHandler configPrix.Click, Sub()
+                                             Try
+                                                 DialogueDelegationPrix.Configurer(Me, New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)))
+                                             Catch ex As Exception
+                                                 MessageBox.Show(Me, ex.Message, "Délégation des prix", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                                             End Try
+                                         End Sub
+            Dim demandesPrix As Button = CreateStyledButton("Demandes de modification de prix", ColorPrimary, 320, 40)
+            demandesPrix.Location = New Point(24, 140)
+            AddHandler demandesPrix.Click, Sub()
+                                               Try
+                                                   DialogueDelegationPrix.Demandes(Me, New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)))
+                                               Catch ex As Exception
+                                                   MessageBox.Show(Me, ex.Message, "Demandes de prix", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                                               End Try
+                                           End Sub
+            tabSecurite.Controls.AddRange(New Control() {configPrix, demandesPrix})
+            tabs.TabPages.Add(tabSecurite)
 
             ' --- INITIALISATION DES COMPOSANTS (Noms conservés) ---
 

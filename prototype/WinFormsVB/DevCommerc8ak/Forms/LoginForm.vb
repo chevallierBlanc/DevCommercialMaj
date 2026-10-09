@@ -351,10 +351,33 @@ Namespace DevCommerc8ak
                     End Using
                 End If
 
+                Dim modesService As New ModeTravailService(dal)
+                Dim modes As List(Of String) = modesService.Lister(utilisateur.UtilisateurId, roleChoisi.RoleId)
+                Dim modeChoisi As String = Nothing
+                If modes.Count = 1 Then
+                    modeChoisi = modes(0)
+                ElseIf modes.Count > 1 Then
+                    Using selection As New DialogueModeTravail(modes)
+                        If selection.ShowDialog(Me) <> DialogResult.OK Then Return False
+                        modeChoisi = selection.ModeSelectionne
+                    End Using
+                End If
                 Dim demarrage As AuthentificationResultat = service.DemarrerSessionApresAuthentification(utilisateur, roleChoisi)
                 If demarrage.Statut <> AuthentificationStatut.Succes Then
                     MessageBox.Show(demarrage.Message, "Connexion", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                     Return False
+                End If
+                SessionUtilisateur.ModeActif = String.Empty
+                If modeChoisi IsNot Nothing Then
+                    Try
+                        modesService.Activer(modeChoisi)
+                    Catch
+                        ' Une permission retiree entre choix et activation ferme
+                        ' la session ; aucun ERP n'est ouvert avec un mode invalide.
+                        sessionRepo.FermerSession(SessionUtilisateur.SessionId)
+                        SessionUtilisateur.Reinitialiser()
+                        Throw
+                    End Try
                 End If
                 Return True
             Catch ex As Exception

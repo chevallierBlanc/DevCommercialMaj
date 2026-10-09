@@ -570,7 +570,8 @@ Namespace DevCommerc8ak
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
                 Dim service As New FacturationService(dal)
-                service.EncaisserFacture(factureId, cmbMode.SelectedItem.ToString(), txtReference.Text.Trim(), montantFC, monnaieFC, devise, SessionUtilisateur.UtilisateurId)
+                service.EncaisserFacture(factureId, cmbMode.SelectedItem.ToString(), txtReference.Text.Trim(), montantFC, monnaieFC, devise, SessionUtilisateur.UtilisateurId,
+                    montantSaisi, If(devise = "FC", 1D, If(_param Is Nothing, 0D, _param.TauxUsd)))
 
                 _dernierTicket = ticket
                 If Not ImprimerTicket(_dernierTicket, 2, True) Then

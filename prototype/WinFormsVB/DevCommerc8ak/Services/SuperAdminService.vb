@@ -214,7 +214,7 @@ Namespace DevCommerc8ak
                             .Provenance = Convert.ToString(row("Provenance")), .Avant = Convert.ToString(row("Avant")),
                             .Apres = Convert.ToString(row("Apres")), .Motif = Convert.ToString(row("Motif")),
                             .SessionId = If(row.IsNull("SessionId"), CType(Nothing, Integer?), Convert.ToInt32(row("SessionId"))),
-                            .ModeActif = Convert.ToString(row("ModeActif"))
+                            .ModeActif = Convert.ToString(row("ModeActif")), .ReferenceDocument = Convert.ToString(row("ReferenceDocument"))
                         })
                     Next
                     Return audits.OrderByDescending(Function(x) x.DateAction).ToList()
