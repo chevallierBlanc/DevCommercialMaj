@@ -71,6 +71,12 @@ Namespace DevCommerc8ak
         Private _typesVenteCourants As List(Of TypeVenteDTO) 'nouveau
         Private _factureEnEditionId As Integer?
         Private _versionFactureEdition As Byte()
+        Private _clientEditionId As Integer?
+        Private _clientEditionNom As String
+        Private _clientEditionTelephone As String
+        Private _remiseEditionMontant As Decimal
+        Private _sousTotalEdition As Decimal
+        Private _remiseEditionTexte As String
         Private _isRefreshingFromEvent As Boolean
         Private _suppressSelectionEvents As Boolean
         Private _dataMonitor As DataChangeMonitorService
@@ -1000,10 +1006,8 @@ Namespace DevCommerc8ak
             Try
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
-                Dim factureRepo As New FactureVenteRepository(dal)
-                _versionFactureEdition = New FactureOperationService(dal).LireVersion(factureVenteId)
-                Dim facture As FactureVenteDTO = factureRepo.ObtenirParId(factureVenteId)
-                If facture Is Nothing OrElse facture.Statut <> "EN_ATTENTE" Then
+                Dim entete As DataRow = New FactureOperationService(dal).LireEntetePourEdition(factureVenteId)
+                If Convert.ToString(entete("Statut")) <> "EN_ATTENTE" Then
                     MessageBox.Show("Seules les factures brouillon peuvent être modifiees.")
                     Return
                 End If
@@ -1012,11 +1016,20 @@ Namespace DevCommerc8ak
                 Dim dtLignes As DataTable = ligneRepo.ListerDetailsParFacture(factureVenteId)
 
                 _factureEnEditionId = factureVenteId
-                txtNumeroFacture.Text = numeroFacture
-                txtClientNom.Text = clientNom
-                txtClientTel.Text = telephone
+                _versionFactureEdition = DirectCast(entete("VersionOperation"), Byte())
+                _clientEditionId = If(entete.IsNull("ClientId"), CType(Nothing, Integer?), Convert.ToInt32(entete("ClientId")))
+                _clientEditionNom = Convert.ToString(entete("NomClient"))
+                _clientEditionTelephone = NettoyerTelephone(Convert.ToString(entete("Telephone")))
+                _remiseEditionMontant = Convert.ToDecimal(entete("MontantRemise"))
+                _sousTotalEdition = Convert.ToDecimal(entete("SousTotal"))
+                ' Le champ reste un pourcentage. Une remise inchangée sur un
+                ' sous-total inchangé conserve son montant exact, sans réarrondi.
+                _remiseEditionTexte = If(_sousTotalEdition = 0D, "0", (_remiseEditionMontant / _sousTotalEdition * 100D).ToString())
+                txtNumeroFacture.Text = Convert.ToString(entete("NumeroFacture"))
+                txtClientNom.Text = _clientEditionNom
+                txtClientTel.Text = _clientEditionTelephone
                 txtClientId.Text = ""
-                txtRemise.Text = ""
+                txtRemise.Text = _remiseEditionTexte
                 btnValider.Text = "METTRE À JOUR LA VENTE"
 
                 _panier.Clear()
@@ -1087,6 +1100,7 @@ Namespace DevCommerc8ak
                 Dim remisePourcent As Decimal
                 Decimal.TryParse(txtRemise.Text.Trim(), remisePourcent)
                 Dim remiseMontant As Decimal = sousTotal * remisePourcent / 100D
+                If _factureEnEditionId.HasValue AndAlso sousTotal = _sousTotalEdition AndAlso txtRemise.Text.Trim() = _remiseEditionTexte Then remiseMontant = _remiseEditionMontant
                 Dim total As Decimal = sousTotal - remiseMontant
 
                 Dim clientId As Integer? = Nothing
@@ -1100,7 +1114,9 @@ Namespace DevCommerc8ak
                     Return
                 End If
 
-                If tel <> "" Then
+                If _factureEnEditionId.HasValue AndAlso AuditMetierRegles.ClientEditionInchange(_clientEditionId, _clientEditionNom, _clientEditionTelephone, nom, tel) Then
+                    clientId = _clientEditionId
+                ElseIf tel <> "" Then
                     Dim c As ClientDTO = clientService.ObtenirParTelephone(tel)
                     If c IsNot Nothing Then
                         clientId = c.ClientId

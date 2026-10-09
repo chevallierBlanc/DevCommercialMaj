@@ -45,7 +45,7 @@ Namespace DevCommerc8ak
             End Using
         End Sub
 
-        Public Shared Sub Echec(dal As DAL, evenement As String, id As Integer, correlation As Guid, ex As Exception, Optional entite As String = "Facture")
+        Public Shared Sub Echec(dal As DAL, evenement As String, id As Integer, correlation As Guid, ex As Exception, Optional entite As String = "Facture", Optional reference As String = Nothing)
             ' Après rollback, l'échec a sa propre transaction et ne peut jamais
             ' être présenté comme un succès. Aucun texte d'exception SQL brut
             ' (qui pourrait contenir une donnée confidentielle) n'est stocké.
@@ -53,7 +53,14 @@ Namespace DevCommerc8ak
                 Using cn As SqlConnection = dal.CreerConnexion()
                     cn.Open()
                     Using tx As SqlTransaction = cn.BeginTransaction()
-                        Enregistrer(cn, tx, evenement, "OPERATIONS_REFUSEES", entite, id, String.Empty, Nothing, Nothing,
+                        If reference Is Nothing AndAlso entite = "Facture" AndAlso id > 0 Then
+                            Using cmd As New SqlCommand("SELECT NumeroFacture FROM dbo.FacturesVente WHERE FactureVenteId=@id", cn, tx)
+                                cmd.Parameters.AddWithValue("@id", id)
+                                reference = Convert.ToString(cmd.ExecuteScalar())
+                            End Using
+                        End If
+                        If reference Is Nothing AndAlso entite <> "Facture" AndAlso id > 0 Then reference = id.ToString(Globalization.CultureInfo.InvariantCulture)
+                        Enregistrer(cn, tx, evenement, "OPERATIONS_REFUSEES", entite, id, If(reference, String.Empty), Nothing, Nothing,
                                     ex.GetType().Name, correlation, If(TypeOf ex Is UnauthorizedAccessException, "REFUS", "ECHEC"))
                         tx.Commit()
                     End Using

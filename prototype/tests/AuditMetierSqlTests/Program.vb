@@ -45,6 +45,27 @@ Module Program
         Dim facture As FactureVente = NouvelleFacture(suffix)
         Dim id As Integer = operations.Enregistrer(facture, Lignes(2D), String.Empty, Nothing)
         Verifier(Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE [Action]='FACTURE_CREEE' AND EntiteId='" & id.ToString() & "'") = 1, "Création et audit")
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE [Action]='FACTURE_CREEE' AND EntiteId='" & id.ToString() & "' AND EffectuePar=" & user.ToString() & " AND SessionId=" & SessionUtilisateur.SessionId.ToString() & " AND ReferenceDocument=@s AND AnciennesValeurs IS NULL AND NouvellesValeurs IS NOT NULL", facture.NumeroFacture) = 1, "Référence, acteur et snapshot réels")
+        Dim entete As DataRow = operations.LireEntetePourEdition(id)
+        Verifier(DirectCast(entete("VersionOperation"), Byte()).SequenceEqual(operations.LireVersion(id)), "Version et en-tête du même chargement")
+        Dim factureRemise As FactureVente = NouvelleFacture(suffix & "-remise")
+        factureRemise.MontantRemise = 2D
+        factureRemise.MontantTotal = 18D
+        Dim nouveauClient As New Client With {.NomClient = "TEST_CLIENT_" & suffix, .Telephone = "", .Email = "", .Adresse = "", .EstActif = True}
+        Dim remiseId As Integer = operations.Enregistrer(factureRemise, Lignes(2D), "", Nothing, nouveauClient)
+        Dim enteteRemise As DataRow = operations.LireEntetePourEdition(remiseId)
+        Verifier(Convert.ToDecimal(enteteRemise("MontantRemise")) = 2D AndAlso Convert.ToString(enteteRemise("Telephone")) = "", "Remise et client sans téléphone chargés")
+        factureRemise.FactureVenteId = remiseId
+        factureRemise.ClientId = Convert.ToInt32(enteteRemise("ClientId"))
+        operations.Enregistrer(factureRemise, Lignes(2D), "Vérification sans changement", DirectCast(enteteRemise("VersionOperation"), Byte()))
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.Clients WHERE NomClient=@s", nouveauClient.NomClient) = 1, "Aucun client dupliqué par le service")
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.FacturesVente WHERE FactureVenteId=" & remiseId.ToString() & " AND MontantRemise=2 AND MontantTotal=18 AND ClientId=" & factureRemise.ClientId.Value.ToString()) = 1, "Client, remise et total conservés")
+        Dim factureTaxe As FactureVente = NouvelleFacture(suffix & "-taxe")
+        factureTaxe.MontantTaxe = 1D
+        factureTaxe.MontantTotal = 21D
+        Dim taxeId As Integer = operations.Enregistrer(factureTaxe, Lignes(2D), "", Nothing)
+        Refus(Of InvalidOperationException)(Sub() operations.LireEntetePourEdition(taxeId))
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.FacturesVente WHERE FactureVenteId=" & taxeId.ToString() & " AND MontantTaxe=1 AND MontantTotal=21") = 1, "Taxe non représentable dans l'éditeur : aucune réécriture")
         facture.FactureVenteId = id
         Dim version As Byte() = operations.LireVersion(id)
         Refus(Of ArgumentException)(Sub() operations.Enregistrer(facture, Lignes(3D), "  ", version))
@@ -73,6 +94,10 @@ Module Program
         infrastructure.AssurerInfrastructure()
         Refus(Of UnauthorizedAccessException)(Sub() operations.Enregistrer(facture, Lignes(2D), "Droit retiré", operations.LireVersion(id)))
         Verifier(Not infrastructure.RoleAutoriseInterface(SessionUtilisateur.Role, "FACTURE_MODIFIER"), "Lecture sans réattribution")
+        Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & role.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface IN('AUDIT_CONSULTER','SUPERADMIN_AUDIT')")
+        Exec("INSERT dbo.JournalAudit([Action],Entite,EntiteId,Details,EffectuePar) VALUES('LEGACY_" & suffix & "','Facture','" & id.ToString() & "','Trace ancienne de test'," & user.ToString() & ")")
+        Dim ancienneTrace As DataTable = infrastructure.ListerAuditActions(Nothing, Nothing, SessionUtilisateur.NomUtilisateur, "", "", "LEGACY_" & suffix, "")
+        Verifier(ancienneTrace.Rows.Count = 1 AndAlso Convert.ToString(ancienneTrace.Rows(0)("Provenance")) = "JournalAudit" AndAlso Convert.ToString(ancienneTrace.Rows(0)("Statut")) = "HISTORIQUE", "Ancienne trace sans nouvelles colonnes toujours consultable")
         Refus(Of ArgumentException)(Sub() operations.Annuler(id, " "))
         operations.Annuler(id, "Erreur de saisie")
         Verifier(Scalar("SELECT COUNT(*) FROM dbo.FacturesVente WHERE FactureVenteId=" & id.ToString() & " AND Statut='ANNULEE'") = 1, "Annulation contrôlée")
@@ -106,9 +131,48 @@ Module Program
             Exec("DROP TRIGGER dbo.TR_TEST_AuditFailure")
         End Try
         caisse.EncaisserFacture(id, "ESPECES", "TEST", 20D, 0D, "FC", user)
-        Refus(Of Exception)(Sub() caisse.EncaisserFacture(id, "ESPECES", "TEST", 20D, 0D, "FC", user))
+        Try
+            caisse.EncaisserFacture(id, "ESPECES", "TEST", 20D, 0D, "FC", user)
+            Throw New Exception("Double encaissement accepté.")
+        Catch ex As Exception
+            Verifier(ex.Message = "Facture deja payee ou invalide.", "Refus du double encaissement pour la bonne raison")
+        End Try
         Verifier(Scalar("SELECT COUNT(*) FROM dbo.Paiements WHERE FactureVenteId=" & id.ToString()) = 1, "Double encaissement refusé")
         Refus(Of InvalidOperationException)(Sub() operations.Annuler(id, "Facture payée"))
+        Dim factureConcurrente As FactureVente = NouvelleFacture(Guid.NewGuid().ToString("N"))
+        Dim concurrentId As Integer = operations.Enregistrer(factureConcurrente, Lignes(2D), "", Nothing)
+        Dim paiementsReussis As Integer = 0
+        Dim paiementsRefuses As Integer = 0
+        Parallel.For(0, 2, Sub(i)
+            Try
+                caisse.EncaisserFacture(concurrentId, "ESPECES", "TEST", 20D, 0D, "FC", user)
+                Interlocked.Increment(paiementsReussis)
+            Catch ex As Exception
+                If ex.Message <> "Facture deja payee ou invalide." Then Throw
+                Interlocked.Increment(paiementsRefuses)
+            End Try
+        End Sub)
+        Verifier(paiementsReussis = 1 AndAlso paiementsRefuses = 1, "Deux encaissements concurrents : un seul succès")
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.Paiements WHERE FactureVenteId=" & concurrentId.ToString()) = 1, "Un seul paiement concurrent persisté")
+        Dim disponible As Decimal
+        Using cn As New SqlConnection(cs)
+            cn.Open()
+            Using cmd As New SqlCommand("SELECT ISNULL((SELECT SUM(QuantiteBase) FROM dbo.StockEntree WHERE ProduitId=@id),0)-ISNULL((SELECT SUM(QuantiteBase) FROM dbo.StockSortie WHERE ProduitId=@id),0)-ISNULL((SELECT SUM(QuantiteBase) FROM dbo.StockPerte WHERE ProduitId=@id),0)", cn)
+                cmd.Parameters.AddWithValue("@id", produit)
+                disponible = Convert.ToDecimal(cmd.ExecuteScalar())
+            End Using
+        End Using
+        Dim factureStock As FactureVente = NouvelleFacture(Guid.NewGuid().ToString("N"))
+        Dim doublons As IList(Of LigneFactureVente) = Lignes(disponible * 0.75D)
+        doublons.Add(Lignes(disponible * 0.75D)(0))
+        Dim stockId As Integer = operations.Enregistrer(factureStock, doublons, "", Nothing)
+        Try
+            caisse.EncaisserFacture(stockId, "ESPECES", "TEST", 20D, 0D, "FC", user)
+            Throw New Exception("Stock négatif accepté.")
+        Catch ex As Exception
+            Verifier(ex.Message = "Stock insuffisant pour un produit.", "Besoin total des lignes du même produit contrôlé")
+        End Try
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.Paiements WHERE FactureVenteId=" & stockId.ToString()) = 0, "Stock insuffisant : aucun paiement")
         Dim repoCloture As New AnalyseCaissePhysiqueRepository(dal)
         Dim serviceCloture As New AnalyseCaissePhysiqueService(repoCloture)
         Dim cloture As Integer = Scalar("INSERT dbo.CloturesCaisse(DateCaisse,UtilisateurId,NomUtilisateur,RoleSession,EcartFC) VALUES(GETDATE()," & user.ToString() & ",'TEST','TEST',-10); SELECT CAST(SCOPE_IDENTITY() AS INT)")

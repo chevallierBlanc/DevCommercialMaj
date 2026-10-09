@@ -21,6 +21,16 @@ Namespace DevCommerc8ak
             Return DirectCast(table.Rows(0)("VersionOperation"), Byte())
         End Function
 
+        Public Function LireEntetePourEdition(id As Integer) As DataRow
+            ' Version, client et remise proviennent du même chargement SQL,
+            ' jamais d'une ancienne ligne affichée dans l'historique.
+            Dim table As DataTable = _dal.ExecuterTable("SELECT f.NumeroFacture,f.ClientId,f.Statut,f.VersionOperation,f.SousTotal,f.MontantRemise,f.MontantTaxe,CASE WHEN EXISTS(SELECT 1 FROM dbo.LignesFactureVente l WHERE l.FactureVenteId=f.FactureVenteId AND l.MontantRemise<>0) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END AS ARemiseParLigne,ISNULL(c.NomClient,'') AS NomClient,ISNULL(c.Telephone,'') AS Telephone FROM dbo.FacturesVente f LEFT JOIN dbo.Clients c ON c.ClientId=f.ClientId WHERE f.FactureVenteId=@id", CommandType.Text,
+                New List(Of SqlParameter) From {New SqlParameter("@id", id)})
+            If table.Rows.Count <> 1 Then Throw New InvalidOperationException("Facture introuvable.")
+            AuditMetierRegles.VerifierEditionCompatible(Convert.ToDecimal(table.Rows(0)("MontantTaxe")), Convert.ToBoolean(table.Rows(0)("ARemiseParLigne")))
+            Return table.Rows(0)
+        End Function
+
         Public Function Enregistrer(facture As FactureVente, lignes As IList(Of LigneFactureVente), motif As String, versionAttendue As Byte(), Optional nouveauClient As Client = Nothing) As Integer
             Dim correlation As Guid = Guid.NewGuid()
             Dim id As Integer = facture.FactureVenteId
@@ -66,8 +76,9 @@ Namespace DevCommerc8ak
                                 ligne.CoutUnitaireBaseVente = New FacturationService(_dal).ObtenirCoutUnitaireBaseVente(ligne.ProduitId, cn, tx)
                                 ligneRepo.Ajouter(ligne, cn, tx)
                             Next
-                            Dim apres As Object = Snapshot(cn, tx, id)
-                            AuditMetierService.Enregistrer(cn, tx, If(avant Is Nothing, "FACTURE_CREEE", "FACTURE_MODIFIEE"), "FACTURATION", "Facture", id, facture.NumeroFacture, avant, apres, motif, correlation)
+                            Dim apres As Dictionary(Of String, Object) = Snapshot(cn, tx, id)
+                            AuditMetierService.Enregistrer(cn, tx, If(avant Is Nothing, "FACTURE_CREEE", "FACTURE_MODIFIEE"), "FACTURATION", "Facture", id,
+                                Convert.ToString(DirectCast(apres("Entete"), Dictionary(Of String, Object))("NumeroFacture")), avant, apres, motif, correlation)
                             tx.Commit()
                         Catch
                             ' Un trigger peut avoir déjà annulé la transaction SQL.
@@ -78,7 +89,7 @@ Namespace DevCommerc8ak
                     End Using
                 End Using
             Catch ex As Exception
-                AuditMetierService.Echec(_dal, "FACTURE_ENREGISTREMENT_REFUSE", facture.FactureVenteId, correlation, ex)
+                AuditMetierService.Echec(_dal, "FACTURE_ENREGISTREMENT_REFUSE", facture.FactureVenteId, correlation, ex, reference:=facture.NumeroFacture)
                 Throw
             End Try
             AppEvents.OnVenteCreee()

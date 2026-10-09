@@ -5,6 +5,7 @@ Imports System
 Imports System.Data
 Imports System.Data.SqlClient
 Imports System.Collections.Generic
+Imports System.Linq
 
 Namespace DevCommerc8ak
     Public Class FacturationService
@@ -71,7 +72,7 @@ Namespace DevCommerc8ak
                         cmd.Parameters.AddWithValue("@id", factureVenteId)
                         If Convert.ToString(cmd.ExecuteScalar()) <> "EN_ATTENTE" Then Throw New InvalidOperationException("Seul un brouillon peut recevoir une ligne.")
                     End Using
-                    Dim avant As Object = FactureOperationService.Snapshot(cn, tx, factureVenteId)
+                    Dim avant As Dictionary(Of String, Object) = FactureOperationService.Snapshot(cn, tx, factureVenteId)
                     Dim id As Integer = repo.Ajouter(ligne, cn, tx)
                     ' L'ajout isolé invalide aussi la version ouverte sur un autre poste.
                     Using cmd As New SqlCommand("UPDATE dbo.FacturesVente SET ModifierPar=@user WHERE FactureVenteId=@id", cn, tx)
@@ -79,7 +80,8 @@ Namespace DevCommerc8ak
                         cmd.Parameters.AddWithValue("@user", SessionUtilisateur.NomUtilisateur)
                         cmd.ExecuteNonQuery()
                     End Using
-                    AuditMetierService.Enregistrer(cn, tx, "FACTURE_MODIFIEE", "FACTURATION", "Facture", factureVenteId, String.Empty,
+                    AuditMetierService.Enregistrer(cn, tx, "FACTURE_MODIFIEE", "FACTURATION", "Facture", factureVenteId,
+                        Convert.ToString(DirectCast(avant("Entete"), Dictionary(Of String, Object))("NumeroFacture")),
                         avant, FactureOperationService.Snapshot(cn, tx, factureVenteId), motif, Guid.NewGuid())
                     tx.Commit()
                     Return id
@@ -138,22 +140,32 @@ Namespace DevCommerc8ak
                         lockCmd.Parameters.AddWithValue("@id", factureVenteId)
                         If Convert.ToString(lockCmd.ExecuteScalar()) <> "EN_ATTENTE" Then Throw New InvalidOperationException("Facture déjà payée ou invalide.")
                     End Using
+                    Dim avant As Dictionary(Of String, Object) = FactureOperationService.Snapshot(cn, tx, factureVenteId)
                     Using cmd As New SqlCommand("sp_valider_paiement", cn, tx)
                         cmd.CommandType = CommandType.StoredProcedure
                         cmd.Parameters.AddRange(p.ToArray())
                         resultat = cmd.ExecuteNonQuery()
                     End Using
-                    AuditMetierService.Enregistrer(cn, tx, "ENCAISSEMENT_VALIDE", "CAISSE", "Facture", factureVenteId, String.Empty,
-                        Nothing, New With {.Montant = montant, .EncaissePar = payePar}, String.Empty, Guid.NewGuid())
+                    ' Le nombre de lignes ExecuteNonQuery peut valoir -1 avec
+                    ' NOCOUNT. Le succès est constaté sur les données persistées.
+                    Using cmd As New SqlCommand("SELECT COUNT(*) FROM dbo.Paiements p JOIN dbo.FacturesVente f ON f.FactureVenteId=p.FactureVenteId WHERE f.FactureVenteId=@id AND f.Statut='PAYEE' AND p.PayePar=@user AND p.Montant=@montant", cn, tx)
+                        cmd.Parameters.AddWithValue("@id", factureVenteId)
+                        cmd.Parameters.AddWithValue("@user", payePar)
+                        cmd.Parameters.AddWithValue("@montant", montant)
+                        If Convert.ToInt32(cmd.ExecuteScalar()) <> 1 Then Throw New InvalidOperationException("Le paiement n'a pas été validé : opération annulée.")
+                    End Using
+                    Dim apres As Dictionary(Of String, Object) = FactureOperationService.Snapshot(cn, tx, factureVenteId)
+                    apres.Add("Paiement", New Dictionary(Of String, Object) From {{"Montant", montant}, {"EncaissePar", payePar}})
+                    AuditMetierService.Enregistrer(cn, tx, "ENCAISSEMENT_VALIDE", "CAISSE", "Facture", factureVenteId,
+                        Convert.ToString(DirectCast(avant("Entete"), Dictionary(Of String, Object))("NumeroFacture")),
+                        avant, apres, String.Empty, Guid.NewGuid())
                     tx.Commit()
                 End Using
             End Using
-            If resultat > 0 Then
-                AppEvents.OnPaiementValide()
-                AppEvents.OnCaisseModifiee()
-                AppEvents.OnAnalyseVenteModifiee()
-                AppEvents.OnDataChanged()
-            End If
+            AppEvents.OnPaiementValide()
+            AppEvents.OnCaisseModifiee()
+            AppEvents.OnAnalyseVenteModifiee()
+            AppEvents.OnDataChanged()
             Return resultat
         End Function
 
@@ -195,7 +207,12 @@ Namespace DevCommerc8ak
                             End Using
                         End Using
 
-                        For Each l As Tuple(Of Integer, Decimal) In lignes
+                        ' Plusieurs types de vente peuvent viser le même produit.
+                        ' Vérifier leur besoin total évite un stock négatif, sans
+                        ' changer les lignes de sortie ni leur QuantiteBase.
+                        Dim besoins As IEnumerable(Of Tuple(Of Integer, Decimal)) = lignes.GroupBy(Function(l) l.Item1).
+                            Select(Function(g) New Tuple(Of Integer, Decimal)(g.Key, g.Sum(Function(l) l.Item2))).OrderBy(Function(l) l.Item1)
+                        For Each l As Tuple(Of Integer, Decimal) In besoins
                             Dim stock As Decimal = 0D
                             Using cmdS As New SqlCommand("" &
                                 "SELECT ISNULL(e.Entree,0) - ISNULL(s.Sortie,0) - ISNULL(p.Perte,0) AS Stock " &

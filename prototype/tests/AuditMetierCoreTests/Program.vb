@@ -27,6 +27,14 @@ Module Program
         Verifie(AuditDifferenceService.Comparer(avant, avant).Count = 0, "Pas de fausse modification")
         Verifie(AuditDifferenceService.Comparer(Nothing, apres).Count > 0, "Création détaillée")
         Verifie(AuditDifferenceService.Comparer(avant, Nothing).Count > 0, "Suppression détaillée")
+        Verifie(AuditMetierRegles.ClientEditionInchange(42, "CLIENT", "", "CLIENT", ""), "Client sans téléphone conservé")
+        Verifie(Not AuditMetierRegles.ClientEditionInchange(Nothing, "CLIENT", "", "CLIENT", ""), "Pas d'ID client inventé")
+        Verifie(Not AuditMetierRegles.ClientEditionInchange(42, "CLIENT", "", "AUTRE", ""), "Changement du nom détecté")
+        Verifie(Not AuditMetierRegles.ClientEditionInchange(42, "CLIENT", "123", "CLIENT", "456"), "Changement téléphone détecté")
+        AuditMetierRegles.VerifierEditionCompatible(0D, False)
+        compte += 1
+        Refuse(Of InvalidOperationException)(Sub() AuditMetierRegles.VerifierEditionCompatible(1D, False))
+        Refuse(Of InvalidOperationException)(Sub() AuditMetierRegles.VerifierEditionCompatible(0D, True))
         Console.WriteLine("PASS : " & compte.ToString() & " contrôles métier réels, sans connexion SQL.")
     End Sub
 
