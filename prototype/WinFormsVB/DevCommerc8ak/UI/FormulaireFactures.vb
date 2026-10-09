@@ -508,11 +508,11 @@ Namespace DevCommerc8ak
                     .RowTemplate = New DataGridViewRow() With {.Height = 42}
                 }
                 grid.EnableHeadersVisualStyles = False
-                grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(52, 73, 94)
-                grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.White
+                grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245)
+                grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(52, 73, 94)
                 grid.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
                 grid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
-                grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(52, 73, 94)
+                grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(245, 245, 245)
                 grid.ColumnHeadersHeight = 40
                 grid.DefaultCellStyle.Font = New Font("Segoe UI", 9.5F)
                 grid.DefaultCellStyle.Padding = New Padding(5, 0, 5, 0)
@@ -526,7 +526,7 @@ Namespace DevCommerc8ak
                 grid.Columns.Add(New DataGridViewTextBoxColumn() With {.DataPropertyName = "MontantLigne", .HeaderText = "Total", .Width = 130, .MinimumWidth = 115, .DefaultCellStyle = New DataGridViewCellStyle() With {.Format = "N0", .Alignment = DataGridViewContentAlignment.MiddleRight}})
                 grid.DataSource = lignes
 
-                Dim footer As New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.White, .Padding = New Padding(20), .Margin = New Padding(0)}
+                Dim footer As New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.White, .Padding = New Padding(10), .Margin = New Padding(0)}
                 Dim sousTotal As Decimal = If(entete Is Nothing OrElse entete.IsNull("SousTotal"), CalculerSommeLignes(lignes), Convert.ToDecimal(entete("SousTotal")))
                 Dim remise As Decimal = If(entete Is Nothing OrElse entete.IsNull("MontantRemise"), 0D, Convert.ToDecimal(entete("MontantRemise")))
                 Dim total As Decimal = If(entete Is Nothing OrElse entete.IsNull("MontantTotal"), sousTotal - remise, Convert.ToDecimal(entete("MontantTotal")))
@@ -538,9 +538,12 @@ Namespace DevCommerc8ak
                 AjouterTotalPreview(pnlTotaux, "TOTAL", total, New Font("Segoe UI", 11, FontStyle.Bold), ColorPrimary, 2)
                 footer.Controls.Add(pnlTotaux)
 
-                root.Controls.Add(header, 0, 0)
-                root.Controls.Add(grid, 0, 1)
+
                 root.Controls.Add(footer, 0, 2)
+                root.Controls.Add(grid, 0, 1)
+                root.Controls.Add(header, 0, 0)
+
+
                 Controls.Add(root)
             End Sub
 

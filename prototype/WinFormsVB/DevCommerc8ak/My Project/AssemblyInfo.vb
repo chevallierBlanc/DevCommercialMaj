@@ -5,7 +5,7 @@ Imports System.Runtime.InteropServices
 <Assembly: AssemblyTitle("DevCommerc8ak")>
 <Assembly: AssemblyDescription("Prototype WinForms VB.NET")>
 <Assembly: AssemblyCompany("Paons Rehoboth")>
-<Assembly: AssemblyProduct("DevCommerc8ak")>
+<Assembly: AssemblyProduct("Commercial Pro")>
 <Assembly: AssemblyCopyright("Copyright © 2026")>
 
 <Assembly: ComVisible(False)>

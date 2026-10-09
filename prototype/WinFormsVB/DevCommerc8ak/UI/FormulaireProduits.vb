@@ -253,7 +253,7 @@ Namespace DevCommerc8ak
             tableEdition.Controls.Add(cardStock, 3, 0)
 
             ' 3. Grille
-            Dim cardTypesPersonnalises As Panel = CreateCard("Types de vente personnalisés")
+            Dim cardTypesPersonnalises As Panel = CreateCard2("Types de vente personnalisés")
             gridTypesPersonnalises = CreateStyledGrid()
             gridTypesPersonnalises.AutoGenerateColumns = False
             gridTypesPersonnalises.Dock = DockStyle.Fill
@@ -412,6 +412,15 @@ Namespace DevCommerc8ak
             Return p
         End Function
 
+        Private Function CreateCard2(title As String) As Panel
+            Dim pnl As New Panel() With {
+                .Dock = DockStyle.Fill, .BackColor = ColorCard, .Margin = New Padding(5), .Padding = New Padding(10)
+            }
+            Dim p As New Panel() With {.Dock = DockStyle.Fill, .BackColor = ColorCard, .Margin = New Padding(5), .Padding = New Padding(10)}
+            p.Controls.Add(New Label() With {.Text = title, .Font = FontLabel, .ForeColor = ColorSecondary, .AutoSize = True, .Top = -4, .Left = 10})
+            Return p
+        End Function
+
         Private Function CreateField(parent As Control, label As String, x As Integer, y As Integer, w As Integer) As TextBox
             parent.Controls.Add(New Label() With {.Text = label, .Left = x, .Top = y - 20, .Font = FontLabel, .ForeColor = ColorTextSecondary, .AutoSize = True})
             Dim txt As New TextBox() With {.Left = x, .Top = y, .Width = w, .Font = FontControl, .BorderStyle = BorderStyle.FixedSingle}
@@ -451,13 +460,15 @@ Namespace DevCommerc8ak
         End Function
 
         Private Function CreateStyledGrid() As DataGridView
+
             Dim dgv As New DataGridView() With {
                 .Dock = DockStyle.Fill, .BackgroundColor = Color.White, .BorderStyle = BorderStyle.None,
                 .EnableHeadersVisualStyles = False, .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 .AllowUserToAddRows = False, .ReadOnly = True, .RowHeadersVisible = False,
                 .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, .GridColor = ColorBorder
-            }
+                            }
             dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245)
+            dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(245, 245, 245)
             dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
             dgv.ColumnHeadersHeight = 40
             dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(232, 234, 246)

@@ -28,7 +28,7 @@ Namespace DevCommerc8ak
         Private lblInfo As Label
         Private lblTitle As Label
         Private lblSubtitle As Label
-        
+
         ' --- Données ---
         Private _roleIdCourant As Integer?
         Private _interfaces As DataTable
@@ -65,7 +65,7 @@ Namespace DevCommerc8ak
             Me.DoubleBuffered = True
 
             BuildUi()
-            
+
             AddHandler Me.Load, AddressOf FormulaireSuperAdminRoles_Load
             AddHandler gridRoles.SelectionChanged, AddressOf ChargerRoleSelectionne
             AddHandler btnNouveau.Click, AddressOf NouveauRole
@@ -92,7 +92,7 @@ Namespace DevCommerc8ak
                 .BackColor = ColorHeaderBg,
                 .Padding = New Padding(30, 20, 30, 20)
             }
-            
+
             lblTitle = New Label() With {
                 .Text = "Gestion des Rôles et Privilèges",
                 .Font = FontTitle,
@@ -100,7 +100,7 @@ Namespace DevCommerc8ak
                 .AutoSize = True,
                 .Location = New Point(30, 20)
             }
-            
+
             lblSubtitle = New Label() With {
                 .Text = "Définissez les profils utilisateurs et gérez les autorisations d'accès aux modules du système.",
                 .Font = FontSubtitle,
@@ -108,7 +108,7 @@ Namespace DevCommerc8ak
                 .AutoSize = True,
                 .Location = New Point(30, 55)
             }
-            
+
             pnlHeader.Controls.AddRange({lblTitle, lblSubtitle})
             rootLayout.Controls.Add(pnlHeader, 0, 0)
 
@@ -117,7 +117,7 @@ Namespace DevCommerc8ak
                 .Dock = DockStyle.Fill,
                 .Padding = New Padding(30, 20, 30, 30)
             }
-            
+
             Dim splitContainer As New TableLayoutPanel() With {
                 .Dock = DockStyle.Fill,
                 .ColumnCount = 2,
@@ -133,7 +133,7 @@ Namespace DevCommerc8ak
                 .Padding = New Padding(20),
                 .Margin = New Padding(0, 0, 10, 0)
             }
-            
+
             Dim lblListTitle As New Label() With {
                 .Text = "RÔLES EXISTANTS",
                 .Font = FontBold,
@@ -141,7 +141,7 @@ Namespace DevCommerc8ak
                 .Dock = DockStyle.Top,
                 .Height = 30
             }
-            
+
             gridRoles = New DataGridView() With {
                 .Dock = DockStyle.Fill,
                 .ReadOnly = True,
@@ -156,6 +156,7 @@ Namespace DevCommerc8ak
                 .GridColor = ColorBorder,
                 .ColumnHeadersHeight = 40
             }
+            gridRoles.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(245, 245, 245)
             gridRoles.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(248, 249, 251)
             gridRoles.ColumnHeadersDefaultCellStyle.Font = FontBold
             gridRoles.DefaultCellStyle.SelectionBackColor = Color.FromArgb(232, 240, 254)
@@ -171,13 +172,13 @@ Namespace DevCommerc8ak
                 .Padding = New Padding(25),
                 .Margin = New Padding(10, 0, 0, 0)
             }
-            
+
             ' Formulaire de saisie
             Dim pnlForm As New Panel() With {.Dock = DockStyle.Top, .Height = 170}
-            
+
             Dim lblNomRole As New Label() With {.Text = "NOM DU RÔLE", .Font = FontBold, .ForeColor = ColorTextSecondary, .Location = New Point(0, 0), .AutoSize = True}
             txtNomRole = New TextBox() With {.Location = New Point(0, 22), .Width = 350, .Font = FontMain, .BorderStyle = BorderStyle.FixedSingle}
-            
+
             chkActif = New CheckBox() With {.Text = "Rôle actif et autorisé à se connecter", .Location = New Point(0, 60), .AutoSize = True, .Font = FontMain, .Checked = True}
 
             Dim pnlActions As New FlowLayoutPanel() With {
@@ -193,7 +194,7 @@ Namespace DevCommerc8ak
             }
             btnNouveau = New Button() With {.Text = "NOUVEAU", .Size = New Size(120, 38), .Margin = New Padding(0)}
             StyliserBouton(btnNouveau, Color.White, ColorTextSecondary, True)
-            
+
             btnEnregistrer = New Button() With {.Text = "ENREGISTRER", .Size = New Size(150, 38), .Margin = New Padding(10, 0, 0, 0)}
             StyliserBouton(btnEnregistrer, ColorPrimary, Color.White, False)
             btnSupprimer = New Button() With {.Text = "SUPPRIMER", .Size = New Size(150, 38), .Margin = New Padding(10, 0, 0, 0)}
@@ -206,15 +207,15 @@ Namespace DevCommerc8ak
             ' Liste des interfaces
             Dim pnlInterfaces As New Panel() With {.Dock = DockStyle.Fill, .Padding = New Padding(0, 20, 0, 0)}
             Dim lblIntTitle As New Label() With {.Text = "PRIVILÈGES ET ACCÈS AUX MODULES", .Font = FontBold, .ForeColor = ColorTextSecondary, .Dock = DockStyle.Top, .Height = 30}
-            
+
             clbInterfaces = New CheckedListBox() With {
-                .Dock = DockStyle.Fill, 
-                .CheckOnClick = True, 
+                .Dock = DockStyle.Fill,
+                .CheckOnClick = True,
                 .BorderStyle = BorderStyle.FixedSingle,
                 .Font = FontMain,
                 .BackColor = Color.White
             }
-            
+
             lblInfo = New Label() With {
                 .Text = "Note : Le rôle SUPERADMIN hérite automatiquement de tous les privilèges techniques.",
                 .Font = New Font("Segoe UI", 8.5F, FontStyle.Italic),
@@ -225,7 +226,7 @@ Namespace DevCommerc8ak
             }
 
             pnlInterfaces.Controls.AddRange({clbInterfaces, lblIntTitle, lblInfo})
-            
+
             cardRight.Controls.AddRange({pnlInterfaces, pnlForm})
             splitContainer.Controls.Add(cardRight, 1, 0)
 
@@ -250,12 +251,12 @@ Namespace DevCommerc8ak
                 Me.Cursor = Cursors.WaitCursor
                 _service.AssurerInfrastructure()
                 _interfaces = _service.ListerInterfaces()
-                
+
                 clbInterfaces.Items.Clear()
                 For Each row As DataRow In _interfaces.Rows
                     clbInterfaces.Items.Add(New InterfaceItem(
-                        Convert.ToInt32(row("InterfaceId")), 
-                        Convert.ToString(row("CodeInterface")), 
+                        Convert.ToInt32(row("InterfaceId")),
+                        Convert.ToString(row("CodeInterface")),
                         Convert.ToString(row("Libelle"))
                     ))
                 Next
@@ -273,7 +274,7 @@ Namespace DevCommerc8ak
         Private Sub ChargerRoles()
             Dim dt As DataTable = _service.ListerRoles()
             gridRoles.DataSource = dt
-            
+
             If gridRoles.Columns.Contains("RoleId") Then gridRoles.Columns("RoleId").Visible = False
             If gridRoles.Columns.Contains("NomRole") Then gridRoles.Columns("NomRole").HeaderText = "RÔLE"
             If gridRoles.Columns.Contains("EstActif") Then gridRoles.Columns("EstActif").HeaderText = "ACTIF"
@@ -298,7 +299,7 @@ Namespace DevCommerc8ak
             ' Chargement des autorisations réelles
             Dim autorisations As DataTable = _service.ListerInterfacesParRole(_roleIdCourant.Value)
             Dim idsAutorises As New HashSet(Of Integer)()
-            
+
             For Each row As DataRow In autorisations.Rows
                 If Convert.ToBoolean(row("Autorise")) Then
                     idsAutorises.Add(Convert.ToInt32(row("InterfaceId")))

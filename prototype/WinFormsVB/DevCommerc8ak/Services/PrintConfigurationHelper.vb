@@ -9,6 +9,7 @@ Imports System.IO
 Imports System.Linq
 Imports System.Reflection
 Imports System.Windows.Forms
+Imports Microsoft.VisualBasic
 
 Namespace DevCommerc8ak
     Public NotInheritable Class PrintConfigurationHelper

@@ -213,6 +213,7 @@ Namespace DevCommerc8ak
                 .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, .GridColor = ColorBorder
             }
             dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245)
+            dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(245, 245, 245)
             dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
             dgv.ColumnHeadersHeight = 40
             dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(232, 234, 246)

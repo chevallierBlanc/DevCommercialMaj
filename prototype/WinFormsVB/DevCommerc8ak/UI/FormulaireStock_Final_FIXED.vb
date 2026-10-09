@@ -2,17 +2,19 @@ Option Strict On
 Option Explicit On
 
 Imports System
-Imports System.Diagnostics
-Imports Microsoft.VisualBasic
+Imports System.Collections.Generic
 Imports System.Configuration
 Imports System.Data
-Imports System.Collections.Generic
+Imports System.Diagnostics
 Imports System.Drawing
-Imports System.Globalization
-Imports System.Linq
-Imports System.Windows.Forms
 Imports System.Drawing.Drawing2D
 Imports System.Drawing.Printing
+Imports System.Globalization
+Imports System.IO
+Imports System.Linq
+Imports System.Windows.Forms
+Imports System.Windows.Forms.DataVisualization.Charting
+Imports Microsoft.VisualBasic
 
 Namespace DevCommerc8ak
     Public Class FormulaireStock
@@ -321,14 +323,14 @@ Namespace DevCommerc8ak
 
             ' Card 2: Unite
             Dim cardUnite As Panel = CreateCard(600, 235, "ENTRÉE / CONDITIONNEMENTS")
-            cmbUniteBase = New ComboBox() With {.Left = 160, .Top = 45, .Width = 150, .DropDownStyle = ComboBoxStyle.DropDownList}
+            cmbUniteBase = New ComboBox() With {.Left = 160, .Top = 45, .Width = 140, .DropDownStyle = ComboBoxStyle.DropDownList}
             cmbUniteBase.Items.AddRange(New Object() {"Carton", "Sac", "Paquet", "Farde", "Plateau", "Seau", "Bidon", "Bouteille", "Boîte", "Pièce"})
             txtNbUniteParBase = New TextBox() With {.Left = 160, .Top = 75, .Width = 100}
             txtQuantiteEntree = New TextBox() With {.Left = 160, .Top = 105, .Width = 100}
             txtQuantiteSecondaireEntree = New TextBox() With {.Left = 160, .Top = 135, .Width = 100}
             btnQuantitesConditionnementsEntree = New Button() With {.Text = "SAISIR PAR CONDITIONNEMENTS", .Left = 160, .Top = 165, .Width = 185, .Height = 28, .BackColor = ColorSecondary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             btnConfigurerConditionnementsEntree = New Button() With {.Text = "CONFIGURER LES CONDITIONNEMENTS", .Left = 355, .Top = 165, .Width = 220, .Height = 28, .BackColor = ColorPrimary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
-            lblQuantitesConditionnementsEntree = New Label() With {.Left = 20, .Top = 168, .Width = 550, .Height = 24, .ForeColor = ColorSecondary}
+            lblQuantitesConditionnementsEntree = New Label() With {.Left = 300, .Top = 158, .AutoSize = True, .ForeColor = ColorSecondary}
             cardProduit.Controls.AddRange(New Control() {btnQuantitesConditionnementsEntree, btnConfigurerConditionnementsEntree})
             cmbTypeGestionStockEntree = New ComboBox() With {.Left = 455, .Top = 45, .Width = 125, .DropDownStyle = ComboBoxStyle.DropDownList}
             cmbTypeGestionStockEntree.Items.AddRange(New Object() {"UNITE", "MESURE"})
@@ -340,8 +342,8 @@ Namespace DevCommerc8ak
             txtContenuUniteSecondaireEntree = New TextBox() With {.Left = 455, .Top = 135, .Width = 125}
             lblStockActuel = New Label() With {.Left = 20, .Top = 170, .AutoSize = True, .ForeColor = ColorSecondary}
             lblStockActuelPiece = New Label() With {.Left = 20, .Top = 190, .AutoSize = True}
-            lblStockApres = New Label() With {.Left = 300, .Top = 194, .AutoSize = True, .ForeColor = ColorAccent}
-            lblStockApresPiece = New Label() With {.Left = 300, .Top = 212, .AutoSize = True}
+            lblStockApres = New Label() With {.Left = 300, .Top = 170, .AutoSize = True, .ForeColor = ColorAccent}
+            lblStockApresPiece = New Label() With {.Left = 300, .Top = 190, .AutoSize = True}
             cardUnite.Controls.AddRange(New Control() {
                 New Label() With {.Text = "Unité d'achat", .Left = 20, .Top = 48, .AutoSize = True},
                 New Label() With {.Text = "Équiv. en base", .Left = 20, .Top = 78, .AutoSize = True},
@@ -351,7 +353,7 @@ Namespace DevCommerc8ak
                 New Label() With {.Text = "Unité mesure", .Left = 300, .Top = 78, .AutoSize = True},
                 New Label() With {.Text = "Contenu principal", .Left = 300, .Top = 108, .AutoSize = True},
                 New Label() With {.Text = "Contenu secondaire", .Left = 300, .Top = 138, .AutoSize = True},
-                cmbUniteBase, txtNbUniteParBase, txtQuantiteEntree, txtQuantiteSecondaireEntree, lblQuantitesConditionnementsEntree, cmbTypeGestionStockEntree, cmbUniteMesureStockEntree, txtContenuUnitePrincipaleEntree, txtContenuUniteSecondaireEntree, lblStockActuel, lblStockActuelPiece, lblStockApres, lblStockApresPiece
+                cmbUniteBase, txtNbUniteParBase, txtQuantiteEntree, txtQuantiteSecondaireEntree, cmbTypeGestionStockEntree, cmbUniteMesureStockEntree, txtContenuUnitePrincipaleEntree, txtContenuUniteSecondaireEntree, lblQuantitesConditionnementsEntree, lblStockActuel, lblStockActuelPiece, lblStockApres, lblStockApresPiece
             })
             'layoutEntree.Controls.Add(cardUnite)
 
@@ -409,7 +411,7 @@ Namespace DevCommerc8ak
             ' layoutEntree.Controls.Add(cardPrix)
 
             ' Card 5: Validation
-            Dim cardValidation As Panel = CreateCard(1220, 80, "VALIDATION")
+            Dim cardValidation As Panel = CreateCard(1220, 100, "VALIDATION")
             dtpDateEntree = New DateTimePicker() With {.Left = 120, .Top = 42, .Width = 165}
             txtObservationEntree = New TextBox() With {.Left = 405, .Top = 42, .Width = 360, .Anchor = AnchorStyles.Top Or AnchorStyles.Left}
             btnEnregistrerEntree = New Button() With {
@@ -837,7 +839,7 @@ Namespace DevCommerc8ak
                 .Margin = New Padding(0, 0, 20, 20)
             }
             Dim p As New Panel() With {.Dock = DockStyle.Fill, .BackColor = ColorCard, .Margin = New Padding(5), .Padding = New Padding(10)}
-            p.Controls.Add(New Label() With {.Text = title, .Font = FontLabel, .ForeColor = ColorPrimary, .AutoSize = True, .Top = 5, .Left = 10})
+            p.Controls.Add(New Label() With {.Text = title, .Font = FontLabel, .ForeColor = ColorSecondary, .AutoSize = True, .Top = -4, .Left = 10})
             Return p
         End Function
         Private Function CreateStyledGrid() As DataGridView
@@ -855,8 +857,9 @@ Namespace DevCommerc8ak
             }
             dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245)
             dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
-            dgv.ColumnHeadersHeight = 45
+            dgv.ColumnHeadersHeight = 40
             dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(232, 234, 246)
+            dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(245, 245, 245)
             dgv.DefaultCellStyle.SelectionForeColor = ColorPrimary
             dgv.DefaultCellStyle.Font = FontControl
             dgv.RowTemplate.Height = 35
@@ -2027,21 +2030,21 @@ Namespace DevCommerc8ak
                 Dim prixAchat As Decimal = Convert.ToDecimal(If(r.IsNull("PrixAchat"), "", Convert.ToDecimal(row("PrixAchat")).ToString()))
                 Dim prixGros As Decimal = Convert.ToDecimal(If(r.IsNull("PrixGros"), "", Convert.ToDecimal(row("PrixGros")).ToString()))
                 Dim prixDemi As Decimal = Convert.ToDecimal(If(r.IsNull("PrixDemi"), "", Convert.ToDecimal(row("PrixDemi")).ToString()))
-	                Dim prixDetail As Decimal = Convert.ToDecimal(If(r.IsNull("PrixDetail"), "", Convert.ToDecimal(row("PrixDetail")).ToString()))
-	                Dim prixQuart As Decimal = Convert.ToDecimal(If(r.IsNull("PrixQuart"), "", Convert.ToDecimal(row("PrixQuart")).ToString()))
-	                Dim prixDouzaine As Decimal = Convert.ToDecimal(If(r.IsNull("PrixDouzaine"), "", Convert.ToDecimal(row("PrixDouzaine")).ToString()))
-	                Dim prixSpecial As Decimal = Convert.ToDecimal(If(r.IsNull("PrixSpecial"), "", Convert.ToDecimal(row("PrixSpecial")).ToString()))
-	                Dim contenuUnitePrincipale As Decimal = LireDecimalTable(r, "ContenuUnitePrincipale")
-	                Dim contenuUniteSecondaire As Decimal = LireDecimalTable(r, "ContenuUniteSecondaire")
-	                Dim typeGestion As String = LireTexteCellule(r, "TypeGestionStock")
-	                Dim uniteSecondaire As String = LireTexteCellule(r, "UniteSecondaire")
+                Dim prixDetail As Decimal = Convert.ToDecimal(If(r.IsNull("PrixDetail"), "", Convert.ToDecimal(row("PrixDetail")).ToString()))
+                Dim prixQuart As Decimal = Convert.ToDecimal(If(r.IsNull("PrixQuart"), "", Convert.ToDecimal(row("PrixQuart")).ToString()))
+                Dim prixDouzaine As Decimal = Convert.ToDecimal(If(r.IsNull("PrixDouzaine"), "", Convert.ToDecimal(row("PrixDouzaine")).ToString()))
+                Dim prixSpecial As Decimal = Convert.ToDecimal(If(r.IsNull("PrixSpecial"), "", Convert.ToDecimal(row("PrixSpecial")).ToString()))
+                Dim contenuUnitePrincipale As Decimal = LireDecimalTable(r, "ContenuUnitePrincipale")
+                Dim contenuUniteSecondaire As Decimal = LireDecimalTable(r, "ContenuUniteSecondaire")
+                Dim typeGestion As String = LireTexteCellule(r, "TypeGestionStock")
+                Dim uniteSecondaire As String = LireTexteCellule(r, "UniteSecondaire")
 
-	                Dim venteDetail As Boolean = If(IsDBNull(row("VenteDetail")), False, Convert.ToInt32(row("VenteDetail")) = 1)
-	                Dim venteDemi As Boolean = If(IsDBNull(row("VenteDemi")), False, Convert.ToDecimal(row("VenteDemi")) = 1)
-	                Dim venteDouzaine As Boolean = If(IsDBNull(row("VenteDouzaine")), False, Convert.ToDecimal(row("VenteDouzaine")) = 1)
-	                Dim venteGros As Boolean = If(IsDBNull(row("VenteGros")), False, Convert.ToDecimal(row("VenteGros")) = 1)
+                Dim venteDetail As Boolean = If(IsDBNull(row("VenteDetail")), False, Convert.ToInt32(row("VenteDetail")) = 1)
+                Dim venteDemi As Boolean = If(IsDBNull(row("VenteDemi")), False, Convert.ToDecimal(row("VenteDemi")) = 1)
+                Dim venteDouzaine As Boolean = If(IsDBNull(row("VenteDouzaine")), False, Convert.ToDecimal(row("VenteDouzaine")) = 1)
+                Dim venteGros As Boolean = If(IsDBNull(row("VenteGros")), False, Convert.ToDecimal(row("VenteGros")) = 1)
 
-	                _typesVenteCourants = _typeVenteService.ConstruireTypesVentePourProduit(produitId, nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine, Nothing, contenuUnitePrincipale, contenuUniteSecondaire, typeGestion, uniteSecondaire)
+                _typesVenteCourants = _typeVenteService.ConstruireTypesVentePourProduit(produitId, nbUnites, prixAchat, prixGros, prixDemi, prixDetail, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine, Nothing, contenuUnitePrincipale, contenuUniteSecondaire, typeGestion, uniteSecondaire)
                 cmbTypeVente.DataSource = Nothing
                 cmbTypeVente.DisplayMember = "NomAffichage"
                 cmbTypeVente.ValueMember = "Nom"

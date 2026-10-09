@@ -577,9 +577,9 @@ Namespace DevCommerc8ak
             If IsDisposed OrElse Disposing OrElse Not IsHandleCreated Then Return
             Try
                 BeginInvoke(New MethodInvoker(Sub()
-                    If IsDisposed OrElse Disposing Then Return
-                    RafraichirProduitsDepuisEvenement(Nothing, EventArgs.Empty)
-                End Sub))
+                                                  If IsDisposed OrElse Disposing Then Return
+                                                  RafraichirProduitsDepuisEvenement(Nothing, EventArgs.Empty)
+                                              End Sub))
             Catch ex As ObjectDisposedException
                 Dim log As New ProductionLogService()
                 log.Warn("FacturationForm", "RafraichirProduitsDepuisVersionSql", "Formulaire fermé avant rafraîchissement multi-postes : " & ex.Message)

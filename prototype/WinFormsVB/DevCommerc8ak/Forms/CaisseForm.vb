@@ -140,6 +140,7 @@ Namespace DevCommerc8ak
             }
             gridFactures.ColumnHeadersDefaultCellStyle.BackColor = ColorSecondary
             gridFactures.ColumnHeadersDefaultCellStyle.ForeColor = ColorWhite
+            gridFactures.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(52, 73, 94)
             gridFactures.EnableHeadersVisualStyles = False
 
             pnlGauche.Controls.Add(gridFactures)
@@ -177,6 +178,7 @@ Namespace DevCommerc8ak
             }
             gridDetails.ColumnHeadersDefaultCellStyle.BackColor = ColorSecondary
             gridDetails.ColumnHeadersDefaultCellStyle.ForeColor = ColorWhite
+            gridDetails.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(52, 73, 94)
             gridDetails.EnableHeadersVisualStyles = False
 
             grpDetails.Controls.Add(gridDetails)
@@ -439,9 +441,9 @@ Namespace DevCommerc8ak
             If IsDisposed OrElse Disposing OrElse Not IsHandleCreated Then Return
             Try
                 BeginInvoke(New MethodInvoker(Sub()
-                    If IsDisposed OrElse Disposing Then Return
-                    RafraichirFacturesDepuisEvenement(Nothing, EventArgs.Empty)
-                End Sub))
+                                                  If IsDisposed OrElse Disposing Then Return
+                                                  RafraichirFacturesDepuisEvenement(Nothing, EventArgs.Empty)
+                                              End Sub))
             Catch ex As ObjectDisposedException
                 Dim log As New ProductionLogService()
                 log.Warn("CaisseForm", "RafraichirFacturesDepuisVersionSql", "Formulaire fermé avant rafraîchissement multi-postes : " & ex.Message)
@@ -785,7 +787,7 @@ Namespace DevCommerc8ak
                         y = MesurerTexteTicket(g, "Merci pour votre confiance", fontSection, largeurDisponible, y)
                         Dim nomApplication As String = If(String.IsNullOrWhiteSpace(Application.ProductName), "COMMERCIAL PRO", Application.ProductName)
                         y = MesurerTexteTicket(g, nomApplication & " - v" & PrintConfigurationHelper.ObtenirVersionApplication(), fontLigne, largeurDisponible, y)
-                        y = MesurerTexteTicket(g, "Développé par : Andy Ntanta", fontLigne, largeurDisponible, y)
+                        y = MesurerTexteTicket(g, "Développé par : Andy NTANTA", fontLigne, largeurDisponible, y)
                         y = MesurerTexteTicket(g, "Imprimé le " & Date.Now.ToString("dd/MM/yyyy HH:mm"), fontLigne, largeurDisponible, y)
                     End Using
 
@@ -910,7 +912,7 @@ Namespace DevCommerc8ak
             y = DessinerTexteCentre(e.Graphics, "Merci pour votre confiance", fontSection, gauche, largeurDisponible, y)
             Dim nomApplication As String = If(String.IsNullOrWhiteSpace(Application.ProductName), "COMMERCIAL PRO", Application.ProductName)
             y = DessinerTexteCentre(e.Graphics, nomApplication & " - v" & PrintConfigurationHelper.ObtenirVersionApplication(), fontLigne, gauche, largeurDisponible, y)
-            y = DessinerTexteCentre(e.Graphics, "Développé par : Andy Ntanta", fontLigne, gauche, largeurDisponible, y)
+            y = DessinerTexteCentre(e.Graphics, "Développé par : Andy NTANTA", fontLigne, gauche, largeurDisponible, y)
             y = DessinerTexteCentre(e.Graphics, "Imprimé le " & Date.Now.ToString("dd/MM/yyyy HH:mm"), fontLigne, gauche, largeurDisponible, y)
         End Sub
 

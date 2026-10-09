@@ -4,6 +4,7 @@ Option Explicit On
 Imports System.Collections.Generic
 Imports System.Configuration
 Imports System.Linq
+Imports System
 
 Namespace DevCommerc8ak
     Public Class ProduitConditionnementService

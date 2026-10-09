@@ -13,6 +13,7 @@ Imports System.Text
 Imports System.Windows.Forms
 Imports System.Drawing.Drawing2D
 Imports System.Data.SqlClient
+Imports Microsoft.VisualBasic
 
 Namespace DevCommerc8ak
     Public Class FormulaireStockInitialTechnique

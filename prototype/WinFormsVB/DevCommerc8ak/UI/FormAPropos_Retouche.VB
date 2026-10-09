@@ -117,7 +117,7 @@ Namespace DevCommerc8ak
             }
 
             Dim lblCopyright As New Label() With {
-                .Text = "© " & DateTime.Now.Year & " DevCommerc8ak. Tous droits réservés.",
+                .Text = "© " & DateTime.Now.Year & " DevCommercial. Tous droits réservés.",
                 .ForeColor = ColorTextSecondary,
                 .Font = New Font("Segoe UI", 8.5F),
                 .AutoSize = True,

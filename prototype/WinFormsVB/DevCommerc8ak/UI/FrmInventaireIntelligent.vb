@@ -713,6 +713,7 @@ Namespace DevCommerc8ak
                 .MultiSelect = False,
                 .Font = FontLabel
             }
+            dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(245, 245, 245)
             dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 247, 250)
             dgv.ColumnHeadersDefaultCellStyle.ForeColor = ColorPrimary
             dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
