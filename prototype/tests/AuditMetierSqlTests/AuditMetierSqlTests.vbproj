@@ -29,6 +29,7 @@
     <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueDelegationPrix.vb" Link="DialogueDelegationPrix.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ConfigurationModesService.vb" Link="ConfigurationModesService.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueModeTravail.vb" Link="DialogueModeTravail.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/CartesSecuriteAutorisations.vb" Link="CartesSecuriteAutorisations.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueConfigurationModes.vb" Link="DialogueConfigurationModes.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/AuditLogEntryDTO.vb" Link="AuditLogEntryDTO.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueAuditMetier.vb" Link="DialogueAuditMetier.vb" />

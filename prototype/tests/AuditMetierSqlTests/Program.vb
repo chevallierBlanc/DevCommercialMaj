@@ -30,6 +30,7 @@ Module Program
         ' Aucun fichier de connexion de production ne doit être repris par le banc.
         If ConfigurationManager.ConnectionStrings("CommercialMagDB") IsNot Nothing Then Throw New InvalidOperationException("Ne pas copier app.config de production dans le banc de tests.")
         dal = New DAL(cs)
+        Exec("IF NOT EXISTS(SELECT 1 FROM dbo.SchemaVersion WHERE Version=2026101301) THROW 51000, 'Migration integration 2026101301 requise sur la copie de test.', 1;")
         Verifier(Scalar("SELECT COUNT(*) FROM dbo.Parametres WHERE GestionModesActive=0 AND DelegationPrixActive=0") = 1, "Copie de test en parcours classique, migrations 0902/0903/0904 requises")
         Dim suffix As String = Guid.NewGuid().ToString("N").Substring(0, 12)
         Dim role As Integer = Scalar("INSERT dbo.Roles(NomRole,EstActif) VALUES('TEST_' + @s,1); SELECT CAST(SCOPE_IDENTITY() AS INT)", suffix)
@@ -108,6 +109,7 @@ Module Program
         Exec("CREATE TRIGGER dbo.TR_TEST_AuditFailure ON dbo.JournalAudit AFTER INSERT AS BEGIN THROW 51001, 'Panne audit simulée', 1; END")
         Try
             Dim f As FactureVente = NouvelleFacture(Guid.NewGuid().ToString("N"))
+            f.SousTotal = 10D : f.MontantTotal = 10D
             Refus(Of SqlException)(Sub() operations.Enregistrer(f, Lignes(1D), String.Empty, Nothing))
             Verifier(Scalar("SELECT COUNT(*) FROM dbo.FacturesVente WHERE NumeroFacture=@s", f.NumeroFacture) = 0, "Échec audit : rollback facture et lignes")
         Finally
@@ -166,9 +168,11 @@ Module Program
         Dim factureStock As FactureVente = NouvelleFacture(Guid.NewGuid().ToString("N"))
         Dim doublons As IList(Of LigneFactureVente) = Lignes(disponible * 0.75D)
         doublons.Add(Lignes(disponible * 0.75D)(0))
+        factureStock.SousTotal = doublons.Sum(Function(l) l.Quantite * l.PrixUnitaire)
+        factureStock.MontantTotal = factureStock.SousTotal
         Dim stockId As Integer = operations.Enregistrer(factureStock, doublons, "", Nothing)
         Try
-            caisse.EncaisserFacture(stockId, "ESPECES", "TEST", 20D, 0D, "FC", user)
+            caisse.EncaisserFacture(stockId, "ESPECES", "TEST", factureStock.MontantTotal, 0D, "FC", user)
             Throw New Exception("Stock négatif accepté.")
         Catch ex As Exception
             Verifier(ex.Message = "Stock insuffisant pour un produit.", "Besoin total des lignes du même produit contrôlé")
@@ -249,6 +253,7 @@ Module Program
             SessionUtilisateur.UtilisateurId = reviewer
             SessionUtilisateur.NomUtilisateur = "REV_" & suffix
             SessionUtilisateur.SessionId = Scalar("INSERT dbo.UtilisateurSessions(UtilisateurId,RoleIdActif,RoleSession,Poste) VALUES(" & reviewer.ToString() & "," & role.ToString() & ",'TEST','TEST'); SELECT CAST(SCOPE_IDENTITY() AS int)")
+            Dim reviewerSession As Integer = SessionUtilisateur.SessionId
             gagnants = 0 : perdants = 0
             Parallel.For(0, 2, Sub(i)
                                   Try
@@ -310,6 +315,67 @@ Module Program
             Verifier(Scalar("SELECT COUNT(*) FROM dbo.Paiements WHERE FactureVenteId=" & factureId.ToString() & " AND Montant=21 AND MontantRecu=25 AND MonnaieRendue=4 AND MontantRecuOrigine=25 AND TauxConversionApplique=1 AND DeviseMontants='FC'") = 1, "Paiement : reçu, affecté et rendu persistés séparément")
             Verifier(Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE EntiteId='" & factureId.ToString() & "' AND [Action]='ENCAISSEMENT_VALIDE' AND ModeActif='FACTURATION_ET_CAISSE' AND NouvellesValeurs LIKE '%EncaisseParNom%'") = 1, "Audit du mode combiné et des identités instantanées")
             Verifier(prix.Consulter(produitPrix, "piece").Prix = 20D, "L'exception facture ne modifie pas le tarif officiel")
+            Dim contexte As Guid = Guid.NewGuid()
+            Refus(Of UnauthorizedAccessException)(Sub() prix.DemanderException(prix.Consulter(produitPrix, "piece"), 27D, "Exception soumise", contexte, 1D))
+            Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & role.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface='PRIX_DEMANDER_FACTURE'")
+            Dim demandeArticle As Integer = prix.DemanderException(prix.Consulter(produitPrix, "piece"), 27D, "Exception pour cet article uniquement", contexte, 1D)
+            Dim pageDemandes As PageDemandesPrix = prix.ListerPage(0, 1, "PRIX TEST", "EN_ATTENTE", "FACTURIER")
+            Verifier(pageDemandes.Lignes.Rows.Count <= 1 AndAlso pageDemandes.Total >= 1, "Pagination et filtrage effectifs côté SQL")
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.DemandesModificationPrix WHERE DemandeId=" & demandeArticle.ToString() & " AND DATEDIFF(HOUR,DemandeLe,ExpireLe)=24 AND CoutReferenceDemande=10 AND Perimetre='FACTURE'") = 1, "Contexte, durée et coût de la demande persistés")
+            Dim sessionCombinee As Integer = SessionUtilisateur.SessionId
+            SessionUtilisateur.UtilisateurId = reviewer : SessionUtilisateur.NomUtilisateur = "REV_" & suffix : SessionUtilisateur.SessionId = reviewerSession
+            prix.Decider(demandeArticle, True, "Prix exceptionnel approuvé, pas de nouveau tarif")
+            SessionUtilisateur.UtilisateurId = user : SessionUtilisateur.NomUtilisateur = "TEST_" & suffix : SessionUtilisateur.SessionId = sessionCombinee
+            Verifier(prix.Consulter(produitPrix, "piece").Prix = 20D, "Approbation facture sans changement du tarif officiel")
+            Refus(Of InvalidOperationException)(Sub() prix.LireExceptionApprouvee(produitPrix, "piece", Guid.NewGuid(), 1D))
+            Refus(Of InvalidOperationException)(Sub() prix.LireExceptionApprouvee(produitPrix, "piece", contexte, 2D))
+            Dim approuvee As LigneFactureVente = prix.LireExceptionApprouvee(produitPrix, "piece", contexte, 1D).Ligne
+            approuvee.QuantiteBase = 1D
+            Dim venteApprouvee As FactureVente = NouvelleFacture("EXCEPTION_" & suffix)
+            venteApprouvee.SousTotal = 27D : venteApprouvee.MontantTotal = 27D
+            Dim enregistrerException As New FactureOperationService(dal)
+            Exec("CREATE TRIGGER dbo.TR_TEST_AuditFailure ON dbo.JournalAudit AFTER INSERT AS BEGIN THROW 51001, 'Panne audit simulée', 1; END")
+            Try
+                Refus(Of SqlException)(Sub() enregistrerException.Enregistrer(venteApprouvee, New List(Of LigneFactureVente) From {approuvee}, "", Nothing))
+            Finally
+                Exec("DROP TRIGGER dbo.TR_TEST_AuditFailure")
+            End Try
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.DemandesModificationPrix WHERE DemandeId=" & demandeArticle.ToString() & " AND UtiliseeLe IS NULL") = 1, "Échec d'audit : consommation annulée")
+            Dim factureExceptionId As Integer = enregistrerException.Enregistrer(venteApprouvee, New List(Of LigneFactureVente) From {approuvee}, "", Nothing)
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.DemandesModificationPrix WHERE DemandeId=" & demandeArticle.ToString() & " AND UtiliseeLe IS NOT NULL AND FactureUtilisationId=" & factureExceptionId.ToString()) = 1, "Approbation consommée dans la transaction facture")
+            Refus(Of InvalidOperationException)(Sub() prix.LireExceptionApprouvee(produitPrix, "piece", contexte, 1D))
+            Dim editee As DataTable = New LigneFactureVenteRepository(dal).ListerDetailsPourEdition(factureExceptionId)
+            Verifier(DirectCast(editee.Rows(0)("ContextePrix"), Guid) = contexte, "Brouillon rechargé : contexte exact conservé")
+            Dim remiseModifiee As FactureVente = NouvelleFacture("EXCEPTION_" & suffix)
+            remiseModifiee.FactureVenteId = factureExceptionId : remiseModifiee.SousTotal = 27D
+            remiseModifiee.MontantRemise = 1D : remiseModifiee.MontantTotal = 26D
+            Refus(Of UnauthorizedAccessException)(Sub() enregistrerException.Enregistrer(remiseModifiee, New List(Of LigneFactureVente) From {approuvee}, "Modification de remise non approuvée", enregistrerException.LireVersion(factureExceptionId)))
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.FacturesVente WHERE FactureVenteId=" & factureExceptionId.ToString() & " AND MontantTotal=27 AND MontantRemise=0") = 1, "Contexte de remise protégé après approbation")
+            Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & role.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface='SUPERADMIN_ROLES'")
+            Dim rolesRepo As New SuperAdminRepository(dal)
+            Dim donneesRole As DataRow = rolesRepo.ListerRoles().Rows.Cast(Of DataRow)().Single(Function(r) CInt(r("RoleId")) = role)
+            Dim versionRole As Byte() = DirectCast(donneesRole("VersionAutorisations"), Byte())
+            Dim droitsRole As New List(Of Integer)()
+            Dim dtDroits As DataTable = dal.ExecuterTable("SELECT InterfaceId FROM dbo.RoleInterfaces WHERE RoleId=@r", CommandType.Text, New List(Of SqlParameter) From {New SqlParameter("@r", role)})
+            For Each row As DataRow In dtDroits.Rows
+                droitsRole.Add(CInt(row("InterfaceId")))
+            Next
+            Refus(Of ArgumentException)(Sub() rolesRepo.EnregistrerRole(role, "TEST_" & suffix, True, droitsRole, " ", versionRole))
+            rolesRepo.EnregistrerRole(role, "TEST_" & suffix, True, droitsRole, "Configuration explicite des privilèges", versionRole)
+            Refus(Of DBConcurrencyException)(Sub() rolesRepo.EnregistrerRole(role, "TEST_" & suffix, True, droitsRole, "Ancien éditeur concurrent", versionRole))
+            donneesRole = rolesRepo.ListerRoles().Rows.Cast(Of DataRow)().Single(Function(r) CInt(r("RoleId")) = role)
+            versionRole = DirectCast(donneesRole("VersionAutorisations"), Byte())
+            Dim droitPrix As Integer = Scalar("SELECT InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface='PRIX_DEMANDER_FACTURE'")
+            droitsRole.Remove(droitPrix)
+            rolesRepo.EnregistrerRole(role, "TEST_" & suffix, True, droitsRole, "Retrait explicite du droit de demande facture", versionRole)
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.RoleInterfaces WHERE RoleId=" & role.ToString() & " AND InterfaceId=" & droitPrix.ToString()) = 0, "Permission retirée conservée comme retirée")
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE Entite='Role' AND EntiteId='" & role.ToString() & "' AND [Action]='PERMISSION_MODIFIEE' AND AnciennesValeurs LIKE '%PRIX_DEMANDER_FACTURE%' AND NouvellesValeurs NOT LIKE '%PRIX_DEMANDER_FACTURE%'") >= 1, "Permissions : différences exactes auditées dans la transaction")
+            Dim typePersonnel As Integer = Scalar("INSERT dbo.TypesVenteProduit(ProduitId,Nom,QuantiteEquivalent,TypeUniteEquivalent,TypeQuantiteEquivalent,ModePrix,Coefficient,PrixVente,Actif) VALUES(" & produitPrix.ToString() & ",'piece',6,'SECONDAIRE','SECONDAIRE','coefficient',2,123,1); SELECT CAST(SCOPE_IDENTITY() AS int)")
+            Refus(Of InvalidOperationException)(Sub() prix.Consulter(produitPrix, "piece"))
+            Dim personnel As TarifDelegue = prix.Consulter(produitPrix, "piece", typePersonnel)
+            Verifier(personnel.Prix = 120D AndAlso personnel.TypeId = typePersonnel, "Type personnalisé homonyme et coefficient insensible à la casse")
+            prix.Modifier(personnel, 125D, "Tarif personnalisé uniquement", False)
+            Verifier(prix.Consulter(produitPrix, "piece", 0).Prix = 20D AndAlso prix.Consulter(produitPrix, "piece", typePersonnel).Prix = 125D, "Tarif officiel standard intact, prix personnalisé appliqué effectivement")
         Finally
             SessionUtilisateur.UtilisateurId = user
             SessionUtilisateur.NomUtilisateur = "TEST_" & suffix

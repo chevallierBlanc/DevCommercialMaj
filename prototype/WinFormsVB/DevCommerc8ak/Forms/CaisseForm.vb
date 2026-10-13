@@ -11,6 +11,32 @@ Imports System.Windows.Forms
 Namespace DevCommerc8ak
     Public Class CaisseForm
         Inherits Form
+        Implements ISortieSessionControlee
+
+        Public Function AutoriserSortie() As Boolean Implements ISortieSessionControlee.AutoriserSortie
+            If _encaissementEnCours Then
+                MessageBox.Show(Me, "L'encaissement est en cours. Attendez son résultat avant de quitter.", "Paiement en cours", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return False
+            End If
+            Return True
+        End Function
+
+        Public Sub SelectionnerFacture(id As Integer)
+            ' Le portail transmet l'ID valide, jamais la ligne actuellement
+            ' selectionnee d'une autre facture ou un numero approximatif.
+            txtRecherche.Text = "" : chkDate.Checked = False
+            ChargerFactures(Me, EventArgs.Empty)
+            For Each ligne As DataGridViewRow In gridFactures.Rows
+                If SafeIntegerCell(CellValueByProperty(ligne, "FactureVenteId")) = id Then
+                    ligne.Selected = True
+                    gridFactures.CurrentCell = ligne.Cells("NumeroFacture")
+                    ChargerDetails(Me, EventArgs.Empty)
+                    Return
+                End If
+            Next
+            AnnulerSelection(Me, EventArgs.Empty)
+            Throw New InvalidOperationException("Cette facture n'est plus en attente. Actualisez son état avant tout encaissement.")
+        End Sub
 
         ' --- Couleurs du Thème ---
         Private ReadOnly ColorPrimary As Color = Color.FromArgb(41, 128, 185) ' Bleu Moderne

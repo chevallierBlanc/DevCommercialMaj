@@ -12,6 +12,11 @@ Imports System.Collections.Generic
 Namespace DevCommerc8ak
     Public Class FormulaireParametres
         Inherits Form
+        Implements ISortieSessionControlee
+
+        Public Function AutoriserSortie() As Boolean Implements ISortieSessionControlee.AutoriserSortie
+            Return cartesSecurite Is Nothing OrElse cartesSecurite.PeutQuitter
+        End Function
 
         ' --- Constantes de Design Windows 11 ---
         Private ReadOnly ColorPrimary As Color = Color.FromArgb(0, 120, 212) ' Windows Blue
@@ -65,6 +70,8 @@ Namespace DevCommerc8ak
         Private ReadOnly lblHeroSousTitre As Label
         Private ReadOnly mainTableLayout As TableLayoutPanel
         Private ReadOnly flowFooter As FlowLayoutPanel
+        Private ReadOnly cartesSecurite As CartesSecuriteAutorisations
+        Private ReadOnly tabSecurite As TabPage
 
         Public Sub New()
             ' Configuration de base du formulaire
@@ -92,36 +99,9 @@ Namespace DevCommerc8ak
             Dim tabScan As New TabPage("Scanner IP") With {.BackColor = ColorBackground}
 
             tabs.TabPages.AddRange({tabGeneral, tabProduits, tabImprimantes, tabMonnaie, tabScan})
-            Dim tabSecurite As New TabPage("Sécurité et autorisations") With {.BackColor = ColorBackground}
-            Dim configModes As Button = CreateStyledButton("Configurer les modes de travail", ColorPrimary, 320, 40)
-            configModes.Location = New Point(24, 24)
-            AddHandler configModes.Click, Sub()
-                                              Try
-                                                  DialogueConfigurationModes.Afficher(Me, New ConfigurationModesService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)))
-                                              Catch ex As Exception
-                                                  MessageBox.Show(Me, ex.Message, "Modes de travail", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-                                              End Try
-                                          End Sub
-            tabSecurite.Controls.Add(configModes)
-            Dim configPrix As Button = CreateStyledButton("Configurer la délégation des prix", ColorPrimary, 320, 40)
-            configPrix.Location = New Point(24, 82)
-            AddHandler configPrix.Click, Sub()
-                                             Try
-                                                 DialogueDelegationPrix.Configurer(Me, New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)))
-                                             Catch ex As Exception
-                                                 MessageBox.Show(Me, ex.Message, "Délégation des prix", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-                                             End Try
-                                         End Sub
-            Dim demandesPrix As Button = CreateStyledButton("Demandes de modification de prix", ColorPrimary, 320, 40)
-            demandesPrix.Location = New Point(24, 140)
-            AddHandler demandesPrix.Click, Sub()
-                                               Try
-                                                   DialogueDelegationPrix.Demandes(Me, New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)))
-                                               Catch ex As Exception
-                                                   MessageBox.Show(Me, ex.Message, "Demandes de prix", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-                                               End Try
-                                           End Sub
-            tabSecurite.Controls.AddRange(New Control() {configPrix, demandesPrix})
+            tabSecurite = New TabPage("Sécurité et autorisations") With {.BackColor = ColorBackground}
+            cartesSecurite = New CartesSecuriteAutorisations(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString))
+            tabSecurite.Controls.Add(cartesSecurite)
             tabs.TabPages.Add(tabSecurite)
 
             ' --- INITIALISATION DES COMPOSANTS (Noms conservés) ---
@@ -260,6 +240,7 @@ Namespace DevCommerc8ak
             AddHandler btnTestImprimanteTicket.Click, AddressOf TesterImprimanteTicket
             AddHandler btnCharger.Click, AddressOf Charger
             AddHandler btnEnregistrer.Click, AddressOf Enregistrer
+            AddHandler tabs.SelectedIndexChanged, Sub() btnEnregistrer.Text = If(tabs.SelectedTab Is tabSecurite, "Enregistrer la sécurité", "Enregistrer les modifications")
 
             ' --- Initialisation ---
             ChargerImprimantes()
@@ -321,7 +302,11 @@ Namespace DevCommerc8ak
             Return New ParametreService(repo)
         End Function
 
-        Private Sub Charger(sender As Object, e As EventArgs)
+        Private Async Sub Charger(sender As Object, e As EventArgs)
+            If tabs.SelectedTab Is tabSecurite Then
+                Await cartesSecurite.ChargerAsync()
+                Return
+            End If
             Try
                 Dim service As ParametreService = ObtenirService()
                 Dim p As ParametreDTO = service.Charger()
@@ -360,8 +345,13 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
-        Private Sub Enregistrer(sender As Object, e As EventArgs)
+        Private Async Sub Enregistrer(sender As Object, e As EventArgs)
             Try
+                If tabs.SelectedTab Is tabSecurite Then
+                    btnEnregistrer.Enabled = False
+                    Await cartesSecurite.EnregistrerAsync(Me)
+                    Return
+                End If
                 Dim service As ParametreService = ObtenirService()
                 Dim parametresExistants As ParametreDTO = service.Charger()
                 Dim intervalleBackup As Integer
@@ -408,6 +398,8 @@ Namespace DevCommerc8ak
                 MessageBox.Show("Parametres enregistres.")
             Catch ex As Exception
                 MessageBox.Show("Erreur enregistrement parametres: " & ex.Message)
+            Finally
+                btnEnregistrer.Enabled = True
             End Try
         End Sub
 

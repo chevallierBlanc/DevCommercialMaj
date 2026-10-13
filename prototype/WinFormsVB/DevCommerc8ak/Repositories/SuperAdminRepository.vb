@@ -117,7 +117,7 @@ Namespace DevCommerc8ak
 
         Public Function ListerRoles() As DataTable
             AssurerInfrastructure()
-            Return _dal.ExecuterTable("SELECT RoleId, NomRole, ISNULL(EstActif, 1) AS EstActif FROM dbo.Roles ORDER BY NomRole", CommandType.Text, Nothing)
+            Return _dal.ExecuterTable("SELECT RoleId, NomRole, ISNULL(EstActif, 1) AS EstActif,VersionAutorisations FROM dbo.Roles ORDER BY NomRole", CommandType.Text, Nothing)
         End Function
 
         Public Function ListerInterfaces() As DataTable
@@ -165,8 +165,8 @@ Namespace DevCommerc8ak
             Return Convert.ToInt32(_dal.ExecuterScalaire(sql, CommandType.Text, p)) > 0
         End Function
 
-        Public Sub EnregistrerRole(roleId As Integer?, nomRole As String, estActif As Boolean, interfaceIds As IEnumerable(Of Integer))
-            AssurerInfrastructure()
+        Public Sub EnregistrerRole(roleId As Integer?, nomRole As String, estActif As Boolean, interfaceIds As IEnumerable(Of Integer), motif As String, Optional versionAttendue As Byte() = Nothing)
+            motif = AuditMetierService.ValiderMotif(motif)
             If RoleExisteDeja(nomRole, roleId) Then
                 Throw New InvalidOperationException("Un rôle portant ce nom existe déjà.")
             End If
@@ -176,8 +176,16 @@ Namespace DevCommerc8ak
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
                     Try
+                        AutorisationActionService.Exiger(cn, tx, "SUPERADMIN_ROLES", "SUPERADMIN_ROLES")
+                        Dim avant As Object = If(roleId.HasValue, LireRoleAudit(cn, tx, roleId.Value), Nothing)
                         Dim roleIdFinal As Integer
                         If roleId.HasValue AndAlso roleId.Value > 0 Then
+                            Using version As New SqlCommand("SELECT VersionAutorisations FROM dbo.Roles WITH(UPDLOCK,HOLDLOCK) WHERE RoleId=@id", cn, tx)
+                                version.Parameters.AddWithValue("@id", roleId.Value)
+                                Dim actuelle As Object = version.ExecuteScalar()
+                                If actuelle Is Nothing Then Throw New InvalidOperationException("Rôle introuvable.")
+                                AuditMetierRegles.VerifierVersion(versionAttendue, DirectCast(actuelle, Byte()))
+                            End Using
                             Using cmdUpdate As New SqlCommand("UPDATE dbo.Roles SET NomRole=@NomRole, EstActif=@EstActif WHERE RoleId=@RoleId", cn, tx)
                                 cmdUpdate.Parameters.AddWithValue("@NomRole", nomRole)
                                 cmdUpdate.Parameters.AddWithValue("@EstActif", estActif)
@@ -208,14 +216,40 @@ Namespace DevCommerc8ak
                             Next
                         End If
 
+                        Using maintien As New SqlCommand("SELECT COUNT(*) FROM dbo.Roles r WITH(HOLDLOCK) JOIN dbo.RoleInterfaces ri WITH(HOLDLOCK) ON ri.RoleId=r.RoleId JOIN dbo.InterfacesApplication i ON i.InterfaceId=ri.InterfaceId WHERE ISNULL(r.EstActif,1)=1 AND i.EstActif=1 AND i.CodeInterface='SUPERADMIN_ROLES' AND EXISTS(SELECT 1 FROM dbo.UtilisateurRoles ur JOIN dbo.Utilisateurs u ON u.UtilisateurId=ur.UtilisateurId WHERE ur.RoleId=r.RoleId AND ur.EstActif=1 AND u.EstActif=1 AND u.EstVerrouille=0)", cn, tx)
+                            If CInt(maintien.ExecuteScalar()) = 0 Then Throw New InvalidOperationException("Le dernier accès actif à la gestion des rôles ne peut pas être retiré. Aucun droit n'a été réattribué : l'opération entière est refusée.")
+                        End Using
+                        AuditMetierService.Enregistrer(cn, tx, "PERMISSION_MODIFIEE", "AUTORISATIONS", "Role", roleIdFinal, nomRole, avant, LireRoleAudit(cn, tx, roleIdFinal), motif, Guid.NewGuid())
                         tx.Commit()
                     Catch
-                        tx.Rollback()
+                        If tx.Connection IsNot Nothing Then tx.Rollback()
                         Throw
                     End Try
                 End Using
             End Using
         End Sub
+
+        Private Shared Function LireRoleAudit(cn As SqlConnection, tx As SqlTransaction, id As Integer) As Object
+            Dim nom As String
+            Dim actif As Boolean
+            Using cmd As New SqlCommand("SELECT NomRole,ISNULL(EstActif,1) FROM dbo.Roles WITH(UPDLOCK,HOLDLOCK) WHERE RoleId=@id", cn, tx)
+                cmd.Parameters.AddWithValue("@id", id)
+                Using r As SqlDataReader = cmd.ExecuteReader()
+                    If Not r.Read() Then Throw New InvalidOperationException("Rôle introuvable.")
+                    nom = Convert.ToString(r(0)) : actif = CBool(r(1))
+                End Using
+            End Using
+            Dim droits As New List(Of String)()
+            Using cmd As New SqlCommand("SELECT i.CodeInterface FROM dbo.RoleInterfaces ri WITH(UPDLOCK,HOLDLOCK) JOIN dbo.InterfacesApplication i ON i.InterfaceId=ri.InterfaceId WHERE ri.RoleId=@id ORDER BY i.CodeInterface", cn, tx)
+                cmd.Parameters.AddWithValue("@id", id)
+                Using r As SqlDataReader = cmd.ExecuteReader()
+                    While r.Read()
+                        droits.Add(Convert.ToString(r(0)))
+                    End While
+                End Using
+            End Using
+            Return New With {.Role = nom, .Actif = actif, .Permissions = droits}
+        End Function
 
         Public Function RoleExisteDeja(nomRole As String, roleIdExclu As Integer?) As Boolean
             Dim sql As String = "SELECT COUNT(*) FROM dbo.Roles WHERE UPPER(NomRole)=@NomRole AND (@RoleIdExclu IS NULL OR RoleId<>@RoleIdExclu)"

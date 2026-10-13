@@ -12,6 +12,19 @@ Namespace DevCommerc8ak
         Private Shared _infrastructureAssuree As Boolean
         Private Shared ReadOnly _lockObj As New Object()
 
+        Friend Shared Sub Touch(cn As SqlConnection, tx As SqlTransaction, ParamArray domaines As String())
+            ' La notification multi-postes appartient a la transaction du tarif.
+            ' Si elle echoue, le prix et l'audit ne sont pas annonces comme valides.
+            For Each domaine As String In domaines
+                Using cmd As New SqlCommand("IF EXISTS(SELECT 1 FROM dbo.AppDataVersions WITH(UPDLOCK,HOLDLOCK) WHERE Domaine=@d) UPDATE dbo.AppDataVersions SET VersionCourante=VersionCourante+1,ModifieLe=SYSDATETIME(),ModifiePar=@u,Poste=@poste WHERE Domaine=@d ELSE INSERT dbo.AppDataVersions(Domaine,VersionCourante,ModifiePar,Poste) VALUES(@d,1,@u,@poste)", cn, tx)
+                    cmd.Parameters.AddWithValue("@d", domaine.Trim().ToUpperInvariant())
+                    cmd.Parameters.AddWithValue("@u", SessionUtilisateur.NomUtilisateur)
+                    cmd.Parameters.AddWithValue("@poste", Environment.MachineName)
+                    cmd.ExecuteNonQuery()
+                End Using
+            Next
+        End Sub
+
         Public Shared Sub Touch(ParamArray domaines As String())
             If domaines Is Nothing OrElse domaines.Length = 0 Then Return
             Try

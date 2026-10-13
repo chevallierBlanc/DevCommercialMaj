@@ -386,7 +386,9 @@ Namespace DevCommerc8ak
 
             _moduleInitialCharge = True
 
-            If SessionUtilisateur.ModeActif = "FACTURATION" OrElse SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE" Then
+            If SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE" Then
+                LoadForm(New FacturationEtCaisseForm())
+            ElseIf SessionUtilisateur.ModeActif = "FACTURATION" Then
                 LoadForm(New FacturationForm())
             ElseIf SessionUtilisateur.ModeActif = "CAISSE" Then
                 LoadForm(New CaisseForm())
@@ -670,6 +672,10 @@ Namespace DevCommerc8ak
                     f.Dispose()
                     Return
                 End If
+            End If
+            If Not AutoriserSortieModule() Then
+                f.Dispose()
+                Return
             End If
             If panelContent.ClientSize.Width <= 0 OrElse panelContent.ClientSize.Height <= 0 Then
                 If Me.IsHandleCreated Then
@@ -981,6 +987,16 @@ Namespace DevCommerc8ak
 
         Private Sub Deconnecter(sender As Object, e As EventArgs)
             If MessageBox.Show("Voulez-vous vraiment vous déconnecter ?", "Déconnexion", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.No Then Return
+            If Not AutoriserSortieModule() Then Return
+            Try
+                If SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE" Then
+                    Dim modesService As New ModeTravailService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString))
+                    modesService.TracerSortieCombinee()
+                End If
+            Catch ex As Exception
+                MessageBox.Show("La sortie n'a pas été journalisée : " & ex.Message)
+                Return
+            End Try
 
             _deconnexionEnCours = True
             ApplicationLifecycle.RequestReturnToLogin()
@@ -988,7 +1004,7 @@ Namespace DevCommerc8ak
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
                 Dim repo As New SessionRepository(dal)
-                repo.FermerSession(SessionUtilisateur.SessionId)
+                If SessionUtilisateur.ModeActif <> "FACTURATION_ET_CAISSE" Then repo.FermerSession(SessionUtilisateur.SessionId)
             Catch
             End Try
             Me.Hide()
@@ -1000,6 +1016,14 @@ Namespace DevCommerc8ak
         Public Sub DeconnecterDepuisModuleSession()
             Deconnecter(Me, EventArgs.Empty)
         End Sub
+
+        Private Function AutoriserSortieModule() As Boolean
+            For Each controle As Control In panelContent.Controls
+                Dim protege As ISortieSessionControlee = TryCast(controle, ISortieSessionControlee)
+                If protege IsNot Nothing AndAlso Not protege.AutoriserSortie() Then Return False
+            Next
+            Return True
+        End Function
 
         Private Sub FermerFormulairesSession()
             Try
@@ -1098,14 +1122,22 @@ Namespace DevCommerc8ak
         ''' Afficher factureir
         ''' </summary>
         Private Sub AfficherFacturier(sender As Object, e As EventArgs)
-            LoadForm(New FacturationForm())
+            If SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE" Then
+                LoadForm(New FacturationEtCaisseForm())
+            Else
+                LoadForm(New FacturationForm())
+            End If
         End Sub
 
         ''' <summary>
         ''' Afficher caisse
         ''' </summary>
         Private Sub AfficherCaisse(sender As Object, e As EventArgs)
-            LoadForm(New CaisseForm())
+            If SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE" Then
+                LoadForm(New FacturationEtCaisseForm())
+            Else
+                LoadForm(New CaisseForm())
+            End If
         End Sub
 
         Private Sub AfficherFinance(sender As Object, e As EventArgs)
@@ -1121,6 +1153,20 @@ Namespace DevCommerc8ak
         End Sub
 
         Protected Overrides Sub OnFormClosing(e As FormClosingEventArgs)
+            If Not _deconnexionEnCours AndAlso Not AutoriserSortieModule() Then
+                e.Cancel = True
+                Return
+            End If
+            If Not _deconnexionEnCours AndAlso SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE" Then
+                Try
+                    Dim modesService As New ModeTravailService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString))
+                    modesService.TracerSortieCombinee()
+                Catch ex As Exception
+                    e.Cancel = True
+                    MessageBox.Show("La sortie du mode combiné n'a pas été confirmée : " & ex.Message)
+                    Return
+                End Try
+            End If
             Try
                 If timer IsNot Nothing Then
                     timer.Stop()
@@ -1160,7 +1206,7 @@ Namespace DevCommerc8ak
                     Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                     Dim dal As New DAL(cs)
                     Dim repo As New SessionRepository(dal)
-                    repo.FermerSession(SessionUtilisateur.SessionId)
+                    If SessionUtilisateur.ModeActif <> "FACTURATION_ET_CAISSE" Then repo.FermerSession(SessionUtilisateur.SessionId)
                 End If
             Catch
             End Try

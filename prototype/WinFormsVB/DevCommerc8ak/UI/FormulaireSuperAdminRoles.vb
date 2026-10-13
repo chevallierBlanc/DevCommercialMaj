@@ -31,6 +31,7 @@ Namespace DevCommerc8ak
 
         ' --- Données ---
         Private _roleIdCourant As Integer?
+        Private _versionRole As Byte()
         Private _interfaces As DataTable
 
         ' --- Palette de Couleurs Enterprise ERP ---
@@ -277,6 +278,7 @@ Namespace DevCommerc8ak
 
             If gridRoles.Columns.Contains("RoleId") Then gridRoles.Columns("RoleId").Visible = False
             If gridRoles.Columns.Contains("NomRole") Then gridRoles.Columns("NomRole").HeaderText = "RÔLE"
+            If gridRoles.Columns.Contains("VersionAutorisations") Then gridRoles.Columns("VersionAutorisations").Visible = False
             If gridRoles.Columns.Contains("EstActif") Then gridRoles.Columns("EstActif").HeaderText = "ACTIF"
             UpdateDeleteButtonState()
         End Sub
@@ -288,6 +290,7 @@ Namespace DevCommerc8ak
             If rowView Is Nothing Then Return
 
             _roleIdCourant = Convert.ToInt32(rowView("RoleId"))
+            _versionRole = DirectCast(rowView("VersionAutorisations"), Byte())
             txtNomRole.Text = Convert.ToString(rowView("NomRole"))
             chkActif.Checked = Convert.ToBoolean(rowView("EstActif"))
 
@@ -318,6 +321,7 @@ Namespace DevCommerc8ak
 
         Private Sub NouveauRole(sender As Object, e As EventArgs)
             _roleIdCourant = Nothing
+            _versionRole = Nothing
             txtNomRole.Clear()
             chkActif.Checked = True
             For i As Integer = 0 To clbInterfaces.Items.Count - 1
@@ -356,7 +360,9 @@ Namespace DevCommerc8ak
 
             Try
                 Me.Cursor = Cursors.WaitCursor
-                _service.EnregistrerRole(_roleIdCourant, nomRole, chkActif.Checked, interfaceIds)
+                Dim motif As String = DialogueMotifOperation.Demander(Me, "Motif du changement des privilèges")
+                If motif Is Nothing Then Return
+                _service.EnregistrerRole(_roleIdCourant, nomRole, chkActif.Checked, interfaceIds, motif, _versionRole)
                 ChargerRoles()
                 AppEvents.OnRolePermissionsChanged()
                 MessageBox.Show("Le rôle et ses privilèges ont été enregistrés avec succès.", "Succès", MessageBoxButtons.OK, MessageBoxIcon.Information)

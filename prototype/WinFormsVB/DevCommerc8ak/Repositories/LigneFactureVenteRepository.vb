@@ -24,8 +24,8 @@ Namespace DevCommerc8ak
 
         ' Cree une ligne de facture et retourne son identifiant.
         Public Function Ajouter(ligne As LigneFactureVente, Optional cn As SqlConnection = Nothing, Optional tx As SqlTransaction = Nothing) As Integer
-            Dim sql As String = "INSERT INTO LignesFactureVente (FactureVenteId, ProduitId, Quantite,QuantiteBase,TypeVente, PrixUnitaire, MontantRemise, MontantLigne, QuantiteSaisie, CoutUnitaireBaseVente,MotifPrixException) " &
-                                "VALUES (@FactureVenteId, @ProduitId, @Quantite,@QuantiteBase, @TypeVente, @PrixUnitaire, @MontantRemise, @MontantLigne, @QuantiteSaisie, @CoutUnitaireBaseVente,@MotifPrixException); " &
+            Dim sql As String = "INSERT INTO LignesFactureVente (FactureVenteId, ProduitId, Quantite,QuantiteBase,TypeVente, PrixUnitaire, MontantRemise, MontantLigne, QuantiteSaisie, CoutUnitaireBaseVente,MotifPrixException,DemandePrixId,ContextePrix,TypeTarifId) " &
+                                "VALUES (@FactureVenteId, @ProduitId, @Quantite,@QuantiteBase, @TypeVente, @PrixUnitaire, @MontantRemise, @MontantLigne, @QuantiteSaisie, @CoutUnitaireBaseVente,@MotifPrixException,@DemandePrixId,@ContextePrix,@TypeTarifId); " &
                                 "SELECT CAST(SCOPE_IDENTITY() AS INT);"
 
             Dim p As New List(Of SqlParameter) From {
@@ -39,7 +39,10 @@ Namespace DevCommerc8ak
                 New SqlParameter("@MontantLigne", ligne.MontantLigne),
                 New SqlParameter("@QuantiteSaisie", If(ligne.QteSaisie.HasValue, CType(ligne.QteSaisie.Value, Object), DBNull.Value)),
                 New SqlParameter("@CoutUnitaireBaseVente", If(ligne.CoutUnitaireBaseVente.HasValue, CType(ligne.CoutUnitaireBaseVente.Value, Object), DBNull.Value)),
-                New SqlParameter("@MotifPrixException", If(String.IsNullOrWhiteSpace(ligne.MotifPrixException), CType(DBNull.Value, Object), ligne.MotifPrixException))
+                New SqlParameter("@MotifPrixException", If(String.IsNullOrWhiteSpace(ligne.MotifPrixException), CType(DBNull.Value, Object), ligne.MotifPrixException)),
+                New SqlParameter("@DemandePrixId", If(ligne.DemandePrixId.HasValue, CType(ligne.DemandePrixId.Value, Object), DBNull.Value)),
+                New SqlParameter("@ContextePrix", If(ligne.ContextePrix.HasValue, CType(ligne.ContextePrix.Value, Object), DBNull.Value)),
+                New SqlParameter("@TypeTarifId", If(ligne.TypeTarifId.HasValue, CType(ligne.TypeTarifId.Value, Object), DBNull.Value))
             }
 
             Dim id As Object
@@ -84,6 +87,29 @@ Namespace DevCommerc8ak
                 "FROM LignesFactureVente l JOIN Produits p ON p.ProduitId = l.ProduitId WHERE l.FactureVenteId = @FactureVenteId ORDER BY l.LigneFactureVenteId"
             Dim p As New List(Of SqlParameter) From {New SqlParameter("@FactureVenteId", factureVenteId)}
             Return _dal.ExecuterTable(sql, CommandType.Text, p)
+        End Function
+
+        ' Supprime une ligne.
+        Public Function ListerDetailsPourEdition(factureVenteId As Integer) As DataTable
+            ' Le contrat de lecture utilise par les impressions reste intact.
+            ' Un chargement groupe ajoute seulement les metadonnees d'edition.
+            Dim result As DataTable = ListerDetailsParFacture(factureVenteId)
+            Dim contexte As DataTable = _dal.ExecuterTable("SELECT LigneFactureVenteId,MotifPrixException,DemandePrixId,ContextePrix,TypeTarifId FROM dbo.LignesFactureVente WHERE FactureVenteId=@id", CommandType.Text, New List(Of SqlParameter) From {New SqlParameter("@id", factureVenteId)})
+            result.Columns.Add("MotifPrixException", GetType(String))
+            result.Columns.Add("DemandePrixId", GetType(Integer))
+            result.Columns.Add("ContextePrix", GetType(Guid))
+            result.Columns.Add("TypeTarifId", GetType(Integer))
+            Dim parId As New Dictionary(Of Integer, DataRow)()
+            For Each row As DataRow In contexte.Rows
+                parId.Add(CInt(row("LigneFactureVenteId")), row)
+            Next
+            For Each row As DataRow In result.Rows
+                Dim source As DataRow = parId(CInt(row("LigneFactureVenteId")))
+                For Each nom As String In New String() {"MotifPrixException", "DemandePrixId", "ContextePrix", "TypeTarifId"}
+                    row(nom) = source(nom)
+                Next
+            Next
+            Return result
         End Function
 
         ' Supprime une ligne.

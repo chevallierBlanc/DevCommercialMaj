@@ -69,6 +69,28 @@ Module Program
         compte += 1
         Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.VerifierTotauxException(21D, 20D, 0D, 0D, 20D))
         Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.VerifierTotauxException(21D, 21D, 0D, 0D, 20D))
+        DelegationPrixRegles.VerifierPagination(0, 25)
+        compte += 1
+        Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.VerifierPagination(-1, 25))
+        Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.VerifierPagination(0, 101))
+        Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.VerifierPagination(1000001, 25))
+        DelegationPrixRegles.VerifierContexte(Guid.NewGuid(), 0.5D)
+        compte += 1
+        Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.VerifierContexte(Guid.Empty, 1D))
+        Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.VerifierContexte(Guid.NewGuid(), 0D))
+        Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.VerifierContexte(Guid.NewGuid(), 0.000000001D))
+        DelegationPrixRegles.VerifierDuree(24)
+        compte += 1
+        Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.VerifierDuree(0))
+        Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.VerifierDuree(169))
+        Verifie(DelegationPrixRegles.PrixNet(100D, New ContexteCommercialPrix With {.SousTotal = 200D, .Remise = 20D}) = 90D, "Coût comparé au prix après remise")
+        Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.PrixNet(100D, New ContexteCommercialPrix With {.SousTotal = 0D}))
+        Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.PrixNet(100D, New ContexteCommercialPrix With {.SousTotal = 100D, .Remise = 101D}))
+        DelegationPrixRegles.VerifierTotauxException(50.275D, 50.28D, 0D, 0D, 50.28D)
+        compte += 1
+        DelegationPrixRegles.VerifierTotauxException(0.999D, 0.99D, 0D, 0D, 0.99D, 0.99D)
+        compte += 1
+        Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.VerifierTotauxException(50.275D, 49D, 0D, 0D, 49D, 50.28D))
         Console.WriteLine("PASS : " & compte.ToString() & " contrôles métier réels, sans connexion SQL.")
     End Sub
 

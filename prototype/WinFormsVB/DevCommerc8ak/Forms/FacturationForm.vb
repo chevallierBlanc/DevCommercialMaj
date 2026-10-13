@@ -13,6 +13,8 @@ Imports System.Windows.Forms
 Namespace DevCommerc8ak
     Public Class FacturationForm
         Inherits Form
+        Implements ISortieSessionControlee
+        Public Event FactureEnregistree(factureId As Integer)
 
         ' --- Couleurs du Thème ---
         Private ReadOnly ColorPrimary As Color = Color.FromArgb(41, 128, 185) ' Bleu Moderne
@@ -89,6 +91,9 @@ Namespace DevCommerc8ak
             Public Property Unite As String
             Public Property PrixUnitaire As Decimal
             Public Property MotifPrixException As String
+            Public Property DemandePrixId As Integer?
+            Public Property TypeTarifId As Integer?
+            Public Property ContextePrix As Guid = Guid.NewGuid()
             Public Property Quantite As Decimal
             Public Property QuantiteBase As Decimal
             Public Property QuantiteEquivalente As Decimal 'nouveau 
@@ -305,9 +310,31 @@ Namespace DevCommerc8ak
 
             gridPanier = CreateStyledGrid()
             gridPanier.Dock = DockStyle.Fill
+            Dim menuArticle As New ContextMenuStrip()
+            Dim prixArticle As New ToolStripMenuItem("Demander une modification de prix pour cet article")
+            menuArticle.Items.Add(prixArticle)
+            gridPanier.ContextMenuStrip = menuArticle
+            AddHandler gridPanier.MouseDown, Sub(sender, e)
+                                                If e.Button <> MouseButtons.Right Then Return
+                                                Dim touche As DataGridView.HitTestInfo = gridPanier.HitTest(e.X, e.Y)
+                                                If touche.RowIndex >= 0 AndAlso touche.ColumnIndex >= 0 Then gridPanier.CurrentCell = gridPanier.Rows(touche.RowIndex).Cells(touche.ColumnIndex)
+                                            End Sub
+            AddHandler prixArticle.Click, Sub()
+                                              If gridPanier.CurrentRow Is Nothing Then Return
+                                              ModifierPrixDelegue(gridPanier.CurrentRow.DataBoundItem, EventArgs.Empty)
+                                          End Sub
 
 
             grpPanier.Controls.Add(gridPanier)
+            Dim prixDeLigne As New Button With {.Text = "DEMANDER UNE MODIFICATION DE PRIX POUR L'ARTICLE SÉLECTIONNÉ", .Dock = DockStyle.Bottom, .Height = 40, .BackColor = ColorPrimary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            AddHandler prixDeLigne.Click, Sub()
+                                             If gridPanier.CurrentRow Is Nothing Then
+                                                 MessageBox.Show("Sélectionnez d'abord un article dans la facture.")
+                                                 Return
+                                             End If
+                                             ModifierPrixDelegue(gridPanier.CurrentRow.DataBoundItem, EventArgs.Empty)
+                                         End Sub
+            grpPanier.Controls.Add(prixDeLigne)
 
             ' Totaux Panel
             Dim pnlTotals As New Panel() With {
@@ -767,19 +794,39 @@ Namespace DevCommerc8ak
 
         Private Sub ModifierPrixDelegue(sender As Object, e As EventArgs)
             Try
-                If gridProduits.CurrentRow Is Nothing Then Return
-                Dim type As TypeVenteDTO = ObtenirTypeVenteSelectionne()
-                If type Is Nothing Then Return
-                Dim id As Integer = SafeInteger(CellValueByProperty(gridProduits.CurrentRow, "ProduitId"))
-                Dim exception As ResultatPrixException = DialogueDelegationPrix.Afficher(Me, New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)), id, type.Nom)
+                Dim ligne As PanierLigne = TryCast(sender, PanierLigne)
+                Dim id As Integer
+                Dim nomType As String
+                Dim typeTarifId As Integer?
+                If ligne IsNot Nothing Then
+                    id = ligne.ProduitId : nomType = ligne.Unite
+                    typeTarifId = ligne.TypeTarifId
+                Else
+                    If gridProduits.CurrentRow Is Nothing Then Return
+                    Dim type As TypeVenteDTO = ObtenirTypeVenteSelectionne()
+                    If type Is Nothing Then Return
+                    id = SafeInteger(CellValueByProperty(gridProduits.CurrentRow, "ProduitId")) : nomType = type.Nom
+                    typeTarifId = If(type.EstPersonnalise, type.TypeVenteProduitId, CType(0, Integer?))
+                    ligne = _panier.Find(Function(l) l.ProduitId = id AndAlso l.Unite = nomType AndAlso Nullable.Equals(l.TypeTarifId, typeTarifId))
+                End If
+                Dim contexteCommercial As Func(Of Decimal, ContexteCommercialPrix) = Nothing
+                If ligne IsNot Nothing Then
+                    contexteCommercial = Function(nouveauPrix As Decimal)
+                                             Dim sousTotal As Decimal = CalculerSousTotalPanier() - ligne.Total + ligne.Quantite * nouveauPrix
+                                             Dim remise As Decimal = CalculerRemiseMontant(sousTotal)
+                                             If _factureEnEditionId.HasValue AndAlso sousTotal = _sousTotalEdition AndAlso txtRemise.Text.Trim() = _remiseEditionTexte Then remise = _remiseEditionMontant
+                                             Return New ContexteCommercialPrix With {.SousTotal = sousTotal, .Remise = remise}
+                                         End Function
+                End If
+                Dim exception As ResultatPrixException = DialogueDelegationPrix.Afficher(Me, New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)), id, nomType, If(ligne Is Nothing, Guid.Empty, ligne.ContextePrix), If(ligne Is Nothing, 0D, ligne.Quantite), If(ligne Is Nothing, CType(Nothing, Decimal?), ligne.PrixUnitaire), contexteCommercial, typeTarifId)
                 If exception IsNot Nothing Then
-                    Dim ligne As PanierLigne = _panier.Find(Function(l) l.ProduitId = id AndAlso l.Unite = type.Nom)
                     If ligne Is Nothing Then
                         MessageBox.Show("Ajoutez d'abord cet article au panier, puis appliquez son prix exceptionnel.")
                         Return
                     End If
                     ligne.PrixUnitaire = exception.Prix
                     ligne.MotifPrixException = exception.Motif
+                    ligne.DemandePrixId = exception.DemandePrixId
                     ligne.Total = ligne.Quantite * ligne.PrixUnitaire
                     RafraichirPanier()
                 Else
@@ -944,9 +991,10 @@ Namespace DevCommerc8ak
                 Return
             End If
 
-            Dim ligne As PanierLigne = _panier.Find(Function(x) x.ProduitId = produitId AndAlso x.Unite = unite)
+            Dim typeTarifId As Integer? = If(typeChoisi.EstPersonnalise, typeChoisi.TypeVenteProduitId, CType(0, Integer?))
+            Dim ligne As PanierLigne = _panier.Find(Function(x) x.ProduitId = produitId AndAlso x.Unite = unite AndAlso Nullable.Equals(x.TypeTarifId, typeTarifId))
             If ligne Is Nothing Then
-                ligne = New PanierLigne With {.ProduitId = produitId, .Libelle = libelle, .Unite = unite, .PrixUnitaire = prix, .Quantite = qte, .QuantiteBase = quantiteBase, .QuantiteEquivalente = quantiteEquivalent, .QuantiteReelle = quantiteBase, .Total = prix * qte}
+                ligne = New PanierLigne With {.ProduitId = produitId, .Libelle = libelle, .Unite = unite, .TypeTarifId = typeTarifId, .PrixUnitaire = prix, .Quantite = qte, .QuantiteBase = quantiteBase, .QuantiteEquivalente = quantiteEquivalent, .QuantiteReelle = quantiteBase, .Total = prix * qte}
                 _panier.Add(ligne)
             Else
                 ligne.Quantite += qte
@@ -962,15 +1010,17 @@ Namespace DevCommerc8ak
         End Sub
         Private Sub RetirerDuPanier(sender As Object, e As EventArgs)
             If gridPanier.CurrentRow Is Nothing Then Return
-            Dim produitId As Integer = Convert.ToInt32(gridPanier.CurrentRow.Cells(0).Value)
-            Dim unite As String = Convert.ToString(gridPanier.CurrentRow.Cells("Unite").Value) '######modifier indice
-            _panier.RemoveAll(Function(x) x.ProduitId = produitId AndAlso x.Unite = unite)
+            Dim selection As PanierLigne = TryCast(gridPanier.CurrentRow.DataBoundItem, PanierLigne)
+            If selection IsNot Nothing Then _panier.Remove(selection)
             RafraichirPanier()
         End Sub
         Private Sub RafraichirPanier()
             gridPanier.DataSource = Nothing
             gridPanier.DataSource = _panier
             If gridPanier.Columns.Contains("ProduitId") Then gridPanier.Columns("ProduitId").Visible = False
+            If gridPanier.Columns.Contains("DemandePrixId") Then gridPanier.Columns("DemandePrixId").Visible = False
+            If gridPanier.Columns.Contains("ContextePrix") Then gridPanier.Columns("ContextePrix").Visible = False
+            If gridPanier.Columns.Contains("TypeTarifId") Then gridPanier.Columns("TypeTarifId").Visible = False
             If gridPanier.Columns.Contains("QuantiteBase") Then gridPanier.Columns("QuantiteBase").Visible = False
             If gridPanier.Columns.Contains("Quantite") Then gridPanier.Columns("Quantite").HeaderText = "Quantité saisie"
             If gridPanier.Columns.Contains("QuantiteEquivalente") Then gridPanier.Columns("QuantiteEquivalente").HeaderText = "Quantité équivalente"
@@ -1065,7 +1115,7 @@ Namespace DevCommerc8ak
                 End If
 
                 Dim ligneRepo As New LigneFactureVenteRepository(dal)
-                Dim dtLignes As DataTable = ligneRepo.ListerDetailsParFacture(factureVenteId)
+                Dim dtLignes As DataTable = ligneRepo.ListerDetailsPourEdition(factureVenteId)
 
                 _factureEnEditionId = factureVenteId
                 _versionFactureEdition = DirectCast(entete("VersionOperation"), Byte())
@@ -1098,6 +1148,10 @@ Namespace DevCommerc8ak
                         .Libelle = Convert.ToString(row("Libelle")),
                         .Unite = unite,
                         .PrixUnitaire = prix,
+                        .MotifPrixException = Convert.ToString(row("MotifPrixException")),
+                        .DemandePrixId = If(row.IsNull("DemandePrixId"), CType(Nothing, Integer?), CInt(row("DemandePrixId"))),
+                        .TypeTarifId = If(row.IsNull("TypeTarifId"), CType(Nothing, Integer?), CInt(row("TypeTarifId"))),
+                        .ContextePrix = If(row.IsNull("ContextePrix"), Guid.NewGuid(), DirectCast(row("ContextePrix"), Guid)),
                         .Quantite = qteSaisie,
                         .QuantiteBase = qteBase,
                         .QuantiteEquivalente = quantiteEquivalente,
@@ -1213,7 +1267,7 @@ Namespace DevCommerc8ak
                 For Each l As PanierLigne In _panier
                     lignes.Add(New LigneFactureVente With {.ProduitId = l.ProduitId, .Quantite = l.Quantite,
                         .QuantiteBase = l.QuantiteBase, .TypeVente = l.Unite, .PrixUnitaire = l.PrixUnitaire,
-                        .MontantRemise = 0D, .QteSaisie = l.Quantite, .MotifPrixException = l.MotifPrixException})
+                        .MontantRemise = 0D, .QteSaisie = l.Quantite, .MotifPrixException = l.MotifPrixException, .DemandePrixId = l.DemandePrixId, .ContextePrix = l.ContextePrix, .TypeTarifId = l.TypeTarifId})
                 Next
                 Dim factureId As Integer = New FactureOperationService(dal).Enregistrer(factureMaj, lignes, motif, _versionFactureEdition, clientNouveau)
 
@@ -1227,6 +1281,7 @@ Namespace DevCommerc8ak
                 RafraichirPanier()
                 ChargerProduits()
                 GenererNouveauNumeroFacture()
+                RaiseEvent FactureEnregistree(factureId)
             Catch ex As Exception
                 MessageBox.Show("Erreur validation facture: " & ex.Message)
             Finally
@@ -1532,13 +1587,30 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub Deconnecter(sender As Object, e As EventArgs)
-            Dim main As MainForm = TryCast(Me.FindForm(), MainForm)
+            Dim main As MainForm = Nothing
+            For Each ouvert As Form In Application.OpenForms
+                If TypeOf ouvert Is MainForm Then main = DirectCast(ouvert, MainForm)
+            Next
             If main IsNot Nothing Then
                 main.DeconnecterDepuisModuleSession()
             Else
-                Me.Close()
+                If AutoriserSortie() Then Me.Close()
             End If
         End Sub
+
+        Public Function AutoriserSortie() As Boolean Implements ISortieSessionControlee.AutoriserSortie
+            If Me.UseWaitCursor Then Return False
+            If _panier.Count = 0 Then Return True
+            Dim choix As DialogResult = MessageBox.Show(Me, "Une facture est en préparation. Oui : enregistrer le brouillon. Non : abandonner explicitement le panier. Annuler : rester sur cette facture.", "Facture non finalisée", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button3)
+            If choix = DialogResult.Cancel Then Return False
+            If choix = DialogResult.Yes Then
+                ValiderFacture(Me, EventArgs.Empty)
+                Return _panier.Count = 0
+            End If
+            _panier.Clear()
+            RafraichirPanier()
+            Return True
+        End Function
 
         Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
             RemoveHandler AppEvents.ProduitModifie, AddressOf RafraichirProduitsDepuisEvenement

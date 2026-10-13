@@ -65,6 +65,12 @@
     <Compile Include="Services\ModeTravailRegles.vb" />
     <Compile Include="Services\ModeTravailService.vb" />
     <Compile Include="UI\DialogueModeTravail.vb" />
+    <Compile Include="UI\ISortieSessionControlee.vb" />
+    <Compile Include="UI\CartesSecuriteAutorisations.vb" />
+    <Compile Include="Forms\FacturationEtCaisseForm.vb" />
+    <EmbeddedResource Include="Migrations\2026101301_IntegrationPrixModes.sql">
+      <LogicalName>IntegrationPrixModesMigration.sql</LogicalName>
+    </EmbeddedResource>
     <Compile Include="Services\ConfigurationModesService.vb" />
     <Compile Include="UI\DialogueConfigurationModes.vb" />
     <Compile Include="Services\DelegationPrixRegles.vb" />

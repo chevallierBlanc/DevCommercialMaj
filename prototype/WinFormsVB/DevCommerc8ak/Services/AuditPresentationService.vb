@@ -28,7 +28,10 @@ Namespace DevCommerc8ak
             {"ReferencePaiement", "Référence du paiement"}, {"PaiementId", "Identifiant paiement"}, {"Montant", "Montant"},
             {"Prix", "Prix"}, {"TypeId", "Identifiant du type de vente"}, {"Cout", "Coût comparable"}, {"Coefficient", "Coefficient tarifaire"},
             {"MontantRegularise", "Montant régularisé"}, {"NouveauStatut", "Nouveau statut"}, {"ClotureCaisseId", "Clôture concernée"},
-            {"ModePrix", "Mode de calcul du tarif"}, {"MotifPrixException", "Motif du prix exceptionnel"}}
+            {"ModePrix", "Mode de calcul du tarif"}, {"MotifPrixException", "Motif du prix exceptionnel"},
+            {"DemandePrixId", "Approbation de prix"}, {"Perimetre", "Périmètre de la demande"},
+            {"DureeHeures", "Validité des demandes (heures)"}, {"Utilisee", "Approbation appliquée"},
+            {"ReconnexionRequise", "Reconnexion requise"}, {"QuantiteContexte", "Quantité approuvée"}}
 
         Public Shared Function EstAuteur(champ As String) As Boolean
             Dim cle As String = champ.Substring(champ.LastIndexOf("."c) + 1)
@@ -79,6 +82,7 @@ Namespace DevCommerc8ak
             For Each d As AuditDifference In source
                 If d.Champ.EndsWith("ParNom", StringComparison.Ordinal) Then Continue For
                 If d.Champ = "Empreinte" OrElse d.Champ = "ChampPrix" Then Continue For
+                If d.Champ.EndsWith("ContextePrix", StringComparison.Ordinal) OrElse d.Champ = "ContexteFacture" OrElse d.Champ = "Contexte" Then Continue For
                 result.Add(New AuditDifference With {.Champ = Libelle(d.Champ, n),
                     .Avant = AfficherValeur(d.Champ, d.Avant, a, noms), .Apres = AfficherValeur(d.Champ, d.Apres, n, noms)})
             Next

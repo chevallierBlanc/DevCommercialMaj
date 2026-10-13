@@ -47,6 +47,15 @@ Namespace DevCommerc8ak
             Using cn As SqlConnection = _dal.CreerConnexion()
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
+                    Enregistrer(cn, tx, valeur, attendu, motif)
+                    tx.Commit()
+                End Using
+            End Using
+        End Sub
+
+        Friend Shared Sub Enregistrer(cn As SqlConnection, tx As SqlTransaction, valeur As ConfigurationModes, attendu As ConfigurationModes, motif As String)
+                    motif = AuditMetierService.ValiderMotif(motif)
+                    If valeur.Active AndAlso Not (valeur.Facturation OrElse valeur.Caisse OrElse valeur.Combine) Then Throw New ArgumentException("Activez au moins un mode.")
                     AutorisationActionService.Exiger(cn, tx, "PARAMETRES_SECURITE", "PARAMETRES")
                     Dim avant As ConfigurationModes = Lire(cn, tx)
                     If avant.Active <> attendu.Active OrElse avant.Facturation <> attendu.Facturation OrElse avant.Caisse <> attendu.Caisse OrElse avant.Combine <> attendu.Combine Then Throw New System.Data.DBConcurrencyException("Les paramètres ont changé. Rechargez avant d'enregistrer.")
@@ -58,9 +67,6 @@ Namespace DevCommerc8ak
                         If cmd.ExecuteNonQuery() <> 1 Then Throw New InvalidOperationException("Configuration entreprise ambiguë.")
                     End Using
                     AuditMetierService.Enregistrer(cn, tx, "PERMISSION_MODIFIEE", "AUTORISATIONS", "Parametres", 0, "MODES_TRAVAIL", avant, valeur, motif, Guid.NewGuid())
-                    tx.Commit()
-                End Using
-            End Using
         End Sub
     End Class
 End Namespace

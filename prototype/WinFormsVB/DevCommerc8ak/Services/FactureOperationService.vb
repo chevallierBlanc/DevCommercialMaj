@@ -45,6 +45,7 @@ Namespace DevCommerc8ak
                         Try
                             AutorisationActionService.Exiger(cn, tx, If(id > 0, "FACTURE_MODIFIER", "FACTURE_CREER"), "FACTURIER")
                             If lignes Is Nothing OrElse lignes.Count = 0 Then Throw New ArgumentException("La facture doit contenir au moins un article.")
+                            If lignes.Any(Function(l) If(l.QteSaisie, l.Quantite) <= 0D OrElse l.QuantiteBase <= 0D OrElse l.PrixUnitaire < 0D OrElse l.MontantRemise < 0D) Then Throw New ArgumentException("Quantités positives et montants non négatifs requis.")
                             If facture.Statut <> "EN_ATTENTE" Then Throw New InvalidOperationException("Cette opération enregistre uniquement un brouillon.")
                             Dim avant As Object = Nothing
                             If id > 0 Then
@@ -70,16 +71,15 @@ Namespace DevCommerc8ak
                             End If
                             For Each ligne As LigneFactureVente In lignes
                                 ligne.FactureVenteId = id
-                                DelegationPrixService.ValiderLigne(cn, tx, ligne, avant, id, facture.NumeroFacture)
+                                DelegationPrixService.ValiderLigne(cn, tx, ligne, avant, id, facture.NumeroFacture, New ContexteCommercialPrix With {.SousTotal = facture.SousTotal, .Remise = facture.MontantRemise})
                                 ' Le calcul existant est conservé ; aucune quantité
                                 ' historique n'est recalculée lors d'une consultation.
                                 ligne.MontantLigne = If(ligne.QteSaisie.HasValue, ligne.QteSaisie.Value, ligne.Quantite) * ligne.PrixUnitaire - ligne.MontantRemise
                                 ligne.CoutUnitaireBaseVente = New FacturationService(_dal).ObtenirCoutUnitaireBaseVente(ligne.ProduitId, cn, tx)
                                 ligneRepo.Ajouter(ligne, cn, tx)
                             Next
-                            If lignes.Any(Function(l) Not String.IsNullOrWhiteSpace(l.MotifPrixException)) Then
-                                DelegationPrixRegles.VerifierTotauxException(lignes.Sum(Function(l) l.MontantLigne), facture.SousTotal, facture.MontantRemise, facture.MontantTaxe, facture.MontantTotal)
-                            End If
+                            If lignes.Where(Function(l) l.DemandePrixId.HasValue).GroupBy(Function(l) l.DemandePrixId.Value).Any(Function(g) g.Count() > 1) Then Throw New UnauthorizedAccessException("Une approbation ne peut pas autoriser plusieurs articles.")
+                            DelegationPrixRegles.VerifierTotauxException(lignes.Sum(Function(l) l.MontantLigne), facture.SousTotal, facture.MontantRemise, facture.MontantTaxe, facture.MontantTotal, lignes.Sum(Function(l) Decimal.Round(l.MontantLigne, 2, MidpointRounding.AwayFromZero)))
                             Dim apres As Dictionary(Of String, Object) = Snapshot(cn, tx, id)
                             AuditMetierService.Enregistrer(cn, tx, If(avant Is Nothing, "FACTURE_CREEE", "FACTURE_MODIFIEE"), "FACTURATION", "Facture", id,
                                 Convert.ToString(DirectCast(apres("Entete"), Dictionary(Of String, Object))("NumeroFacture")), avant, apres, motif, correlation)
@@ -152,7 +152,7 @@ Namespace DevCommerc8ak
             result.Add("Entete", entete(0))
             ' Les ID techniques recréés ne sont pas une différence commerciale.
             ' Les articles et leur ordre sont conservés pour comparer les vraies valeurs.
-            result.Add("Lignes", Lire(cn, tx, "SELECT l.ProduitId,p.Libelle AS Produit,l.TypeVente,l.Quantite,l.QuantiteSaisie,l.QuantiteBase,l.PrixUnitaire,l.MontantRemise,l.MontantLigne,l.CoutUnitaireBaseVente,l.MotifPrixException FROM dbo.LignesFactureVente l LEFT JOIN dbo.Produits p ON p.ProduitId=l.ProduitId WHERE l.FactureVenteId=@id ORDER BY l.LigneFactureVenteId", id))
+            result.Add("Lignes", Lire(cn, tx, "SELECT l.ProduitId,p.Libelle AS Produit,l.TypeVente,l.Quantite,l.QuantiteSaisie,l.QuantiteBase,l.PrixUnitaire,l.MontantRemise,l.MontantLigne,l.CoutUnitaireBaseVente,l.MotifPrixException,l.DemandePrixId,l.ContextePrix,l.TypeTarifId FROM dbo.LignesFactureVente l LEFT JOIN dbo.Produits p ON p.ProduitId=l.ProduitId WHERE l.FactureVenteId=@id ORDER BY l.LigneFactureVenteId", id))
             Return result
         End Function
 

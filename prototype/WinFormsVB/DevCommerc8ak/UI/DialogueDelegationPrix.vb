@@ -9,26 +9,36 @@ Namespace DevCommerc8ak
     Public Class ResultatPrixException
         Public Property Prix As Decimal
         Public Property Motif As String
+        Public Property DemandePrixId As Integer?
     End Class
     Public NotInheritable Class DialogueDelegationPrix
         Private Sub New()
         End Sub
 
-        Public Shared Function Afficher(owner As IWin32Window, service As DelegationPrixService, produitId As Integer, typeVente As String) As ResultatPrixException
-            Dim t As TarifDelegue = service.Consulter(produitId, typeVente)
+        Public Shared Function Afficher(owner As IWin32Window, service As DelegationPrixService, produitId As Integer, typeVente As String, Optional contexte As Guid = Nothing, Optional quantite As Decimal = 0D, Optional prixArticle As Decimal? = Nothing, Optional contexteCommercial As Func(Of Decimal, ContexteCommercialPrix) = Nothing, Optional typeTarifId As Integer? = Nothing) As ResultatPrixException
+            Dim t As TarifDelegue = service.Consulter(produitId, typeVente, typeTarifId)
             Dim resultat As ResultatPrixException = Nothing
-            Using form As New Form With {.Text = "Modification rapide du prix", .Size = New Size(700, 520), .MinimumSize = New Size(660, 520), .StartPosition = FormStartPosition.CenterParent, .BackColor = Color.FromArgb(245, 247, 250), .Font = New Font("Segoe UI", 10)}
+            Using form As New Form With {.Text = "Modification rapide du prix", .Size = New Size(780, 680), .MinimumSize = New Size(740, 660), .StartPosition = FormStartPosition.CenterParent, .BackColor = Color.FromArgb(245, 247, 250), .Font = New Font("Segoe UI", 10)}
                 Dim root As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(20), .ColumnCount = 1, .RowCount = 8}
                 root.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
-                For Each h As Integer In New Integer() {44, 60, 46, 36, 72, 60, 36, 48}
+                For Each h As Integer In New Integer() {44, 82, 46, 54, 72, 70, 36, 140}
                     root.RowStyles.Add(New RowStyle(SizeType.Absolute, h))
                 Next
                 root.Controls.Add(New Label With {.Text = t.Produit & " — " & t.TypeVente, .Dock = DockStyle.Fill, .ForeColor = Color.FromArgb(41, 128, 185), .Font = New Font("Segoe UI", 14, FontStyle.Bold)}, 0, 0)
-                root.Controls.Add(New Label With {.Text = "Tarif officiel : " & t.Prix.ToString("N2") & " FC" & Environment.NewLine & "Coût comparable pour ce type de vente : " & t.Cout.ToString("N2") & " FC", .Dock = DockStyle.Fill}, 0, 1)
-                Dim prix As New NumericUpDown With {.Dock = DockStyle.Fill, .DecimalPlaces = 2, .Maximum = 9999999999999999.99D, .Minimum = 0.01D, .Value = Math.Max(0.01D, t.Prix)}
+                root.Controls.Add(New Label With {.Text = "Tarif officiel : " & t.Prix.ToString("N2") & " FC" & Environment.NewLine & "Coût comparable pour ce type de vente : " & t.Cout.ToString("N2") & " FC" & If(prixArticle.HasValue, Environment.NewLine & "Prix actuel de cet article : " & prixArticle.GetValueOrDefault().ToString("N2") & " FC", ""), .Dock = DockStyle.Fill}, 0, 1)
+                Dim prix As New NumericUpDown With {.Dock = DockStyle.Fill, .DecimalPlaces = 2, .Maximum = 9999999999999999.99D, .Minimum = 0.01D, .Value = Math.Max(0.01D, If(prixArticle, t.Prix))}
                 root.Controls.Add(prix, 0, 2)
                 Dim variation As New Label With {.Dock = DockStyle.Fill}
-                AddHandler prix.ValueChanged, Sub() variation.Text = "Variation : " & If(t.Prix > 0D, ((prix.Value - t.Prix) / t.Prix * 100D).ToString("N2"), "?") & " %"
+                Dim actualiserVariation As Action = Sub()
+                                                       Try
+                                                           Dim net As Decimal = If(contexteCommercial Is Nothing, prix.Value, DelegationPrixRegles.PrixNet(prix.Value, contexteCommercial(prix.Value)))
+                                                           variation.Text = "Écart au tarif : " & (prix.Value - t.Prix).ToString("N2") & " FC • " & If(t.Prix > 0D, ((prix.Value - t.Prix) / t.Prix * 100D).ToString("N2"), "?") & " %" & Environment.NewLine & "Marge après remise : " & If(t.Cout > 0D, ((net - t.Cout) / t.Cout * 100D).ToString("N2"), "?") & " %"
+                                                       Catch ex As ArgumentException
+                                                           variation.Text = "Contrôlez le panier et la remise avant de soumettre un prix."
+                                                       End Try
+                                                   End Sub
+                AddHandler prix.ValueChanged, Sub() actualiserVariation()
+                actualiserVariation()
                 root.Controls.Add(variation, 0, 3)
                 Dim motif As New TextBox With {.Dock = DockStyle.Fill, .Multiline = True, .MaxLength = 1000}
                 root.Controls.Add(motif, 0, 4)
@@ -40,13 +50,13 @@ Namespace DevCommerc8ak
                 For Each code As String In New String() {"PRIX_TARIF_MODIFIER", "PRIX_DEMANDER", "PRIX_FACTURE_EXCEPTION"}
                     If Not service.Autorise(code, "FACTURIER") Then Continue For
                     Dim action As String = code
-                    Dim button As New Button With {.Text = If(code = "PRIX_TARIF_MODIFIER", "TARIF OFFICIEL", If(code = "PRIX_DEMANDER", "SOUMETTRE", "CETTE FACTURE")), .Width = 145, .Height = 36, .BackColor = Color.FromArgb(41, 128, 185), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+                    Dim button As New Button With {.Text = If(code = "PRIX_TARIF_MODIFIER", "MODIFIER LE TARIF OFFICIEL", If(code = "PRIX_DEMANDER", "DEMANDER UN TARIF OFFICIEL", "PRIX POUR CET ARTICLE")), .Width = 215, .Height = 36, .BackColor = Color.FromArgb(41, 128, 185), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
                     AddHandler button.Click, Sub()
                                                  Try
                                                      Dim raison As String = AuditMetierService.ValiderMotif(motif.Text)
                                                      If MessageBox.Show(form, "Confirmer ce prix et le motif ?", "Confirmation", MessageBoxButtons.YesNo, MessageBoxIcon.Question) <> DialogResult.Yes Then Return
                                                      If action = "PRIX_FACTURE_EXCEPTION" Then
-                                                         service.VerifierExceptionProposee(t, prix.Value, raison)
+                                                         service.VerifierExceptionProposee(t, prix.Value, raison, If(contexteCommercial Is Nothing, Nothing, contexteCommercial(prix.Value)))
                                                          resultat = New ResultatPrixException With {.Prix = prix.Value, .Motif = raison}
                                                          MessageBox.Show(form, "L'exception sera contrôlée et auditée lors de l'enregistrement de la facture.")
                                                      Else
@@ -59,6 +69,37 @@ Namespace DevCommerc8ak
                                              End Sub
                     actions.Controls.Add(button)
                 Next
+                If contexte <> Guid.Empty AndAlso service.Autorise("PRIX_DEMANDER_FACTURE", "FACTURIER") Then
+                    Dim demander As New Button With {.Text = "DEMANDER POUR CET ARTICLE", .Width = 240, .Height = 36}
+                    AddHandler demander.Click, Sub()
+                                                   Try
+                                                       Dim raison As String = AuditMetierService.ValiderMotif(motif.Text)
+                                                       If MessageBox.Show(form, "Soumettre une exception limitée à cet article et cette quantité ? Le tarif officiel restera inchangé.", "Demande d'approbation", MessageBoxButtons.YesNo, MessageBoxIcon.Question) <> DialogResult.Yes Then Return
+                                                       Dim commercial As ContexteCommercialPrix = If(contexteCommercial Is Nothing, Nothing, contexteCommercial(prix.Value))
+                                                       Dim id As Integer = service.DemanderException(t, prix.Value, raison, contexte, quantite, commercial)
+                                                       MessageBox.Show(form, "Demande " & id.ToString() & " EN ATTENTE. Conservez le panier, puis utilisez APPLIQUER L'APPROBATION après décision du responsable.")
+                                                   Catch ex As Exception
+                                                       MessageBox.Show(form, ex.Message, "Demande refusée")
+                                                   End Try
+                                               End Sub
+                    Dim appliquer As New Button With {.Text = "APPLIQUER L'APPROBATION", .Width = 240, .Height = 36}
+                    AddHandler appliquer.Click, Sub()
+                                                    Try
+                                                        Dim approuvee As ApprobationPrixArticle = service.LireExceptionApprouvee(produitId, typeVente, contexte, quantite)
+                                                        Dim ligne As LigneFactureVente = approuvee.Ligne
+                                                        If contexteCommercial IsNot Nothing Then
+                                                            Dim actuel As ContexteCommercialPrix = contexteCommercial(ligne.PrixUnitaire)
+                                                            If actuel.SousTotal <> approuvee.Contexte.SousTotal OrElse actuel.Remise <> approuvee.Contexte.Remise Then Throw New InvalidOperationException("Le panier ou la remise ont changé. Soumettez une nouvelle demande.")
+                                                        End If
+                                                        If MessageBox.Show(form, "Appliquer le prix approuvé de " & ligne.PrixUnitaire.ToString("N2") & " FC à cet article seulement ?", "Approbation", MessageBoxButtons.YesNo, MessageBoxIcon.Question) <> DialogResult.Yes Then Return
+                                                        resultat = New ResultatPrixException With {.Prix = ligne.PrixUnitaire, .Motif = ligne.MotifPrixException, .DemandePrixId = ligne.DemandePrixId}
+                                                        form.DialogResult = DialogResult.OK
+                                                    Catch ex As Exception
+                                                        MessageBox.Show(form, ex.Message, "Approbation indisponible")
+                                                    End Try
+                                                End Sub
+                    actions.Controls.Add(demander) : actions.Controls.Add(appliquer)
+                End If
                 Dim suivi As New LinkLabel With {.Text = "MES DEMANDES DE PRIX", .Dock = DockStyle.Fill}
                 AddHandler suivi.LinkClicked, Sub()
                                                   Try
@@ -81,7 +122,7 @@ Namespace DevCommerc8ak
             Using form As New Form With {.Text = "Gestion des prix et délégations", .Size = New Size(650, 510), .StartPosition = FormStartPosition.CenterParent, .BackColor = Color.FromArgb(245, 247, 250), .Font = New Font("Segoe UI", 10)}
                 Dim root As New FlowLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(20), .FlowDirection = FlowDirection.TopDown, .WrapContents = False, .AutoScroll = True}
                 Dim active As New CheckBox With {.Text = "Activer la délégation des prix", .AutoSize = True, .Checked = initial.Active}
-                Dim demandes As New CheckBox With {.Text = "Autoriser les demandes (validité : 24 heures)", .AutoSize = True, .Checked = initial.Demandes}
+                Dim demandes As New CheckBox With {.Text = "Autoriser les demandes (validité : " & initial.DureeHeures.ToString() & " heures)", .AutoSize = True, .Checked = initial.Demandes}
                 Dim immediate As New CheckBox With {.Text = "Autoriser les modifications immédiates selon permission", .AutoSize = True, .Checked = initial.Immediate}
                 Dim sousCout As New CheckBox With {.Text = "Autoriser sous coût uniquement avec PRIX_SOUS_COUT", .AutoSize = True, .Checked = initial.SousCout}
                 root.Controls.AddRange(New Control() {active, demandes, immediate, sousCout})
@@ -97,7 +138,7 @@ Namespace DevCommerc8ak
                 Dim save As New Button With {.Text = "ENREGISTRER", .Width = 160, .Height = 36}
                 AddHandler save.Click, Sub()
                                           Try
-                                              service.Configurer(New ConfigurationPrix With {.Active = active.Checked, .Demandes = demandes.Checked, .Immediate = immediate.Checked, .SousCout = sousCout.Checked, .Variation = variation.Value, .Marge = marge.Value}, initial, motif.Text)
+                                              service.Configurer(New ConfigurationPrix With {.Active = active.Checked, .Demandes = demandes.Checked, .Immediate = immediate.Checked, .SousCout = sousCout.Checked, .Variation = variation.Value, .Marge = marge.Value, .DureeHeures = initial.DureeHeures}, initial, motif.Text)
                                               form.DialogResult = DialogResult.OK
                                           Catch ex As Exception
                                               MessageBox.Show(form, ex.Message, "Configuration refusée", MessageBoxButtons.OK, MessageBoxIcon.Warning)
@@ -110,6 +151,20 @@ Namespace DevCommerc8ak
         End Sub
 
         Public Shared Sub Demandes(owner As IWin32Window, service As DelegationPrixService, Optional ecran As String = "PARAMETRES")
+            Using consultation As New Form With {.Text = "Demandes et approbations de prix", .Size = New Size(1080, 650), .MinimumSize = New Size(800, 500), .StartPosition = FormStartPosition.CenterParent}
+                Dim contenu As New ConsultationDemandesPrix(service, ecran)
+                consultation.Controls.Add(contenu)
+                AddHandler consultation.FormClosing, Sub(sender, e)
+                                                         If contenu.Occupe Then
+                                                             e.Cancel = True
+                                                             MessageBox.Show(consultation, "Attendez la fin de la consultation ou de la décision avant de fermer.")
+                                                         End If
+                                                     End Sub
+                consultation.ShowDialog(owner)
+            End Using
+        End Sub
+
+        Private Shared Sub AncienneListeDemandes(owner As IWin32Window, service As DelegationPrixService, ecran As String)
             Using form As New Form With {.Text = "Demandes de modification de prix", .Size = New Size(1050, 640), .MinimumSize = New Size(800, 460), .StartPosition = FormStartPosition.CenterParent, .BackColor = Color.FromArgb(245, 247, 250)}
                 Dim grid As New DataGridView With {.Dock = DockStyle.Fill, .ReadOnly = True, .AllowUserToAddRows = False, .AllowUserToDeleteRows = False, .RowHeadersVisible = False, .SelectionMode = DataGridViewSelectionMode.FullRowSelect, .MultiSelect = False, .BackgroundColor = Color.White, .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells, .EnableHeadersVisualStyles = False}
                 grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(52, 73, 94)

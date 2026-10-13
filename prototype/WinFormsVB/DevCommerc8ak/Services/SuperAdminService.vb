@@ -53,9 +53,15 @@ Namespace DevCommerc8ak
             Return ObtenirRepository().ListerInterfacesParRole(roleId)
         End Function
 
-        Public Sub EnregistrerRole(roleId As Integer?, nomRole As String, estActif As Boolean, interfaceIds As IEnumerable(Of Integer))
-            ObtenirRepository().EnregistrerRole(roleId, nomRole, estActif, interfaceIds)
-            AuditActionService.Enregistrer("SuperAdmin", "Modification rôle", "Rôle " & nomRole.Trim().ToUpperInvariant() & " mis à jour.")
+        Public Sub EnregistrerRole(roleId As Integer?, nomRole As String, estActif As Boolean, interfaceIds As IEnumerable(Of Integer), motif As String, Optional versionAttendue As Byte() = Nothing)
+            Dim dal As DAL = ObtenirDal()
+            Try
+                Dim repository As New SuperAdminRepository(dal)
+                repository.EnregistrerRole(roleId, nomRole, estActif, interfaceIds, motif, versionAttendue)
+            Catch ex As Exception
+                AuditMetierService.Echec(dal, "PERMISSION_MODIFICATION_REFUSEE", If(roleId, 0), Guid.NewGuid(), ex, "Role", nomRole)
+                Throw
+            End Try
             AppEvents.OnRolePermissionsChanged()
         End Sub
 

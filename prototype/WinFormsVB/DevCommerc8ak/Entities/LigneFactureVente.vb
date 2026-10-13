@@ -22,5 +22,8 @@ Namespace DevCommerc8ak
         Public Property MontantLigne As Decimal
         Public Property CoutUnitaireBaseVente As Decimal?
         Public Property MotifPrixException As String
+        Public Property DemandePrixId As Integer?
+        Public Property ContextePrix As Guid?
+        Public Property TypeTarifId As Integer?
     End Class
 End Namespace

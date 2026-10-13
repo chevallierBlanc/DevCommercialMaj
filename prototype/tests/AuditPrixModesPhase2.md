@@ -1,5 +1,10 @@
 # Journal métier, paiements, prix et modes : déploiement et validation
 
+> Rapport de la livraison précédente. Pour le portail combiné, les cartes,
+> la pagination et les approbations d'article, suivre désormais
+> `Phase2IntegrationGuide.md`. Les limites indiquées ici décrivent cette
+> livraison historique, pas les nouvelles fonctionnalités.
+
 ## Périmètre et architecture
 
 Base de départ : `184a541b90c37a235e8a4eff79ee5f34e35f393d`, branche

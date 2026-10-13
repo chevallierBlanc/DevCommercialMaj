@@ -34,6 +34,7 @@ Namespace DevCommerc8ak
                         AppliquerMigration(cn, tx, 2026100902, "Tracabilite montants paiements", AddressOf MigrationTracabilitePaiements)
                         AppliquerMigration(cn, tx, 2026100903, "Modes travail explicites", AddressOf MigrationModesTravail)
                         AppliquerMigration(cn, tx, 2026100904, "Delegation tarifs et exceptions facture", AddressOf MigrationDelegationPrix)
+                        AppliquerMigration(cn, tx, 2026101301, "Integration prix et modes operationnels", AddressOf MigrationIntegrationPrixModes)
                         AssurerSchemaCritiquePostMigrations(cn, tx)
                         tx.Commit()
                     Catch
@@ -76,6 +77,15 @@ Namespace DevCommerc8ak
         Private Shared Sub MigrationDelegationPrix(cn As SqlConnection, tx As SqlTransaction)
             Using stream As System.IO.Stream = GetType(SchemaMigrationService).Assembly.GetManifestResourceStream("DelegationPrixMigration.sql")
                 If stream Is Nothing Then Throw New InvalidOperationException("Migration delegation embarquee absente.")
+                Using reader As New System.IO.StreamReader(stream)
+                    Executer(cn, tx, reader.ReadToEnd())
+                End Using
+            End Using
+        End Sub
+
+        Private Shared Sub MigrationIntegrationPrixModes(cn As SqlConnection, tx As SqlTransaction)
+            Using stream As System.IO.Stream = GetType(SchemaMigrationService).Assembly.GetManifestResourceStream("IntegrationPrixModesMigration.sql")
+                If stream Is Nothing Then Throw New InvalidOperationException("Migration integration prix/modes absente.")
                 Using reader As New System.IO.StreamReader(stream)
                     Executer(cn, tx, reader.ReadToEnd())
                 End Using

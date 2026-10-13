@@ -15,11 +15,15 @@ GO
 GO
 :r ../WinFormsVB/DevCommerc8ak/Migrations/2026100904_DelegationPrix.sql
 GO
+:r ../WinFormsVB/DevCommerc8ak/Migrations/2026101301_IntegrationPrixModes.sql
+GO
 :r ../WinFormsVB/DevCommerc8ak/Migrations/2026100902_TracabilitePaiements.sql
 GO
 :r ../WinFormsVB/DevCommerc8ak/Migrations/2026100903_ModesTravail.sql
 GO
 :r ../WinFormsVB/DevCommerc8ak/Migrations/2026100904_DelegationPrix.sql
+GO
+:r ../WinFormsVB/DevCommerc8ak/Migrations/2026101301_IntegrationPrixModes.sql
 GO
 IF EXISTS(SELECT * FROM #PaiementsAvant EXCEPT SELECT PaiementId,FactureVenteId,ModePaiement,ReferencePaiement,Montant,MontantRecu,MonnaieRendue,Devise,PayePar,PayeLe FROM dbo.Paiements)
  OR (SELECT COUNT_BIG(*) FROM #PaiementsAvant)<>(SELECT COUNT_BIG(*) FROM dbo.Paiements)
@@ -37,3 +41,5 @@ IF EXISTS(SELECT * FROM #AuditAvant EXCEPT SELECT AuditId,[Action],Details,Effec
 PRINT N'VALIDATION_MIGRATION_AUDIT_PRIX_MODES_CONSERVATION_OK';
 GO
 :r AuditPrixModesValidation.sql
+GO
+:r Phase2IntegrationValidation.sql
