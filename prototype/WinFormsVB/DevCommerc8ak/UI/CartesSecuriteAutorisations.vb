@@ -45,7 +45,7 @@ Namespace DevCommerc8ak
             BackColor = Color.FromArgb(243, 243, 243) : Font = New Font("Segoe UI", 9.5F)
             carteModes = Carte("Modes de travail", "Définissez comment les utilisateurs autorisés travaillent à la facturation et à la caisse. Un seul mode par session.")
             Ajouter(carteModes, modesActifs, facturation, caisse, combine,
-                Texte("Les choix globaux rendent les modes disponibles dans cet établissement. Attribuez ensuite leurs permissions dans Rôles et privilèges. Le mode combiné n'est jamais déduit du cumul de rôles. Prévenez les employés : un changement peut exiger une reconnexion. Aucun poste n'est fermé à distance."), etatModes)
+                Texte("Modes séparés : le rôle doit disposer de Facturation et Créer une facture, ou de Caisse et Créer un encaissement. Aucun nouveau privilège n'est attribué. Le mode combiné exige ces deux ensembles et la permission Mode combiné du rôle actif, jamais le cumul de rôles. Après un changement, reconnectez le poste concerné ; aucun autre poste n'est fermé."), etatModes)
             cartePrix = Carte("Délégation et contrôle des prix", "Autorisez certains employés à demander ou appliquer un prix sans accès à l'administration générale des produits.")
             Ajouter(cartePrix, delegation, demandes, immediate,
                 Texte("Variation maximale sans approbation (%) : variation absolue par rapport au tarif officiel."), variation,

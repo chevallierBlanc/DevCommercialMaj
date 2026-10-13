@@ -16,16 +16,18 @@ Namespace DevCommerc8ak
         End Sub
 
         Public Shared Function Afficher(owner As IWin32Window, service As DelegationPrixService, produitId As Integer, typeVente As String, Optional contexte As Guid = Nothing, Optional quantite As Decimal = 0D, Optional prixArticle As Decimal? = Nothing, Optional contexteCommercial As Func(Of Decimal, ContexteCommercialPrix) = Nothing, Optional typeTarifId As Integer? = Nothing) As ResultatPrixException
+            Dim disponibles As System.Collections.Generic.HashSet(Of String) = service.ActionsDisponibles()
+            If disponibles.Count = 0 Then Throw New UnauthorizedAccessException("La délégation est désactivée ou aucune action de prix n'est autorisée pour cette session.")
             Dim t As TarifDelegue = service.Consulter(produitId, typeVente, typeTarifId)
             Dim resultat As ResultatPrixException = Nothing
-            Using form As New Form With {.Text = "Modification rapide du prix", .Size = New Size(780, 680), .MinimumSize = New Size(740, 660), .StartPosition = FormStartPosition.CenterParent, .BackColor = Color.FromArgb(245, 247, 250), .Font = New Font("Segoe UI", 10)}
-                Dim root As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(20), .ColumnCount = 1, .RowCount = 8}
+            Using form As New Form With {.Text = "Modification rapide du prix", .Size = New Size(780, 780), .MinimumSize = New Size(740, 640), .StartPosition = FormStartPosition.CenterParent, .BackColor = Color.FromArgb(245, 247, 250), .Font = New Font("Segoe UI", 10)}
+                Dim root As New TableLayoutPanel With {.Dock = DockStyle.Fill, .AutoScroll = True, .Padding = New Padding(20), .ColumnCount = 1, .RowCount = 8}
                 root.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
-                For Each h As Integer In New Integer() {44, 82, 46, 54, 72, 70, 36, 140}
+                For Each h As Integer In New Integer() {44, 116, 46, 54, 72, 70, 36, 140}
                     root.RowStyles.Add(New RowStyle(SizeType.Absolute, h))
                 Next
                 root.Controls.Add(New Label With {.Text = t.Produit & " — " & t.TypeVente, .Dock = DockStyle.Fill, .ForeColor = Color.FromArgb(41, 128, 185), .Font = New Font("Segoe UI", 14, FontStyle.Bold)}, 0, 0)
-                root.Controls.Add(New Label With {.Text = "Tarif officiel : " & t.Prix.ToString("N2") & " FC" & Environment.NewLine & "Coût comparable pour ce type de vente : " & t.Cout.ToString("N2") & " FC" & If(prixArticle.HasValue, Environment.NewLine & "Prix actuel de cet article : " & prixArticle.GetValueOrDefault().ToString("N2") & " FC", ""), .Dock = DockStyle.Fill}, 0, 1)
+                root.Controls.Add(New Label With {.Text = "Tarif officiel : " & t.Prix.ToString("N2") & " FC" & Environment.NewLine & "Coût comparable pour ce type de vente : " & t.Cout.ToString("N2") & " FC" & If(prixArticle.HasValue, Environment.NewLine & "Prix actuel de cet article : " & prixArticle.GetValueOrDefault().ToString("N2") & " FC — Quantité : " & quantite.ToString("0.########"), "") & Environment.NewLine & "Demandeur : " & SessionUtilisateur.NomUtilisateur & " (ID " & SessionUtilisateur.UtilisateurId.ToString() & ")", .Dock = DockStyle.Fill}, 0, 1)
                 Dim prix As New NumericUpDown With {.Dock = DockStyle.Fill, .DecimalPlaces = 2, .Maximum = 9999999999999999.99D, .Minimum = 0.01D, .Value = Math.Max(0.01D, If(prixArticle, t.Prix))}
                 root.Controls.Add(prix, 0, 2)
                 Dim variation As New Label With {.Dock = DockStyle.Fill}
@@ -48,7 +50,8 @@ Namespace DevCommerc8ak
                 Dim annuler As New Button With {.Text = "ANNULER", .Width = 100, .Height = 36, .DialogResult = DialogResult.Cancel}
                 actions.Controls.Add(annuler)
                 For Each code As String In New String() {"PRIX_TARIF_MODIFIER", "PRIX_DEMANDER", "PRIX_FACTURE_EXCEPTION"}
-                    If Not service.Autorise(code, "FACTURIER") Then Continue For
+                    If Not disponibles.Contains(code) Then Continue For
+                    If code = "PRIX_FACTURE_EXCEPTION" AndAlso contexte = Guid.Empty Then Continue For
                     Dim action As String = code
                     Dim button As New Button With {.Text = If(code = "PRIX_TARIF_MODIFIER", "MODIFIER LE TARIF OFFICIEL", If(code = "PRIX_DEMANDER", "DEMANDER UN TARIF OFFICIEL", "PRIX POUR CET ARTICLE")), .Width = 215, .Height = 36, .BackColor = Color.FromArgb(41, 128, 185), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
                     AddHandler button.Click, Sub()
@@ -69,7 +72,7 @@ Namespace DevCommerc8ak
                                              End Sub
                     actions.Controls.Add(button)
                 Next
-                If contexte <> Guid.Empty AndAlso service.Autorise("PRIX_DEMANDER_FACTURE", "FACTURIER") Then
+                If contexte <> Guid.Empty AndAlso disponibles.Contains("PRIX_DEMANDER_FACTURE") Then
                     Dim demander As New Button With {.Text = "DEMANDER POUR CET ARTICLE", .Width = 240, .Height = 36}
                     AddHandler demander.Click, Sub()
                                                    Try

@@ -70,6 +70,37 @@ Namespace DevCommerc8ak
             End Using
         End Function
 
+        Public Function ActionsDisponibles() As HashSet(Of String)
+            Dim actions As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    Dim p As ConfigurationPrix = LireConfiguration(cn, tx)
+                    If p.Active Then
+                        Try
+                            AutorisationActionService.Exiger(cn, tx, "PRIX_CONSULTER", "FACTURIER")
+                            Dim droits As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+                            Using cmd As New SqlCommand("SELECT i.CodeInterface FROM dbo.RoleInterfaces ri WITH(HOLDLOCK) JOIN dbo.InterfacesApplication i WITH(HOLDLOCK) ON i.InterfaceId=ri.InterfaceId WHERE ri.RoleId=@role AND i.EstActif=1", cn, tx)
+                                cmd.Parameters.AddWithValue("@role", SessionUtilisateur.RoleIdActif)
+                                Using r As SqlDataReader = cmd.ExecuteReader()
+                                    While r.Read()
+                                        droits.Add(Convert.ToString(r(0)))
+                                    End While
+                                End Using
+                            End Using
+                            For Each code As String In New String() {"PRIX_TARIF_MODIFIER", "PRIX_FACTURE_EXCEPTION", "PRIX_DEMANDER", "PRIX_DEMANDER_FACTURE"}
+                                If DelegationPrixRegles.AutoriseCommande(code, p.Active, p.Demandes, p.Immediate, droits) Then actions.Add(code)
+                            Next
+                        Catch ex As UnauthorizedAccessException
+                            actions.Clear()
+                        End Try
+                    End If
+                    tx.Commit()
+                End Using
+            End Using
+            Return actions
+        End Function
+
         Public Shared Function LireConfiguration(cn As SqlConnection, tx As SqlTransaction) As ConfigurationPrix
             Using cmd As New SqlCommand("SELECT DelegationPrixActive,PrixDemandesActives,PrixModificationImmediate,PrixSousCoutAutorise,PrixVariationMaxPourcent,PrixMargeMinimumPourcent,PrixDemandeDureeHeures FROM dbo.Parametres WITH(HOLDLOCK)", cn, tx)
                 Using r As SqlDataReader = cmd.ExecuteReader()
@@ -481,17 +512,30 @@ Namespace DevCommerc8ak
         Public Shared Sub VerifierException(cn As SqlConnection, tx As SqlTransaction, ligne As LigneFactureVente)
             Dim p As ConfigurationPrix = LireConfiguration(cn, tx)
             If Not p.Active Then Throw New UnauthorizedAccessException("Délégation des prix désactivée.")
+            If Not p.Immediate Then Throw New UnauthorizedAccessException("Modifications immédiates désactivées. Soumettez une demande d'approbation pour cet article.")
             AutorisationActionService.Exiger(cn, tx, "PRIX_FACTURE_EXCEPTION", "FACTURIER")
             ligne.MotifPrixException = AuditMetierService.ValiderMotif(ligne.MotifPrixException)
             Dim t As TarifDelegue = LireTarif(cn, tx, ligne.ProduitId, ligne.TypeVente, ligne.TypeTarifId)
-            If DelegationPrixRegles.NecessiteApprobation(t.Prix, ligne.PrixUnitaire, t.Cout, p.Variation, p.Marge) Then Throw New UnauthorizedAccessException("Exception hors seuil : faites approuver un tarif officiel avant la vente.")
+            If DelegationPrixRegles.NecessiteApprobation(t.Prix, ligne.PrixUnitaire, t.Cout, p.Variation, p.Marge) Then Throw New UnauthorizedAccessException("Exception hors seuil : soumettez une demande d'approbation pour cet article. Le tarif officiel reste inchangé.")
             VerifierSousCout(cn, tx, p, t, ligne.PrixUnitaire, "FACTURIER")
         End Sub
 
         Public Sub VerifierExceptionProposee(t As TarifDelegue, prix As Decimal, motif As String, Optional commercial As ContexteCommercialPrix = Nothing)
+            Try
+                VerifierExceptionProposeeInterne(t, prix, motif, commercial)
+            Catch ex As Exception
+                If t IsNot Nothing Then AuditMetierService.Echec(_dal, "PRIX_EXCEPTION_REFUSEE", t.ProduitId, Guid.NewGuid(), ex, "Produit", t.Produit & " / " & t.TypeVente)
+                Throw
+            End Try
+        End Sub
+
+        Private Sub VerifierExceptionProposeeInterne(t As TarifDelegue, prix As Decimal, motif As String, commercial As ContexteCommercialPrix)
             Using cn As SqlConnection = _dal.CreerConnexion()
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
+                    ' Meme ordre de verrouillage que les autres operations :
+                    ' contexte de securite avant la ligne produit.
+                    AutorisationActionService.Exiger(cn, tx, "PRIX_FACTURE_EXCEPTION", "FACTURIER")
                     Dim actuel As TarifDelegue = LireTarif(cn, tx, t.ProduitId, t.TypeVente, t.TypeId)
                     If actuel.Empreinte <> t.Empreinte Then Throw New DBConcurrencyException("Le tarif a changé. Rechargez.")
                     VerifierException(cn, tx, New LigneFactureVente With {.ProduitId = t.ProduitId, .TypeVente = t.TypeVente, .TypeTarifId = t.TypeId, .PrixUnitaire = prix, .MotifPrixException = motif})

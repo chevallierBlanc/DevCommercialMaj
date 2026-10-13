@@ -1,6 +1,7 @@
 Option Strict On
 Option Explicit On
 Imports System
+Imports System.Collections.Generic
 
 Namespace DevCommerc8ak
     Public Class ContexteCommercialPrix
@@ -10,6 +11,24 @@ Namespace DevCommerc8ak
     Public NotInheritable Class DelegationPrixRegles
         Private Sub New()
         End Sub
+        Public Shared Function ChoisirArticle(Of T As Class)(articles As IList(Of T), selection As T) As T
+            If selection IsNot Nothing Then
+                For Each article As T In articles
+                    If Object.ReferenceEquals(article, selection) Then Return article
+                Next
+            End If
+            If articles.Count = 1 Then Return articles(0)
+            Return Nothing
+        End Function
+
+        Public Shared Function AutoriseCommande(code As String, active As Boolean, demandes As Boolean, immediate As Boolean, droits As ISet(Of String)) As Boolean
+            If Not active OrElse Not droits.Contains("PRIX_CONSULTER") OrElse Not droits.Contains(code) Then Return False
+            Select Case code
+                Case "PRIX_DEMANDER", "PRIX_DEMANDER_FACTURE" : Return demandes
+                Case "PRIX_TARIF_MODIFIER", "PRIX_FACTURE_EXCEPTION" : Return immediate
+                Case Else : Return False
+            End Select
+        End Function
         Public Shared Sub VerifierPrix(prix As Decimal)
             If prix <= 0D OrElse prix > 9999999999999999.99D OrElse Decimal.Round(prix, 2) <> prix Then Throw New ArgumentException("Saisissez un prix positif avec au maximum deux décimales.")
         End Sub

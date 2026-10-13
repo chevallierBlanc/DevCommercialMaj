@@ -60,9 +60,8 @@ Namespace DevCommerc8ak
                     If combine Then modes.Add("FACTURATION_ET_CAISSE")
                 End Using
             End Using
-            modes.RemoveAll(Function(m) Not droits.Contains(ModeTravailRegles.Permission(m)))
-            modes.RemoveAll(Function(m) (m <> "CAISSE" AndAlso Not droits.Contains("FACTURIER")) OrElse (m <> "FACTURATION" AndAlso Not droits.Contains("CAISSE")))
-            If modes.Count = 0 Then Throw New UnauthorizedAccessException("Aucun mode autorisé pour ce rôle. Contactez un administrateur.")
+            modes.RemoveAll(Function(m) Not ModeTravailRegles.AutoriseRole(m, droits))
+            If modes.Count = 0 Then Throw New UnauthorizedAccessException("Aucun parcours opérationnel autorisé. Dans Paramètres, activez le mode séparé adapté ; dans Rôles et privilèges, vérifiez Facturation + Créer une facture ou Caisse + Créer un encaissement pour le rôle choisi. Le parcours combiné exige ces deux ensembles et Mode combiné.")
             Return modes
         End Function
 

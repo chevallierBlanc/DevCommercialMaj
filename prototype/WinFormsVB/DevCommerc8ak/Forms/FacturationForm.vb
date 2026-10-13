@@ -49,6 +49,9 @@ Namespace DevCommerc8ak
         Private ReadOnly lblTotalReel As Label 'nouveau 
 
         Private ReadOnly gridPanier As DataGridView
+        Private ReadOnly btnPrixDelegue As Button
+        Private ReadOnly prixDeLigne As Button
+        Private ReadOnly prixArticle As ToolStripMenuItem
         Private ReadOnly txtRemise As TextBox
         Private ReadOnly lblSousTotal As Label
         Private ReadOnly lblTotal As Label
@@ -256,7 +259,7 @@ Namespace DevCommerc8ak
 
             grpProduits.Controls.AddRange({lblRecherche, txtRecherche, btnActualiser, gridProduits, lblQuantite, txtQuantite, lblUnite, cmbUnite, lblPrix, txtPrixUnitaire, lblStock, lblEquivalent, lblTotalReel, btnAjouter, btnRetirer})
             btnRetirer.Width = 110
-            Dim btnPrixDelegue As New Button With {.Text = "MODIFIER PRIX", .Left = 400, .Top = 477, .Width = 120, .Height = 45, .FlatStyle = FlatStyle.Flat, .BackColor = ColorPrimary, .ForeColor = ColorWhite}
+            btnPrixDelegue = New Button With {.Text = "MODIFIER PRIX", .Visible = False, .Left = 400, .Top = 477, .Width = 120, .Height = 45, .FlatStyle = FlatStyle.Flat, .BackColor = ColorPrimary, .ForeColor = ColorWhite}
             grpProduits.Controls.Add(btnPrixDelegue)
             AddHandler btnPrixDelegue.Click, AddressOf ModifierPrixDelegue
             Dim menuPrix As New ContextMenuStrip()
@@ -270,15 +273,8 @@ Namespace DevCommerc8ak
                                                  MessageBox.Show(ex.Message, "Mes demandes de prix", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                                              End Try
                                          End Sub
-            AddHandler Me.Shown, Sub()
-                                     Try
-                                         btnPrixDelegue.Visible = New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)).Autorise("PRIX_CONSULTER", "FACTURIER")
-                                     Catch ex As Exception
-                                         btnPrixDelegue.Visible = False
-                                         Dim log As New ProductionLogService()
-                                         log.Warn("FacturationForm", "DelegationPrix", "Autorisation de consultation des prix indisponible.")
-                                     End Try
-                                 End Sub
+            AddHandler Me.Shown, Sub() ActualiserCommandesPrix()
+            AddHandler Me.Activated, Sub() ActualiserCommandesPrix()
 
             pnlLeft.Controls.Add(grpProduits)
             pnlLeft.Controls.Add(grpClient)
@@ -310,8 +306,9 @@ Namespace DevCommerc8ak
 
             gridPanier = CreateStyledGrid()
             gridPanier.Dock = DockStyle.Fill
+            gridPanier.MultiSelect = False
             Dim menuArticle As New ContextMenuStrip()
-            Dim prixArticle As New ToolStripMenuItem("Demander une modification de prix pour cet article")
+            prixArticle = New ToolStripMenuItem("Demander une modification de prix pour cet article") With {.Visible = False}
             menuArticle.Items.Add(prixArticle)
             gridPanier.ContextMenuStrip = menuArticle
             AddHandler gridPanier.MouseDown, Sub(sender, e)
@@ -319,21 +316,12 @@ Namespace DevCommerc8ak
                                                 Dim touche As DataGridView.HitTestInfo = gridPanier.HitTest(e.X, e.Y)
                                                 If touche.RowIndex >= 0 AndAlso touche.ColumnIndex >= 0 Then gridPanier.CurrentCell = gridPanier.Rows(touche.RowIndex).Cells(touche.ColumnIndex)
                                             End Sub
-            AddHandler prixArticle.Click, Sub()
-                                              If gridPanier.CurrentRow Is Nothing Then Return
-                                              ModifierPrixDelegue(gridPanier.CurrentRow.DataBoundItem, EventArgs.Empty)
-                                          End Sub
+            AddHandler prixArticle.Click, AddressOf ModifierPrixArticle
 
 
             grpPanier.Controls.Add(gridPanier)
-            Dim prixDeLigne As New Button With {.Text = "DEMANDER UNE MODIFICATION DE PRIX POUR L'ARTICLE SÉLECTIONNÉ", .Dock = DockStyle.Bottom, .Height = 40, .BackColor = ColorPrimary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
-            AddHandler prixDeLigne.Click, Sub()
-                                             If gridPanier.CurrentRow Is Nothing Then
-                                                 MessageBox.Show("Sélectionnez d'abord un article dans la facture.")
-                                                 Return
-                                             End If
-                                             ModifierPrixDelegue(gridPanier.CurrentRow.DataBoundItem, EventArgs.Empty)
-                                         End Sub
+            prixDeLigne = New Button With {.Text = "DEMANDER UNE MODIFICATION DE PRIX POUR L'ARTICLE SÉLECTIONNÉ", .Visible = False, .Dock = DockStyle.Bottom, .Height = 40, .BackColor = ColorPrimary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            AddHandler prixDeLigne.Click, AddressOf ModifierPrixArticle
             grpPanier.Controls.Add(prixDeLigne)
 
             ' Totaux Panel
@@ -586,6 +574,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub RechargerProduits(sender As Object, e As EventArgs)
+            ActualiserCommandesPrix()
             _suppressSelectionEvents = True
             Try
                 ChargerProduits()
@@ -792,8 +781,36 @@ Namespace DevCommerc8ak
             MiseAJourIndicateursQuantite(Nothing, EventArgs.Empty)
         End Sub
 
+        Private Sub ActualiserCommandesPrix()
+            Try
+                Dim service As New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString))
+                Dim actions As HashSet(Of String) = service.ActionsDisponibles()
+                btnPrixDelegue.Visible = actions.Contains("PRIX_TARIF_MODIFIER") OrElse actions.Contains("PRIX_DEMANDER")
+                Dim autoriseArticle As Boolean = actions.Contains("PRIX_FACTURE_EXCEPTION") OrElse actions.Contains("PRIX_DEMANDER_FACTURE")
+                prixDeLigne.Visible = autoriseArticle
+                prixArticle.Visible = autoriseArticle
+            Catch ex As Exception
+                btnPrixDelegue.Visible = False
+                prixDeLigne.Visible = False
+                prixArticle.Visible = False
+                Dim log As New ProductionLogService()
+                log.Warn("FacturationForm", "DelegationPrix", "Configuration ou autorisation des commandes de prix indisponible.")
+            End Try
+        End Sub
+
+        Private Sub ModifierPrixArticle(sender As Object, e As EventArgs)
+            Dim selection As PanierLigne = If(gridPanier.CurrentRow Is Nothing, Nothing, TryCast(gridPanier.CurrentRow.DataBoundItem, PanierLigne))
+            Dim ligne As PanierLigne = DelegationPrixRegles.ChoisirArticle(_panier, selection)
+            If ligne Is Nothing Then
+                MessageBox.Show("Sélectionnez la ligne concernée dans le panier. Avec plusieurs articles, le choix doit être explicite.", "Prix de l'article", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+            ModifierPrixDelegue(ligne, EventArgs.Empty)
+        End Sub
+
         Private Sub ModifierPrixDelegue(sender As Object, e As EventArgs)
             Try
+                ActualiserCommandesPrix()
                 Dim ligne As PanierLigne = TryCast(sender, PanierLigne)
                 Dim id As Integer
                 Dim nomType As String
@@ -1004,7 +1021,7 @@ Namespace DevCommerc8ak
                 ligne.Total = ligne.PrixUnitaire * ligne.Quantite
             End If
 
-            RafraichirPanier()
+            RafraichirPanier(ligne)
             txtQuantite.Clear()
             txtQuantite.Focus()
         End Sub
@@ -1014,7 +1031,9 @@ Namespace DevCommerc8ak
             If selection IsNot Nothing Then _panier.Remove(selection)
             RafraichirPanier()
         End Sub
-        Private Sub RafraichirPanier()
+        Private Sub RafraichirPanier(Optional selection As PanierLigne = Nothing)
+            If selection Is Nothing AndAlso gridPanier.CurrentRow IsNot Nothing Then selection = TryCast(gridPanier.CurrentRow.DataBoundItem, PanierLigne)
+            selection = DelegationPrixRegles.ChoisirArticle(_panier, selection)
             gridPanier.DataSource = Nothing
             gridPanier.DataSource = _panier
             If gridPanier.Columns.Contains("ProduitId") Then gridPanier.Columns("ProduitId").Visible = False
@@ -1025,6 +1044,25 @@ Namespace DevCommerc8ak
             If gridPanier.Columns.Contains("Quantite") Then gridPanier.Columns("Quantite").HeaderText = "Quantité saisie"
             If gridPanier.Columns.Contains("QuantiteEquivalente") Then gridPanier.Columns("QuantiteEquivalente").HeaderText = "Quantité équivalente"
             If gridPanier.Columns.Contains("QuantiteReelle") Then gridPanier.Columns("QuantiteReelle").HeaderText = "Quantité réelle"
+
+            ' Le rebinding et le masquage des colonnes techniques peuvent perdre
+            ' CurrentRow. Restaurer une cellule visible de la meme ligne, jamais
+            ' un premier article arbitraire dans un panier a plusieurs lignes.
+            gridPanier.ClearSelection()
+            gridPanier.CurrentCell = Nothing
+            If selection IsNot Nothing Then
+                For Each row As DataGridViewRow In gridPanier.Rows
+                    If Not Object.ReferenceEquals(row.DataBoundItem, selection) Then Continue For
+                    For Each cell As DataGridViewCell In row.Cells
+                        If cell.OwningColumn.Visible Then
+                            gridPanier.CurrentCell = cell
+                            row.Selected = True
+                            Exit For
+                        End If
+                    Next
+                    Exit For
+                Next
+            End If
 
             Dim sousTotal As Decimal = 0D
             For Each l As PanierLigne In _panier

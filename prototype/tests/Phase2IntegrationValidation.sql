@@ -32,6 +32,35 @@ SELECT r.NomRole,i.CodeInterface,i.Libelle
 FROM dbo.RoleInterfaces ri JOIN dbo.Roles r ON r.RoleId=ri.RoleId JOIN dbo.InterfacesApplication i ON i.InterfaceId=ri.InterfaceId
 WHERE i.CodeInterface LIKE N'MODE[_]%' OR i.CodeInterface LIKE N'PRIX[_]%' OR i.CodeInterface IN(N'FACTURIER',N'CAISSE',N'PARAMETRES',N'PARAMETRES_SECURITE',N'PARAMETRES_PRIX',N'FACTURE_CREER',N'ENCAISSEMENT_CREER') ORDER BY r.NomRole,i.CodeInterface;
 -- Aide a l'integration : un grant MODE_COMBINE ne fournit aucun ecran/action.
+-- Diagnostic des parcours reellement disponibles pour chaque role actif.
+-- Les droits historiques ecran + creation autorisent leur mode separe :
+-- MODE_FACTURATION / MODE_CAISSE ne sont pas des grants supplementaires requis.
+;WITH Droits AS (
+ SELECT r.RoleId,r.NomRole,
+ MAX(CASE WHEN i.CodeInterface=N'FACTURIER' THEN 1 ELSE 0 END) AS EcranFacturation,
+ MAX(CASE WHEN i.CodeInterface=N'FACTURE_CREER' THEN 1 ELSE 0 END) AS CreationFacture,
+ MAX(CASE WHEN i.CodeInterface=N'CAISSE' THEN 1 ELSE 0 END) AS EcranCaisse,
+ MAX(CASE WHEN i.CodeInterface=N'ENCAISSEMENT_CREER' THEN 1 ELSE 0 END) AS CreationEncaissement,
+ MAX(CASE WHEN i.CodeInterface=N'MODE_COMBINE' THEN 1 ELSE 0 END) AS DroitCombine,
+ MAX(CASE WHEN i.CodeInterface IN(N'MODE_FACTURATION',N'MODE_CAISSE',N'MODE_COMBINE') THEN 1 ELSE 0 END) AS ModeExplicite,
+ MAX(CASE WHEN i.CodeInterface IN(N'ADMINISTRATION',N'SUPERADMIN_TECH') THEN 1 ELSE 0 END) AS Administration
+ FROM dbo.Roles r LEFT JOIN dbo.RoleInterfaces ri ON ri.RoleId=r.RoleId
+ LEFT JOIN dbo.InterfacesApplication i ON i.InterfaceId=ri.InterfaceId AND i.EstActif=1
+ WHERE r.EstActif=1 GROUP BY r.RoleId,r.NomRole
+)
+SELECT d.*,p.GestionModesActive,
+ CASE WHEN p.ModeFacturationAutorise=1 AND EcranFacturation=1 AND CreationFacture=1 THEN 1 ELSE 0 END AS FacturationDisponible,
+ CASE WHEN p.ModeCaisseAutorise=1 AND EcranCaisse=1 AND CreationEncaissement=1 THEN 1 ELSE 0 END AS CaisseDisponible,
+ CASE WHEN p.ModeCombineAutorise=1 AND EcranFacturation=1 AND CreationFacture=1 AND EcranCaisse=1 AND CreationEncaissement=1 AND DroitCombine=1 THEN 1 ELSE 0 END AS CombineDisponible,
+ CASE WHEN p.GestionModesActive=0 THEN N'Parcours historique (gestion des modes inactive)'
+ WHEN d.NomRole IN(N'ADMIN',N'SUPERADMIN') OR (ModeExplicite=0 AND Administration=1) THEN N'Parcours administratif preserve'
+ WHEN EcranFacturation=0 AND EcranCaisse=0 THEN N'Role non operationnel : parcours existant'
+ WHEN (p.ModeFacturationAutorise=1 AND EcranFacturation=1 AND CreationFacture=1)
+ OR (p.ModeCaisseAutorise=1 AND EcranCaisse=1 AND CreationEncaissement=1)
+ OR (p.ModeCombineAutorise=1 AND EcranFacturation=1 AND CreationFacture=1 AND EcranCaisse=1 AND CreationEncaissement=1 AND DroitCombine=1)
+ THEN N'Au moins un mode disponible'
+ ELSE N'CORRIGER : activer un mode global et verifier les droits ecran + creation du role actif' END AS DiagnosticConnexion
+FROM Droits d CROSS JOIN dbo.Parametres p ORDER BY d.NomRole;
 SELECT r.NomRole AS RoleCombineSansEcrans
 FROM dbo.Roles r WHERE EXISTS(SELECT 1 FROM dbo.RoleInterfaces ri JOIN dbo.InterfacesApplication i ON i.InterfaceId=ri.InterfaceId WHERE ri.RoleId=r.RoleId AND i.CodeInterface=N'MODE_COMBINE')
 AND (SELECT COUNT(DISTINCT i.CodeInterface) FROM dbo.RoleInterfaces ri JOIN dbo.InterfacesApplication i ON i.InterfaceId=ri.InterfaceId WHERE ri.RoleId=r.RoleId AND i.EstActif=1 AND i.CodeInterface IN(N'FACTURIER',N'CAISSE'))<>2;

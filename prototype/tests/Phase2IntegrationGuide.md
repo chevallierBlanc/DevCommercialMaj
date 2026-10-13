@@ -1,5 +1,9 @@
 # Phase 2 : integration operationnelle, configuration et validation
 
+Complement apres essais Windows : consulter `CorrectionModesPrixGuide.md` pour
+la compatibilite des modes separes, les commandes de prix et la procedure a jour.
+Les regles de cette livraison historique ci-dessous ne remplacent pas ce correctif.
+
 ## Etat initial et diagnostic
 
 Depart : main propre, HEAD et origin/main =

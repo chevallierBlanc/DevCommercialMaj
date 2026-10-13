@@ -222,8 +222,31 @@ Module Program
         Dim initialModes As ConfigurationModes = configModes.Charger()
         Dim sessionInitiale As Integer = SessionUtilisateur.SessionId
         Try
+            Verifier(modes.Lister(user, role).Count = 0, "Gestion des modes desactivee : parcours classique conserve")
+            Verifier(prix.ActionsDisponibles().Count = 0, "Delegation desactivee : commandes masquees meme avec privileges")
             prix.Configurer(New ConfigurationPrix With {.Active = True, .Demandes = True, .Immediate = True, .Variation = 10D}, initialPrix, "Configuration de fixture isolée")
             Dim t As TarifDelegue = prix.Consulter(produitPrix, "piece")
+            Verifier(prix.ActionsDisponibles().Contains("PRIX_TARIF_MODIFIER"), "Session valide et action explicite : commande disponible")
+            Dim sessionValide As Integer = SessionUtilisateur.SessionId
+            SessionUtilisateur.SessionId = -1
+            Try
+                Verifier(prix.ActionsDisponibles().Count = 0, "Session inexistante : aucune commande disponible")
+                Refus(Of UnauthorizedAccessException)(Sub() prix.VerifierExceptionProposee(t, 16D, "Session invalide"))
+            Finally
+                SessionUtilisateur.SessionId = sessionValide
+            End Try
+            Dim activePrix As ConfigurationPrix = prix.Configuration()
+            prix.Configurer(New ConfigurationPrix With {.Active = True, .Demandes = True, .Immediate = False, .Variation = 10D}, activePrix, "Refuser les modifications immediates")
+            Verifier(Not prix.ActionsDisponibles().Contains("PRIX_FACTURE_EXCEPTION"), "Exception directe masquee si immediate desactivee")
+            Dim refusAvant As Integer = Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE [Action]='PRIX_EXCEPTION_REFUSEE' AND Resultat='REFUS' AND EffectuePar=" & user.ToString())
+            Refus(Of UnauthorizedAccessException)(Sub() prix.VerifierExceptionProposee(t, 16D, "Exception directe interdite"))
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE [Action]='PRIX_EXCEPTION_REFUSEE' AND Resultat='REFUS' AND EffectuePar=" & user.ToString()) = refusAvant + 1, "Exception refusee tracee sans faux succes")
+            Refus(Of UnauthorizedAccessException)(Sub() prix.Modifier(t, 16D, "Tarif direct interdit", False))
+            Verifier(prix.Consulter(produitPrix, "piece").Prix = 15D, "Refus sans modification du catalogue")
+            prix.Configurer(New ConfigurationPrix With {.Active = False, .Demandes = True, .Immediate = True, .Variation = 10D}, prix.Configuration(), "Delegation globalement inactive dans la fixture")
+            Verifier(prix.ActionsDisponibles().Count = 0, "Desactivation globale masque toutes les commandes")
+            Refus(Of UnauthorizedAccessException)(Sub() prix.Modifier(t, 16D, "Demande interdite globalement", True))
+            prix.Configurer(activePrix, prix.Configuration(), "Restaurer les actions de la fixture")
             Verifier(t.Prix = 15D AndAlso t.Cout = 10D AndAlso t.QuantiteBase = 1D, "Coût et tarif comparés dans la même unité")
             Refus(Of ArgumentException)(Sub() prix.Modifier(t, 16D, "  ", False))
             Refus(Of UnauthorizedAccessException)(Sub() prix.Modifier(t, 9D, "Sous coût interdit", True))
@@ -284,7 +307,16 @@ Module Program
             Verifier(prix.Consulter(produitPrix, "piece").Prix = 20D, "Échec d'audit : rollback du tarif et de son historique")
             configModes.Enregistrer(New ConfigurationModes With {.Active = True, .Facturation = True, .Caisse = True, .Combine = True}, initialModes, "Modes de la fixture")
             Dim autorises As List(Of String) = modes.Lister(user, role)
-            Verifier(autorises.Count = 1 AndAlso autorises(0) = "FACTURATION", "Mode combiné absent sans attribution explicite")
+            Verifier(autorises.Count = 2 AndAlso autorises.Contains("FACTURATION") AndAlso autorises.Contains("CAISSE"), "Modes historiques disponibles, combine absent sans attribution explicite")
+            Dim roleCaisse As Integer = Scalar("INSERT dbo.Roles(NomRole,EstActif) VALUES('CAISSE_TEST_' + @s,1); SELECT CAST(SCOPE_IDENTITY() AS int)", suffix)
+            Exec("INSERT dbo.UtilisateurRoles(UtilisateurId,RoleId,EstActif,EstRolePrincipal) VALUES(" & user.ToString() & "," & roleCaisse.ToString() & ",1,0)")
+            Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & roleCaisse.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface IN('CAISSE','ENCAISSEMENT_CREER')")
+            Dim modesCaisse As List(Of String) = modes.Lister(user, roleCaisse)
+            Verifier(modesCaisse.Count = 1 AndAlso modesCaisse(0) = "CAISSE", "Role caissiere historique reconnectable sans MODE_CAISSE et sans union des roles")
+            Dim modesActifs As ConfigurationModes = configModes.Charger()
+            configModes.Enregistrer(New ConfigurationModes With {.Active = True, .Facturation = True, .Caisse = False, .Combine = True}, modesActifs, "Caisse separee desactivee dans la fixture")
+            Refus(Of UnauthorizedAccessException)(Sub() modes.Lister(user, roleCaisse))
+            configModes.Enregistrer(modesActifs, configModes.Charger(), "Restaurer le mode caisse de la fixture")
             Refus(Of UnauthorizedAccessException)(Sub() modes.Activer("FACTURATION_ET_CAISSE"))
             modes.Activer("FACTURATION")
             Using cn As SqlConnection = dal.CreerConnexion()
