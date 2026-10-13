@@ -72,6 +72,25 @@ Module Program
         Verifie(ModeTravailRegles.AutoriseRole("FACTURATION_ET_CAISSE", droitsFacture), "Combine explicitement autorise au role actif")
         droitsFacture.Remove("FACTURE_CREER")
         Verifie(Not ModeTravailRegles.AutoriseRole("FACTURATION_ET_CAISSE", droitsFacture), "Retrait facturation invalide immediatement le combine")
+        Dim seulFacturier As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {"FACTURIER", "FACTURE_CREER"}
+        Dim seuleCaisse As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {"CAISSE", "ENCAISSEMENT_CREER"}
+        Verifie(ModeTravailRegles.Resoudre(False, False, False, False, "FACTURIER", seulFacturier).Count = 0, "Gestion inactive conserve le parcours historique")
+        Verifie(ModeTravailRegles.Resoudre(True, True, True, True, "FACTURIER", seulFacturier).Count = 1, "Facturier voit un seul mode")
+        Verifie(ModeTravailRegles.Resoudre(True, True, True, True, "CAISSIERE", seuleCaisse)(0) = "CAISSE", "Caissiere conserve son identite et son mode")
+        Verifie(ModeTravailRegles.Resoudre(True, True, True, True, "CAISSIER", seuleCaisse)(0) = "CAISSE", "Caissier fonctionne sans fusion de roles")
+        Refuse(Of UnauthorizedAccessException)(Sub() ModeTravailRegles.Resoudre(True, True, False, True, "CAISSIER", seuleCaisse))
+        Dim combineAutorise As New HashSet(Of String)(seulFacturier, StringComparer.OrdinalIgnoreCase)
+        combineAutorise.UnionWith(seuleCaisse)
+        Verifie(ModeTravailRegles.Resoudre(True, True, True, True, "OPERATEUR", combineAutorise).Count = 2, "Deux droits ne fabriquent pas un combine")
+        combineAutorise.Add("MODE_COMBINE")
+        Verifie(ModeTravailRegles.Resoudre(True, True, True, True, "OPERATEUR", combineAutorise).Count = 3, "Trois choix lorsque le combine est explicite")
+        Verifie(ModeTravailRegles.Resoudre(True, True, True, False, "OPERATEUR", combineAutorise).Count = 2, "Combine globalement desactive")
+        Verifie(ModeTravailRegles.Resoudre(True, False, False, True, "OPERATEUR", combineAutorise)(0) = "FACTURATION_ET_CAISSE", "Combine unique choisi automatiquement par login")
+        Verifie(ModeTravailRegles.Resoudre(True, True, True, True, "ADMIN", New HashSet(Of String)(seulFacturier)).Count = 0, "Portail administratif historique preserve")
+        Verifie(ModeTravailRegles.Resoudre(True, True, True, True, "ADMIN", combineAutorise).Count = 3, "Admin explicitement autorise peut choisir un mode")
+        Dim incomplet As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {"MODE_COMBINE"}
+        Refuse(Of UnauthorizedAccessException)(Sub() ModeTravailRegles.Resoudre(True, True, True, True, "TEST", incomplet))
+        Verifie(ModeTravailRegles.DiagnosticCombine(seuleCaisse).Contains("Créer une facture"), "Diagnostic des droits manquants sans union des roles")
         Dim premier As New Object(), second As New Object(), externe As New Object()
         Dim panier As New List(Of Object) From {premier}
         Verifie(Object.ReferenceEquals(DelegationPrixRegles.ChoisirArticle(panier, Nothing), premier), "Une seule ligne selectionnee sans ambiguite")

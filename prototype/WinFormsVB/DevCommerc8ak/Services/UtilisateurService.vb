@@ -106,6 +106,8 @@ Namespace DevCommerc8ak
                 Throw New InvalidOperationException("Cet utilisateur possède déjà une session active. Fermez l'autre session ou demandez au SUPERADMIN de la libérer.")
             End If
 
+            Dim sessionId As Integer = _sessionRepo.DemarrerSession(user.UtilisateurId, roleSession.RoleId, roleSession.NomRole)
+            ' Ne publier le contexte memoire qu'apres validation et commit SQL.
             SessionUtilisateur.UtilisateurId = user.UtilisateurId
             SessionUtilisateur.NomUtilisateur = user.NomUtilisateur
             SessionUtilisateur.Role = roleSession.NomRole
@@ -114,7 +116,7 @@ Namespace DevCommerc8ak
             SessionUtilisateur.DateConnexion = Date.Now
             SessionUtilisateur.ModeActif = String.Empty
             SessionUtilisateur.Poste = Environment.MachineName
-            SessionUtilisateur.SessionId = _sessionRepo.DemarrerSession(user.UtilisateurId, roleSession.RoleId, roleSession.NomRole)
+            SessionUtilisateur.SessionId = sessionId
         End Sub
 
         Public Function DemarrerSessionApresAuthentification(user As Utilisateur, roleSession As RoleSessionInfo) As AuthentificationResultat

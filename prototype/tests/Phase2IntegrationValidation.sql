@@ -49,12 +49,12 @@ WHERE i.CodeInterface LIKE N'MODE[_]%' OR i.CodeInterface LIKE N'PRIX[_]%' OR i.
  WHERE r.EstActif=1 GROUP BY r.RoleId,r.NomRole
 )
 SELECT d.*,p.GestionModesActive,
- CASE WHEN p.ModeFacturationAutorise=1 AND EcranFacturation=1 AND CreationFacture=1 THEN 1 ELSE 0 END AS FacturationDisponible,
- CASE WHEN p.ModeCaisseAutorise=1 AND EcranCaisse=1 AND CreationEncaissement=1 THEN 1 ELSE 0 END AS CaisseDisponible,
- CASE WHEN p.ModeCombineAutorise=1 AND EcranFacturation=1 AND CreationFacture=1 AND EcranCaisse=1 AND CreationEncaissement=1 AND DroitCombine=1 THEN 1 ELSE 0 END AS CombineDisponible,
+ CASE WHEN p.GestionModesActive=1 AND NOT(ModeExplicite=0 AND (d.NomRole IN(N'ADMIN',N'SUPERADMIN') OR Administration=1)) AND p.ModeFacturationAutorise=1 AND EcranFacturation=1 AND CreationFacture=1 THEN 1 ELSE 0 END AS FacturationDisponible,
+ CASE WHEN p.GestionModesActive=1 AND NOT(ModeExplicite=0 AND (d.NomRole IN(N'ADMIN',N'SUPERADMIN') OR Administration=1)) AND p.ModeCaisseAutorise=1 AND EcranCaisse=1 AND CreationEncaissement=1 THEN 1 ELSE 0 END AS CaisseDisponible,
+ CASE WHEN p.GestionModesActive=1 AND NOT(ModeExplicite=0 AND (d.NomRole IN(N'ADMIN',N'SUPERADMIN') OR Administration=1)) AND p.ModeCombineAutorise=1 AND EcranFacturation=1 AND CreationFacture=1 AND EcranCaisse=1 AND CreationEncaissement=1 AND DroitCombine=1 THEN 1 ELSE 0 END AS CombineDisponible,
  CASE WHEN p.GestionModesActive=0 THEN N'Parcours historique (gestion des modes inactive)'
- WHEN d.NomRole IN(N'ADMIN',N'SUPERADMIN') OR (ModeExplicite=0 AND Administration=1) THEN N'Parcours administratif preserve'
- WHEN EcranFacturation=0 AND EcranCaisse=0 THEN N'Role non operationnel : parcours existant'
+ WHEN ModeExplicite=0 AND (d.NomRole IN(N'ADMIN',N'SUPERADMIN') OR Administration=1) THEN N'Parcours administratif preserve'
+ WHEN EcranFacturation=0 AND EcranCaisse=0 AND ModeExplicite=0 THEN N'Role non operationnel : parcours existant'
  WHEN (p.ModeFacturationAutorise=1 AND EcranFacturation=1 AND CreationFacture=1)
  OR (p.ModeCaisseAutorise=1 AND EcranCaisse=1 AND CreationEncaissement=1)
  OR (p.ModeCombineAutorise=1 AND EcranFacturation=1 AND CreationFacture=1 AND EcranCaisse=1 AND CreationEncaissement=1 AND DroitCombine=1)
@@ -68,4 +68,13 @@ SELECT r.NomRole AS RolePrixSansConsultation
 FROM dbo.Roles r WHERE EXISTS(SELECT 1 FROM dbo.RoleInterfaces ri JOIN dbo.InterfacesApplication i ON i.InterfaceId=ri.InterfaceId WHERE ri.RoleId=r.RoleId AND i.CodeInterface IN(N'PRIX_TARIF_MODIFIER',N'PRIX_FACTURE_EXCEPTION',N'PRIX_DEMANDER',N'PRIX_DEMANDER_FACTURE'))
 AND NOT EXISTS(SELECT 1 FROM dbo.RoleInterfaces ri JOIN dbo.InterfacesApplication i ON i.InterfaceId=ri.InterfaceId WHERE ri.RoleId=r.RoleId AND i.EstActif=1 AND i.CodeInterface=N'PRIX_CONSULTER');
 PRINT N'VALIDATION_SCHEMA_INTEGRATION_PHASE2_OK';
+-- Identites et associations reelles : ne fusionner ni renommer les roles.
+SELECT u.UtilisateurId,u.NomUtilisateur,u.EstActif AS CompteActif,u.EstVerrouille,
+ r.RoleId,r.NomRole,r.EstActif AS RoleActif,ur.EstActif AS AssociationActive,ur.EstRolePrincipal
+FROM dbo.Utilisateurs u JOIN dbo.UtilisateurRoles ur ON ur.UtilisateurId=u.UtilisateurId
+JOIN dbo.Roles r ON r.RoleId=ur.RoleId ORDER BY u.UtilisateurId,ur.EstRolePrincipal DESC,r.RoleId;
+SELECT RoleId,NomRole,EstActif FROM dbo.Roles WHERE NomRole IN(N'CAISSIER',N'CAISSIERE',N'CAISSIÈRE');
+SELECT TOP(50) SessionId,UtilisateurId,RoleIdActif,ModeActif,Debut,DernierPing,Fin,Poste,
+ CASE WHEN Fin IS NOT NULL THEN N'FERMEE' WHEN DernierPing<DATEADD(MINUTE,-30,SYSUTCDATETIME()) THEN N'EXPIREE' ELSE N'ACTIVE' END AS EtatSession
+FROM dbo.UtilisateurSessions ORDER BY SessionId DESC;
 -- Ce marqueur ne prouve ni l'execution des workflows ni la charge multi-postes.

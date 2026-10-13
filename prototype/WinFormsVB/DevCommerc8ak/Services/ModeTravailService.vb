@@ -25,7 +25,6 @@ Namespace DevCommerc8ak
         End Function
 
         Private Shared Function Lister(cn As SqlConnection, tx As SqlTransaction, userId As Integer, roleId As Integer) As List(Of String)
-            Dim modes As New List(Of String)()
             Dim role As String
             Using cmd As New SqlCommand("SELECT r.NomRole FROM dbo.Utilisateurs u WITH(HOLDLOCK) JOIN dbo.UtilisateurRoles ur WITH(HOLDLOCK) ON ur.UtilisateurId=u.UtilisateurId AND ur.EstActif=1 JOIN dbo.Roles r WITH(HOLDLOCK) ON r.RoleId=ur.RoleId AND r.EstActif=1 WHERE u.UtilisateurId=@u AND u.EstActif=1 AND u.EstVerrouille=0 AND r.RoleId=@r", cn, tx)
                 cmd.Parameters.AddWithValue("@u", userId)
@@ -43,7 +42,9 @@ Namespace DevCommerc8ak
                     End While
                 End Using
             End Using
-            If Not droits.Contains("FACTURIER") AndAlso Not droits.Contains("CAISSE") Then Return modes
+            ' Les roles techniques sans parcours operationnel gardent leur acces
+            ' historique, y compris pour configurer une nouvelle installation.
+            If Not droits.Contains("FACTURIER") AndAlso Not droits.Contains("CAISSE") AndAlso Not droits.Contains("MODE_FACTURATION") AndAlso Not droits.Contains("MODE_CAISSE") AndAlso Not droits.Contains("MODE_COMBINE") Then Return New List(Of String)()
             Using cmd As New SqlCommand("SELECT GestionModesActive,ModeFacturationAutorise,ModeCaisseAutorise,ModeCombineAutorise FROM dbo.Parametres WITH(HOLDLOCK)", cn, tx)
                 Using r As SqlDataReader = cmd.ExecuteReader()
                     If Not r.Read() Then Throw New InvalidOperationException("Paramètres entreprise absents.")
@@ -52,21 +53,63 @@ Namespace DevCommerc8ak
                     Dim caisse As Boolean = CBool(r("ModeCaisseAutorise"))
                     Dim combine As Boolean = CBool(r("ModeCombineAutorise"))
                     If r.Read() Then Throw New InvalidOperationException("Plusieurs configurations entreprise : modes refusés.")
-                    Dim modesExplicites As Boolean = droits.Contains("MODE_FACTURATION") OrElse droits.Contains("MODE_CAISSE") OrElse droits.Contains("MODE_COMBINE")
-                    Dim administratif As Boolean = EstAdministratif(role) OrElse (Not modesExplicites AndAlso (droits.Contains("ADMINISTRATION") OrElse droits.Contains("SUPERADMIN_TECH")))
-                    If Not gestion OrElse administratif Then Return modes
-                    If facturation Then modes.Add("FACTURATION")
-                    If caisse Then modes.Add("CAISSE")
-                    If combine Then modes.Add("FACTURATION_ET_CAISSE")
+                    Return ModeTravailRegles.Resoudre(gestion, facturation, caisse, combine, role, droits)
                 End Using
             End Using
-            modes.RemoveAll(Function(m) Not ModeTravailRegles.AutoriseRole(m, droits))
-            If modes.Count = 0 Then Throw New UnauthorizedAccessException("Aucun parcours opérationnel autorisé. Dans Paramètres, activez le mode séparé adapté ; dans Rôles et privilèges, vérifiez Facturation + Créer une facture ou Caisse + Créer un encaissement pour le rôle choisi. Le parcours combiné exige ces deux ensembles et Mode combiné.")
-            Return modes
         End Function
 
-        Private Shared Function EstAdministratif(role As String) As Boolean
-            Return String.Equals(role, "ADMIN", StringComparison.OrdinalIgnoreCase) OrElse String.Equals(role, "SUPERADMIN", StringComparison.OrdinalIgnoreCase)
+        Public Function DiagnostiquerRoles(utilisateurId As Integer) As Dictionary(Of Integer, String)
+            Dim resultat As New Dictionary(Of Integer, String)()
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    Dim noms As New Dictionary(Of Integer, String)()
+                    Dim droits As New Dictionary(Of Integer, HashSet(Of String))()
+                    ' Un seul chargement pour les roles autorises et leurs droits,
+                    ' jamais une union entre roles et jamais une requete par role.
+                    Using cmd As New SqlCommand("SELECT r.RoleId,r.NomRole,i.CodeInterface FROM dbo.Utilisateurs u WITH(HOLDLOCK) JOIN dbo.UtilisateurRoles ur WITH(HOLDLOCK) ON ur.UtilisateurId=u.UtilisateurId AND ur.EstActif=1 JOIN dbo.Roles r WITH(HOLDLOCK) ON r.RoleId=ur.RoleId AND r.EstActif=1 LEFT JOIN dbo.RoleInterfaces ri WITH(HOLDLOCK) ON ri.RoleId=r.RoleId LEFT JOIN dbo.InterfacesApplication i WITH(HOLDLOCK) ON i.InterfaceId=ri.InterfaceId AND i.EstActif=1 WHERE u.UtilisateurId=@u AND u.EstActif=1 AND u.EstVerrouille=0", cn, tx)
+                        cmd.Parameters.AddWithValue("@u", utilisateurId)
+                        Using r As SqlDataReader = cmd.ExecuteReader()
+                            While r.Read()
+                                Dim id As Integer = CInt(r(0))
+                                If Not droits.ContainsKey(id) Then
+                                    noms.Add(id, CStr(r(1)))
+                                    droits.Add(id, New HashSet(Of String)(StringComparer.OrdinalIgnoreCase))
+                                End If
+                                If Not r.IsDBNull(2) Then droits(id).Add(CStr(r(2)))
+                            End While
+                        End Using
+                    End Using
+                    Dim operationnel As Boolean = False
+                    For Each ensemble As HashSet(Of String) In droits.Values
+                        If ensemble.Contains("FACTURIER") OrElse ensemble.Contains("CAISSE") OrElse ensemble.Contains("MODE_FACTURATION") OrElse ensemble.Contains("MODE_CAISSE") OrElse ensemble.Contains("MODE_COMBINE") Then operationnel = True
+                    Next
+                    If Not operationnel Then
+                        For Each id As Integer In droits.Keys
+                            resultat.Add(id, "Parcours historique ou administratif.")
+                        Next
+                        tx.Commit()
+                        Return resultat
+                    End If
+                    Using cmd As New SqlCommand("SELECT GestionModesActive,ModeFacturationAutorise,ModeCaisseAutorise,ModeCombineAutorise FROM dbo.Parametres WITH(HOLDLOCK)", cn, tx)
+                        Using r As SqlDataReader = cmd.ExecuteReader()
+                            If Not r.Read() Then Throw New InvalidOperationException("Paramètres entreprise absents.")
+                            Dim gestion As Boolean = CBool(r(0)), facturation As Boolean = CBool(r(1)), caisse As Boolean = CBool(r(2)), combine As Boolean = CBool(r(3))
+                            If r.Read() Then Throw New InvalidOperationException("Plusieurs configurations entreprise.")
+                            For Each paire As KeyValuePair(Of Integer, HashSet(Of String)) In droits
+                                Try
+                                    Dim modes As List(Of String) = ModeTravailRegles.Resoudre(gestion, facturation, caisse, combine, noms(paire.Key), paire.Value)
+                                    resultat.Add(paire.Key, If(modes.Count = 0, "Parcours historique ou administratif.", "Modes accessibles : " & String.Join(" / ", modes).Replace("_ET_", " + ")) & If(gestion, Environment.NewLine & If(Not combine, "Mode combiné désactivé dans les paramètres.", ModeTravailRegles.DiagnosticCombine(paire.Value)), ""))
+                                Catch ex As UnauthorizedAccessException
+                                    resultat.Add(paire.Key, ex.Message)
+                                End Try
+                            Next
+                        End Using
+                    End Using
+                    tx.Commit()
+                End Using
+            End Using
+            Return resultat
         End Function
 
         Public Sub Activer(mode As String)
@@ -75,7 +118,7 @@ Namespace DevCommerc8ak
                 Using tx As SqlTransaction = cn.BeginTransaction()
                     Dim modes As List(Of String) = Lister(cn, tx, SessionUtilisateur.UtilisateurId, SessionUtilisateur.RoleIdActif)
                     If Not modes.Contains(mode) Then Throw New UnauthorizedAccessException("Mode non autorisé pour ce rôle.")
-                    Using cmd As New SqlCommand("UPDATE dbo.UtilisateurSessions SET ModeActif=@mode WHERE SessionId=@s AND UtilisateurId=@u AND RoleIdActif=@r AND Fin IS NULL AND ModeActif IS NULL", cn, tx)
+                    Using cmd As New SqlCommand("UPDATE dbo.UtilisateurSessions SET ModeActif=@mode WHERE SessionId=@s AND UtilisateurId=@u AND RoleIdActif=@r AND Fin IS NULL AND DernierPing>=DATEADD(MINUTE,-30,SYSUTCDATETIME()) AND ModeActif IS NULL", cn, tx)
                         cmd.Parameters.AddWithValue("@mode", mode)
                         cmd.Parameters.AddWithValue("@s", SessionUtilisateur.SessionId)
                         cmd.Parameters.AddWithValue("@u", SessionUtilisateur.UtilisateurId)

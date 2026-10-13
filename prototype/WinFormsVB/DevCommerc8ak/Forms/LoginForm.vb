@@ -342,8 +342,9 @@ Namespace DevCommerc8ak
                 End If
 
                 Dim roleChoisi As RoleSessionInfo = roles(0)
+                Dim modesService As New ModeTravailService(dal)
                 If roles.Count > 1 Then
-                    Using frm As New FormChoixRoleSession(roles)
+                    Using frm As New FormChoixRoleSession(roles, modesService.DiagnostiquerRoles(utilisateur.UtilisateurId))
                         If frm.ShowDialog(Me) <> DialogResult.OK OrElse frm.RoleSelectionne Is Nothing Then
                             Return False
                         End If
@@ -351,13 +352,12 @@ Namespace DevCommerc8ak
                     End Using
                 End If
 
-                Dim modesService As New ModeTravailService(dal)
                 Dim modes As List(Of String) = modesService.Lister(utilisateur.UtilisateurId, roleChoisi.RoleId)
                 Dim modeChoisi As String = Nothing
                 If modes.Count = 1 Then
                     modeChoisi = modes(0)
                 ElseIf modes.Count > 1 Then
-                    Using selection As New DialogueModeTravail(modes)
+                    Using selection As New DialogueModeTravail(modes, roleChoisi.NomRole)
                         If selection.ShowDialog(Me) <> DialogResult.OK Then Return False
                         modeChoisi = selection.ModeSelectionne
                     End Using
@@ -508,27 +508,33 @@ Namespace DevCommerc8ak
             Private ReadOnly _roles As List(Of RoleSessionInfo)
             Public Property RoleSelectionne As RoleSessionInfo
 
-            Public Sub New(roles As List(Of RoleSessionInfo))
+            Public Sub New(roles As List(Of RoleSessionInfo), diagnostics As Dictionary(Of Integer, String))
                 _roles = roles
                 Text = "Choix du rôle"
                 StartPosition = FormStartPosition.CenterParent
                 FormBorderStyle = FormBorderStyle.FixedDialog
                 MinimizeBox = False
                 MaximizeBox = False
-                ClientSize = New Size(360, 260)
+                ClientSize = New Size(560, 400)
                 BackColor = Color.White
 
                 Dim lbl As New Label() With {
-                    .Text = "Sélectionnez le rôle pour cette session",
+                    .Text = "1. Choisissez votre rôle actif" & Environment.NewLine & "2. Le mode sera choisi parmi les parcours autorisés pour ce rôle",
                     .Dock = DockStyle.Top,
-                    .Height = 45,
+                    .Height = 64,
                     .TextAlign = ContentAlignment.MiddleCenter,
                     .Font = New Font("Segoe UI", 10, FontStyle.Bold)
                 }
                 lstRoles = New ListBox() With {.Dock = DockStyle.Fill, .Font = New Font("Segoe UI", 10)}
                 For Each role As RoleSessionInfo In _roles
-                    lstRoles.Items.Add(role.NomRole)
+                    lstRoles.Items.Add(role.NomRole & If(role.EstRolePrincipal, " (rôle principal)", ""))
                 Next
+                Dim diagnostic As New Label With {.Dock = DockStyle.Bottom, .Height = 140, .Padding = New Padding(14), .ForeColor = Color.FromArgb(52, 73, 94), .Font = New Font("Segoe UI", 9.5F)}
+                AddHandler lstRoles.SelectedIndexChanged, Sub()
+                                                             If lstRoles.SelectedIndex < 0 Then Return
+                                                             Dim id As Integer = _roles(lstRoles.SelectedIndex).RoleId
+                                                             diagnostic.Text = If(diagnostics.ContainsKey(id), diagnostics(id), "Ce rôle n'est plus attribué ou le compte a changé. Reconnectez-vous.")
+                                                         End Sub
                 If lstRoles.Items.Count > 0 Then
                     lstRoles.SelectedIndex = 0
                 End If
@@ -540,6 +546,7 @@ Namespace DevCommerc8ak
                 pnlActions.Controls.AddRange(New Control() {btnOk, btnCancel})
 
                 Controls.Add(lstRoles)
+                Controls.Add(diagnostic)
                 Controls.Add(pnlActions)
                 Controls.Add(lbl)
                 AcceptButton = btnOk

@@ -52,6 +52,8 @@ Namespace DevCommerc8ak
         Private ReadOnly btnPrixDelegue As Button
         Private ReadOnly prixDeLigne As Button
         Private ReadOnly prixArticle As ToolStripMenuItem
+        Private ReadOnly lblDelegationPrix As Label
+        Private ReadOnly aideDelegationPrix As New ToolTip()
         Private ReadOnly txtRemise As TextBox
         Private ReadOnly lblSousTotal As Label
         Private ReadOnly lblTotal As Label
@@ -323,6 +325,8 @@ Namespace DevCommerc8ak
             prixDeLigne = New Button With {.Text = "DEMANDER UNE MODIFICATION DE PRIX POUR L'ARTICLE SÉLECTIONNÉ", .Visible = False, .Dock = DockStyle.Bottom, .Height = 40, .BackColor = ColorPrimary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             AddHandler prixDeLigne.Click, AddressOf ModifierPrixArticle
             grpPanier.Controls.Add(prixDeLigne)
+            lblDelegationPrix = New Label With {.Dock = DockStyle.Bottom, .Height = 46, .Padding = New Padding(8), .AutoEllipsis = True, .Text = "Chargement des autorisations de prix…", .Font = FontControl, .ForeColor = ColorSecondary}
+            grpPanier.Controls.Add(lblDelegationPrix)
 
             ' Totaux Panel
             Dim pnlTotals As New Panel() With {
@@ -432,6 +436,7 @@ Namespace DevCommerc8ak
             MettreAJourBoutonsPanier()
             AddHandler AppEvents.ProduitModifie, AddressOf RafraichirProduitsDepuisEvenement
             AddHandler AppEvents.StockModifie, AddressOf RafraichirProduitsDepuisEvenement
+            AddHandler AppEvents.RolePermissionsChanged, AddressOf RafraichirAutorisationsPrix
             _dataMonitor = New DataChangeMonitorService(New String() {"PRODUITS", "STOCK", "TYPES_VENTE"}, 5000)
             AddHandler _dataMonitor.DomaineModifie, AddressOf RafraichirProduitsDepuisVersionSql
             _dataMonitor.Start()
@@ -781,10 +786,22 @@ Namespace DevCommerc8ak
             MiseAJourIndicateursQuantite(Nothing, EventArgs.Empty)
         End Sub
 
+        Private Sub RafraichirAutorisationsPrix(sender As Object, e As EventArgs)
+            If IsDisposed OrElse Disposing OrElse Not IsHandleCreated Then Return
+            If InvokeRequired Then
+                BeginInvoke(New MethodInvoker(Sub() RafraichirAutorisationsPrix(Nothing, EventArgs.Empty)))
+                Return
+            End If
+            ActualiserCommandesPrix()
+        End Sub
+
         Private Sub ActualiserCommandesPrix()
             Try
                 Dim service As New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString))
-                Dim actions As HashSet(Of String) = service.ActionsDisponibles()
+                Dim diagnostic As DiagnosticActionsPrix = service.DiagnostiquerActions()
+                Dim actions As HashSet(Of String) = diagnostic.Actions
+                lblDelegationPrix.Text = diagnostic.Explication
+                aideDelegationPrix.SetToolTip(lblDelegationPrix, diagnostic.Explication)
                 btnPrixDelegue.Visible = actions.Contains("PRIX_TARIF_MODIFIER") OrElse actions.Contains("PRIX_DEMANDER")
                 Dim autoriseArticle As Boolean = actions.Contains("PRIX_FACTURE_EXCEPTION") OrElse actions.Contains("PRIX_DEMANDER_FACTURE")
                 prixDeLigne.Visible = autoriseArticle
@@ -793,6 +810,7 @@ Namespace DevCommerc8ak
                 btnPrixDelegue.Visible = False
                 prixDeLigne.Visible = False
                 prixArticle.Visible = False
+                lblDelegationPrix.Text = "Commandes de prix indisponibles. Vérifiez la connexion et reconnectez-vous ou utilisez Actualiser."
                 Dim log As New ProductionLogService()
                 log.Warn("FacturationForm", "DelegationPrix", "Configuration ou autorisation des commandes de prix indisponible.")
             End Try
@@ -1653,6 +1671,8 @@ Namespace DevCommerc8ak
         Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
             RemoveHandler AppEvents.ProduitModifie, AddressOf RafraichirProduitsDepuisEvenement
             RemoveHandler AppEvents.StockModifie, AddressOf RafraichirProduitsDepuisEvenement
+            RemoveHandler AppEvents.RolePermissionsChanged, AddressOf RafraichirAutorisationsPrix
+            aideDelegationPrix.Dispose()
             If _dataMonitor IsNot Nothing Then
                 RemoveHandler _dataMonitor.DomaineModifie, AddressOf RafraichirProduitsDepuisVersionSql
                 _dataMonitor.Dispose()

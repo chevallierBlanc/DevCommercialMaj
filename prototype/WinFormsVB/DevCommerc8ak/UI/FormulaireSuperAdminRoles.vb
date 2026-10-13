@@ -72,6 +72,9 @@ Namespace DevCommerc8ak
             AddHandler btnNouveau.Click, AddressOf NouveauRole
             AddHandler btnEnregistrer.Click, AddressOf EnregistrerRole
             AddHandler btnSupprimer.Click, AddressOf SupprimerRoleSelectionne
+            AddHandler clbInterfaces.ItemCheck, Sub()
+                                                   If IsHandleCreated Then BeginInvoke(New MethodInvoker(AddressOf ActualiserDiagnosticModes))
+                                               End Sub
         End Sub
 
         Private Sub BuildUi()
@@ -218,11 +221,11 @@ Namespace DevCommerc8ak
             }
 
             lblInfo = New Label() With {
-                .Text = "Note : Le rôle SUPERADMIN hérite automatiquement de tous les privilèges techniques.",
+                .Text = "Les privilèges sont explicites. Aucun rôle n'hérite automatiquement du mode combiné ni des droits de prix.",
                 .Font = New Font("Segoe UI", 8.5F, FontStyle.Italic),
                 .ForeColor = ColorTextSecondary,
                 .Dock = DockStyle.Bottom,
-                .Height = 40,
+                .Height = 86,
                 .TextAlign = ContentAlignment.MiddleLeft
             }
 
@@ -431,6 +434,16 @@ Namespace DevCommerc8ak
             Dim nomRole As String = If(txtNomRole Is Nothing, String.Empty, txtNomRole.Text.Trim())
             btnSupprimer.Enabled = _roleIdCourant.HasValue AndAlso _roleIdCourant.Value > 0 AndAlso
                                    Not String.Equals(nomRole, "SUPERADMIN", StringComparison.OrdinalIgnoreCase)
+        End Sub
+
+        Private Sub ActualiserDiagnosticModes()
+            If IsDisposed OrElse Disposing Then Return
+            Dim droits As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+            For Each objet As Object In clbInterfaces.CheckedItems
+                Dim item As InterfaceItem = DirectCast(objet, InterfaceItem)
+                droits.Add(item.CodeInterface)
+            Next
+            lblInfo.Text = ModeTravailRegles.DiagnosticCombine(droits) & Environment.NewLine & "Prix d'une facture : Consulter les tarifs et demandes + Demander une exception pour une facture (ou Exception sur une facture uniquement). Activation globale dans Paramètres ; enregistrez puis reconnectez le poste concerné."
         End Sub
 
         Private Function SelectionContientAccesCritique(interfaceIds As IEnumerable(Of Integer)) As Boolean

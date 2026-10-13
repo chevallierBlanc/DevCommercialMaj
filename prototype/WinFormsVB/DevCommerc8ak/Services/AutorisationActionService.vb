@@ -18,7 +18,7 @@ Namespace DevCommerc8ak
                 "JOIN dbo.Roles r WITH (HOLDLOCK) ON r.RoleId=ur.RoleId AND r.EstActif=1 " &
                 "JOIN dbo.UtilisateurSessions s WITH (HOLDLOCK) ON s.UtilisateurId=u.UtilisateurId AND s.RoleIdActif=r.RoleId " &
                 "WHERE u.UtilisateurId=@user AND u.EstActif=1 AND u.EstVerrouille=0 " &
-                "AND r.RoleId=@role AND s.SessionId=@session AND s.Fin IS NULL " &
+                "AND r.RoleId=@role AND s.SessionId=@session AND s.Fin IS NULL AND s.DernierPing>=DATEADD(MINUTE,-30,SYSUTCDATETIME()) " &
                 "AND EXISTS(SELECT 1 FROM dbo.RoleInterfaces ri WITH (HOLDLOCK) JOIN dbo.InterfacesApplication i WITH (HOLDLOCK) ON i.InterfaceId=ri.InterfaceId WHERE ri.RoleId=r.RoleId AND i.CodeInterface=@action AND i.EstActif=1) " &
                 "AND EXISTS(SELECT 1 FROM dbo.RoleInterfaces ri WITH (HOLDLOCK) JOIN dbo.InterfacesApplication i WITH (HOLDLOCK) ON i.InterfaceId=ri.InterfaceId WHERE ri.RoleId=r.RoleId AND i.CodeInterface=@ecran AND i.EstActif=1)"
             Using cmd As New SqlCommand(sql, cn, tx)

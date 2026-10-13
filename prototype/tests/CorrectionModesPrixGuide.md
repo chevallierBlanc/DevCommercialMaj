@@ -1,5 +1,8 @@
 # Correction des connexions et commandes de prix
 
+Suite apres les nouveaux essais Windows : `ConnexionModesPrixGuide.md` precise
+le diagnostic par role, l'opt-in administratif et les controles atomiques de session.
+
 ## Etat initial et diagnostic
 
 Baseline : `9918835d5fbf57716f03392956e6e56666fde710`, main propre et

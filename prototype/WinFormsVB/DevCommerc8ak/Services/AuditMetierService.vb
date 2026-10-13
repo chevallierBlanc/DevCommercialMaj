@@ -50,6 +50,18 @@ Namespace DevCommerc8ak
         Public Shared Sub Enregistrer(cn As SqlConnection, tx As SqlTransaction, evenement As String, categorie As String,
                                       entite As String, id As Integer, reference As String, avant As Object, apres As Object,
                                       motif As String, correlation As Guid, Optional resultat As String = "SUCCES")
+            EnregistrerPourSession(cn, tx, evenement, categorie, entite, id, reference, avant, apres, motif, correlation, resultat, SessionUtilisateur.UtilisateurId, SessionUtilisateur.SessionId)
+        End Sub
+
+        Friend Shared Sub EnregistrerOuvertureSession(cn As SqlConnection, tx As SqlTransaction, utilisateurId As Integer, sessionId As Integer, roleId As Integer)
+            ' La session vient d'etre validee et inseree dans cette transaction.
+            ' L'identite historique est resolue en SQL, jamais depuis un nom fourni.
+            EnregistrerPourSession(cn, tx, "SESSION_ROLE_ACTIVE", "AUTORISATIONS", "Session", sessionId, sessionId.ToString(), Nothing, New With {.RoleIdActif = roleId}, "", Guid.NewGuid(), "SUCCES", utilisateurId, sessionId)
+        End Sub
+
+        Private Shared Sub EnregistrerPourSession(cn As SqlConnection, tx As SqlTransaction, evenement As String, categorie As String,
+                                      entite As String, id As Integer, reference As String, avant As Object, apres As Object,
+                                      motif As String, correlation As Guid, resultat As String, utilisateurId As Integer, sessionId As Integer)
             If tx Is Nothing OrElse tx.Connection IsNot cn Then Throw New ArgumentException("Transaction audit obligatoire.")
             ' Seuls des snapshots métier explicitement construits sont fournis.
             ' Aucun objet d'authentification ni secret n'est sérialisé.
@@ -71,8 +83,8 @@ Namespace DevCommerc8ak
                 cmd.Parameters.AddWithValue("@apres", If(apres Is Nothing, CType(DBNull.Value, Object), json.Serialize(apres)))
                 cmd.Parameters.AddWithValue("@motif", If(motif, String.Empty))
                 cmd.Parameters.AddWithValue("@resultat", resultat)
-                cmd.Parameters.AddWithValue("@user", SessionUtilisateur.UtilisateurId)
-                cmd.Parameters.AddWithValue("@session", SessionUtilisateur.SessionId)
+                cmd.Parameters.AddWithValue("@user", utilisateurId)
+                cmd.Parameters.AddWithValue("@session", sessionId)
                 If cmd.ExecuteNonQuery() <> 1 Then Throw New InvalidOperationException("Session audit invalide : opération annulée.")
             End Using
         End Sub

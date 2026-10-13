@@ -313,12 +313,42 @@ Module Program
             Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & roleCaisse.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface IN('CAISSE','ENCAISSEMENT_CREER')")
             Dim modesCaisse As List(Of String) = modes.Lister(user, roleCaisse)
             Verifier(modesCaisse.Count = 1 AndAlso modesCaisse(0) = "CAISSE", "Role caissiere historique reconnectable sans MODE_CAISSE et sans union des roles")
+            Dim diagnostics As Dictionary(Of Integer, String) = modes.DiagnostiquerRoles(user)
+            Verifier(diagnostics.ContainsKey(roleCaisse) AndAlso diagnostics(roleCaisse).Contains("Créer une facture"), "Diagnostic par role avec droits manquants, sans cumul")
+            Dim sessions As New SessionRepository(dal)
+            TesterOuvertureSessions(role, suffix, sessions)
+            Refus(Of UnauthorizedAccessException)(Sub() sessions.DemarrerSession(user, -1, "ROLE INVENTE"))
+            Refus(Of InvalidOperationException)(Sub() sessions.DemarrerSession(user, roleCaisse, "FAUX NOM"))
             Dim modesActifs As ConfigurationModes = configModes.Charger()
             configModes.Enregistrer(New ConfigurationModes With {.Active = True, .Facturation = True, .Caisse = False, .Combine = True}, modesActifs, "Caisse separee desactivee dans la fixture")
             Refus(Of UnauthorizedAccessException)(Sub() modes.Lister(user, roleCaisse))
             configModes.Enregistrer(modesActifs, configModes.Charger(), "Restaurer le mode caisse de la fixture")
             Refus(Of UnauthorizedAccessException)(Sub() modes.Activer("FACTURATION_ET_CAISSE"))
             modes.Activer("FACTURATION")
+            Verifier(prix.ActionsDisponibles().Count > 0, "Precondition : commandes actives avant expiration")
+            Dim pingAvant As Object = Nothing
+            Using cn As SqlConnection = dal.CreerConnexion()
+                cn.Open()
+                Using cmd As New SqlCommand("SELECT DernierPing FROM dbo.UtilisateurSessions WHERE SessionId=@s", cn)
+                    cmd.Parameters.AddWithValue("@s", SessionUtilisateur.SessionId)
+                    pingAvant = cmd.ExecuteScalar()
+                End Using
+                Using cmd As New SqlCommand("UPDATE dbo.UtilisateurSessions SET DernierPing=DATEADD(MINUTE,-31,SYSUTCDATETIME()) WHERE SessionId=@s", cn)
+                    cmd.Parameters.AddWithValue("@s", SessionUtilisateur.SessionId)
+                    cmd.ExecuteNonQuery()
+                End Using
+                Try
+                    Verifier(prix.ActionsDisponibles().Count = 0, "Session expiree : aucune commande autorisee")
+                    sessions.Ping(SessionUtilisateur.SessionId)
+                    Verifier(prix.ActionsDisponibles().Count = 0, "Ping ne ressuscite pas une session expiree")
+                Finally
+                    Using cmd As New SqlCommand("UPDATE dbo.UtilisateurSessions SET DernierPing=@ping WHERE SessionId=@s", cn)
+                        cmd.Parameters.AddWithValue("@ping", pingAvant)
+                        cmd.Parameters.AddWithValue("@s", SessionUtilisateur.SessionId)
+                        cmd.ExecuteNonQuery()
+                    End Using
+                End Try
+            End Using
             Using cn As SqlConnection = dal.CreerConnexion()
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
@@ -452,6 +482,36 @@ Module Program
         End Try
         Throw New Exception("Refus attendu : " & GetType(T).Name)
     End Sub
+    Private Sub TesterOuvertureSessions(role As Integer, suffix As String, sessions As SessionRepository)
+        Dim compte As Integer = Scalar("INSERT dbo.Utilisateurs(NomUtilisateur,MotDePasseHash,MotDePasseSel,EstActif) SELECT TOP(1) 'SES_' + @s,MotDePasseHash,MotDePasseSel,1 FROM dbo.Utilisateurs; SELECT CAST(SCOPE_IDENTITY() AS int)", suffix)
+        Exec("INSERT dbo.UtilisateurRoles(UtilisateurId,RoleId,EstActif,EstRolePrincipal) VALUES(" & compte.ToString() & "," & role.ToString() & ",1,1)")
+        Exec("UPDATE dbo.UtilisateurRoles SET EstActif=0 WHERE UtilisateurId=" & compte.ToString())
+        Refus(Of UnauthorizedAccessException)(Sub() sessions.DemarrerSession(compte, role, "NOM INVENTE"))
+        Exec("UPDATE dbo.UtilisateurRoles SET EstActif=1 WHERE UtilisateurId=" & compte.ToString())
+        Exec("CREATE TRIGGER dbo.TR_TEST_SessionAuditFailure ON dbo.JournalAudit AFTER INSERT AS BEGIN IF EXISTS(SELECT 1 FROM inserted WHERE [Action]='SESSION_ROLE_ACTIVE' AND EffectuePar=" & compte.ToString() & ") THROW 51000,'TEST SESSION AUDIT FAILURE',1; END")
+        Try
+            Refus(Of SqlException)(Sub() sessions.DemarrerSession(compte, role, "NOM INVENTE"))
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.UtilisateurSessions WHERE UtilisateurId=" & compte.ToString()) = 0, "Echec audit : aucune session partiellement ouverte")
+        Finally
+            Exec("DROP TRIGGER dbo.TR_TEST_SessionAuditFailure")
+        End Try
+        Dim gagnants As Integer = 0, refuses As Integer = 0, sessionCreee As Integer = 0
+        Parallel.For(0, 2, Sub(i)
+                              Try
+                                  Dim id As Integer = sessions.DemarrerSession(compte, role, "NOM INVENTE")
+                                  Interlocked.Exchange(sessionCreee, id)
+                                  Interlocked.Increment(gagnants)
+                              Catch ex As InvalidOperationException
+                                  Interlocked.Increment(refuses)
+                              End Try
+                          End Sub)
+        Verifier(gagnants = 1 AndAlso refuses = 1, "Deux ouvertures concurrentes : une seule session du compte")
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.JournalAudit a JOIN dbo.Roles r ON r.RoleId=" & role.ToString() & " WHERE a.SessionId=" & sessionCreee.ToString() & " AND a.[Action]='SESSION_ROLE_ACTIVE' AND a.EffectuePar=" & compte.ToString() & " AND a.RoleActif=r.NomRole AND a.Resultat='SUCCES'") = 1, "Role reel et auteur audites une seule fois dans la transaction")
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.UtilisateurSessions s JOIN dbo.Roles r ON r.RoleId=s.RoleIdActif WHERE s.SessionId=" & sessionCreee.ToString() & " AND s.RoleSession=r.NomRole") = 1, "Nom de role fourni par le client ignore au profit de SQL")
+        sessions.FermerSession(sessionCreee)
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.UtilisateurSessions WHERE SessionId=" & sessionCreee.ToString() & " AND Fin IS NOT NULL") = 1, "Deconnexion ferme uniquement la session choisie")
+    End Sub
+
     Private Sub Verifier(condition As Boolean, message As String)
         If Not condition Then Throw New Exception(message)
         compteur += 1

@@ -31,6 +31,30 @@ Namespace DevCommerc8ak
             End Select
         End Function
 
+        Public Shared Function Resoudre(gestion As Boolean, facturation As Boolean, caisse As Boolean, combine As Boolean, role As String, droits As ISet(Of String)) As List(Of String)
+            Dim modes As New List(Of String)()
+            Dim explicite As Boolean = droits.Contains("MODE_FACTURATION") OrElse droits.Contains("MODE_CAISSE") OrElse droits.Contains("MODE_COMBINE")
+            Dim administratif As Boolean = String.Equals(role, "ADMIN", StringComparison.OrdinalIgnoreCase) OrElse String.Equals(role, "SUPERADMIN", StringComparison.OrdinalIgnoreCase) OrElse droits.Contains("ADMINISTRATION") OrElse droits.Contains("SUPERADMIN_TECH")
+            ' Un administrateur conserve son portail classique sauf s'il choisit
+            ' explicitement un parcours operationnel via ses privileges.
+            If Not gestion OrElse (administratif AndAlso Not explicite) Then Return modes
+            If Not explicite AndAlso Not droits.Contains("FACTURIER") AndAlso Not droits.Contains("CAISSE") Then Return modes
+            If facturation AndAlso AutoriseRole("FACTURATION", droits) Then modes.Add("FACTURATION")
+            If caisse AndAlso AutoriseRole("CAISSE", droits) Then modes.Add("CAISSE")
+            If combine AndAlso AutoriseRole("FACTURATION_ET_CAISSE", droits) Then modes.Add("FACTURATION_ET_CAISSE")
+            If modes.Count = 0 Then Throw New UnauthorizedAccessException("Aucun mode opérationnel accessible. Activez le mode global adapté et vérifiez les droits du rôle choisi : Facturation + Créer une facture, ou Caisse + Créer un encaissement. Le combiné exige ces deux ensembles et Mode combiné.")
+            Return modes
+        End Function
+
+        Public Shared Function DiagnosticCombine(droits As ISet(Of String)) As String
+            Dim manquants As New List(Of String)()
+            For Each droit As KeyValuePair(Of String, String) In New Dictionary(Of String, String) From {{"FACTURIER", "accès Facturation"}, {"FACTURE_CREER", "Créer une facture"}, {"CAISSE", "accès Caisse"}, {"ENCAISSEMENT_CREER", "Créer un encaissement"}, {"MODE_COMBINE", "Mode combiné"}}
+                If Not droits.Contains(droit.Key) Then manquants.Add(droit.Value)
+            Next
+            If manquants.Count = 0 Then Return "Droits du combiné réunis pour ce rôle ; l'activation globale reste nécessaire."
+            Return "Combiné : droits manquants pour ce rôle : " & String.Join(", ", manquants) & ". Les droits d'autres rôles ne sont pas cumulés."
+        End Function
+
         Public Shared Function AutoriseEcran(mode As String, ecran As String) As Boolean
             ' Un mode limite un droit existant, il n'accorde jamais les droits
             ' de l'autre role. Le mode combine reste une option unique explicite.

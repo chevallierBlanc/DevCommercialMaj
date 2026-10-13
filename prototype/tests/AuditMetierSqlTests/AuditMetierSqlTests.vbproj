@@ -7,6 +7,7 @@
     <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Repositories/SessionRepository.vb" Link="SessionRepository.vb" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />

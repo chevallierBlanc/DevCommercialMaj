@@ -10,6 +10,10 @@ Imports System.Text
 Imports System.Web.Script.Serialization
 
 Namespace DevCommerc8ak
+    Public Class DiagnosticActionsPrix
+        Public ReadOnly Property Actions As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+        Public Property Explication As String
+    End Class
     Public Class ApprobationPrixArticle
         Public Property Ligne As LigneFactureVente
         Public Property Contexte As ContexteCommercialPrix
@@ -71,7 +75,12 @@ Namespace DevCommerc8ak
         End Function
 
         Public Function ActionsDisponibles() As HashSet(Of String)
-            Dim actions As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+            Return DiagnostiquerActions().Actions
+        End Function
+
+        Public Function DiagnostiquerActions() As DiagnosticActionsPrix
+            Dim diagnostic As New DiagnosticActionsPrix With {.Explication = "Délégation des prix désactivée dans les paramètres."}
+            Dim actions As HashSet(Of String) = diagnostic.Actions
             Using cn As SqlConnection = _dal.CreerConnexion()
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
@@ -91,14 +100,20 @@ Namespace DevCommerc8ak
                             For Each code As String In New String() {"PRIX_TARIF_MODIFIER", "PRIX_FACTURE_EXCEPTION", "PRIX_DEMANDER", "PRIX_DEMANDER_FACTURE"}
                                 If DelegationPrixRegles.AutoriseCommande(code, p.Active, p.Demandes, p.Immediate, droits) Then actions.Add(code)
                             Next
+                            If actions.Contains("PRIX_DEMANDER_FACTURE") OrElse actions.Contains("PRIX_FACTURE_EXCEPTION") Then
+                                diagnostic.Explication = "Prix de l'article : sélectionnez une ligne du panier. Tarif officiel et exception de facture ont des droits distincts."
+                            Else
+                                diagnostic.Explication = "Prix de l'article indisponible : autorisez « Prix : demander une exception pour une facture » ou « Prix : exception sur une facture uniquement » dans le rôle actif, puis activez les demandes ou modifications immédiates correspondantes."
+                            End If
                         Catch ex As UnauthorizedAccessException
                             actions.Clear()
+                            diagnostic.Explication = "Prix indisponibles : vérifiez Consulter les prix, l'accès Facturation et la validité de la session du rôle actif. Une reconnexion peut être nécessaire."
                         End Try
                     End If
                     tx.Commit()
                 End Using
             End Using
-            Return actions
+            Return diagnostic
         End Function
 
         Public Shared Function LireConfiguration(cn As SqlConnection, tx As SqlTransaction) As ConfigurationPrix

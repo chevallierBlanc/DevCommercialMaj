@@ -11,18 +11,18 @@ Namespace DevCommerc8ak
         Inherits Form
         Public Property ModeSelectionne As String
 
-        Public Sub New(modes As IList(Of String))
+        Public Sub New(modes As IList(Of String), Optional roleActif As String = "")
             Text = "Choisir votre mode de travail"
             StartPosition = FormStartPosition.CenterParent
-            Size = New Size(580, 340)
+            Size = New Size(620, 460)
             MinimumSize = Size
             BackColor = Color.FromArgb(245, 247, 250)
             Font = New Font("Segoe UI", 10)
             Dim root As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(20), .ColumnCount = 1, .RowCount = 3}
-            root.RowStyles.Add(New RowStyle(SizeType.Absolute, 50))
+            root.RowStyles.Add(New RowStyle(SizeType.Absolute, 72))
             root.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
             root.RowStyles.Add(New RowStyle(SizeType.Absolute, 48))
-            root.Controls.Add(New Label With {.Text = "Un rôle actif • Un mode de travail", .Dock = DockStyle.Fill, .Font = New Font("Segoe UI", 15, FontStyle.Bold), .ForeColor = Color.FromArgb(41, 128, 185)}, 0, 0)
+            root.Controls.Add(New Label With {.Text = "Choisissez votre mode de travail" & If(String.IsNullOrWhiteSpace(roleActif), "", Environment.NewLine & "Rôle actif : " & roleActif), .Dock = DockStyle.Fill, .Font = New Font("Segoe UI", 13, FontStyle.Bold), .ForeColor = Color.FromArgb(41, 128, 185)}, 0, 0)
             Dim choix As New FlowLayoutPanel With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.TopDown, .WrapContents = False, .AutoScroll = True}
             For Each mode As String In modes
                 Dim description As String = If(mode = "FACTURATION", "Créer et gérer les factures autorisées.", If(mode = "CAISSE", "Encaisser et consulter les paiements.", "Facturer puis encaisser : deux opérations distinctes."))

@@ -3,6 +3,7 @@ Option Explicit On
 
 Imports System
 Imports System.Data
+Imports System.Data.SqlClient
 Imports System.Collections.Generic
 
 Namespace DevCommerc8ak
@@ -39,15 +40,41 @@ Namespace DevCommerc8ak
 
         Public Function DemarrerSession(utilisateurId As Integer, roleIdActif As Integer, roleSession As String) As Integer
             AssurerTable()
-            Dim sql As String = "INSERT INTO UtilisateurSessions (UtilisateurId, RoleIdActif, RoleSession, Poste) VALUES (@UtilisateurId, @RoleIdActif, @RoleSession, @Poste); SELECT CAST(SCOPE_IDENTITY() AS INT);"
-            Dim p As New List(Of System.Data.SqlClient.SqlParameter) From {
-                New System.Data.SqlClient.SqlParameter("@UtilisateurId", utilisateurId),
-                New System.Data.SqlClient.SqlParameter("@RoleIdActif", If(roleIdActif > 0, CType(roleIdActif, Object), DBNull.Value)),
-                New System.Data.SqlClient.SqlParameter("@RoleSession", If(String.IsNullOrWhiteSpace(roleSession), CType(DBNull.Value, Object), roleSession.Trim())),
-                New System.Data.SqlClient.SqlParameter("@Poste", Environment.MachineName)
-            }
-            Dim id As Object = _dal.ExecuterScalaire(sql, CommandType.Text, p)
-            Return Convert.ToInt32(id)
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    ' Serialiser les ouvertures pour ce compte, sans bloquer les
+                    ' autres utilisateurs. Relire le role apres son choix dans l'UI.
+                    Using compte As New SqlCommand("SELECT UtilisateurId FROM dbo.Utilisateurs WITH(UPDLOCK,HOLDLOCK) WHERE UtilisateurId=@u AND EstActif=1 AND EstVerrouille=0", cn, tx)
+                        compte.Parameters.AddWithValue("@u", utilisateurId)
+                        If compte.ExecuteScalar() Is Nothing Then Throw New UnauthorizedAccessException("Ce compte n'est plus actif ou est verrouillé.")
+                    End Using
+                    Dim idRole As Integer
+                    Dim nomRole As String
+                    Using role As New SqlCommand("SELECT TOP(1) r.RoleId,r.NomRole FROM dbo.UtilisateurRoles ur WITH(HOLDLOCK) JOIN dbo.Roles r WITH(HOLDLOCK) ON r.RoleId=ur.RoleId AND r.EstActif=1 WHERE ur.UtilisateurId=@u AND ur.EstActif=1 AND (@r=0 OR r.RoleId=@r) ORDER BY ur.EstRolePrincipal DESC,r.RoleId", cn, tx)
+                        role.Parameters.AddWithValue("@u", utilisateurId)
+                        role.Parameters.AddWithValue("@r", roleIdActif)
+                        Using lecteur As SqlDataReader = role.ExecuteReader()
+                            If Not lecteur.Read() Then Throw New UnauthorizedAccessException("Le rôle choisi n'est plus autorisé pour ce compte. Reconnectez-vous.")
+                            idRole = CInt(lecteur(0)) : nomRole = CStr(lecteur(1))
+                        End Using
+                    End Using
+                    Using active As New SqlCommand("SELECT COUNT(*) FROM dbo.UtilisateurSessions WHERE UtilisateurId=@u AND Fin IS NULL AND DernierPing>=DATEADD(MINUTE,-30,SYSUTCDATETIME())", cn, tx)
+                        active.Parameters.AddWithValue("@u", utilisateurId)
+                        If CInt(active.ExecuteScalar()) > 0 Then Throw New InvalidOperationException("Ce compte possède déjà une session active. Fermez-la avant de vous reconnecter.")
+                    End Using
+                    Using cmd As New SqlCommand("INSERT dbo.UtilisateurSessions(UtilisateurId,RoleIdActif,RoleSession,Poste) VALUES(@u,@r,@nom,@poste); SELECT CAST(SCOPE_IDENTITY() AS int);", cn, tx)
+                        cmd.Parameters.AddWithValue("@u", utilisateurId)
+                        cmd.Parameters.AddWithValue("@r", idRole)
+                        cmd.Parameters.AddWithValue("@nom", nomRole)
+                        cmd.Parameters.AddWithValue("@poste", Environment.MachineName)
+                        Dim id As Integer = CInt(cmd.ExecuteScalar())
+                        AuditMetierService.EnregistrerOuvertureSession(cn, tx, utilisateurId, id, idRole)
+                        tx.Commit()
+                        Return id
+                    End Using
+                End Using
+            End Using
         End Function
 
         Public Function UtilisateurDejaConnecte(utilisateurId As Integer) As Boolean
@@ -60,7 +87,7 @@ Namespace DevCommerc8ak
         End Function
 
         Public Sub Ping(sessionId As Integer)
-            Dim sql As String = "UPDATE UtilisateurSessions SET DernierPing=SYSUTCDATETIME() WHERE SessionId=@SessionId"
+            Dim sql As String = "UPDATE UtilisateurSessions SET DernierPing=SYSUTCDATETIME() WHERE SessionId=@SessionId AND Fin IS NULL AND DernierPing>=DATEADD(MINUTE,-30,SYSUTCDATETIME())"
             Dim p As New List(Of System.Data.SqlClient.SqlParameter) From {
                 New System.Data.SqlClient.SqlParameter("@SessionId", sessionId)
             }
@@ -68,7 +95,7 @@ Namespace DevCommerc8ak
         End Sub
 
         Public Sub FermerSession(sessionId As Integer)
-            Dim sql As String = "UPDATE UtilisateurSessions SET Fin=SYSUTCDATETIME() WHERE SessionId=@SessionId"
+            Dim sql As String = "UPDATE UtilisateurSessions SET Fin=SYSUTCDATETIME() WHERE SessionId=@SessionId AND Fin IS NULL"
             Dim p As New List(Of System.Data.SqlClient.SqlParameter) From {
                 New System.Data.SqlClient.SqlParameter("@SessionId", sessionId)
             }
