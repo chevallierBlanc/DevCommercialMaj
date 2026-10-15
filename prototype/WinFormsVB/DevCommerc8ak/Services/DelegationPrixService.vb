@@ -13,6 +13,7 @@ Namespace DevCommerc8ak
     Public Class DiagnosticActionsPrix
         Public ReadOnly Property Actions As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
         Public Property Explication As String
+        Public Property ExplicationTarif As String
     End Class
     Public Class ApprobationPrixArticle
         Public Property Ligne As LigneFactureVente
@@ -102,6 +103,7 @@ Namespace DevCommerc8ak
                             For Each code As String In New String() {"PRIX_TARIF_MODIFIER", "PRIX_FACTURE_EXCEPTION", "PRIX_DEMANDER", "PRIX_DEMANDER_FACTURE"}
                                 If DelegationPrixRegles.AutoriseCommande(code, p.Active, p.Demandes, p.Immediate, droits) Then actions.Add(code)
                             Next
+                            diagnostic.ExplicationTarif = "Tarif officiel : " & If(actions.Contains("PRIX_TARIF_MODIFIER"), "modification autorisée sous contrôle des seuils.", If(actions.Contains("PRIX_DEMANDER"), "demande d'approbation autorisée.", "accès refusé. " & If(Not p.Immediate, "Modifications immédiates désactivées. ", "") & If(Not p.Demandes, "Demandes désactivées. ", "") & If(Not droits.Contains("PRIX_TARIF_MODIFIER"), "Permission Modifier le tarif officiel absente. ", "") & If(Not droits.Contains("PRIX_DEMANDER"), "Permission Demander un tarif officiel absente.", "")))
                             If actions.Contains("PRIX_DEMANDER_FACTURE") OrElse actions.Contains("PRIX_FACTURE_EXCEPTION") Then
                                 diagnostic.Explication = "Prix de l'article : sélectionnez une ligne du panier. Tarif officiel et exception de facture ont des droits distincts."
                             Else
@@ -112,6 +114,7 @@ Namespace DevCommerc8ak
                             diagnostic.Explication = "Prix indisponibles : vérifiez Consulter les prix, l'accès Facturation et la validité de la session du rôle actif. Une reconnexion peut être nécessaire."
                         End Try
                     End If
+                    If diagnostic.ExplicationTarif Is Nothing Then diagnostic.ExplicationTarif = diagnostic.Explication
                     tx.Commit()
                 End Using
             End Using

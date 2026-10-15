@@ -71,6 +71,7 @@
     <Compile Include="Forms\VenteEncaissementForm.vb" />
     <Compile Include="Services\VenteEncaissementService.vb" />
     <Compile Include="Services\AttributionModeService.vb" />
+    <Compile Include="UI\ModesUtilisateurPanel.vb" />
     <EmbeddedResource Include="Migrations\2026101501_VenteEncaissement.sql">
       <LogicalName>VenteEncaissementMigration.sql</LogicalName>
     </EmbeddedResource>

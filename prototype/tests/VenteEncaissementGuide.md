@@ -1,5 +1,9 @@
 # Vente et Encaissement : livraison et validation
 
+> Correctif suivant : consulter CorrectionVenteEncaissementGuide.md pour la
+> section integree Modes par role, le point d'entree FacturationEtCaisseForm
+> et le paiement integre qui remplacent le bouton/modal de cette livraison.
+
 ## Diagnostic et perimetre
 
 Depart : `bee019d7cef7df914bc8ce73e0b9c47d0ba78f58`, branche main propre,

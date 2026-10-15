@@ -57,6 +57,8 @@ Module Program
         Verifie(ModeTravailRegles.AutoriseEcran("FACTURATION_ET_CAISSE", "FACTURIER") AndAlso ModeTravailRegles.AutoriseEcran("FACTURATION_ET_CAISSE", "CAISSE"), "Mode combiné unique")
         Refuse(Of UnauthorizedAccessException)(Sub() ModeTravailRegles.Permission("FACTURIER+CAISSIER"))
         Verifie(ModeTravailRegles.ModeSeparePrefere("CAISSIER", New List(Of String) From {"FACTURATION", "CAISSE"}) = "CAISSE", "Case decochee : parcours caisse habituel")
+        Verifie(ModeTravailRegles.ModeSeparePrefere("CAISSIÈRE", New List(Of String) From {"CAISSE", "FACTURATION_ET_CAISSE"}) = "CAISSE", "Tatiana/CAISSIERE accentuee : case decochee reste en caisse")
+        Verifie(ModeTravailRegles.ModeSeparePrefere("CAISSIÈRE", New List(Of String) From {"FACTURATION_ET_CAISSE"}) Is Nothing, "Aucun parcours classique fabrique si seul le combine est autorise")
         Verifie(ModeTravailRegles.ModeSeparePrefere("FACTURIER", New List(Of String) From {"FACTURATION", "CAISSE"}) = "FACTURATION", "Parcours facturier habituel sans cumul")
         Verifie(ModeTravailRegles.ModeSeparePrefere("CAISSIER", New List(Of String)()) Is Nothing, "Preference ne fabrique jamais un mode interdit")
         Dim droitsCaisse As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {"CAISSE", "ENCAISSEMENT_CREER"}

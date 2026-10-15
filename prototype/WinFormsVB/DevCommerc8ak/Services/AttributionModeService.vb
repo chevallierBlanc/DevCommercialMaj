@@ -15,8 +15,12 @@ Namespace DevCommerc8ak
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
                     AutorisationActionService.Exiger(cn, tx, "UTILISATEUR_MODES", "ADMINISTRATION")
+                    VerifierSchema(cn, tx)
+                    Using config As New SqlCommand("SELECT COUNT(*) FROM dbo.Parametres", cn, tx)
+                        If CInt(config.ExecuteScalar()) <> 1 Then Throw New InvalidOperationException("Une configuration entreprise unique est requise pour diagnostiquer les modes.")
+                    End Using
                     Dim table As New DataTable()
-                    Using cmd As New SqlCommand("SELECT ur.RoleId,r.NomRole,ur.EstRolePrincipal,ur.VenteEncaissementAutorise FROM dbo.UtilisateurRoles ur JOIN dbo.Roles r ON r.RoleId=ur.RoleId WHERE ur.UtilisateurId=@u AND ur.EstActif=1 AND r.EstActif=1 ORDER BY ur.EstRolePrincipal DESC,r.NomRole", cn, tx)
+                    Using cmd As New SqlCommand("SELECT ur.RoleId,r.NomRole,ur.EstRolePrincipal,ur.VenteEncaissementAutorise,u.EstActif AS CompteActif,u.EstVerrouille,p.GestionModesActive,p.ModeFacturationAutorise,p.ModeCaisseAutorise,p.ModeCombineAutorise,d.FacturationEligible,d.CaisseEligible,d.CombineEligible FROM dbo.UtilisateurRoles ur JOIN dbo.Utilisateurs u ON u.UtilisateurId=ur.UtilisateurId JOIN dbo.Roles r ON r.RoleId=ur.RoleId CROSS JOIN dbo.Parametres p OUTER APPLY(SELECT CASE WHEN COUNT(DISTINCT CASE WHEN i.CodeInterface IN('FACTURIER','FACTURE_CREER') THEN i.CodeInterface END)=2 THEN 1 ELSE 0 END AS FacturationEligible,CASE WHEN COUNT(DISTINCT CASE WHEN i.CodeInterface IN('CAISSE','ENCAISSEMENT_CREER') THEN i.CodeInterface END)=2 THEN 1 ELSE 0 END AS CaisseEligible,CASE WHEN COUNT(DISTINCT i.CodeInterface)=5 THEN 1 ELSE 0 END AS CombineEligible FROM dbo.RoleInterfaces ri JOIN dbo.InterfacesApplication i ON i.InterfaceId=ri.InterfaceId AND i.EstActif=1 WHERE ri.RoleId=r.RoleId AND i.CodeInterface IN('FACTURIER','FACTURE_CREER','CAISSE','ENCAISSEMENT_CREER','MODE_COMBINE')) d WHERE ur.UtilisateurId=@u AND ur.EstActif=1 AND r.EstActif=1 ORDER BY ur.EstRolePrincipal DESC,r.NomRole", cn, tx)
                         cmd.Parameters.AddWithValue("@u", utilisateurId)
                         Using lecteur As SqlDataReader = cmd.ExecuteReader()
                             table.Load(lecteur)
@@ -41,6 +45,7 @@ Namespace DevCommerc8ak
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
                     AutorisationActionService.Exiger(cn, tx, "UTILISATEUR_MODES", "ADMINISTRATION")
+                    VerifierSchema(cn, tx)
                     Using protection As New SqlCommand("SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.UtilisateurRoles ur JOIN dbo.Roles r ON r.RoleId=ur.RoleId WHERE ur.UtilisateurId=@u AND ur.EstActif=1 AND r.NomRole='SUPERADMIN') AND NOT EXISTS(SELECT 1 FROM dbo.Roles WHERE RoleId=@acteur AND NomRole='SUPERADMIN') THEN 1 ELSE 0 END", cn, tx)
                         protection.Parameters.AddWithValue("@u", utilisateurId)
                         protection.Parameters.AddWithValue("@acteur", SessionUtilisateur.RoleIdActif)
@@ -63,6 +68,11 @@ Namespace DevCommerc8ak
                     AuditMetierService.Enregistrer(cn, tx, "MODE_UTILISATEUR_ATTRIBUE", "AUTORISATIONS", "Utilisateur", utilisateurId, utilisateurId.ToString(), New With {.RoleId = roleId, .Autorise = attendu}, New With {.RoleId = roleId, .Autorise = valeur}, motif, Guid.NewGuid())
                     tx.Commit()
                 End Using
+            End Using
+        End Sub
+        Friend Shared Sub VerifierSchema(cn As SqlConnection, tx As SqlTransaction)
+            Using cmd As New SqlCommand("SELECT COL_LENGTH(N'dbo.UtilisateurRoles',N'VenteEncaissementAutorise')", cn, tx)
+                If cmd.ExecuteScalar() Is DBNull.Value Then Throw New InvalidOperationException("Migration 2026101501 absente sur cette base : appliquez la migration additive avant de configurer les modes. Aucun droit ne sera attribué automatiquement.")
             End Using
         End Sub
     End Class

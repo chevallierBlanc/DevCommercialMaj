@@ -387,7 +387,7 @@ Namespace DevCommerc8ak
             _moduleInitialCharge = True
 
             If SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE" Then
-                LoadForm(New VenteEncaissementForm())
+                OuvrirVenteEncaissement()
             ElseIf SessionUtilisateur.ModeActif = "FACTURATION" Then
                 LoadForm(New FacturationForm())
             ElseIf SessionUtilisateur.ModeActif = "CAISSE" Then
@@ -395,6 +395,7 @@ Namespace DevCommerc8ak
             ElseIf String.Equals(SessionUtilisateur.Role, "FACTURIER", StringComparison.OrdinalIgnoreCase) Then
                 LoadForm(New FacturationForm())
             ElseIf String.Equals(SessionUtilisateur.Role, "CAISSIERE", StringComparison.OrdinalIgnoreCase) OrElse
+                   String.Equals(SessionUtilisateur.Role, "CAISSIÈRE", StringComparison.OrdinalIgnoreCase) OrElse
                    String.Equals(SessionUtilisateur.Role, "CAISSIER", StringComparison.OrdinalIgnoreCase) Then
                 LoadForm(New CaisseForm())
             ElseIf EstRoleAdminEtendu() Then
@@ -1123,7 +1124,7 @@ Namespace DevCommerc8ak
         ''' </summary>
         Private Sub AfficherFacturier(sender As Object, e As EventArgs)
             If SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE" Then
-                LoadForm(New VenteEncaissementForm())
+                OuvrirVenteEncaissement()
             Else
                 LoadForm(New FacturationForm())
             End If
@@ -1134,10 +1135,26 @@ Namespace DevCommerc8ak
         ''' </summary>
         Private Sub AfficherCaisse(sender As Object, e As EventArgs)
             If SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE" Then
-                LoadForm(New VenteEncaissementForm())
+                OuvrirVenteEncaissement()
             Else
                 LoadForm(New CaisseForm())
             End If
+        End Sub
+
+        Private Sub OuvrirVenteEncaissement()
+            Try
+                LoadForm(New FacturationEtCaisseForm())
+            Catch ex As UnauthorizedAccessException
+                MessageBox.Show(Me, "Vente & Encaissement refusé : " & ex.Message & Environment.NewLine & "Vérifiez l'attribution de ce rôle puis reconnectez-vous.", "Autorisation", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Catch ex As System.Data.SqlClient.SqlException
+                Dim log As New ProductionLogService()
+                log.Error("MainForm", "OuvrirVenteEncaissement", "Contrôle SQL d'ouverture impossible.", ex)
+                MessageBox.Show(Me, "Vente & Encaissement indisponible : le contrôle SQL n'a pas abouti. Aucun paiement n'a été engagé.", "Connexion SQL", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Catch ex As InvalidOperationException
+                Dim log As New ProductionLogService()
+                log.Error("MainForm", "OuvrirVenteEncaissement", "Configuration d'ouverture invalide.", ex)
+                MessageBox.Show(Me, "Ouverture impossible : " & ex.Message, "Configuration", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            End Try
         End Sub
 
         Private Sub AfficherFinance(sender As Object, e As EventArgs)

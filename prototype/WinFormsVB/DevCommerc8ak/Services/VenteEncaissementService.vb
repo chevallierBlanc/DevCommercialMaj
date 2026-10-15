@@ -35,6 +35,30 @@ Namespace DevCommerc8ak
         Public Sub New(dal As DAL)
             _dal = dal
         End Sub
+        Public Sub VerifierAcces()
+            Try
+                Using cn As SqlConnection = _dal.CreerConnexion()
+                    cn.Open()
+                    Using tx As SqlTransaction = cn.BeginTransaction()
+                        ExigerContexte(cn, tx)
+                        tx.Commit()
+                    End Using
+                End Using
+            Catch ex As Exception
+                AuditMetierService.Echec(_dal, "VENTE_COMPTOIR_ACCES_REFUSE", SessionUtilisateur.SessionId, Guid.NewGuid(), ex, entite:="Session")
+                Throw
+            End Try
+        End Sub
+        Private Shared Sub ExigerContexte(cn As SqlConnection, tx As SqlTransaction)
+            AutorisationActionService.Exiger(cn, tx, "FACTURE_CREER", "FACTURIER")
+            AutorisationActionService.Exiger(cn, tx, "ENCAISSEMENT_CREER", "CAISSE")
+            Using session As New SqlCommand("SELECT COUNT(*) FROM dbo.UtilisateurSessions WHERE SessionId=@s AND UtilisateurId=@u AND RoleIdActif=@r AND ModeActif='FACTURATION_ET_CAISSE' AND Fin IS NULL", cn, tx)
+                session.Parameters.AddWithValue("@s", SessionUtilisateur.SessionId)
+                session.Parameters.AddWithValue("@u", SessionUtilisateur.UtilisateurId)
+                session.Parameters.AddWithValue("@r", SessionUtilisateur.RoleIdActif)
+                If CInt(session.ExecuteScalar()) <> 1 Then Throw New UnauthorizedAccessException("Vente & Encaissement n'est pas le mode de cette session.")
+            End Using
+        End Sub
         Public Function Finaliser(operationId As Guid, facture As FactureVente, lignes As IList(Of LigneFactureVente), motif As String, version As Byte(), client As Client, reglement As ReglementComptoir) As Integer
             If operationId = Guid.Empty Then Throw New ArgumentException("Identifiant de vente obligatoire.")
             If reglement Is Nothing OrElse lignes Is Nothing Then Throw New ArgumentException("Panier et règlement obligatoires.")
@@ -58,14 +82,7 @@ Namespace DevCommerc8ak
                 Using cn As SqlConnection = _dal.CreerConnexion()
                     cn.Open()
                     Using tx As SqlTransaction = cn.BeginTransaction()
-                        AutorisationActionService.Exiger(cn, tx, "FACTURE_CREER", "FACTURIER")
-                        AutorisationActionService.Exiger(cn, tx, "ENCAISSEMENT_CREER", "CAISSE")
-                        Using session As New SqlCommand("SELECT COUNT(*) FROM dbo.UtilisateurSessions WHERE SessionId=@s AND UtilisateurId=@u AND RoleIdActif=@r AND ModeActif='FACTURATION_ET_CAISSE' AND Fin IS NULL", cn, tx)
-                            session.Parameters.AddWithValue("@s", SessionUtilisateur.SessionId)
-                            session.Parameters.AddWithValue("@u", SessionUtilisateur.UtilisateurId)
-                            session.Parameters.AddWithValue("@r", SessionUtilisateur.RoleIdActif)
-                            If CInt(session.ExecuteScalar()) <> 1 Then Throw New UnauthorizedAccessException("Vente & Encaissement n'est pas le mode de cette session.")
-                        End Using
+                        ExigerContexte(cn, tx)
                         ' Une cle d'intention de vente, pas un verrou global de caisse.
                         Using verrou As New SqlCommand("DECLARE @result int; EXEC @result=sys.sp_getapplock @Resource=@cle,@LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=5000; SELECT @result;", cn, tx)
                             verrou.Parameters.AddWithValue("@cle", "VENTE_COMPTOIR:" & operationId.ToString("D"))

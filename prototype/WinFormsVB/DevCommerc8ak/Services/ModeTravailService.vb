@@ -25,6 +25,7 @@ Namespace DevCommerc8ak
         End Function
 
         Private Shared Function Lister(cn As SqlConnection, tx As SqlTransaction, userId As Integer, roleId As Integer) As List(Of String)
+            AttributionModeService.VerifierSchema(cn, tx)
             Dim role As String
             Dim attribution As Boolean
             Using cmd As New SqlCommand("SELECT r.NomRole,ur.VenteEncaissementAutorise FROM dbo.Utilisateurs u WITH(HOLDLOCK) JOIN dbo.UtilisateurRoles ur WITH(HOLDLOCK) ON ur.UtilisateurId=u.UtilisateurId AND ur.EstActif=1 JOIN dbo.Roles r WITH(HOLDLOCK) ON r.RoleId=ur.RoleId AND r.EstActif=1 WHERE u.UtilisateurId=@u AND u.EstActif=1 AND u.EstVerrouille=0 AND r.RoleId=@r", cn, tx)
@@ -67,6 +68,7 @@ Namespace DevCommerc8ak
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
                     Dim noms As New Dictionary(Of Integer, String)()
+                    AttributionModeService.VerifierSchema(cn, tx)
                     Dim attributions As New Dictionary(Of Integer, Boolean)()
                     Dim droits As New Dictionary(Of Integer, HashSet(Of String))()
                     ' Un seul chargement pour les roles autorises et leurs droits,

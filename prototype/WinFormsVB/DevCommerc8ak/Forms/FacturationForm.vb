@@ -68,6 +68,7 @@ Namespace DevCommerc8ak
         Private ReadOnly btnDeconnexion As Button
         Private ReadOnly actionsPanier As FlowLayoutPanel
         Private ReadOnly lblAppTitle As Label
+        Private ReadOnly zoneEncaissement As New Panel With {.Dock = DockStyle.Fill, .Visible = False, .BackColor = Color.White}
 
         Private ReadOnly _panier As List(Of PanierLigne)
         Private _validationEnCours As Boolean
@@ -406,6 +407,7 @@ Namespace DevCommerc8ak
             pnlRight.Controls.Add(pnlActions)
             pnlRight.Controls.Add(pnlTotals)
             pnlRight.Controls.Add(grpPanier)
+            pnlRight.Controls.Add(zoneEncaissement)
 
             pnlMain.Controls.Add(pnlRight)
             pnlMain.Controls.Add(pnlLeft)
@@ -807,8 +809,9 @@ Namespace DevCommerc8ak
                 Dim service As New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString))
                 Dim diagnostic As DiagnosticActionsPrix = service.DiagnostiquerActions()
                 Dim actions As HashSet(Of String) = diagnostic.Actions
-                lblDelegationPrix.Text = diagnostic.Explication
-                aideDelegationPrix.SetToolTip(lblDelegationPrix, diagnostic.Explication)
+                lblDelegationPrix.Text = diagnostic.ExplicationTarif & Environment.NewLine & diagnostic.Explication
+                aideDelegationPrix.SetToolTip(lblDelegationPrix, lblDelegationPrix.Text)
+                aideDelegationPrix.SetToolTip(btnPrixDelegue, diagnostic.ExplicationTarif & " Sélectionnez un produit et son type de vente, même avec un panier vide.")
                 btnPrixDelegue.Visible = actions.Contains("PRIX_TARIF_MODIFIER") OrElse actions.Contains("PRIX_DEMANDER")
                 btnPrixDelegue.Enabled = gridProduits.CurrentRow IsNot Nothing AndAlso ObtenirTypeVenteSelectionne() IsNot Nothing
                 Dim autoriseArticle As Boolean = actions.Contains("PRIX_FACTURE_EXCEPTION") OrElse actions.Contains("PRIX_DEMANDER_FACTURE")
@@ -1265,6 +1268,17 @@ Namespace DevCommerc8ak
         End Property
         Protected Sub EnregistrerPreparation()
             ValiderFacture(Me, EventArgs.Empty)
+        End Sub
+        Protected Sub AfficherZoneEncaissement(contenu As Control)
+            zoneEncaissement.Controls.Clear()
+            For Each voisin As Control In zoneEncaissement.Parent.Controls
+                If voisin IsNot zoneEncaissement Then voisin.Visible = contenu Is Nothing
+            Next
+            zoneEncaissement.Visible = contenu IsNot Nothing
+            If contenu Is Nothing Then Return
+            contenu.Dock = DockStyle.Fill
+            zoneEncaissement.Controls.Add(contenu)
+            zoneEncaissement.BringToFront()
         End Sub
         Protected Sub VerrouillerPreparation(verrouille As Boolean)
             txtClientNom.Parent.Enabled = Not verrouille

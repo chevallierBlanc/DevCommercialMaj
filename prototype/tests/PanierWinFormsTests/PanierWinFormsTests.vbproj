@@ -7,5 +7,7 @@
   <ItemGroup>
     <Reference Include="System.Windows.Forms" /><Reference Include="System.Drawing" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/DelegationPrixRegles.vb" Link="DelegationPrixRegles.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ModeTravailRegles.vb" Link="ModeTravailRegles.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueModeTravail.vb" Link="DialogueModeTravail.vb" />
   </ItemGroup>
 </Project>

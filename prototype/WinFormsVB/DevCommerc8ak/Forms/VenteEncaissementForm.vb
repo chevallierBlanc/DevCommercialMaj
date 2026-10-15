@@ -18,10 +18,13 @@ Namespace DevCommerc8ak
         Private _derniereFacture As Integer
         Private _confirmationIncertaine As Boolean
         Private _reglement As ReglementComptoir
+        Private _zoneReglement As ReglementZone
         Private ReadOnly _dal As New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)
         Private ReadOnly horloge As New Timer With {.Interval = 30000}
         Public Sub New()
             If SessionUtilisateur.ModeActif <> "FACTURATION_ET_CAISSE" Then Throw New UnauthorizedAccessException("Choisissez Vente & Encaissement à la connexion.")
+            Dim acces As New VenteEncaissementService(_dal)
+            acces.VerifierAcces()
             Text = "Vente & Encaissement"
             Dim attente As New Button With {.Text = "METTRE EN ATTENTE"}
             Dim reprendre As New Button With {.Text = "REPRENDRE UNE VENTE"}
@@ -65,6 +68,7 @@ Namespace DevCommerc8ak
             horloge.Start()
             AddHandler FactureEnregistree, Sub(id)
                                               _confirmationIncertaine = False
+                                              FermerReglement()
                                               VerrouillerPreparation(False)
                                               _operation = Guid.NewGuid()
                                               If _enAttente Then Return
@@ -81,7 +85,7 @@ Namespace DevCommerc8ak
             Return If(_enAttente, "Vente en attente : ", "Vente encaissée : ")
         End Function
         Protected Overrides Function ConfirmerAbandon() As Boolean
-            If _confirmationIncertaine Then Return False
+            If _confirmationIncertaine OrElse _zoneReglement IsNot Nothing Then Return False
             Return MessageBox.Show(Me, "Abandonner ce panier ? Un brouillon déjà enregistré reste en attente tant qu'il n'est pas annulé avec un motif.", "Abandon explicite", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) = DialogResult.Yes
         End Function
         Protected Overrides Function DisponibiliteAvantValidation() As Boolean
@@ -91,24 +95,35 @@ Namespace DevCommerc8ak
         End Function
         Protected Overrides Function PersisterOperation(dal As DAL, facture As FactureVente, lignes As IList(Of LigneFactureVente), motif As String, version As Byte(), client As Client) As Integer
             If _enAttente Then
-                If _confirmationIncertaine Then Throw New InvalidOperationException("Vérifiez d'abord la confirmation incertaine, sans créer un autre brouillon.")
+                If _confirmationIncertaine OrElse _zoneReglement IsNot Nothing Then Throw New InvalidOperationException("Terminez le règlement ou revenez au panier avant de créer un brouillon.")
                 Return New FactureOperationService(dal).Enregistrer(facture, lignes, motif, version, client, False)
             End If
-            Dim param As ParametreDTO = PrintConfigurationHelper.ChargerParametres()
-            If Not _confirmationIncertaine Then
-                Using dialogue As New ReglementDialogue(facture.MontantTotal, If(param Is Nothing, 0D, param.TauxUsd))
-                    If dialogue.ShowDialog(Me) <> DialogResult.OK Then Return 0
-                    _reglement = dialogue.Reglement
-                End Using
+            If Not _confirmationIncertaine AndAlso _reglement Is Nothing Then
+                If _zoneReglement IsNot Nothing Then Return 0
+                Dim param As ParametreDTO = PrintConfigurationHelper.ChargerParametres()
+                _zoneReglement = New ReglementZone(facture.MontantTotal, If(param Is Nothing, 0D, param.TauxUsd))
+                AddHandler _zoneReglement.Annulation, Sub()
+                                                        FermerReglement()
+                                                        VerrouillerPreparation(False)
+                                                    End Sub
+                AddHandler _zoneReglement.Confirmation, Sub()
+                                                           _reglement = _zoneReglement.Reglement
+                                                           EnregistrerPreparation()
+                                                       End Sub
+                VerrouillerPreparation(True)
+                AfficherZoneEncaissement(_zoneReglement)
+                Return 0
             End If
             Try
                 Return New VenteEncaissementService(dal).Finaliser(_operation, facture, lignes, motif, version, client, _reglement)
             Catch ex As ConfirmationComptoirIncertaineException
                 _confirmationIncertaine = True
+                FermerReglement(False)
                 VerrouillerPreparation(True)
                 Throw
             Catch ex As VenteComptoirNonFinaliseeException
                 _confirmationIncertaine = False
+                FermerReglement()
                 VerrouillerPreparation(False)
                 Throw
             End Try
@@ -118,6 +133,10 @@ Namespace DevCommerc8ak
                 MessageBox.Show("La confirmation doit être vérifiée avant de quitter. Réessayez la même opération lorsque SQL Server est disponible.")
                 Return False
             End If
+            If _zoneReglement IsNot Nothing Then
+                MessageBox.Show("Terminez le règlement ou utilisez « Revenir au panier » avant de quitter.")
+                Return False
+            End If
             _enAttente = True
             Try
                 Return MyBase.AutoriserSortie()
@@ -125,6 +144,12 @@ Namespace DevCommerc8ak
                 _enAttente = False
             End Try
         End Function
+        Private Sub FermerReglement(Optional effacer As Boolean = True)
+            AfficherZoneEncaissement(Nothing)
+            If _zoneReglement IsNot Nothing Then _zoneReglement.Dispose()
+            _zoneReglement = Nothing
+            If effacer Then _reglement = Nothing
+        End Sub
         Private Sub ReprendreVente(sender As Object, e As EventArgs)
             If Not AutoriserSortie() Then Return
             Try
@@ -187,15 +212,15 @@ Namespace DevCommerc8ak
             MyBase.OnFormClosed(e)
         End Sub
 
-        Private Class ReglementDialogue
-            Inherits Form
+        Private Class ReglementZone
+            Inherits UserControl
             Public Property Reglement As ReglementComptoir
+            Public Event Confirmation As EventHandler
+            Public Event Annulation As EventHandler
             Public Sub New(total As Decimal, tauxUsd As Decimal)
-                Text = "Confirmer le règlement — aucune écriture avant confirmation"
-                Size = New Size(620, 600) : MinimumSize = New Size(560, 520)
-                StartPosition = FormStartPosition.CenterParent
                 BackColor = Color.FromArgb(245, 247, 250) : Font = New Font("Segoe UI", 10)
-                Dim root As New FlowLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(22), .FlowDirection = FlowDirection.TopDown, .WrapContents = False, .AutoScroll = True}
+                Dim root As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(16), .ColumnCount = 1, .AutoScroll = True}
+                root.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
                 Dim devise As New ComboBox With {.Width = 240, .DropDownStyle = ComboBoxStyle.DropDownList}
                 devise.Items.Add("FC") : If tauxUsd > 0D Then devise.Items.Add("USD")
                 devise.SelectedIndex = 0
@@ -218,9 +243,10 @@ Namespace DevCommerc8ak
                 AddHandler reference.TextChanged, Sub() actualiser()
                 AddHandler confirmer.Click, Sub()
                                                  Reglement = New ReglementComptoir With {.Devise = CStr(devise.SelectedItem), .Moyen = CStr(moyen.SelectedItem), .MontantOrigine = recu.Value, .Taux = If(CStr(devise.SelectedItem) = "FC", 1D, tauxUsd), .Reference = reference.Text.Trim(), .ConfirmationExterne = externe.Checked}
-                                                 DialogResult = DialogResult.OK
+                                                 RaiseEvent Confirmation(Me, EventArgs.Empty)
                                              End Sub
-                Dim annuler As New Button With {.Text = "REVENIR AU PANIER", .Width = 240, .Height = 36, .DialogResult = DialogResult.Cancel}
+                Dim annuler As New Button With {.Text = "REVENIR AU PANIER", .Width = 240, .Height = 36}
+                AddHandler annuler.Click, Sub() RaiseEvent Annulation(Me, EventArgs.Empty)
                 root.Controls.Add(New Label With {.Text = "TOTAL : " & total.ToString("N2") & " FC", .AutoSize = True, .Font = New Font("Segoe UI", 16, FontStyle.Bold)})
                 root.Controls.Add(New Label With {.Text = "Devise du montant reçu", .AutoSize = True}) : root.Controls.Add(devise)
                 root.Controls.Add(New Label With {.Text = "Moyen de paiement", .AutoSize = True}) : root.Controls.Add(moyen)
@@ -230,7 +256,21 @@ Namespace DevCommerc8ak
                 root.Controls.Add(externe)
                 root.Controls.Add(New Label With {.Text = "Règlement intégral. Pour un paiement partiel, mettez en attente et utilisez le circuit de caisse existant. Aucune confirmation opérateur automatique.", .Width = 510, .Height = 54})
                 root.Controls.Add(confirmer) : root.Controls.Add(annuler)
-                Controls.Add(root) : CancelButton = annuler
+                For Each controle As Control In root.Controls
+                    controle.Dock = DockStyle.Top
+                    controle.Margin = New Padding(0, 0, 0, 8)
+                    root.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+                    If TypeOf controle Is Label Then
+                        DirectCast(controle, Label).AutoSize = True
+                        DirectCast(controle, Label).MaximumSize = New Size(400, 0)
+                    End If
+                Next
+                AddHandler Resize, Sub()
+                                       For Each controle As Control In root.Controls
+                                           If TypeOf controle Is Label Then DirectCast(controle, Label).MaximumSize = New Size(Math.Max(180, Width - 50), 0)
+                                       Next
+                                   End Sub
+                Controls.Add(root)
                 actualiser()
             End Sub
         End Class
