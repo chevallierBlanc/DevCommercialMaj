@@ -607,7 +607,10 @@ Namespace DevCommerc8ak
                     Dim v As Object = grid.CurrentRow.Cells("EstVerrouille").Value
                     btnDeverrouiller.Enabled = v IsNot Nothing AndAlso Not Convert.IsDBNull(v) AndAlso Convert.ToBoolean(v)
                 End If
-            Catch
+            Catch ex As Exception
+                Dim log As New ProductionLogService()
+                log.Error("FormulaireUtilisateurs", "SelectionCompte", "Impossible de charger les rôles du compte sélectionné.", ex)
+                modesUtilisateur.ChargerCompte(0, "Sélection du compte impossible. Actualisez le répertoire.")
             End Try
         End Sub
 

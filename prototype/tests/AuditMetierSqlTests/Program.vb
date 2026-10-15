@@ -374,6 +374,7 @@ Module Program
             Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & role.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface='MODE_COMBINE'")
             Refus(Of UnauthorizedAccessException)(Sub() modes.Activer("FACTURATION_ET_CAISSE"))
             Dim attribution As New AttributionModeService(dal)
+            TesterDroitAdministrationModes(attribution, role, roleCaisse, user)
             Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & roleCaisse.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface IN('FACTURIER','FACTURE_CREER','MODE_COMBINE')")
             attribution.Attribuer(user, roleCaisse, True, False, "Sarah : attribution au role caisse seulement")
             Dim etatAttributions As DataTable = attribution.Lister(user)
@@ -531,6 +532,59 @@ Module Program
         End Try
         Throw New Exception("Refus attendu : " & GetType(T).Name)
     End Sub
+    Private Sub TesterDroitAdministrationModes(service As AttributionModeService, role As Integer, autreRole As Integer, user As Integer)
+        Dim supprimerDroit As String = "DELETE ri FROM dbo.RoleInterfaces ri JOIN dbo.InterfacesApplication i ON i.InterfaceId=ri.InterfaceId WHERE ri.RoleId=" & role.ToString() & " AND i.CodeInterface='UTILISATEUR_MODES'"
+        Exec(supprimerDroit)
+        Dim lecture As DataTable = service.Lister(user)
+        Verifier(lecture.Rows.Count > 0 AndAlso Not CBool(lecture.ExtendedProperties("PeutModifier")), "Roles charges en lecture seule sans UTILISATEUR_MODES, ComboBox non vide")
+        Refus(Of UnauthorizedAccessException)(Sub() service.Attribuer(user, role, True, False, "Attribution interdite sans privilege"))
+        Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & autreRole.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface='SUPERADMIN_ROLES'")
+        Try
+            Refus(Of UnauthorizedAccessException)(Sub() service.AccorderAdministrationAuRoleActif("Un autre role du compte ne suffit pas"))
+            Verifier(Not CBool(service.Lister(user).ExtendedProperties("PeutAccorder")), "Droit d'un autre role non cumule dans le role actif")
+        Finally
+            Exec("DELETE ri FROM dbo.RoleInterfaces ri JOIN dbo.InterfacesApplication i ON i.InterfaceId=ri.InterfaceId WHERE ri.RoleId=" & autreRole.ToString() & " AND i.CodeInterface='SUPERADMIN_ROLES'")
+        End Try
+        Dim nomRole As String = SessionUtilisateur.Role
+        Try
+            SessionUtilisateur.Role = "SUPERADMIN"
+            Refus(Of UnauthorizedAccessException)(Sub() service.AccorderAdministrationAuRoleActif("Nom de role local ne donne aucun pouvoir"))
+        Finally
+            SessionUtilisateur.Role = nomRole
+        End Try
+        Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & role.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface='SUPERADMIN_ROLES'")
+        Try
+            Verifier(CBool(service.Lister(user).ExtendedProperties("PeutAccorder")), "Gestionnaire reel de privileges peut proposer un grant explicite")
+            Refus(Of ArgumentException)(Sub() service.AccorderAdministrationAuRoleActif(" "))
+            Exec("CREATE TRIGGER dbo.TR_TEST_AuditFailure ON dbo.JournalAudit AFTER INSERT AS BEGIN THROW 51001, 'Panne audit grant simulee', 1; END")
+            Try
+                Refus(Of SqlException)(Sub() service.AccorderAdministrationAuRoleActif("Panne audit : aucun grant partiel"))
+            Finally
+                Exec("DROP TRIGGER dbo.TR_TEST_AuditFailure")
+            End Try
+            Verifier(Not CBool(service.Lister(user).ExtendedProperties("PeutModifier")), "Audit echoue : privilege non accorde")
+            Dim editeur As New SuperAdminRepository(dal)
+            Dim roleAvant As DataRow = editeur.ListerRoles().Rows.Cast(Of DataRow)().Single(Function(r) CInt(r("RoleId")) = role)
+            Dim versionAvant As Byte() = DirectCast(roleAvant("VersionAutorisations"), Byte())
+            Dim droitsAvant As List(Of Integer) = editeur.ListerInterfacesParRole(role).Rows.Cast(Of DataRow)().Where(Function(r) CBool(r("Autorise"))).Select(Function(r) CInt(r("InterfaceId"))).ToList()
+            Dim avant As Integer = Scalar("SELECT COUNT(*) FROM dbo.RoleInterfaces WHERE RoleId=" & role.ToString())
+            Dim audits As Integer = Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE Entite='Role' AND EntiteId='" & role.ToString() & "' AND [Action]='PERMISSION_MODIFIEE'")
+            Verifier(service.AccorderAdministrationAuRoleActif("Autorisation explicite du gestionnaire"), "Grant explicite reussi")
+            Refus(Of DBConcurrencyException)(Sub() editeur.EnregistrerRole(role, CStr(roleAvant("NomRole")), True, droitsAvant, "Editeur ouvert avant le grant", versionAvant))
+            Verifier(Not service.AccorderAdministrationAuRoleActif("Repetition sans doublon"), "Grant idempotent sans seconde modification")
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.RoleInterfaces WHERE RoleId=" & role.ToString()) = avant + 1, "Aucun autre privilege change")
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE Entite='Role' AND EntiteId='" & role.ToString() & "' AND [Action]='PERMISSION_MODIFIEE'") = audits + 1, "Un grant et un audit transactionnel")
+            Verifier(CBool(New AttributionModeService(dal).Lister(user).ExtendedProperties("PeutModifier")), "Grant relu depuis SQL, pas un cache de droits")
+            Exec(supprimerDroit)
+            Dim repo As New SuperAdminRepository(dal)
+            repo.AssurerInfrastructure()
+            Verifier(Not CBool(service.Lister(user).ExtendedProperties("PeutModifier")), "Retrait non restaure par l'amorcage")
+            service.AccorderAdministrationAuRoleActif("Restaurer explicitement la fixture")
+        Finally
+            Exec("DELETE ri FROM dbo.RoleInterfaces ri JOIN dbo.InterfacesApplication i ON i.InterfaceId=ri.InterfaceId WHERE ri.RoleId=" & role.ToString() & " AND i.CodeInterface='SUPERADMIN_ROLES'")
+        End Try
+    End Sub
+
     Private Sub TesterComptoir(role As Integer, user As Integer, reviewer As Integer, reviewerSession As Integer, produitPrix As Integer, suffix As String)
         Dim service As New VenteEncaissementService(dal)
         Dim operation As Guid = Guid.NewGuid()

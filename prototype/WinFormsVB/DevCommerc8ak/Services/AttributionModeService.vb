@@ -14,7 +14,9 @@ Namespace DevCommerc8ak
             Using cn As SqlConnection = _dal.CreerConnexion()
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
-                    AutorisationActionService.Exiger(cn, tx, "UTILISATEUR_MODES", "ADMINISTRATION")
+                    AutorisationActionService.Exiger(cn, tx, "ADMINISTRATION", "ADMINISTRATION")
+                    Dim peutModifier As Boolean = Autorise(cn, tx, "UTILISATEUR_MODES", "ADMINISTRATION")
+                    Dim peutAccorder As Boolean = Autorise(cn, tx, "SUPERADMIN_ROLES", "SUPERADMIN_ROLES")
                     VerifierSchema(cn, tx)
                     Using config As New SqlCommand("SELECT COUNT(*) FROM dbo.Parametres", cn, tx)
                         If CInt(config.ExecuteScalar()) <> 1 Then Throw New InvalidOperationException("Une configuration entreprise unique est requise pour diagnostiquer les modes.")
@@ -26,10 +28,23 @@ Namespace DevCommerc8ak
                             table.Load(lecteur)
                         End Using
                     End Using
+                    table.ExtendedProperties("PeutModifier") = peutModifier
+                    table.ExtendedProperties("PeutAccorder") = peutAccorder
                     tx.Commit()
                     Return table
                 End Using
             End Using
+        End Function
+        Public Function AccorderAdministrationAuRoleActif(motif As String) As Boolean
+            Return New SuperAdminRepository(_dal).AccorderAdministrationModesAuRoleActif(motif)
+        End Function
+        Private Shared Function Autorise(cn As SqlConnection, tx As SqlTransaction, action As String, ecran As String) As Boolean
+            Try
+                AutorisationActionService.Exiger(cn, tx, action, ecran)
+                Return True
+            Catch ex As UnauthorizedAccessException
+                Return False
+            End Try
         End Function
         Public Sub Attribuer(utilisateurId As Integer, roleId As Integer, valeur As Boolean, attendu As Boolean, motif As String)
             Try

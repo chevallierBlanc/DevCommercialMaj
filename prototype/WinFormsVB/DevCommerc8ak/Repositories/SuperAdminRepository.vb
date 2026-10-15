@@ -229,6 +229,54 @@ Namespace DevCommerc8ak
             End Using
         End Sub
 
+        Public Function AccorderAdministrationModesAuRoleActif(motif As String) As Boolean
+            motif = AuditMetierService.ValiderMotif(motif)
+            Dim roleId As Integer = SessionUtilisateur.RoleIdActif
+            Try
+                Using cn As SqlConnection = _dal.CreerConnexion()
+                    cn.Open()
+                    Using tx As SqlTransaction = cn.BeginTransaction()
+                        ' Meme pouvoir que l'editeur de privileges, jamais un
+                        ' passe-droit fonde sur le nom SUPERADMIN ou un autre role.
+                        AutorisationActionService.Exiger(cn, tx, "SUPERADMIN_ROLES", "SUPERADMIN_ROLES")
+                        AutorisationActionService.Exiger(cn, tx, "ADMINISTRATION", "ADMINISTRATION")
+                        Dim avant As Object = LireRoleAudit(cn, tx, roleId)
+                        Dim interfaceId As Integer
+                        Using cmd As New SqlCommand("SELECT InterfaceId FROM dbo.InterfacesApplication WITH(HOLDLOCK) WHERE CodeInterface='UTILISATEUR_MODES' AND EstActif=1", cn, tx)
+                            Dim valeur As Object = cmd.ExecuteScalar()
+                            If valeur Is Nothing Then Throw New InvalidOperationException("Privilège UTILISATEUR_MODES absent ou désactivé. Vérifiez la migration 2026101501 et Rôles et privilèges sur cette base.")
+                            interfaceId = CInt(valeur)
+                        End Using
+                        Dim ajoute As Boolean
+                        Using cmd As New SqlCommand("DECLARE @ajoutes TABLE(InterfaceId int); INSERT dbo.RoleInterfaces(RoleId,InterfaceId) OUTPUT inserted.InterfaceId INTO @ajoutes SELECT @r,@i WHERE NOT EXISTS(SELECT 1 FROM dbo.RoleInterfaces WITH(UPDLOCK,HOLDLOCK) WHERE RoleId=@r AND InterfaceId=@i); SELECT COUNT(*) FROM @ajoutes;", cn, tx)
+                            cmd.Parameters.AddWithValue("@r", roleId)
+                            cmd.Parameters.AddWithValue("@i", interfaceId)
+                            ajoute = CInt(cmd.ExecuteScalar()) = 1
+                        End Using
+                        If ajoute Then
+                            Dim nom As String
+                            Using cmd As New SqlCommand("UPDATE dbo.Roles SET EstActif=EstActif WHERE RoleId=@r", cn, tx)
+                                cmd.Parameters.AddWithValue("@r", roleId)
+                                cmd.ExecuteNonQuery()
+                            End Using
+                            Using cmd As New SqlCommand("SELECT NomRole FROM dbo.Roles WHERE RoleId=@r", cn, tx)
+                                cmd.Parameters.AddWithValue("@r", roleId)
+                                nom = CStr(cmd.ExecuteScalar())
+                            End Using
+                            ' La rowversion du role invalide aussi les editeurs
+                            ' deja ouverts pour eviter un ecrasement silencieux.
+                            AuditMetierService.Enregistrer(cn, tx, "PERMISSION_MODIFIEE", "AUTORISATIONS", "Role", roleId, nom, avant, LireRoleAudit(cn, tx, roleId), motif, Guid.NewGuid())
+                        End If
+                        tx.Commit()
+                        Return ajoute
+                    End Using
+                End Using
+            Catch ex As Exception
+                AuditMetierService.Echec(_dal, "PERMISSION_MODIFICATION_REFUSEE", roleId, Guid.NewGuid(), ex, entite:="Role")
+                Throw
+            End Try
+        End Function
+
         Private Shared Function LireRoleAudit(cn As SqlConnection, tx As SqlTransaction, id As Integer) As Object
             Dim nom As String
             Dim actif As Boolean
