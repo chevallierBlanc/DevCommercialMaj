@@ -2,6 +2,8 @@ Option Strict On
 Imports System
 Imports System.Collections.Generic
 Imports System.Windows.Forms
+Imports System.Globalization
+Imports System.Linq
 Imports DevCommerc8ak
 
 Module Program
@@ -15,6 +17,8 @@ Module Program
     Sub Main()
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException)
         TesterChoixMode()
+        TesterReglement()
+        TesterChoixRole()
         Using fenetre As New Form(), grille As New DataGridView With {.Dock = DockStyle.Fill, .AllowUserToAddRows = False, .ReadOnly = True}
             fenetre.Controls.Add(grille) : fenetre.Show()
             Dim evenements As Integer = 0
@@ -37,6 +41,49 @@ Module Program
             Next
             If evenements < 80 Then Throw New Exception("Evenements de liaison non executes")
             Console.WriteLine("PASS Windows : 40 cycles suppression / selection / validation vide sans masquer DataError.")
+        End Using
+    End Sub
+    Private Sub TesterReglement()
+        Dim culture As CultureInfo = CultureInfo.CurrentCulture
+        Try
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR")
+            Using fenetre As New Form With {.Size = New System.Drawing.Size(640, 700)}, reglement As New ReglementComptoirPanel(56000D, 2500D)
+                fenetre.Controls.Add(reglement) : reglement.Dock = DockStyle.Fill : fenetre.Show() : Application.DoEvents()
+                Dim controles As List(Of Control) = Descendants(reglement).ToList()
+                Dim recu As TextBox = DirectCast(controles.Single(Function(c) c.Name = "MontantRecu"), TextBox)
+                Dim etat As Label = DirectCast(controles.Single(Function(c) c.Name = "EtatReglement"), Label)
+                Dim confirmer As Button = DirectCast(controles.Single(Function(c) c.Name = "ConfirmerReglement"), Button)
+                recu.Focus()
+                For Each texte As String In New String() {"56000", "60000", "55000", "", "abc", "60000,50"}
+                    recu.Text = texte ' Aucun changement de focus ni Validate().
+                    If (texte = "" OrElse texte = "abc" OrElse texte = "55000") AndAlso confirmer.Enabled Then Throw New Exception("Reglement invalide accepte")
+                    If texte = "56000" AndAlso Not confirmer.Enabled Then Throw New Exception("Reglement exact refuse")
+                    If texte = "60000" AndAlso (Not confirmer.Enabled OrElse Not etat.Text.Contains(4000D.ToString("N2"))) Then Throw New Exception("Monnaie non recalculee a la frappe")
+                Next
+                Dim devise As ComboBox = DirectCast(controles.Single(Function(c) c.Name = "DeviseRecue"), ComboBox)
+                devise.SelectedItem = "USD" : recu.Text = "24"
+                If Not confirmer.Enabled OrElse Not etat.Text.Contains(4000D.ToString("N2")) Then Throw New Exception("Conversion USD incorrecte")
+                confirmer.PerformClick()
+                If reglement.Reglement Is Nothing OrElse reglement.Reglement.MontantOrigine <> 24D OrElse reglement.Reglement.Taux <> 2500D Then Throw New Exception("Montant d'origine ou taux perdu")
+            End Using
+            Using reglement As New ReglementComptoirPanel(100D, 0D)
+                Dim devise As ComboBox = DirectCast(Descendants(reglement).Single(Function(c) c.Name = "DeviseRecue"), ComboBox)
+                If devise.Items.Contains("USD") Then Throw New Exception("Taux USD absent : option disponible a tort")
+            End Using
+        Finally
+            CultureInfo.CurrentCulture = culture
+        End Try
+        Console.WriteLine("PASS Windows : frappe immediate, montant invalide/insuffisant et USD.")
+    End Sub
+    Private Sub TesterChoixRole()
+        Dim roles As New List(Of RoleSessionInfo) From {New RoleSessionInfo With {.RoleId = 11, .NomRole = "FACTURIER", .EstRolePrincipal = True}, New RoleSessionInfo With {.RoleId = 22, .NomRole = "CAISSIÈRE"}}
+        Using choix As New DialogueRoleSession(roles, New Dictionary(Of Integer, String)(), "Tatiana")
+            choix.Show() : Application.DoEvents()
+            Dim controles As List(Of Control) = Descendants(choix).ToList()
+            DirectCast(controles.Single(Function(c) TypeOf c Is ListBox), ListBox).SelectedIndex = 1
+            DirectCast(controles.Single(Function(c) TypeOf c Is Button AndAlso c.Text = "CONTINUER"), Button).PerformClick()
+            If choix.RoleSelectionne.RoleId <> 22 Then Throw New Exception("Role choisi incorrect")
+            choix.Close()
         End Using
     End Sub
     Private Sub TesterChoixMode()

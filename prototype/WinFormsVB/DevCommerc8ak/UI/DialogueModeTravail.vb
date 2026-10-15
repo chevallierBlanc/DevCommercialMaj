@@ -11,26 +11,27 @@ Namespace DevCommerc8ak
         Inherits Form
         Public Property ModeSelectionne As String
 
-        Public Sub New(modes As IList(Of String), Optional roleActif As String = "")
+        Public Sub New(modes As IList(Of String), Optional roleActif As String = "", Optional utilisateur As String = "")
             Text = "Choisir votre mode de travail"
             StartPosition = FormStartPosition.CenterParent
-            Size = New Size(620, 460)
-            MinimumSize = Size
+            AutoScaleMode = AutoScaleMode.Dpi : AutoScaleDimensions = New SizeF(96, 96)
+            ClientSize = New Size(510, If(modes.Count > 2 AndAlso ModeTravailRegles.ModeSeparePrefere(roleActif, modes) Is Nothing, 350, 290))
+            FormBorderStyle = FormBorderStyle.FixedDialog : MinimizeBox = False : MaximizeBox = False
             BackColor = Color.FromArgb(245, 247, 250)
             Font = New Font("Segoe UI", 10)
             Dim root As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(20), .ColumnCount = 1, .RowCount = 3}
-            root.RowStyles.Add(New RowStyle(SizeType.Absolute, 72))
+            root.RowStyles.Add(New RowStyle(SizeType.Absolute, 62))
             root.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
             root.RowStyles.Add(New RowStyle(SizeType.Absolute, 48))
-            root.Controls.Add(New Label With {.Text = "Choisissez votre mode de travail" & If(String.IsNullOrWhiteSpace(roleActif), "", Environment.NewLine & "Rôle actif : " & roleActif), .Dock = DockStyle.Fill, .Font = New Font("Segoe UI", 13, FontStyle.Bold), .ForeColor = Color.FromArgb(41, 128, 185)}, 0, 0)
+            root.Controls.Add(New Label With {.Text = "Votre parcours de travail" & Environment.NewLine & utilisateur & If(String.IsNullOrWhiteSpace(roleActif), "", " · " & roleActif), .Dock = DockStyle.Fill, .Font = New Font("Segoe UI", 11, FontStyle.Bold), .ForeColor = Color.FromArgb(41, 128, 185)}, 0, 0)
             Dim choix As New FlowLayoutPanel With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.TopDown, .WrapContents = False, .AutoScroll = True}
-            Dim comptoir As New CheckBox With {.Text = "Utiliser Vente & Encaissement" & Environment.NewLine & "Préparer et régler dans une seule interface.", .Size = New Size(500, 60), .Visible = modes.Contains("FACTURATION_ET_CAISSE")}
+            Dim comptoir As New CheckBox With {.Text = "Utiliser Vente & Encaissement" & Environment.NewLine & "Préparer et régler dans une seule interface.", .Size = New Size(450, 56), .Visible = modes.Contains("FACTURATION_ET_CAISSE")}
             Dim prefere As String = ModeTravailRegles.ModeSeparePrefere(roleActif, modes)
             For Each mode As String In modes
                 If mode = "FACTURATION_ET_CAISSE" Then Continue For
                 If prefere IsNot Nothing AndAlso mode <> prefere Then Continue For
                 Dim description As String = If(mode = "FACTURATION", "Créer et gérer les factures autorisées.", If(mode = "CAISSE", "Encaisser et consulter les paiements.", "Facturer puis encaisser : deux opérations distinctes."))
-                Dim radio As New RadioButton With {.Text = mode.Replace("_ET_", " + ") & Environment.NewLine & description, .Tag = mode, .Checked = mode = prefere, .Size = New Size(500, 54), .Margin = New Padding(0, 0, 0, 8)}
+                Dim radio As New RadioButton With {.Text = If(mode = "FACTURATION", "Facturation classique", "Caisse classique") & Environment.NewLine & description, .Tag = mode, .Checked = mode = prefere, .Size = New Size(450, 54), .Margin = New Padding(0, 0, 0, 8)}
                 choix.Controls.Add(radio)
             Next
             If modes.Contains("FACTURATION_ET_CAISSE") Then choix.Controls.Add(comptoir)
@@ -63,6 +64,10 @@ Namespace DevCommerc8ak
             root.Controls.Add(footer, 0, 2)
             Controls.Add(root)
             CancelButton = annuler
+            AddHandler Shown, Sub()
+                                  Dim zone As Rectangle = Screen.FromControl(Me).WorkingArea
+                                  Size = New Size(Math.Min(Width, zone.Width - 24), Math.Min(Height, zone.Height - 24))
+                              End Sub
         End Sub
     End Class
 End Namespace

@@ -72,6 +72,9 @@
     <Compile Include="Services\VenteEncaissementService.vb" />
     <Compile Include="Services\AttributionModeService.vb" />
     <Compile Include="UI\ModesUtilisateurPanel.vb" />
+    <Compile Include="UI\ReglementComptoirPanel.vb" />
+    <Compile Include="UI\DialogueRoleSession.vb" />
+    <Compile Include="DTOs\ReglementComptoir.vb" />
     <EmbeddedResource Include="Migrations\2026101501_VenteEncaissement.sql">
       <LogicalName>VenteEncaissementMigration.sql</LogicalName>
     </EmbeddedResource>

@@ -3,11 +3,26 @@ Option Explicit On
 
 Imports System
 Imports System.Collections.Generic
+Imports System.Globalization
 
 Namespace DevCommerc8ak
     Public NotInheritable Class EncaissementAuditRegles
         Private Sub New()
         End Sub
+
+        Public Shared Function ConvertirRecuFc(montant As Decimal, devise As String, tauxUsd As Decimal) As Decimal
+            If montant < 0D Then Throw New ArgumentException("Le montant reçu ne peut pas être négatif.")
+            If Decimal.Round(montant, 8) <> montant Then Throw New ArgumentException("Le montant reçu ne peut pas dépasser huit décimales.")
+            If devise <> "FC" AndAlso devise <> "USD" Then Throw New ArgumentException("Devise non prise en charge.")
+            If devise = "USD" AndAlso tauxUsd <= 0D Then Throw New InvalidOperationException("Taux officiel USD indisponible.")
+            ' Meme convention FC/USD que la caisse, precision de Paiements.
+            ' Aucun arrondi configurable supplementaire n'existe dans le schema.
+            Return Decimal.Round(montant * If(devise = "FC", 1D, tauxUsd), 2, MidpointRounding.ToEven)
+        End Function
+
+        Public Shared Function LireMontant(texte As String, culture As CultureInfo, ByRef montant As Decimal) As Boolean
+            Return Not String.IsNullOrWhiteSpace(texte) AndAlso Decimal.TryParse(texte, NumberStyles.Number, culture, montant) AndAlso montant >= 0D AndAlso Decimal.Round(montant, 8) = montant
+        End Function
 
         Public Shared Sub Verifier(total As Decimal, dejaPaye As Decimal, recu As Decimal, rendu As Decimal)
             ' Ce flux existant solde une facture en une fois. Un paiement partiel

@@ -36,6 +36,18 @@ Module Program
         Refuse(Of InvalidOperationException)(Sub() AuditMetierRegles.VerifierEditionCompatible(1D, False))
         Refuse(Of InvalidOperationException)(Sub() AuditMetierRegles.VerifierEditionCompatible(0D, True))
         EncaissementAuditRegles.Verifier(56000D, 0D, 60000D, 4000D)
+        Verifie(EncaissementAuditRegles.ConvertirRecuFc(24D, "USD", 2500D) = 60000D, "Recu USD au taux officiel")
+        Verifie(EncaissementAuditRegles.ConvertirRecuFc(60000D, "FC", 0D) = 60000D, "FC sans inventer un taux USD")
+        Verifie(EncaissementAuditRegles.ConvertirRecuFc(1.005D, "FC", 0D) = 1D, "Precision paiement deux decimales ToEven")
+        Refuse(Of InvalidOperationException)(Sub() EncaissementAuditRegles.ConvertirRecuFc(1D, "USD", 0D))
+        Refuse(Of ArgumentException)(Sub() EncaissementAuditRegles.ConvertirRecuFc(-1D, "FC", 1D))
+        Refuse(Of ArgumentException)(Sub() EncaissementAuditRegles.ConvertirRecuFc(1D, "EUR", 1D))
+        Dim montantLocal As Decimal
+        Verifie(EncaissementAuditRegles.LireMontant("60000,50", Globalization.CultureInfo.GetCultureInfo("fr-FR"), montantLocal) AndAlso montantLocal = 60000.5D, "Separateur decimal local francais")
+        Verifie(Not EncaissementAuditRegles.LireMontant("", Globalization.CultureInfo.InvariantCulture, montantLocal), "Saisie vide non confirmee")
+        Verifie(Not EncaissementAuditRegles.LireMontant("abc", Globalization.CultureInfo.InvariantCulture, montantLocal), "Saisie invalide non confirmee")
+        Verifie(Not EncaissementAuditRegles.LireMontant("0.000000001", Globalization.CultureInfo.InvariantCulture, montantLocal), "Precision origine non tronquee silencieusement")
+        Refuse(Of ArgumentException)(Sub() EncaissementAuditRegles.ConvertirRecuFc(0.000000001D, "FC", 1D))
         compte += 1
         Refuse(Of ArgumentException)(Sub() EncaissementAuditRegles.Verifier(56000D, 0D, 60000D, 0D))
         Refuse(Of ArgumentException)(Sub() EncaissementAuditRegles.Verifier(56000D, 0D, 55000D, 0D))

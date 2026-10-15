@@ -22,14 +22,6 @@ Namespace DevCommerc8ak
             MyBase.New("Vente non finalisée, transaction annulée : " & cause.Message, cause)
         End Sub
     End Class
-    Public Class ReglementComptoir
-        Public Property Devise As String = "FC"
-        Public Property MontantOrigine As Decimal
-        Public Property Taux As Decimal = 1D
-        Public Property Moyen As String = "CASH"
-        Public Property Reference As String = ""
-        Public Property ConfirmationExterne As Boolean
-    End Class
     Public Class VenteEncaissementService
         Private ReadOnly _dal As DAL
         Public Sub New(dal As DAL)
@@ -49,8 +41,8 @@ Namespace DevCommerc8ak
                 Throw
             End Try
         End Sub
-        Private Shared Sub ExigerContexte(cn As SqlConnection, tx As SqlTransaction)
-            AutorisationActionService.Exiger(cn, tx, "FACTURE_CREER", "FACTURIER")
+        Private Shared Sub ExigerContexte(cn As SqlConnection, tx As SqlTransaction, Optional lectureDocument As Boolean = False)
+            If Not lectureDocument Then AutorisationActionService.Exiger(cn, tx, "FACTURE_CREER", "FACTURIER")
             AutorisationActionService.Exiger(cn, tx, "ENCAISSEMENT_CREER", "CAISSE")
             Using session As New SqlCommand("SELECT COUNT(*) FROM dbo.UtilisateurSessions WHERE SessionId=@s AND UtilisateurId=@u AND RoleIdActif=@r AND ModeActif='FACTURATION_ET_CAISSE' AND Fin IS NULL", cn, tx)
                 session.Parameters.AddWithValue("@s", SessionUtilisateur.SessionId)
@@ -111,7 +103,7 @@ Namespace DevCommerc8ak
                                 End Using
                             End If
                             If taux <= 0D OrElse reglement.Taux <> taux Then Throw New DBConcurrencyException("Le taux a changé. Rechargez le règlement.")
-                            Dim recu As Decimal = reglement.MontantOrigine * taux
+                            Dim recu As Decimal = EncaissementAuditRegles.ConvertirRecuFc(reglement.MontantOrigine, reglement.Devise, taux)
                             Dim rendu As Decimal = If(reglement.Moyen = "CASH", Math.Max(0D, recu - facture.MontantTotal), 0D)
                             EncaissementAuditRegles.Verifier(facture.MontantTotal, 0D, recu, rendu)
                             Dim copie As New FactureVente With {.FactureVenteId = facture.FactureVenteId, .NumeroFacture = facture.NumeroFacture, .ClientId = facture.ClientId, .SousTotal = facture.SousTotal, .MontantRemise = facture.MontantRemise, .MontantTaxe = facture.MontantTaxe, .MontantTotal = facture.MontantTotal, .Statut = facture.Statut}
@@ -153,7 +145,7 @@ Namespace DevCommerc8ak
                 Using tx As SqlTransaction = cn.BeginTransaction()
                     AutorisationActionService.Exiger(cn, tx, "FACTURE_MODIFIER", "FACTURIER")
                     Dim table As New DataTable()
-                    Using cmd As New SqlCommand("SELECT TOP(100) f.FactureVenteId,f.NumeroFacture,ISNULL(c.NomClient,'CLIENT') AS Client,ISNULL(c.Telephone,'') AS Telephone,f.MontantTotal,f.CreeLe FROM dbo.FacturesVente f LEFT JOIN dbo.Clients c ON c.ClientId=f.ClientId WHERE f.Statut='EN_ATTENTE' AND (f.NumeroFacture LIKE @q OR c.NomClient LIKE @q) ORDER BY f.CreeLe DESC,f.FactureVenteId DESC", cn, tx)
+                    Using cmd As New SqlCommand("SELECT TOP(100) f.FactureVenteId,f.NumeroFacture,ISNULL(c.NomClient,'CLIENT') AS Client,ISNULL(c.Telephone,'') AS Telephone,f.MontantTotal,f.CreeLe,u.NomUtilisateur AS PreparePar FROM dbo.FacturesVente f LEFT JOIN dbo.Clients c ON c.ClientId=f.ClientId LEFT JOIN dbo.Utilisateurs u ON u.UtilisateurId=f.CreePar WHERE f.Statut='EN_ATTENTE' AND NOT EXISTS(SELECT 1 FROM dbo.Paiements pa WHERE pa.FactureVenteId=f.FactureVenteId) AND (f.NumeroFacture LIKE @q OR c.NomClient LIKE @q) ORDER BY f.CreeLe DESC,f.FactureVenteId DESC", cn, tx)
                         cmd.Parameters.Add("@q", SqlDbType.NVarChar, 202).Value = "%" & If(recherche, "").Substring(0, Math.Min(200, If(recherche, "").Length)) & "%"
                         Using lecteur As SqlDataReader = cmd.ExecuteReader()
                             table.Load(lecteur)
@@ -165,18 +157,22 @@ Namespace DevCommerc8ak
             End Using
         End Function
 
-        Public Function LireDocument(id As Integer) As DataSet
+        Public Function LireDocument(Optional id As Integer = 0) As DataSet
+            If id < 0 Then Throw New ArgumentException("Identifiant de facture invalide.")
             Using cn As SqlConnection = _dal.CreerConnexion()
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
-                    AutorisationActionService.Exiger(cn, tx, "ENCAISSEMENT_CREER", "CAISSE")
+                    ExigerContexte(cn, tx, lectureDocument:=True)
                     Dim data As New DataSet()
-                    Using cmd As New SqlCommand("SELECT f.NumeroFacture,f.CreeLe,f.Statut,f.SousTotal,f.MontantRemise,f.MontantTotal,c.NomClient,c.Telephone,u.NomUtilisateur FROM dbo.FacturesVente f LEFT JOIN dbo.Clients c ON c.ClientId=f.ClientId LEFT JOIN dbo.Utilisateurs u ON u.UtilisateurId=f.CreePar WHERE f.FactureVenteId=@id AND f.ValideeParUtilisateurId=@u AND f.OperationComptoirId IS NOT NULL", cn, tx)
+                    ' Reimpression de SON encaissement confirme, pas une nouvelle
+                    ' vente ni un droit general de consulter les factures d'autrui.
+                    Using cmd As New SqlCommand("SELECT TOP(1) f.FactureVenteId,f.NumeroFacture,f.CreeLe,f.Statut,f.SousTotal,f.MontantRemise,f.MontantTotal,c.NomClient,c.Telephone,u.NomUtilisateur FROM dbo.FacturesVente f LEFT JOIN dbo.Clients c ON c.ClientId=f.ClientId LEFT JOIN dbo.Utilisateurs u ON u.UtilisateurId=f.CreePar WHERE (@id=0 OR f.FactureVenteId=@id) AND f.Statut='PAYEE' AND EXISTS(SELECT 1 FROM dbo.Paiements pa WHERE pa.FactureVenteId=f.FactureVenteId AND pa.PayePar=@u) AND (f.OperationComptoirId IS NOT NULL OR EXISTS(SELECT 1 FROM dbo.JournalAudit a WHERE a.Entite='Facture' AND a.EntiteId=CONVERT(nvarchar(30),f.FactureVenteId) AND a.[Action]='ENCAISSEMENT_VALIDE' AND a.ModeActif='FACTURATION_ET_CAISSE' AND a.EffectuePar=@u AND a.Resultat='SUCCES')) ORDER BY f.ValideLe DESC,f.FactureVenteId DESC", cn, tx)
                         cmd.Parameters.AddWithValue("@id", id) : cmd.Parameters.AddWithValue("@u", SessionUtilisateur.UtilisateurId)
                         Using r As SqlDataReader = cmd.ExecuteReader()
                             Dim table As New DataTable("Entete")
                             table.Load(r)
-                            If table.Rows.Count <> 1 Then Throw New UnauthorizedAccessException("Vente comptoir inaccessible à cette session.")
+                            If table.Rows.Count <> 1 Then Throw New UnauthorizedAccessException("Aucune vente finalisée encaissée par votre compte n'est accessible. Vérifiez le document sélectionné ou consultez l'historique avec un responsable autorisé.")
+                            id = CInt(table.Rows(0)("FactureVenteId"))
                             data.Tables.Add(table)
                         End Using
                     End Using

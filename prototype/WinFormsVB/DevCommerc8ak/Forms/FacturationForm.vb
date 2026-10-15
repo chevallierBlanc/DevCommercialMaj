@@ -1170,37 +1170,22 @@ Namespace DevCommerc8ak
             Return 0D
         End Function
 
-        Public Sub ChargerFacturePourEdition(factureVenteId As Integer, numeroFacture As String, clientNom As String, telephone As String)
+        Public Function ChargerFacturePourEdition(factureVenteId As Integer, numeroFacture As String, clientNom As String, telephone As String) As Boolean
             Try
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
                 Dim entete As DataRow = New FactureOperationService(dal).LireEntetePourEdition(factureVenteId)
                 If Convert.ToString(entete("Statut")) <> "EN_ATTENTE" Then
                     MessageBox.Show("Seules les factures brouillon peuvent être modifiees.")
-                    Return
+                    Return False
                 End If
 
                 Dim ligneRepo As New LigneFactureVenteRepository(dal)
                 Dim dtLignes As DataTable = ligneRepo.ListerDetailsPourEdition(factureVenteId)
 
-                _factureEnEditionId = factureVenteId
-                _versionFactureEdition = DirectCast(entete("VersionOperation"), Byte())
-                _clientEditionId = If(entete.IsNull("ClientId"), CType(Nothing, Integer?), Convert.ToInt32(entete("ClientId")))
-                _clientEditionNom = Convert.ToString(entete("NomClient"))
-                _clientEditionTelephone = NettoyerTelephone(Convert.ToString(entete("Telephone")))
-                _remiseEditionMontant = Convert.ToDecimal(entete("MontantRemise"))
-                _sousTotalEdition = Convert.ToDecimal(entete("SousTotal"))
-                ' Le champ reste un pourcentage. Une remise inchangée sur un
-                ' sous-total inchangé conserve son montant exact, sans réarrondi.
-                _remiseEditionTexte = If(_sousTotalEdition = 0D, "0", (_remiseEditionMontant / _sousTotalEdition * 100D).ToString())
-                txtNumeroFacture.Text = Convert.ToString(entete("NumeroFacture"))
-                txtClientNom.Text = _clientEditionNom
-                txtClientTel.Text = _clientEditionTelephone
-                txtClientId.Text = ""
-                txtRemise.Text = _remiseEditionTexte
-                btnValider.Text = TexteValidation
-
-                _panier.Clear()
+                ' Construire avant de remplacer le panier : une ancienne ligne
+                ' incompatible ne doit pas laisser une reprise partielle.
+                Dim articlesCharges As New List(Of PanierLigne)()
                 For Each row As DataRow In dtLignes.Rows
                     Dim qteSaisie As Decimal = If(dtLignes.Columns.Contains("QuantiteSaisie") AndAlso Not row.IsNull("QuantiteSaisie"), Convert.ToDecimal(row("QuantiteSaisie")), Convert.ToDecimal(row("Quantite")))
                     Dim qteBase As Decimal = If(dtLignes.Columns.Contains("QuantiteBase") AndAlso Not row.IsNull("QuantiteBase"), Convert.ToDecimal(row("QuantiteBase")), qteSaisie)
@@ -1209,7 +1194,7 @@ Namespace DevCommerc8ak
                     Dim unite As String = Convert.ToString(row("TypeVente"))
                     Dim quantiteEquivalente As Decimal = If(qteSaisie = 0D, qteBase, qteBase / qteSaisie)
 
-                    _panier.Add(New PanierLigne With {
+                    articlesCharges.Add(New PanierLigne With {
                         .ProduitId = Convert.ToInt32(row("ProduitId")),
                         .Libelle = Convert.ToString(row("Libelle")),
                         .Unite = unite,
@@ -1226,12 +1211,31 @@ Namespace DevCommerc8ak
                     })
                 Next
 
+                _factureEnEditionId = factureVenteId
+                _versionFactureEdition = DirectCast(entete("VersionOperation"), Byte())
+                _clientEditionId = If(entete.IsNull("ClientId"), CType(Nothing, Integer?), Convert.ToInt32(entete("ClientId")))
+                _clientEditionNom = Convert.ToString(entete("NomClient"))
+                _clientEditionTelephone = NettoyerTelephone(Convert.ToString(entete("Telephone")))
+                _remiseEditionMontant = Convert.ToDecimal(entete("MontantRemise"))
+                _sousTotalEdition = Convert.ToDecimal(entete("SousTotal"))
+                ' Garder le montant exact d'une remise inchangee.
+                _remiseEditionTexte = If(_sousTotalEdition = 0D, "0", (_remiseEditionMontant / _sousTotalEdition * 100D).ToString())
+                txtNumeroFacture.Text = Convert.ToString(entete("NumeroFacture"))
+                txtClientNom.Text = _clientEditionNom
+                txtClientTel.Text = _clientEditionTelephone
+                txtClientId.Text = ""
+                txtRemise.Text = _remiseEditionTexte
+                btnValider.Text = TexteValidation
+                _panier.Clear()
+                _panier.AddRange(articlesCharges)
                 RafraichirPanier()
                 ChargerProduits()
+                Return True
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement facture brouillon: " & ex.Message)
+                Return False
             End Try
-        End Sub
+        End Function
 
         Protected Overridable ReadOnly Property TexteValidation As String
             Get

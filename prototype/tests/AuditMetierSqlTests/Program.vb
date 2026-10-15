@@ -587,12 +587,19 @@ Module Program
 
     Private Sub TesterComptoir(role As Integer, user As Integer, reviewer As Integer, reviewerSession As Integer, produitPrix As Integer, suffix As String)
         Dim service As New VenteEncaissementService(dal)
+        TesterAttenteComptoir(produitPrix, suffix)
         Dim operation As Guid = Guid.NewGuid()
         Dim facture As FactureVente = NouvelleFacture("COMPTOIR_" & suffix)
         facture.SousTotal = 20D : facture.MontantTotal = 20D
         Dim articles As New List(Of LigneFactureVente) From {New LigneFactureVente With {.ProduitId = produitPrix, .Quantite = 1D, .QteSaisie = 1D, .QuantiteBase = 1D, .TypeVente = "piece", .TypeTarifId = 0, .PrixUnitaire = 20D}}
         Dim paiement As New ReglementComptoir With {.MontantOrigine = 25D}
         Dim id As Integer = service.Finaliser(operation, facture, articles, "", Nothing, Nothing, paiement)
+        Dim nombrePaiements As Integer = Scalar("SELECT COUNT(*) FROM dbo.Paiements")
+        Dim nombreSorties As Integer = Scalar("SELECT COUNT(*) FROM dbo.StockSortie")
+        Verifier(CInt(service.LireDocument(id).Tables("Entete").Rows(0)("FactureVenteId")) = id, "Document immediat relu apres paiement")
+        Verifier(CInt(service.LireDocument().Tables("Entete").Rows(0)("FactureVenteId")) = id, "Derniere vente retrouvee sans etat du panier")
+        service.LireDocument(id) : service.LireDocument(id)
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.Paiements") = nombrePaiements AndAlso Scalar("SELECT COUNT(*) FROM dbo.StockSortie") = nombreSorties, "Reimpressions sans nouvel effet financier ni stock")
         Verifier(service.Finaliser(operation, facture, articles, "", Nothing, Nothing, paiement) = id, "Repetition idempotente de la meme vente")
         Dim panneNotification As EventHandler = Sub(sender, e) Throw New InvalidOperationException("Panne notification comptoir")
         AddHandler AppEvents.VenteValidee, panneNotification
@@ -636,12 +643,38 @@ Module Program
             Dim caisse As New FacturationService(dal)
             caisse.EncaisserFacture(factureSeparee, "CASH", "TEST", 20D, 0D, "FC", user, 20D, 1D)
             Verifier(Scalar("SELECT COUNT(*) FROM dbo.FacturesVente f JOIN dbo.Paiements p ON p.FactureVenteId=f.FactureVenteId WHERE f.FactureVenteId=" & factureSeparee.ToString() & " AND f.CreePar=" & reviewer.ToString() & " AND f.ValideeParUtilisateurId=" & reviewer.ToString() & " AND p.PayePar=" & user.ToString()) = 1, "Preparation par un utilisateur et encaissement par un autre preserves")
+            Verifier(CInt(service.LireDocument(factureSeparee).Tables("Entete").Rows(0)("FactureVenteId")) = factureSeparee, "Reimpression autorisee a l'encaisseur distinct du validateur, origine auditee combinee")
+            Refus(Of UnauthorizedAccessException)(Sub() service.LireDocument(Integer.MaxValue))
         Finally
             SessionUtilisateur.UtilisateurId = user
             SessionUtilisateur.NomUtilisateur = "TEST_" & suffix
             SessionUtilisateur.SessionId = sid
             SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE"
         End Try
+    End Sub
+
+    Private Sub TesterAttenteComptoir(produitPrix As Integer, suffix As String)
+        Dim operations As New FactureOperationService(dal)
+        Dim f As FactureVente = NouvelleFacture("ATTENTE_" & suffix)
+        f.SousTotal = 40D : f.MontantRemise = 1D : f.MontantTotal = 39D
+        Dim lignes As New List(Of LigneFactureVente) From {New LigneFactureVente With {.ProduitId = produitPrix, .Quantite = 2D, .QteSaisie = 2D, .QuantiteBase = 2D, .TypeVente = "piece", .TypeTarifId = 0, .PrixUnitaire = 20D, .ContextePrix = Guid.NewGuid()}}
+        Dim paiements As Integer = Scalar("SELECT COUNT(*) FROM dbo.Paiements"), sorties As Integer = Scalar("SELECT COUNT(*) FROM dbo.StockSortie")
+        Dim client As New Client With {.NomClient = "ATTENTE_CLIENT_" & suffix, .Telephone = "", .Adresse = "", .Email = "", .EstActif = True}
+        Dim id As Integer = operations.Enregistrer(f, lignes, "Client revient ; remise conservee", Nothing, client, False)
+        Refus(Of SqlException)(Sub() operations.Enregistrer(f, lignes, "Repetition identique sans recréer le panier", Nothing, Nothing, False))
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.FacturesVente WHERE NumeroFacture=@s", f.NumeroFacture) = 1, "Contextes de lignes uniques : pas de brouillon duplique")
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.Paiements") = paiements AndAlso Scalar("SELECT COUNT(*) FROM dbo.StockSortie") = sorties, "Attente sans encaissement ni stock deduit")
+        Dim entete As DataRow = operations.LireEntetePourEdition(id)
+        Verifier(CDec(entete("MontantRemise")) = 1D AndAlso CStr(entete("NomClient")) = client.NomClient, "Client et remise relus pour reprise")
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.LignesFactureVente WHERE FactureVenteId=" & id.ToString() & " AND QuantiteSaisie=2 AND QuantiteBase=2 AND TypeVente='piece' AND PrixUnitaire=20") = 1, "Quantite, unite et prix conserves")
+        f.FactureVenteId = id
+        lignes(0).Quantite = 3D : lignes(0).QteSaisie = 3D : lignes(0).QuantiteBase = 3D
+        f.SousTotal = 60D : f.MontantTotal = 59D
+        operations.Enregistrer(f, lignes, "Reprise et correction quantite", operations.LireVersion(id), Nothing, False)
+        Dim comptoir As New VenteEncaissementService(dal)
+        Refus(Of UnauthorizedAccessException)(Sub() comptoir.LireDocument(id))
+        comptoir.Finaliser(Guid.NewGuid(), f, lignes, "Validation apres reprise", operations.LireVersion(id), Nothing, New ReglementComptoir With {.MontantOrigine = 60D})
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.Paiements WHERE FactureVenteId=" & id.ToString() & " AND Montant=59 AND MonnaieRendue=1") = 1, "Reprise finalisee une seule fois avec paiement reel")
     End Sub
 
     Private Sub TesterOuvertureSessions(role As Integer, suffix As String, sessions As SessionRepository)

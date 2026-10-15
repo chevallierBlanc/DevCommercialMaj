@@ -344,7 +344,7 @@ Namespace DevCommerc8ak
                 Dim roleChoisi As RoleSessionInfo = roles(0)
                 Dim modesService As New ModeTravailService(dal)
                 If roles.Count > 1 Then
-                    Using frm As New FormChoixRoleSession(roles, modesService.DiagnostiquerRoles(utilisateur.UtilisateurId))
+                    Using frm As New DialogueRoleSession(roles, modesService.DiagnostiquerRoles(utilisateur.UtilisateurId), utilisateur.NomUtilisateur)
                         If frm.ShowDialog(Me) <> DialogResult.OK OrElse frm.RoleSelectionne Is Nothing Then
                             Return False
                         End If
@@ -359,7 +359,7 @@ Namespace DevCommerc8ak
                 ElseIf Not modes.Contains("FACTURATION_ET_CAISSE") AndAlso ModeTravailRegles.ModeSeparePrefere(roleChoisi.NomRole, modes) IsNot Nothing Then
                     modeChoisi = ModeTravailRegles.ModeSeparePrefere(roleChoisi.NomRole, modes)
                 ElseIf modes.Count > 0 Then
-                    Using selection As New DialogueModeTravail(modes, roleChoisi.NomRole)
+                    Using selection As New DialogueModeTravail(modes, roleChoisi.NomRole, utilisateur.NomUtilisateur)
                         If selection.ShowDialog(Me) <> DialogResult.OK Then Return False
                         modeChoisi = selection.ModeSelectionne
                     End Using
@@ -499,68 +499,6 @@ Namespace DevCommerc8ak
                     Return
                 End If
                 NouveauMotDePasse = txtNouveau.Text
-                DialogResult = DialogResult.OK
-            End Sub
-        End Class
-
-        Private NotInheritable Class FormChoixRoleSession
-            Inherits Form
-
-            Private ReadOnly lstRoles As ListBox
-            Private ReadOnly _roles As List(Of RoleSessionInfo)
-            Public Property RoleSelectionne As RoleSessionInfo
-
-            Public Sub New(roles As List(Of RoleSessionInfo), diagnostics As Dictionary(Of Integer, String))
-                _roles = roles
-                Text = "Choix du rôle"
-                StartPosition = FormStartPosition.CenterParent
-                FormBorderStyle = FormBorderStyle.FixedDialog
-                MinimizeBox = False
-                MaximizeBox = False
-                ClientSize = New Size(560, 400)
-                BackColor = Color.White
-
-                Dim lbl As New Label() With {
-                    .Text = "1. Choisissez votre rôle actif" & Environment.NewLine & "2. Le mode sera choisi parmi les parcours autorisés pour ce rôle",
-                    .Dock = DockStyle.Top,
-                    .Height = 64,
-                    .TextAlign = ContentAlignment.MiddleCenter,
-                    .Font = New Font("Segoe UI", 10, FontStyle.Bold)
-                }
-                lstRoles = New ListBox() With {.Dock = DockStyle.Fill, .Font = New Font("Segoe UI", 10)}
-                For Each role As RoleSessionInfo In _roles
-                    lstRoles.Items.Add(role.NomRole & If(role.EstRolePrincipal, " (rôle principal)", ""))
-                Next
-                Dim diagnostic As New Label With {.Dock = DockStyle.Bottom, .Height = 140, .Padding = New Padding(14), .ForeColor = Color.FromArgb(52, 73, 94), .Font = New Font("Segoe UI", 9.5F)}
-                AddHandler lstRoles.SelectedIndexChanged, Sub()
-                                                             If lstRoles.SelectedIndex < 0 Then Return
-                                                             Dim id As Integer = _roles(lstRoles.SelectedIndex).RoleId
-                                                             diagnostic.Text = If(diagnostics.ContainsKey(id), diagnostics(id), "Ce rôle n'est plus attribué ou le compte a changé. Reconnectez-vous.")
-                                                         End Sub
-                If lstRoles.Items.Count > 0 Then
-                    lstRoles.SelectedIndex = 0
-                End If
-
-                Dim pnlActions As New FlowLayoutPanel() With {.Dock = DockStyle.Bottom, .Height = 55, .FlowDirection = FlowDirection.RightToLeft, .Padding = New Padding(10)}
-                Dim btnOk As New Button() With {.Text = "Continuer", .Width = 110, .Height = 32, .DialogResult = DialogResult.None}
-                Dim btnCancel As New Button() With {.Text = "Annuler", .Width = 90, .Height = 32, .DialogResult = DialogResult.Cancel}
-                AddHandler btnOk.Click, AddressOf Valider
-                pnlActions.Controls.AddRange(New Control() {btnOk, btnCancel})
-
-                Controls.Add(lstRoles)
-                Controls.Add(diagnostic)
-                Controls.Add(pnlActions)
-                Controls.Add(lbl)
-                AcceptButton = btnOk
-                CancelButton = btnCancel
-            End Sub
-
-            Private Sub Valider(sender As Object, e As EventArgs)
-                If lstRoles.SelectedIndex < 0 OrElse lstRoles.SelectedIndex >= _roles.Count Then
-                    MessageBox.Show(Me, "Sélectionnez un rôle.", "Connexion", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-                    Return
-                End If
-                RoleSelectionne = _roles(lstRoles.SelectedIndex)
                 DialogResult = DialogResult.OK
             End Sub
         End Class

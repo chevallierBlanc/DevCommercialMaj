@@ -9,5 +9,11 @@
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/DelegationPrixRegles.vb" Link="DelegationPrixRegles.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ModeTravailRegles.vb" Link="ModeTravailRegles.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueModeTravail.vb" Link="DialogueModeTravail.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/ReglementComptoirPanel.vb" Link="ReglementComptoirPanel.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueRoleSession.vb" Link="DialogueRoleSession.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/UtilisateurDTO.vb" Link="UtilisateurDTO.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Entities/Utilisateur.vb" Link="Utilisateur.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/ReglementComptoir.vb" Link="ReglementComptoir.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/EncaissementAuditRegles.vb" Link="EncaissementAuditRegles.vb" />
   </ItemGroup>
 </Project>

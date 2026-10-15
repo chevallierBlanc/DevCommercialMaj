@@ -15,10 +15,9 @@ Namespace DevCommerc8ak
         Inherits FacturationForm
         Private _enAttente As Boolean
         Private _operation As Guid = Guid.NewGuid()
-        Private _derniereFacture As Integer
         Private _confirmationIncertaine As Boolean
         Private _reglement As ReglementComptoir
-        Private _zoneReglement As ReglementZone
+        Private _zoneReglement As ReglementComptoirPanel
         Private ReadOnly _dal As New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)
         Private ReadOnly horloge As New Timer With {.Interval = 30000}
         Public Sub New()
@@ -72,8 +71,7 @@ Namespace DevCommerc8ak
                                               VerrouillerPreparation(False)
                                               _operation = Guid.NewGuid()
                                               If _enAttente Then Return
-                                              _derniereFacture = id
-                                              If MessageBox.Show(Me, "Vente réglée. Imprimer le ticket 80 mm ?", "Vente & Encaissement", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then ImprimerDerniere(True)
+                                              If MessageBox.Show(Me, "Vente réglée. Imprimer le ticket 80 mm ?", "Vente & Encaissement", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then ImprimerDerniere(True, id)
                                           End Sub
         End Sub
         Protected Overrides ReadOnly Property TexteValidation As String
@@ -91,17 +89,21 @@ Namespace DevCommerc8ak
         Protected Overrides Function DisponibiliteAvantValidation() As Boolean
             ' Un rejeu peut concerner la derniere unite deja vendue : laisser le
             ' service retrouver l'operation avant ses controles de nouvelle vente.
-            Return _confirmationIncertaine OrElse MyBase.DisponibiliteAvantValidation()
+            Return _enAttente OrElse _confirmationIncertaine OrElse MyBase.DisponibiliteAvantValidation()
         End Function
         Protected Overrides Function PersisterOperation(dal As DAL, facture As FactureVente, lignes As IList(Of LigneFactureVente), motif As String, version As Byte(), client As Client) As Integer
             If _enAttente Then
                 If _confirmationIncertaine OrElse _zoneReglement IsNot Nothing Then Throw New InvalidOperationException("Terminez le règlement ou revenez au panier avant de créer un brouillon.")
+                If String.IsNullOrWhiteSpace(motif) Then
+                    motif = DialogueMotifOperation.Demander(Me, "Motif de mise en attente (précisez toute remise exceptionnelle)")
+                    If motif Is Nothing Then Return 0
+                End If
                 Return New FactureOperationService(dal).Enregistrer(facture, lignes, motif, version, client, False)
             End If
             If Not _confirmationIncertaine AndAlso _reglement Is Nothing Then
                 If _zoneReglement IsNot Nothing Then Return 0
                 Dim param As ParametreDTO = PrintConfigurationHelper.ChargerParametres()
-                _zoneReglement = New ReglementZone(facture.MontantTotal, If(param Is Nothing, 0D, param.TauxUsd))
+                _zoneReglement = New ReglementComptoirPanel(facture.MontantTotal, If(param Is Nothing, 0D, param.TauxUsd))
                 AddHandler _zoneReglement.Annulation, Sub()
                                                         FermerReglement()
                                                         VerrouillerPreparation(False)
@@ -172,8 +174,7 @@ Namespace DevCommerc8ak
                     AddHandler ouvrir.Click, Sub()
                                                  If grille.CurrentRow Is Nothing Then Return
                                                  Dim row As DataRow = DirectCast(grille.CurrentRow.DataBoundItem, DataRowView).Row
-                                                 ChargerFacturePourEdition(CInt(row("FactureVenteId")), CStr(row("NumeroFacture")), CStr(row("Client")), CStr(row("Telephone")))
-                                                 dialogue.DialogResult = DialogResult.OK
+                                                 If ChargerFacturePourEdition(CInt(row("FactureVenteId")), CStr(row("NumeroFacture")), CStr(row("Client")), CStr(row("Telephone"))) Then dialogue.DialogResult = DialogResult.OK
                                              End Sub
                     dialogue.Controls.Add(grille) : dialogue.Controls.Add(ouvrir) : dialogue.Controls.Add(charger) : dialogue.Controls.Add(recherche)
                     lire()
@@ -183,10 +184,11 @@ Namespace DevCommerc8ak
                 MessageBox.Show(ex.Message, "Reprise impossible")
             End Try
         End Sub
-        Private Sub ImprimerDerniere(thermique As Boolean)
-            If _derniereFacture <= 0 Then Return
+        Private Sub ImprimerDerniere(thermique As Boolean, Optional factureId As Integer = 0)
+            Dim documentCharge As Boolean = False
             Try
-                Dim donnees As DataSet = New VenteEncaissementService(_dal).LireDocument(_derniereFacture)
+                Dim donnees As DataSet = New VenteEncaissementService(_dal).LireDocument(factureId)
+                documentCharge = True
                 Dim entete As DataRow = donnees.Tables("Entete").Rows(0)
                 Dim data As New FacturePrintData With {.Numero = CStr(entete("NumeroFacture")), .DateDocument = CDate(entete("CreeLe")), .Statut = CStr(entete("Statut")), .SousTotal = CDec(entete("SousTotal")), .Remise = CDec(entete("MontantRemise")), .Total = CDec(entete("MontantTotal")), .Client = If(entete.IsNull("NomClient"), "CLIENT", CStr(entete("NomClient"))), .Telephone = If(entete.IsNull("Telephone"), "", CStr(entete("Telephone"))), .Facturier = If(entete.IsNull("NomUtilisateur"), "Auteur inconnu", CStr(entete("NomUtilisateur"))), .Lignes = New List(Of FacturePrintLine)()}
                 For Each row As DataRow In donnees.Tables("Lignes").Rows
@@ -204,7 +206,7 @@ Namespace DevCommerc8ak
                     End If
                 End Using
             Catch ex As Exception
-                MessageBox.Show("La vente reste enregistrée. Impression impossible : " & ex.Message, "Impression", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                MessageBox.Show(If(documentCharge OrElse factureId > 0, "La vente reste enregistrée. Vous pourrez réessayer l'impression. ", "Aucune opération commerciale n'a été effectuée. ") & "Impression impossible : " & ex.Message, "Impression", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             End Try
         End Sub
         Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
@@ -212,67 +214,5 @@ Namespace DevCommerc8ak
             MyBase.OnFormClosed(e)
         End Sub
 
-        Private Class ReglementZone
-            Inherits UserControl
-            Public Property Reglement As ReglementComptoir
-            Public Event Confirmation As EventHandler
-            Public Event Annulation As EventHandler
-            Public Sub New(total As Decimal, tauxUsd As Decimal)
-                BackColor = Color.FromArgb(245, 247, 250) : Font = New Font("Segoe UI", 10)
-                Dim root As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(16), .ColumnCount = 1, .AutoScroll = True}
-                root.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
-                Dim devise As New ComboBox With {.Width = 240, .DropDownStyle = ComboBoxStyle.DropDownList}
-                devise.Items.Add("FC") : If tauxUsd > 0D Then devise.Items.Add("USD")
-                devise.SelectedIndex = 0
-                Dim moyen As New ComboBox With {.Width = 240, .DropDownStyle = ComboBoxStyle.DropDownList}
-                moyen.Items.AddRange(New Object() {"CASH", "MOBILE_MONEY", "CARTE", "AUTRE"}) : moyen.SelectedIndex = 0
-                Dim recu As New NumericUpDown With {.Width = 280, .DecimalPlaces = 8, .Maximum = 999999999999D, .Value = Math.Min(999999999999D, Math.Max(0D, total))}
-                Dim reference As New TextBox With {.Width = 500, .MaxLength = 120}
-                Dim externe As New CheckBox With {.Text = "Je confirme le paiement externe effectivement reçu.", .AutoSize = True}
-                Dim rendu As New Label With {.Width = 510, .Height = 50, .Font = New Font("Segoe UI", 12, FontStyle.Bold), .ForeColor = Color.FromArgb(41, 128, 185)}
-                Dim confirmer As New Button With {.Text = "CONFIRMER LA VENTE ET LE PAIEMENT", .Width = 510, .Height = 44, .BackColor = Color.FromArgb(39, 174, 96), .ForeColor = Color.White}
-                Dim actualiser As Action = Sub()
-                                              Dim fc As Decimal = recu.Value * If(CStr(devise.SelectedItem) = "FC", 1D, tauxUsd)
-                                              rendu.Text = "Monnaie à rendre : " & Math.Max(0D, fc - total).ToString("N2") & " FC"
-                                              confirmer.Enabled = fc >= total AndAlso (CStr(moyen.SelectedItem) = "CASH" OrElse (externe.Checked AndAlso reference.Text.Trim() <> "" AndAlso fc = total))
-                                          End Sub
-                AddHandler recu.ValueChanged, Sub() actualiser()
-                AddHandler devise.SelectedIndexChanged, Sub() actualiser()
-                AddHandler moyen.SelectedIndexChanged, Sub() actualiser()
-                AddHandler externe.CheckedChanged, Sub() actualiser()
-                AddHandler reference.TextChanged, Sub() actualiser()
-                AddHandler confirmer.Click, Sub()
-                                                 Reglement = New ReglementComptoir With {.Devise = CStr(devise.SelectedItem), .Moyen = CStr(moyen.SelectedItem), .MontantOrigine = recu.Value, .Taux = If(CStr(devise.SelectedItem) = "FC", 1D, tauxUsd), .Reference = reference.Text.Trim(), .ConfirmationExterne = externe.Checked}
-                                                 RaiseEvent Confirmation(Me, EventArgs.Empty)
-                                             End Sub
-                Dim annuler As New Button With {.Text = "REVENIR AU PANIER", .Width = 240, .Height = 36}
-                AddHandler annuler.Click, Sub() RaiseEvent Annulation(Me, EventArgs.Empty)
-                root.Controls.Add(New Label With {.Text = "TOTAL : " & total.ToString("N2") & " FC", .AutoSize = True, .Font = New Font("Segoe UI", 16, FontStyle.Bold)})
-                root.Controls.Add(New Label With {.Text = "Devise du montant reçu", .AutoSize = True}) : root.Controls.Add(devise)
-                root.Controls.Add(New Label With {.Text = "Moyen de paiement", .AutoSize = True}) : root.Controls.Add(moyen)
-                root.Controls.Add(New Label With {.Text = "Montant réellement reçu", .AutoSize = True}) : root.Controls.Add(recu)
-                root.Controls.Add(rendu)
-                root.Controls.Add(New Label With {.Text = "Référence externe (jamais de données carte)", .AutoSize = True}) : root.Controls.Add(reference)
-                root.Controls.Add(externe)
-                root.Controls.Add(New Label With {.Text = "Règlement intégral. Pour un paiement partiel, mettez en attente et utilisez le circuit de caisse existant. Aucune confirmation opérateur automatique.", .Width = 510, .Height = 54})
-                root.Controls.Add(confirmer) : root.Controls.Add(annuler)
-                For Each controle As Control In root.Controls
-                    controle.Dock = DockStyle.Top
-                    controle.Margin = New Padding(0, 0, 0, 8)
-                    root.RowStyles.Add(New RowStyle(SizeType.AutoSize))
-                    If TypeOf controle Is Label Then
-                        DirectCast(controle, Label).AutoSize = True
-                        DirectCast(controle, Label).MaximumSize = New Size(400, 0)
-                    End If
-                Next
-                AddHandler Resize, Sub()
-                                       For Each controle As Control In root.Controls
-                                           If TypeOf controle Is Label Then DirectCast(controle, Label).MaximumSize = New Size(Math.Max(180, Width - 50), 0)
-                                       Next
-                                   End Sub
-                Controls.Add(root)
-                actualiser()
-            End Sub
-        End Class
     End Class
 End Namespace
