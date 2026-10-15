@@ -18,7 +18,7 @@ Namespace DevCommerc8ak
         Private ReadOnly modesActifs As New CheckBox With {.Text = "Activer la gestion des modes"}
         Private ReadOnly facturation As New CheckBox With {.Text = "Facturation : préparer les factures"}
         Private ReadOnly caisse As New CheckBox With {.Text = "Caisse : encaisser les factures"}
-        Private ReadOnly combine As New CheckBox With {.Text = "Facturation et caisse : parcours commun"}
+        Private ReadOnly combine As New CheckBox With {.Text = "Vente & Encaissement : parcours commercial complet"}
         Private ReadOnly delegation As New CheckBox With {.Text = "Activer la délégation des prix"}
         Private ReadOnly demandes As New CheckBox With {.Text = "Autoriser les demandes de modification"}
         Private ReadOnly immediate As New CheckBox With {.Text = "Autoriser les modifications immédiates sous conditions"}
@@ -45,7 +45,7 @@ Namespace DevCommerc8ak
             BackColor = Color.FromArgb(243, 243, 243) : Font = New Font("Segoe UI", 9.5F)
             carteModes = Carte("Modes de travail", "Définissez comment les utilisateurs autorisés travaillent à la facturation et à la caisse. Un seul mode par session.")
             Ajouter(carteModes, modesActifs, facturation, caisse, combine,
-                Texte("Modes séparés : le rôle doit disposer de Facturation et Créer une facture, ou de Caisse et Créer un encaissement. Aucun nouveau privilège n'est attribué. Le mode combiné exige ces deux ensembles et la permission Mode combiné du rôle actif, jamais le cumul de rôles. Après un changement, reconnectez le poste concerné ; aucun autre poste n'est fermé."), etatModes)
+                Texte("Modes séparés : droits de facturation ou de caisse du rôle actif. Vente & Encaissement exige les deux ensembles, l'éligibilité du rôle ET une attribution pour ce compte et ce rôle dans Administration Utilisateurs. Aucun droit n'est ajouté automatiquement. Reconnexion après changement ; aucun autre poste n'est fermé."), etatModes)
             cartePrix = Carte("Délégation et contrôle des prix", "Autorisez certains employés à demander ou appliquer un prix sans accès à l'administration générale des produits.")
             Ajouter(cartePrix, delegation, demandes, immediate,
                 Texte("Variation maximale sans approbation (%) : variation absolue par rapport au tarif officiel."), variation,

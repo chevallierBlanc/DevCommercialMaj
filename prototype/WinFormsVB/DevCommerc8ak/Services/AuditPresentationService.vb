@@ -18,7 +18,7 @@ Namespace DevCommerc8ak
             {"Quantite", "Quantité"}, {"QuantiteSaisie", "Quantité commerciale"}, {"QuantiteBase", "Quantité de stock"},
             {"PrixUnitaire", "Prix unitaire"}, {"MontantLigne", "Total article"}, {"ProduitId", "Identifiant produit"},
             {"Produit", "Produit"}, {"TypeVente", "Conditionnement"}, {"CoutUnitaireBaseVente", "Coût par unité de stock"},
-            {"FactureCreePar", "Facture créée par"}, {"EncaissePar", "Encaissé par"}, {"PayePar", "Encaissé par"},
+            {"FactureCreePar", "Facture créée par"}, {"FactureValideePar", "Facture validée par"}, {"EncaissePar", "Encaissé par"}, {"PayePar", "Encaissé par"},
             {"TotalFacture", "Total facture"}, {"DejaPayeAvant", "Déjà payé avant"}, {"ResteAvant", "Reste à payer avant"},
             {"MontantRecu", "Montant reçu"}, {"MontantAffecte", "Montant affecté à la facture"},
             {"MonnaieRendue", "Monnaie rendue"}, {"ResteApres", "Reste à payer après"},
@@ -35,7 +35,7 @@ Namespace DevCommerc8ak
 
         Public Shared Function EstAuteur(champ As String) As Boolean
             Dim cle As String = champ.Substring(champ.LastIndexOf("."c) + 1)
-            Return cle = "FactureCreePar" OrElse cle = "EncaissePar" OrElse cle = "PayePar"
+            Return cle = "FactureCreePar" OrElse cle = "FactureValideePar" OrElse cle = "EncaissePar" OrElse cle = "PayePar"
         End Function
 
         Public Shared Function Libelle(champ As String, valeurs As IDictionary(Of String, String)) As String

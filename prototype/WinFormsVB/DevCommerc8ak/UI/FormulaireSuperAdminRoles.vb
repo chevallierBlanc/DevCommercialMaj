@@ -478,6 +478,7 @@ Namespace DevCommerc8ak
             End Sub
 
             Public Overrides Function ToString() As String
+                If CodeInterface = "MODE_COMBINE" Then Return "Éligibilité : Vente & Encaissement (attribution utilisateur requise)"
                 Return Libelle
             End Function
         End Class

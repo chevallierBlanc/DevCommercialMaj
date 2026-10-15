@@ -26,12 +26,15 @@ Namespace DevCommerc8ak
 
         Private Shared Function Lister(cn As SqlConnection, tx As SqlTransaction, userId As Integer, roleId As Integer) As List(Of String)
             Dim role As String
-            Using cmd As New SqlCommand("SELECT r.NomRole FROM dbo.Utilisateurs u WITH(HOLDLOCK) JOIN dbo.UtilisateurRoles ur WITH(HOLDLOCK) ON ur.UtilisateurId=u.UtilisateurId AND ur.EstActif=1 JOIN dbo.Roles r WITH(HOLDLOCK) ON r.RoleId=ur.RoleId AND r.EstActif=1 WHERE u.UtilisateurId=@u AND u.EstActif=1 AND u.EstVerrouille=0 AND r.RoleId=@r", cn, tx)
+            Dim attribution As Boolean
+            Using cmd As New SqlCommand("SELECT r.NomRole,ur.VenteEncaissementAutorise FROM dbo.Utilisateurs u WITH(HOLDLOCK) JOIN dbo.UtilisateurRoles ur WITH(HOLDLOCK) ON ur.UtilisateurId=u.UtilisateurId AND ur.EstActif=1 JOIN dbo.Roles r WITH(HOLDLOCK) ON r.RoleId=ur.RoleId AND r.EstActif=1 WHERE u.UtilisateurId=@u AND u.EstActif=1 AND u.EstVerrouille=0 AND r.RoleId=@r", cn, tx)
                 cmd.Parameters.AddWithValue("@u", userId)
                 cmd.Parameters.AddWithValue("@r", roleId)
-                Dim valeur As Object = cmd.ExecuteScalar()
-                If valeur Is Nothing Then Throw New UnauthorizedAccessException("Le rôle n'est plus attribué au compte actif.")
-                role = Convert.ToString(valeur)
+                Using lecteur As SqlDataReader = cmd.ExecuteReader()
+                    If Not lecteur.Read() Then Throw New UnauthorizedAccessException("Le rôle n'est plus attribué au compte actif.")
+                    role = CStr(lecteur(0))
+                    attribution = CBool(lecteur(1))
+                End Using
             End Using
             Dim droits As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
             Using cmd As New SqlCommand("SELECT i.CodeInterface FROM dbo.RoleInterfaces ri WITH(HOLDLOCK) JOIN dbo.InterfacesApplication i WITH(HOLDLOCK) ON i.InterfaceId=ri.InterfaceId WHERE ri.RoleId=@r AND i.EstActif=1", cn, tx)
@@ -53,7 +56,7 @@ Namespace DevCommerc8ak
                     Dim caisse As Boolean = CBool(r("ModeCaisseAutorise"))
                     Dim combine As Boolean = CBool(r("ModeCombineAutorise"))
                     If r.Read() Then Throw New InvalidOperationException("Plusieurs configurations entreprise : modes refusés.")
-                    Return ModeTravailRegles.Resoudre(gestion, facturation, caisse, combine, role, droits)
+                    Return ModeTravailRegles.Resoudre(gestion, facturation, caisse, combine AndAlso attribution, role, droits)
                 End Using
             End Using
         End Function
@@ -64,16 +67,18 @@ Namespace DevCommerc8ak
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
                     Dim noms As New Dictionary(Of Integer, String)()
+                    Dim attributions As New Dictionary(Of Integer, Boolean)()
                     Dim droits As New Dictionary(Of Integer, HashSet(Of String))()
                     ' Un seul chargement pour les roles autorises et leurs droits,
                     ' jamais une union entre roles et jamais une requete par role.
-                    Using cmd As New SqlCommand("SELECT r.RoleId,r.NomRole,i.CodeInterface FROM dbo.Utilisateurs u WITH(HOLDLOCK) JOIN dbo.UtilisateurRoles ur WITH(HOLDLOCK) ON ur.UtilisateurId=u.UtilisateurId AND ur.EstActif=1 JOIN dbo.Roles r WITH(HOLDLOCK) ON r.RoleId=ur.RoleId AND r.EstActif=1 LEFT JOIN dbo.RoleInterfaces ri WITH(HOLDLOCK) ON ri.RoleId=r.RoleId LEFT JOIN dbo.InterfacesApplication i WITH(HOLDLOCK) ON i.InterfaceId=ri.InterfaceId AND i.EstActif=1 WHERE u.UtilisateurId=@u AND u.EstActif=1 AND u.EstVerrouille=0", cn, tx)
+                    Using cmd As New SqlCommand("SELECT r.RoleId,r.NomRole,i.CodeInterface,ur.VenteEncaissementAutorise FROM dbo.Utilisateurs u WITH(HOLDLOCK) JOIN dbo.UtilisateurRoles ur WITH(HOLDLOCK) ON ur.UtilisateurId=u.UtilisateurId AND ur.EstActif=1 JOIN dbo.Roles r WITH(HOLDLOCK) ON r.RoleId=ur.RoleId AND r.EstActif=1 LEFT JOIN dbo.RoleInterfaces ri WITH(HOLDLOCK) ON ri.RoleId=r.RoleId LEFT JOIN dbo.InterfacesApplication i WITH(HOLDLOCK) ON i.InterfaceId=ri.InterfaceId AND i.EstActif=1 WHERE u.UtilisateurId=@u AND u.EstActif=1 AND u.EstVerrouille=0", cn, tx)
                         cmd.Parameters.AddWithValue("@u", utilisateurId)
                         Using r As SqlDataReader = cmd.ExecuteReader()
                             While r.Read()
                                 Dim id As Integer = CInt(r(0))
                                 If Not droits.ContainsKey(id) Then
                                     noms.Add(id, CStr(r(1)))
+                                    attributions.Add(id, CBool(r(3)))
                                     droits.Add(id, New HashSet(Of String)(StringComparer.OrdinalIgnoreCase))
                                 End If
                                 If Not r.IsDBNull(2) Then droits(id).Add(CStr(r(2)))
@@ -98,8 +103,9 @@ Namespace DevCommerc8ak
                             If r.Read() Then Throw New InvalidOperationException("Plusieurs configurations entreprise.")
                             For Each paire As KeyValuePair(Of Integer, HashSet(Of String)) In droits
                                 Try
-                                    Dim modes As List(Of String) = ModeTravailRegles.Resoudre(gestion, facturation, caisse, combine, noms(paire.Key), paire.Value)
+                                    Dim modes As List(Of String) = ModeTravailRegles.Resoudre(gestion, facturation, caisse, combine AndAlso attributions(paire.Key), noms(paire.Key), paire.Value)
                                     resultat.Add(paire.Key, If(modes.Count = 0, "Parcours historique ou administratif.", "Modes accessibles : " & String.Join(" / ", modes).Replace("_ET_", " + ")) & If(gestion, Environment.NewLine & If(Not combine, "Mode combiné désactivé dans les paramètres.", ModeTravailRegles.DiagnosticCombine(paire.Value)), ""))
+                                    If gestion AndAlso combine AndAlso Not attributions(paire.Key) Then resultat(paire.Key) &= Environment.NewLine & "Vente & Encaissement non attribué à ce compte pour ce rôle."
                                 Catch ex As UnauthorizedAccessException
                                     resultat.Add(paire.Key, ex.Message)
                                 End Try

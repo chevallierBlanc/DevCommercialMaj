@@ -66,8 +66,13 @@ Namespace DevCommerc8ak
         Private ReadOnly btnHistorique As Button
         Private ReadOnly btnAnnuler As Button
         Private ReadOnly btnDeconnexion As Button
+        Private ReadOnly actionsPanier As FlowLayoutPanel
+        Private ReadOnly lblAppTitle As Label
 
         Private ReadOnly _panier As List(Of PanierLigne)
+        Private _validationEnCours As Boolean
+        Private _abandonConfirme As Boolean
+        Private _enregistrementBrouillon As Boolean
         Private ReadOnly _typeVenteService As TypeVenteService 'nouveau
         Private ReadOnly _typeVenteProduitService As TypeVenteProduitService
         Private ReadOnly _conditionnementService As ProduitConditionnementService
@@ -132,7 +137,7 @@ Namespace DevCommerc8ak
                 .Height = 70,
                 .BackColor = Color.FromArgb(44, 62, 80)
             }
-            Dim lblAppTitle As New Label() With {
+            lblAppTitle = New Label() With {
                 .Text = "GESTION DE FACTURATION",
                 .ForeColor = ColorWhite,
                 .Font = FontTitle,
@@ -261,7 +266,7 @@ Namespace DevCommerc8ak
 
             grpProduits.Controls.AddRange({lblRecherche, txtRecherche, btnActualiser, gridProduits, lblQuantite, txtQuantite, lblUnite, cmbUnite, lblPrix, txtPrixUnitaire, lblStock, lblEquivalent, lblTotalReel, btnAjouter, btnRetirer})
             btnRetirer.Width = 110
-            btnPrixDelegue = New Button With {.Text = "MODIFIER PRIX", .Visible = False, .Left = 400, .Top = 477, .Width = 120, .Height = 45, .FlatStyle = FlatStyle.Flat, .BackColor = ColorPrimary, .ForeColor = ColorWhite}
+            btnPrixDelegue = New Button With {.Text = "MODIFIER LE" & Environment.NewLine & "PRIX DE VENTE", .Visible = False, .Enabled = False, .Left = 400, .Top = 477, .Width = 120, .Height = 45, .FlatStyle = FlatStyle.Flat, .BackColor = ColorPrimary, .ForeColor = ColorWhite}
             grpProduits.Controls.Add(btnPrixDelegue)
             AddHandler btnPrixDelegue.Click, AddressOf ModifierPrixDelegue
             Dim menuPrix As New ContextMenuStrip()
@@ -373,8 +378,9 @@ Namespace DevCommerc8ak
                 .WrapContents = True,
                 .AutoScroll = True
             }
+            actionsPanier = pnlActions
 
-            btnValider = New Button() With {.Text = "VALIDER LA VENTE", .Width = 210, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorAccent, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
+            btnValider = New Button() With {.Text = TexteValidation, .Width = 210, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorAccent, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
             btnImprimer = New Button() With {.Text = "IMPRIMER", .Width = 140, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
             btnPdf = New Button() With {.Text = "PDF", .Width = 100, .Height = 50, .FlatStyle = FlatStyle.Flat, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand}
 
@@ -770,6 +776,7 @@ Namespace DevCommerc8ak
         End Function
 
         Private Sub MiseAJourPrixUnitaire(sender As Object, e As EventArgs)
+            btnPrixDelegue.Enabled = gridProduits.CurrentRow IsNot Nothing AndAlso ObtenirTypeVenteSelectionne() IsNot Nothing
             If gridProduits.CurrentRow Is Nothing Then Return
             Dim typeChoisi As TypeVenteDTO = ObtenirTypeVenteSelectionne()
             Dim prix As Decimal = PrixSelonUnite()
@@ -803,6 +810,7 @@ Namespace DevCommerc8ak
                 lblDelegationPrix.Text = diagnostic.Explication
                 aideDelegationPrix.SetToolTip(lblDelegationPrix, diagnostic.Explication)
                 btnPrixDelegue.Visible = actions.Contains("PRIX_TARIF_MODIFIER") OrElse actions.Contains("PRIX_DEMANDER")
+                btnPrixDelegue.Enabled = gridProduits.CurrentRow IsNot Nothing AndAlso ObtenirTypeVenteSelectionne() IsNot Nothing
                 Dim autoriseArticle As Boolean = actions.Contains("PRIX_FACTURE_EXCEPTION") OrElse actions.Contains("PRIX_DEMANDER_FACTURE")
                 prixDeLigne.Visible = autoriseArticle
                 prixArticle.Visible = autoriseArticle
@@ -842,7 +850,6 @@ Namespace DevCommerc8ak
                     If type Is Nothing Then Return
                     id = SafeInteger(CellValueByProperty(gridProduits.CurrentRow, "ProduitId")) : nomType = type.Nom
                     typeTarifId = If(type.EstPersonnalise, type.TypeVenteProduitId, CType(0, Integer?))
-                    ligne = _panier.Find(Function(l) l.ProduitId = id AndAlso l.Unite = nomType AndAlso Nullable.Equals(l.TypeTarifId, typeTarifId))
                 End If
                 Dim contexteCommercial As Func(Of Decimal, ContexteCommercialPrix) = Nothing
                 If ligne IsNot Nothing Then
@@ -853,7 +860,7 @@ Namespace DevCommerc8ak
                                              Return New ContexteCommercialPrix With {.SousTotal = sousTotal, .Remise = remise}
                                          End Function
                 End If
-                Dim exception As ResultatPrixException = DialogueDelegationPrix.Afficher(Me, New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)), id, nomType, If(ligne Is Nothing, Guid.Empty, ligne.ContextePrix), If(ligne Is Nothing, 0D, ligne.Quantite), If(ligne Is Nothing, CType(Nothing, Decimal?), ligne.PrixUnitaire), contexteCommercial, typeTarifId)
+                Dim exception As ResultatPrixException = DialogueDelegationPrix.Afficher(Me, New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)), id, nomType, If(ligne Is Nothing, Guid.Empty, ligne.ContextePrix), If(ligne Is Nothing, 0D, ligne.Quantite), If(ligne Is Nothing, CType(Nothing, Decimal?), ligne.PrixUnitaire), contexteCommercial, typeTarifId, If(ligne Is Nothing, "TARIF", "FACTURE"))
                 If exception IsNot Nothing Then
                     If ligne Is Nothing Then
                         MessageBox.Show("Ajoutez d'abord cet article au panier, puis appliquez son prix exceptionnel.")
@@ -1053,7 +1060,7 @@ Namespace DevCommerc8ak
             If selection Is Nothing AndAlso gridPanier.CurrentRow IsNot Nothing Then selection = TryCast(gridPanier.CurrentRow.DataBoundItem, PanierLigne)
             selection = DelegationPrixRegles.ChoisirArticle(_panier, selection)
             gridPanier.DataSource = Nothing
-            gridPanier.DataSource = _panier
+            gridPanier.DataSource = DelegationPrixRegles.InstantaneArticles(_panier)
             If gridPanier.Columns.Contains("ProduitId") Then gridPanier.Columns("ProduitId").Visible = False
             If gridPanier.Columns.Contains("DemandePrixId") Then gridPanier.Columns("DemandePrixId").Visible = False
             If gridPanier.Columns.Contains("ContextePrix") Then gridPanier.Columns("ContextePrix").Visible = False
@@ -1188,7 +1195,7 @@ Namespace DevCommerc8ak
                 txtClientTel.Text = _clientEditionTelephone
                 txtClientId.Text = ""
                 txtRemise.Text = _remiseEditionTexte
-                btnValider.Text = "METTRE À JOUR LA VENTE"
+                btnValider.Text = TexteValidation
 
                 _panier.Clear()
                 For Each row As DataRow In dtLignes.Rows
@@ -1223,14 +1230,83 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
+        Protected Overridable ReadOnly Property TexteValidation As String
+            Get
+                Return "VALIDER LA VENTE"
+            End Get
+        End Property
+        Protected Sub ConfigurerComptoir(titre As String, ParamArray commandes As Button())
+            lblAppTitle.AutoSize = False
+            lblAppTitle.Width = 680
+            lblAppTitle.Height = 58
+            lblAppTitle.Top = 6
+            lblAppTitle.Font = FontBold
+            lblAppTitle.Text = titre
+            Dim index As Integer = 1
+            For Each bouton As Button In commandes
+                bouton.Width = 185 : bouton.Height = 42 : bouton.FlatStyle = FlatStyle.Flat
+                bouton.BackColor = ColorPrimary : bouton.ForeColor = Color.White
+                actionsPanier.Controls.Add(bouton)
+                actionsPanier.Controls.SetChildIndex(bouton, index)
+                index += 1
+            Next
+            If commandes.Length > 0 Then
+                btnImprimer.Visible = False
+                btnPdf.Visible = False
+                btnAnnuler.Text = "EFFACER LE PANIER"
+                Dim droits As New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString))
+                btnHistorique.Visible = droits.Autorise("HISTORIQUE_FACTURES", "HISTORIQUE_FACTURES")
+            End If
+        End Sub
+        Protected ReadOnly Property FactureEnEdition As Integer?
+            Get
+                Return _factureEnEditionId
+            End Get
+        End Property
+        Protected Sub EnregistrerPreparation()
+            ValiderFacture(Me, EventArgs.Empty)
+        End Sub
+        Protected Sub VerrouillerPreparation(verrouille As Boolean)
+            txtClientNom.Parent.Enabled = Not verrouille
+            btnAjouter.Parent.Enabled = Not verrouille
+            gridPanier.Parent.Enabled = Not verrouille
+            txtRemise.Enabled = Not verrouille
+            btnAnnuler.Enabled = Not verrouille
+            btnValider.Text = TexteValidation
+        End Sub
+        Protected Sub EffacerPreparation()
+            _abandonConfirme = True
+            Try
+                AnnulerFacture(Me, EventArgs.Empty)
+            Finally
+                _abandonConfirme = False
+            End Try
+        End Sub
+        Protected Overridable Function ConfirmerAbandon() As Boolean
+            Return True
+        End Function
+        Protected Overridable Function PersisterOperation(dal As DAL, facture As FactureVente, lignes As IList(Of LigneFactureVente), motif As String, version As Byte(), client As Client) As Integer
+            Return New FactureOperationService(dal).Enregistrer(facture, lignes, motif, version, client, Not _enregistrementBrouillon)
+        End Function
+        Protected Overridable Function MessageOperation() As String
+            Return If(_factureEnEditionId.HasValue, "Facture brouillon mise à jour : ", "Facture en attente : ")
+        End Function
+        Protected Overridable Function DisponibiliteAvantValidation() As Boolean
+            Return VerifierStockAvantValidation()
+        End Function
+
         Private Sub ValiderFacture(sender As Object, e As EventArgs)
+            If _validationEnCours Then Return
+            _validationEnCours = True
+            Dim factureEnregistree As Integer = 0
+            Dim evenementFactureEmis As Boolean = False
             Try
                 If _panier.Count = 0 Then
                     MessageBox.Show("Panier vide.")
                     Return
                 End If
 
-                If Not VerifierStockAvantValidation() Then
+                If Not DisponibiliteAvantValidation() Then
                     Return
                 End If
 
@@ -1325,22 +1401,53 @@ Namespace DevCommerc8ak
                         .QuantiteBase = l.QuantiteBase, .TypeVente = l.Unite, .PrixUnitaire = l.PrixUnitaire,
                         .MontantRemise = 0D, .QteSaisie = l.Quantite, .MotifPrixException = l.MotifPrixException, .DemandePrixId = l.DemandePrixId, .ContextePrix = l.ContextePrix, .TypeTarifId = l.TypeTarifId})
                 Next
-                Dim factureId As Integer = New FactureOperationService(dal).Enregistrer(factureMaj, lignes, motif, _versionFactureEdition, clientNouveau)
+                Dim factureId As Integer = PersisterOperation(dal, factureMaj, lignes, motif, _versionFactureEdition, clientNouveau)
+                If factureId = 0 Then Return
+                factureEnregistree = factureId
 
                 AppDataVersionService.Touch("FACTURES")
                 AppEvents.OnDataChanged()
 
-                MessageBox.Show(If(_factureEnEditionId.HasValue, "Facture brouillon mise a jour: ", "Facture en attente: ") & numeroFacture)
+                MessageBox.Show(MessageOperation() & numeroFacture)
                 _panier.Clear()
                 _factureEnEditionId = Nothing
-                btnValider.Text = "VALIDER LA VENTE"
+                btnValider.Text = TexteValidation
                 RafraichirPanier()
                 ChargerProduits()
                 GenererNouveauNumeroFacture()
+                evenementFactureEmis = True
                 RaiseEvent FactureEnregistree(factureId)
             Catch ex As Exception
-                MessageBox.Show("Erreur validation facture: " & ex.Message)
+                If TypeOf ex Is FactureEnregistreeAffichageException Then
+                    factureEnregistree = DirectCast(ex, FactureEnregistreeAffichageException).FactureId
+                End If
+                If factureEnregistree > 0 Then
+                    ' Une erreur UI apres commit ne doit jamais laisser ce panier
+                    ' disponible pour une seconde soumission commerciale.
+                    _panier.Clear()
+                    _factureEnEditionId = Nothing
+                    btnValider.Enabled = False
+                    txtNumeroFacture.Text = ""
+                    Try
+                        RafraichirPanier()
+                    Catch nettoyage As Exception
+                        Dim log As New ProductionLogService()
+                        log.Error("FacturationForm", "NettoyageApresCommit", "Facture enregistrée : " & factureEnregistree.ToString(), nettoyage)
+                    End Try
+                    GenererNouveauNumeroFacture()
+                    If Not evenementFactureEmis Then
+                        Try
+                            evenementFactureEmis = True
+                            RaiseEvent FactureEnregistree(factureEnregistree)
+                        Catch notification As Exception
+                            Dim log As New ProductionLogService()
+                            log.Error("FacturationForm", "NotificationApresCommit", "Facture enregistrée : " & factureEnregistree.ToString(), notification)
+                        End Try
+                    End If
+                End If
+                MessageBox.Show(If(factureEnregistree > 0, "La facture " & factureEnregistree.ToString() & " est enregistrée. Erreur de rafraîchissement : consultez l'historique avant toute nouvelle saisie. ", "Erreur validation facture : ") & ex.Message)
             Finally
+                _validationEnCours = False
                 Me.UseWaitCursor = False
             End Try
         End Sub
@@ -1626,18 +1733,29 @@ Namespace DevCommerc8ak
         End Class
 
         Private Sub OuvrirHistorique(sender As Object, e As EventArgs)
-            Dim f As New FormulaireFactures()
-            f.ShowDialog()
+            Try
+                Dim droits As New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString))
+                If Not droits.Autorise("HISTORIQUE_FACTURES", "HISTORIQUE_FACTURES") Then
+                    MessageBox.Show("L'historique n'est pas autorisé pour cette session.")
+                    Return
+                End If
+                Using f As New FormulaireFactures()
+                    f.ShowDialog(Me)
+                End Using
+            Catch ex As Exception
+                MessageBox.Show("Historique inaccessible : " & ex.Message, "Historique", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            End Try
         End Sub
 
         Private Sub AnnulerFacture(sender As Object, e As EventArgs)
+            If _panier.Count > 0 AndAlso Not _abandonConfirme AndAlso Not ConfirmerAbandon() Then Return
             _panier.Clear()
             _factureEnEditionId = Nothing
             txtClientId.Text = ""
             txtClientNom.Text = ""
             txtClientTel.Text = ""
             txtRemise.Text = ""
-            btnValider.Text = "VALIDER LA VENTE"
+            btnValider.Text = TexteValidation
             RafraichirPanier()
             GenererNouveauNumeroFacture()
         End Sub
@@ -1654,13 +1772,18 @@ Namespace DevCommerc8ak
             End If
         End Sub
 
-        Public Function AutoriserSortie() As Boolean Implements ISortieSessionControlee.AutoriserSortie
+        Public Overridable Function AutoriserSortie() As Boolean Implements ISortieSessionControlee.AutoriserSortie
             If Me.UseWaitCursor Then Return False
             If _panier.Count = 0 Then Return True
             Dim choix As DialogResult = MessageBox.Show(Me, "Une facture est en préparation. Oui : enregistrer le brouillon. Non : abandonner explicitement le panier. Annuler : rester sur cette facture.", "Facture non finalisée", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button3)
             If choix = DialogResult.Cancel Then Return False
             If choix = DialogResult.Yes Then
-                ValiderFacture(Me, EventArgs.Empty)
+                _enregistrementBrouillon = True
+                Try
+                    ValiderFacture(Me, EventArgs.Empty)
+                Finally
+                    _enregistrementBrouillon = False
+                End Try
                 Return _panier.Count = 0
             End If
             _panier.Clear()

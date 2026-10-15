@@ -173,6 +173,19 @@ Namespace DevCommerc8ak
             btnRafraichir = CreateStyledButton("Rafraîchir", Color.Gray)
 
             flowButtons.Controls.AddRange(New Control() {btnAjouter, btnModifier, btnDesactiver, btnResetMdp, btnDeverrouiller, btnSupprimer, btnRafraichir})
+            Dim modesParRole As Button = CreateStyledButton("Vente & Encaissement", ColorPrimary)
+            modesParRole.Visible = False
+            flowButtons.Controls.Add(modesParRole)
+            AddHandler Shown, Sub()
+                                  Try
+                                      modesParRole.Visible = New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)).Autorise("UTILISATEUR_MODES", "ADMINISTRATION")
+                                  Catch ex As Exception
+                                      modesParRole.Visible = False
+                                      Dim log As New ProductionLogService()
+                                      log.Error("FormulaireUtilisateurs", "AutorisationsModes", "Impossible de charger le droit d'attribution des modes.", ex)
+                                  End Try
+                              End Sub
+            AddHandler modesParRole.Click, AddressOf ConfigurerModesUtilisateur
 
             ' --- Grilles (Split Vertical) ---
             splitGrids = New TableLayoutPanel() With {
@@ -680,6 +693,48 @@ Namespace DevCommerc8ak
                 lblEtat.Text = "Expire dans : " & Math.Max(0, CInt(Math.Floor(restant.TotalMinutes))).ToString("00") & ":" & restant.Seconds.ToString("00")
             End Sub
         End Class
+
+        Private Sub ConfigurerModesUtilisateur(sender As Object, e As EventArgs)
+            If _utilisateurSelectionneId <= 0 Then
+                MessageBox.Show("Enregistrez puis sélectionnez un compte et ses rôles autorisés.")
+                Return
+            End If
+            Try
+                Dim service As New AttributionModeService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString))
+                Dim cible As Integer = _utilisateurSelectionneId
+                Using fenetre As New Form With {.Text = "Vente & Encaissement — autorisation par rôle", .Size = New Size(720, 440), .MinimumSize = New Size(620, 380), .StartPosition = FormStartPosition.CenterParent, .BackColor = Color.FromArgb(245, 247, 250), .Font = FontControl}
+                    Dim liste As New DataGridView With {.Dock = DockStyle.Fill, .ReadOnly = True, .AllowUserToAddRows = False, .AllowUserToDeleteRows = False, .MultiSelect = False, .SelectionMode = DataGridViewSelectionMode.FullRowSelect, .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, .BackgroundColor = Color.White, .RowHeadersVisible = False, .EnableHeadersVisualStyles = False}
+                    liste.ColumnHeadersDefaultCellStyle.BackColor = ColorPrimary
+                    liste.ColumnHeadersDefaultCellStyle.ForeColor = Color.White
+                    Dim charger As Action = Sub()
+                                                liste.DataSource = service.Lister(cible)
+                                                liste.Columns("RoleId").Visible = False
+                                                liste.Columns("NomRole").HeaderText = "Rôle autorisé"
+                                                liste.Columns("EstRolePrincipal").HeaderText = "Principal"
+                                                liste.Columns("VenteEncaissementAutorise").HeaderText = "Vente & Encaissement"
+                                            End Sub
+                    Dim agir As New Button With {.Text = "AUTORISER / RETIRER POUR CE RÔLE", .Dock = DockStyle.Bottom, .Height = 44, .BackColor = ColorPrimary, .ForeColor = Color.White}
+                    AddHandler agir.Click, Sub()
+                                               Try
+                                                   If liste.CurrentRow Is Nothing Then Return
+                                                   Dim row As DataRow = DirectCast(liste.CurrentRow.DataBoundItem, DataRowView).Row
+                                                   Dim motif As String = DialogueMotifOperation.Demander(fenetre, "Motif de l'attribution ou du retrait")
+                                                   If motif Is Nothing Then Return
+                                                   service.Attribuer(cible, CInt(row("RoleId")), Not CBool(row("VenteEncaissementAutorise")), CBool(row("VenteEncaissementAutorise")), motif)
+                                                   charger()
+                                               Catch ex As Exception
+                                                   MessageBox.Show(fenetre, ex.Message, "Attribution refusée", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                                               End Try
+                                           End Sub
+                    fenetre.Controls.Add(liste) : fenetre.Controls.Add(agir)
+                    fenetre.Controls.Add(New Label With {.Text = "Compte sélectionné : " & txtNom.Text & Environment.NewLine & "Un rôle éligible et l'activation globale sont aussi requis. Reconnexion nécessaire. Aucun droit n'est ajouté au rôle.", .Dock = DockStyle.Top, .Height = 76, .Padding = New Padding(12)})
+                    charger()
+                    fenetre.ShowDialog(Me)
+                End Using
+            Catch ex As Exception
+                MessageBox.Show(ex.Message, "Autorisations de modes", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            End Try
+        End Sub
 
         Private Function ObtenirRolesCochesAvecPrincipal() As List(Of String)
             Dim roles As New List(Of String)()

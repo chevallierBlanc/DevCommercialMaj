@@ -31,6 +31,7 @@ Module Program
         If ConfigurationManager.ConnectionStrings("CommercialMagDB") IsNot Nothing Then Throw New InvalidOperationException("Ne pas copier app.config de production dans le banc de tests.")
         dal = New DAL(cs)
         Exec("IF NOT EXISTS(SELECT 1 FROM dbo.SchemaVersion WHERE Version=2026101301) THROW 51000, 'Migration integration 2026101301 requise sur la copie de test.', 1;")
+        Exec("IF NOT EXISTS(SELECT 1 FROM dbo.SchemaVersion WHERE Version=2026101501) THROW 51000, 'Migration Vente et Encaissement 2026101501 requise sur la copie.', 1;")
         Verifier(Scalar("SELECT COUNT(*) FROM dbo.Parametres WHERE GestionModesActive=0 AND DelegationPrixActive=0") = 1, "Copie de test en parcours classique, migrations 0902/0903/0904 requises")
         Dim suffix As String = Guid.NewGuid().ToString("N").Substring(0, 12)
         Dim role As Integer = Scalar("INSERT dbo.Roles(NomRole,EstActif) VALUES('TEST_' + @s,1); SELECT CAST(SCOPE_IDENTITY() AS INT)", suffix)
@@ -48,6 +49,19 @@ Module Program
         Dim id As Integer = operations.Enregistrer(facture, Lignes(2D), String.Empty, Nothing)
         Verifier(Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE [Action]='FACTURE_CREEE' AND EntiteId='" & id.ToString() & "'") = 1, "Création et audit")
         Verifier(Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE [Action]='FACTURE_CREEE' AND EntiteId='" & id.ToString() & "' AND EffectuePar=" & user.ToString() & " AND SessionId=" & SessionUtilisateur.SessionId.ToString() & " AND ReferenceDocument=@s AND AnciennesValeurs IS NULL AND NouvellesValeurs IS NOT NULL", facture.NumeroFacture) = 1, "Référence, acteur et snapshot réels")
+        Dim panneAffichage As EventHandler = Sub(sender, e) Throw New InvalidOperationException("Panne UI apres commit simulee")
+        Dim apresCommit As FactureVente = NouvelleFacture("UI_APRES_COMMIT_" & suffix)
+        AddHandler AppEvents.VenteCreee, panneAffichage
+        Try
+            Refus(Of FactureEnregistreeAffichageException)(Sub() operations.Enregistrer(apresCommit, Lignes(2D), "", Nothing))
+        Finally
+            RemoveHandler AppEvents.VenteCreee, panneAffichage
+        End Try
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.FacturesVente WHERE NumeroFacture=@s", apresCommit.NumeroFacture) = 1, "Echec de notification distingue de l'echec SQL : facture presente une fois")
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE ReferenceDocument=@s AND [Action]='FACTURE_ENREGISTREMENT_REFUSE'", apresCommit.NumeroFacture) = 0, "Aucun faux refus SQL apres commit reussi")
+        Dim brouillon As FactureVente = NouvelleFacture("BROUILLON_" & suffix)
+        Dim brouillonId As Integer = operations.Enregistrer(brouillon, Lignes(2D), "", Nothing, Nothing, False)
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.FacturesVente WHERE FactureVenteId=" & brouillonId.ToString() & " AND ValideeParUtilisateurId IS NULL AND Statut='EN_ATTENTE'") = 1, "Mettre en attente ne fabrique pas de validation commerciale")
         Dim entete As DataRow = operations.LireEntetePourEdition(id)
         Verifier(DirectCast(entete("VersionOperation"), Byte()).SequenceEqual(operations.LireVersion(id)), "Version et en-tête du même chargement")
         Dim factureRemise As FactureVente = NouvelleFacture(suffix & "-remise")
@@ -217,7 +231,7 @@ Module Program
         Dim configModes As New ConfigurationModesService(dal)
         Dim produitPrix As Integer = Scalar("INSERT dbo.Produits(CodeBarres,Libelle,PrixDetail,PrixGros,PrixAchat,ConversionUnite,TypeGestionStock,ContenuUnitePrincipale,ContenuUniteSecondaire,VenteGros) VALUES('PRIX_' + @s,'PRIX TEST',15,150,100,10,'UNITE',10,1,1); SELECT CAST(SCOPE_IDENTITY() AS int)", suffix)
         Refus(Of UnauthorizedAccessException)(Sub() prix.Consulter(produitPrix, "piece"))
-        Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & role.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface IN('PRIX_CONSULTER','PRIX_TARIF_MODIFIER','PRIX_DEMANDER','PRIX_APPROUVER','PRIX_REFUSER','PRIX_FACTURE_EXCEPTION','PARAMETRES','PARAMETRES_PRIX','PARAMETRES_SECURITE','MODE_FACTURATION')")
+        Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & role.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface IN('PRIX_CONSULTER','PRIX_TARIF_MODIFIER','PRIX_DEMANDER','PRIX_APPROUVER','PRIX_REFUSER','PRIX_FACTURE_EXCEPTION','PARAMETRES','PARAMETRES_PRIX','PARAMETRES_SECURITE','MODE_FACTURATION','UTILISATEUR_MODES','ADMINISTRATION')")
         Dim initialPrix As ConfigurationPrix = prix.Configuration()
         Dim initialModes As ConfigurationModes = configModes.Charger()
         Dim sessionInitiale As Integer = SessionUtilisateur.SessionId
@@ -357,6 +371,24 @@ Module Program
                 End Using
             End Using
             Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & role.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface='MODE_COMBINE'")
+            Refus(Of UnauthorizedAccessException)(Sub() modes.Activer("FACTURATION_ET_CAISSE"))
+            Dim attribution As New AttributionModeService(dal)
+            Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & roleCaisse.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface IN('FACTURIER','FACTURE_CREER','MODE_COMBINE')")
+            attribution.Attribuer(user, roleCaisse, True, False, "Sarah : attribution au role caisse seulement")
+            Verifier(modes.Lister(user, roleCaisse).Contains("FACTURATION_ET_CAISSE") AndAlso Not modes.Lister(user, role).Contains("FACTURATION_ET_CAISSE"), "Sarah : caisse autorisee, facturier non autorise malgre le meme compte")
+            attribution.Attribuer(user, roleCaisse, False, True, "Fin du scenario Sarah")
+            Dim sarah As Integer = Scalar("INSERT dbo.Utilisateurs(NomUtilisateur,MotDePasseHash,MotDePasseSel,EstActif) SELECT TOP(1) 'SARAH_' + @s,MotDePasseHash,MotDePasseSel,1 FROM dbo.Utilisateurs; SELECT CAST(SCOPE_IDENTITY() AS int)", suffix)
+            Dim comptes As New UtilisateurRepository(dal)
+            comptes.MettreAJourRolesUtilisateur(sarah, New List(Of Integer) From {role, roleCaisse}, role)
+            attribution.Attribuer(sarah, roleCaisse, True, False, "Attribution individuelle sur second role")
+            comptes.MettreAJour(sarah, "SARAH_" & suffix, True, role, Nothing, Nothing, New List(Of Integer) From {role, roleCaisse})
+            Verifier(modes.Lister(sarah, roleCaisse).Contains("FACTURATION_ET_CAISSE"), "Edition du compte conserve l'attribution du role conserve")
+            comptes.MettreAJourRolesUtilisateur(sarah, New List(Of Integer) From {role}, role)
+            comptes.MettreAJourRolesUtilisateur(sarah, New List(Of Integer) From {role, roleCaisse}, role)
+            Verifier(Not modes.Lister(sarah, roleCaisse).Contains("FACTURATION_ET_CAISSE"), "Retrait puis reactivation d'un role ne ressuscite pas son attribution sensible")
+            Verifier(Not modes.Lister(user, role).Contains("FACTURATION_ET_CAISSE"), "Eligibilite de role seule ne donne pas l'attribution individuelle")
+            attribution.Attribuer(user, role, True, False, "Attribution explicite de la fixture")
+            Verifier(modes.Lister(user, role).Contains("FACTURATION_ET_CAISSE") AndAlso Not modes.Lister(user, roleCaisse).Contains("FACTURATION_ET_CAISSE"), "Attribution limitee a l'association, jamais a l'autre role du compte")
             ' Une nouvelle session choisit le mode : jamais de cumul dans l'ancienne.
             Exec("UPDATE dbo.UtilisateurSessions SET Fin=SYSUTCDATETIME() WHERE SessionId=" & sessionInitiale.ToString())
             SessionUtilisateur.SessionId = Scalar("INSERT dbo.UtilisateurSessions(UtilisateurId,RoleIdActif,RoleSession,Poste) VALUES(" & user.ToString() & "," & role.ToString() & ",'TEST','TEST'); SELECT CAST(SCOPE_IDENTITY() AS int)")
@@ -374,6 +406,7 @@ Module Program
             Verifier(Scalar("SELECT COUNT(*) FROM dbo.Paiements WHERE FactureVenteId=" & factureId.ToString()) = 0, "Mode combiné : création distincte de l'encaissement")
             Dim caisseCombinee As New FacturationService(dal)
             caisseCombinee.EncaisserFacture(factureId, "ESPECES", "REF_" & suffix, 25D, 4D, "FC", user, 25D, 1D)
+            TesterComptoir(role, user, reviewer, reviewerSession, produitPrix, suffix)
             Verifier(Scalar("SELECT COUNT(*) FROM dbo.Paiements WHERE FactureVenteId=" & factureId.ToString() & " AND Montant=21 AND MontantRecu=25 AND MonnaieRendue=4 AND MontantRecuOrigine=25 AND TauxConversionApplique=1 AND DeviseMontants='FC'") = 1, "Paiement : reçu, affecté et rendu persistés séparément")
             Verifier(Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE EntiteId='" & factureId.ToString() & "' AND [Action]='ENCAISSEMENT_VALIDE' AND ModeActif='FACTURATION_ET_CAISSE' AND NouvellesValeurs LIKE '%EncaisseParNom%'") = 1, "Audit du mode combiné et des identités instantanées")
             Verifier(prix.Consulter(produitPrix, "piece").Prix = 20D, "L'exception facture ne modifie pas le tarif officiel")
@@ -482,6 +515,65 @@ Module Program
         End Try
         Throw New Exception("Refus attendu : " & GetType(T).Name)
     End Sub
+    Private Sub TesterComptoir(role As Integer, user As Integer, reviewer As Integer, reviewerSession As Integer, produitPrix As Integer, suffix As String)
+        Dim service As New VenteEncaissementService(dal)
+        Dim operation As Guid = Guid.NewGuid()
+        Dim facture As FactureVente = NouvelleFacture("COMPTOIR_" & suffix)
+        facture.SousTotal = 20D : facture.MontantTotal = 20D
+        Dim articles As New List(Of LigneFactureVente) From {New LigneFactureVente With {.ProduitId = produitPrix, .Quantite = 1D, .QteSaisie = 1D, .QuantiteBase = 1D, .TypeVente = "piece", .TypeTarifId = 0, .PrixUnitaire = 20D}}
+        Dim paiement As New ReglementComptoir With {.MontantOrigine = 25D}
+        Dim id As Integer = service.Finaliser(operation, facture, articles, "", Nothing, Nothing, paiement)
+        Verifier(service.Finaliser(operation, facture, articles, "", Nothing, Nothing, paiement) = id, "Repetition idempotente de la meme vente")
+        Dim panneNotification As EventHandler = Sub(sender, e) Throw New InvalidOperationException("Panne notification comptoir")
+        AddHandler AppEvents.VenteValidee, panneNotification
+        Try
+            Refus(Of FactureEnregistreeAffichageException)(Sub() service.Finaliser(operation, facture, articles, "", Nothing, Nothing, paiement))
+        Finally
+            RemoveHandler AppEvents.VenteValidee, panneNotification
+        End Try
+        Verifier(service.Finaliser(operation, facture, articles, "", Nothing, Nothing, paiement) = id, "Reprise apres notification UI echouee sans second encaissement")
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.Paiements WHERE FactureVenteId=" & id.ToString() & " AND Montant=20 AND MontantRecu=25 AND MonnaieRendue=5 AND PayePar=" & user.ToString()) = 1, "Un paiement, monnaie non comptabilisee comme recette")
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.FacturesVente WHERE FactureVenteId=" & id.ToString() & " AND CreePar=" & user.ToString() & " AND ValideeParUtilisateurId=" & user.ToString() & " AND Statut='PAYEE'") = 1, "Createur et validateur reels, distincts du champ encaisseur")
+        paiement.MontantOrigine = 30D
+        Refus(Of DBConcurrencyException)(Sub() service.Finaliser(operation, facture, articles, "", Nothing, Nothing, paiement))
+        paiement.MontantOrigine = 25D
+        Dim autre As FactureVente = NouvelleFacture("COMPTOIR_CONCURRENT_" & suffix)
+        autre.SousTotal = 20D : autre.MontantTotal = 20D
+        Dim cle As Guid = Guid.NewGuid(), premier As Integer = 0, second As Integer = 0
+        Parallel.Invoke(Sub() premier = service.Finaliser(cle, autre, articles, "", Nothing, Nothing, paiement), Sub() second = service.Finaliser(cle, autre, articles, "", Nothing, Nothing, paiement))
+        Verifier(premier = second AndAlso Scalar("SELECT COUNT(*) FROM dbo.Paiements WHERE FactureVenteId=" & premier.ToString()) = 1, "Double confirmation concurrente : une vente et un paiement")
+        Dim impossible As FactureVente = NouvelleFacture("COMPTOIR_ROLLBACK_" & suffix)
+        impossible.SousTotal = 19980D : impossible.MontantTotal = 19980D
+        Dim trop As New List(Of LigneFactureVente) From {New LigneFactureVente With {.ProduitId = produitPrix, .Quantite = 999D, .QteSaisie = 999D, .QuantiteBase = 999D, .TypeVente = "piece", .TypeTarifId = 0, .PrixUnitaire = 20D}}
+        Refus(Of Exception)(Sub() service.Finaliser(Guid.NewGuid(), impossible, trop, "", Nothing, Nothing, New ReglementComptoir With {.MontantOrigine = 20000D}))
+        Verifier(Scalar("SELECT COUNT(*) FROM dbo.FacturesVente WHERE NumeroFacture=@s", impossible.NumeroFacture) = 0, "Stock insuffisant : facture et paiement annules ensemble")
+        Refus(Of ArgumentException)(Sub() service.Finaliser(Guid.NewGuid(), autre, articles, "", Nothing, Nothing, New ReglementComptoir With {.Moyen = "CARTE", .MontantOrigine = 20D}))
+        Dim sid As Integer = SessionUtilisateur.SessionId
+        Try
+            SessionUtilisateur.UtilisateurId = reviewer
+            SessionUtilisateur.NomUtilisateur = "REV_" & suffix
+            SessionUtilisateur.SessionId = reviewerSession
+            SessionUtilisateur.ModeActif = ""
+            Dim modes As New ModeTravailService(dal)
+            modes.Activer("FACTURATION")
+            Dim preparee As FactureVente = NouvelleFacture("AUTEURS_DISTINCTS_" & suffix)
+            preparee.SousTotal = 20D : preparee.MontantTotal = 20D
+            Dim factureSeparee As Integer = New FactureOperationService(dal).Enregistrer(preparee, articles, "", Nothing)
+            SessionUtilisateur.UtilisateurId = user
+            SessionUtilisateur.NomUtilisateur = "TEST_" & suffix
+            SessionUtilisateur.SessionId = sid
+            SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE"
+            Dim caisse As New FacturationService(dal)
+            caisse.EncaisserFacture(factureSeparee, "CASH", "TEST", 20D, 0D, "FC", user, 20D, 1D)
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.FacturesVente f JOIN dbo.Paiements p ON p.FactureVenteId=f.FactureVenteId WHERE f.FactureVenteId=" & factureSeparee.ToString() & " AND f.CreePar=" & reviewer.ToString() & " AND f.ValideeParUtilisateurId=" & reviewer.ToString() & " AND p.PayePar=" & user.ToString()) = 1, "Preparation par un utilisateur et encaissement par un autre preserves")
+        Finally
+            SessionUtilisateur.UtilisateurId = user
+            SessionUtilisateur.NomUtilisateur = "TEST_" & suffix
+            SessionUtilisateur.SessionId = sid
+            SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE"
+        End Try
+    End Sub
+
     Private Sub TesterOuvertureSessions(role As Integer, suffix As String, sessions As SessionRepository)
         Dim compte As Integer = Scalar("INSERT dbo.Utilisateurs(NomUtilisateur,MotDePasseHash,MotDePasseSel,EstActif) SELECT TOP(1) 'SES_' + @s,MotDePasseHash,MotDePasseSel,1 FROM dbo.Utilisateurs; SELECT CAST(SCOPE_IDENTITY() AS int)", suffix)
         Exec("INSERT dbo.UtilisateurRoles(UtilisateurId,RoleId,EstActif,EstRolePrincipal) VALUES(" & compte.ToString() & "," & role.ToString() & ",1,1)")

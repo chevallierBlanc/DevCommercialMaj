@@ -11,6 +11,10 @@ Namespace DevCommerc8ak
     Public NotInheritable Class DelegationPrixRegles
         Private Sub New()
         End Sub
+        Public Shared Function InstantaneArticles(Of T)(articles As IEnumerable(Of T)) As List(Of T)
+            ' La collection liee ne doit pas changer sous le CurrencyManager.
+            Return New List(Of T)(articles)
+        End Function
         Public Shared Function ChoisirArticle(Of T As Class)(articles As IList(Of T), selection As T) As T
             If selection IsNot Nothing Then
                 For Each article As T In articles

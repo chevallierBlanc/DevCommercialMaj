@@ -7,6 +7,13 @@
     <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Repositories/RoleRepository.vb" Link="RoleRepository.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/UtilisateurService.vb" Link="UtilisateurService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Entities/Utilisateur.vb" Link="Utilisateur.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/UtilisateurDTO.vb" Link="UtilisateurDTO.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Repositories/UtilisateurRepository.vb" Link="UtilisateurRepository.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/VenteEncaissementService.vb" Link="VenteEncaissementService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/AttributionModeService.vb" Link="AttributionModeService.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Repositories/SessionRepository.vb" Link="SessionRepository.vb" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Drawing" />

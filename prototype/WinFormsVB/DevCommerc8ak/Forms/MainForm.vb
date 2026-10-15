@@ -250,7 +250,7 @@ Namespace DevCommerc8ak
                 .TextAlign = ContentAlignment.MiddleLeft
             }
             Dim lblUserRole As New Label() With {
-                .Text = SessionUtilisateur.Role & If(String.IsNullOrWhiteSpace(SessionUtilisateur.ModeActif), "", Environment.NewLine & SessionUtilisateur.ModeActif.Replace("_ET_", " + ")),
+                .Text = SessionUtilisateur.Role & If(String.IsNullOrWhiteSpace(SessionUtilisateur.ModeActif), "", Environment.NewLine & If(SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE", "VENTE & ENCAISSEMENT", SessionUtilisateur.ModeActif)),
                 .ForeColor = Color.FromArgb(145, 158, 171),
                 .Font = New Font("Segoe UI", 9),
                 .Dock = DockStyle.Top,
@@ -387,7 +387,7 @@ Namespace DevCommerc8ak
             _moduleInitialCharge = True
 
             If SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE" Then
-                LoadForm(New FacturationEtCaisseForm())
+                LoadForm(New VenteEncaissementForm())
             ElseIf SessionUtilisateur.ModeActif = "FACTURATION" Then
                 LoadForm(New FacturationForm())
             ElseIf SessionUtilisateur.ModeActif = "CAISSE" Then
@@ -1123,7 +1123,7 @@ Namespace DevCommerc8ak
         ''' </summary>
         Private Sub AfficherFacturier(sender As Object, e As EventArgs)
             If SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE" Then
-                LoadForm(New FacturationEtCaisseForm())
+                LoadForm(New VenteEncaissementForm())
             Else
                 LoadForm(New FacturationForm())
             End If
@@ -1134,7 +1134,7 @@ Namespace DevCommerc8ak
         ''' </summary>
         Private Sub AfficherCaisse(sender As Object, e As EventArgs)
             If SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE" Then
-                LoadForm(New FacturationEtCaisseForm())
+                LoadForm(New VenteEncaissementForm())
             Else
                 LoadForm(New CaisseForm())
             End If

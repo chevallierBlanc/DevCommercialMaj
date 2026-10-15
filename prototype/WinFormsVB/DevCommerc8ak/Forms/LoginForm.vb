@@ -354,9 +354,11 @@ Namespace DevCommerc8ak
 
                 Dim modes As List(Of String) = modesService.Lister(utilisateur.UtilisateurId, roleChoisi.RoleId)
                 Dim modeChoisi As String = Nothing
-                If modes.Count = 1 Then
+                If modes.Count = 1 AndAlso modes(0) <> "FACTURATION_ET_CAISSE" Then
                     modeChoisi = modes(0)
-                ElseIf modes.Count > 1 Then
+                ElseIf Not modes.Contains("FACTURATION_ET_CAISSE") AndAlso ModeTravailRegles.ModeSeparePrefere(roleChoisi.NomRole, modes) IsNot Nothing Then
+                    modeChoisi = ModeTravailRegles.ModeSeparePrefere(roleChoisi.NomRole, modes)
+                ElseIf modes.Count > 0 Then
                     Using selection As New DialogueModeTravail(modes, roleChoisi.NomRole)
                         If selection.ShowDialog(Me) <> DialogResult.OK Then Return False
                         modeChoisi = selection.ModeSelectionne

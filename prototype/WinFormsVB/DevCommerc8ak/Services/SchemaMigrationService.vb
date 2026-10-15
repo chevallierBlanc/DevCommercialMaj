@@ -35,12 +35,22 @@ Namespace DevCommerc8ak
                         AppliquerMigration(cn, tx, 2026100903, "Modes travail explicites", AddressOf MigrationModesTravail)
                         AppliquerMigration(cn, tx, 2026100904, "Delegation tarifs et exceptions facture", AddressOf MigrationDelegationPrix)
                         AppliquerMigration(cn, tx, 2026101301, "Integration prix et modes operationnels", AddressOf MigrationIntegrationPrixModes)
+                        AppliquerMigration(cn, tx, 2026101501, "Vente encaissement et attribution par utilisateur role", AddressOf MigrationVenteEncaissement)
                         AssurerSchemaCritiquePostMigrations(cn, tx)
                         tx.Commit()
                     Catch
                         tx.Rollback()
                         Throw
                     End Try
+                End Using
+            End Using
+        End Sub
+
+        Private Shared Sub MigrationVenteEncaissement(cn As SqlConnection, tx As SqlTransaction)
+            Using stream As System.IO.Stream = GetType(SchemaMigrationService).Assembly.GetManifestResourceStream("VenteEncaissementMigration.sql")
+                If stream Is Nothing Then Throw New InvalidOperationException("Migration Vente et Encaissement absente.")
+                Using reader As New System.IO.StreamReader(stream)
+                    Executer(cn, tx, reader.ReadToEnd())
                 End Using
             End Using
         End Sub

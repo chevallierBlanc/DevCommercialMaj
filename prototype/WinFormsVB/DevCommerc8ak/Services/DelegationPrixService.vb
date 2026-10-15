@@ -37,6 +37,8 @@ Namespace DevCommerc8ak
     Public Class TarifDelegue
         Public Property ProduitId As Integer
         Public Property Produit As String
+        <ScriptIgnore>
+        Public Property CodeBarres As String
         Public Property TypeVente As String
         Public Property TypeId As Integer
         Public Property ChampPrix As String
@@ -218,7 +220,7 @@ Namespace DevCommerc8ak
             Dim secondaire As Decimal = If(row.IsNull("ContenuUniteSecondaire"), 0D, CDec(row("ContenuUniteSecondaire")))
             Dim gestion As String = Convert.ToString(row("TypeGestionStock"))
             Dim achat As Decimal = CDec(row("PrixAchat"))
-            Dim t As New TarifDelegue With {.ProduitId = id, .Produit = Convert.ToString(row("Libelle")), .TypeVente = typeVente}
+            Dim t As New TarifDelegue With {.ProduitId = id, .Produit = Convert.ToString(row("Libelle")), .CodeBarres = Convert.ToString(row("CodeBarres")), .TypeVente = typeVente}
             Dim champ As String = Nothing
             Dim standard As Boolean = Champs.TryGetValue(typeVente, champ)
             If standard AndAlso Not typeTarifId.HasValue Then

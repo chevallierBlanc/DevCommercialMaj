@@ -17,6 +17,13 @@ Namespace DevCommerc8ak
                 Case Else : Throw New UnauthorizedAccessException("Mode de travail inconnu.")
             End Select
         End Function
+        Public Shared Function ModeSeparePrefere(role As String, modes As IList(Of String)) As String
+            ' Preference d'ergonomie seulement, jamais une attribution de droits.
+            If (String.Equals(role, "CAISSIER", StringComparison.OrdinalIgnoreCase) OrElse String.Equals(role, "CAISSIERE", StringComparison.OrdinalIgnoreCase) OrElse String.Equals(role, "CAISSIÈRE", StringComparison.OrdinalIgnoreCase)) AndAlso modes.Contains("CAISSE") Then Return "CAISSE"
+            If String.Equals(role, "FACTURIER", StringComparison.OrdinalIgnoreCase) AndAlso modes.Contains("FACTURATION") Then Return "FACTURATION"
+            If modes.Count = 1 AndAlso modes(0) <> "FACTURATION_ET_CAISSE" Then Return modes(0)
+            Return Nothing
+        End Function
 
         Public Shared Function AutoriseRole(mode As String, droits As ISet(Of String)) As Boolean
             Dim facturation As Boolean = droits.Contains("FACTURIER") AndAlso droits.Contains("FACTURE_CREER")
@@ -42,6 +49,9 @@ Namespace DevCommerc8ak
             If facturation AndAlso AutoriseRole("FACTURATION", droits) Then modes.Add("FACTURATION")
             If caisse AndAlso AutoriseRole("CAISSE", droits) Then modes.Add("CAISSE")
             If combine AndAlso AutoriseRole("FACTURATION_ET_CAISSE", droits) Then modes.Add("FACTURATION_ET_CAISSE")
+            ' Recuperation administrative si la configuration operationnelle est
+            ' incomplete : aucun droit metier n'est cree, aucun mode combine actif.
+            If modes.Count = 0 AndAlso administratif Then Return modes
             If modes.Count = 0 Then Throw New UnauthorizedAccessException("Aucun mode opérationnel accessible. Activez le mode global adapté et vérifiez les droits du rôle choisi : Facturation + Créer une facture, ou Caisse + Créer un encaissement. Le combiné exige ces deux ensembles et Mode combiné.")
             Return modes
         End Function
@@ -51,7 +61,7 @@ Namespace DevCommerc8ak
             For Each droit As KeyValuePair(Of String, String) In New Dictionary(Of String, String) From {{"FACTURIER", "accès Facturation"}, {"FACTURE_CREER", "Créer une facture"}, {"CAISSE", "accès Caisse"}, {"ENCAISSEMENT_CREER", "Créer un encaissement"}, {"MODE_COMBINE", "Mode combiné"}}
                 If Not droits.Contains(droit.Key) Then manquants.Add(droit.Value)
             Next
-            If manquants.Count = 0 Then Return "Droits du combiné réunis pour ce rôle ; l'activation globale reste nécessaire."
+            If manquants.Count = 0 Then Return "Rôle éligible : l'activation globale ET l'attribution à ce compte pour ce rôle restent nécessaires."
             Return "Combiné : droits manquants pour ce rôle : " & String.Join(", ", manquants) & ". Les droits d'autres rôles ne sont pas cumulés."
         End Function
 

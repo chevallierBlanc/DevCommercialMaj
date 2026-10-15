@@ -15,18 +15,19 @@ Namespace DevCommerc8ak
         Private Sub New()
         End Sub
 
-        Public Shared Function Afficher(owner As IWin32Window, service As DelegationPrixService, produitId As Integer, typeVente As String, Optional contexte As Guid = Nothing, Optional quantite As Decimal = 0D, Optional prixArticle As Decimal? = Nothing, Optional contexteCommercial As Func(Of Decimal, ContexteCommercialPrix) = Nothing, Optional typeTarifId As Integer? = Nothing) As ResultatPrixException
+        Public Shared Function Afficher(owner As IWin32Window, service As DelegationPrixService, produitId As Integer, typeVente As String, Optional contexte As Guid = Nothing, Optional quantite As Decimal = 0D, Optional prixArticle As Decimal? = Nothing, Optional contexteCommercial As Func(Of Decimal, ContexteCommercialPrix) = Nothing, Optional typeTarifId As Integer? = Nothing, Optional perimetre As String = "TOUS") As ResultatPrixException
             Dim disponibles As System.Collections.Generic.HashSet(Of String) = service.ActionsDisponibles()
             If disponibles.Count = 0 Then Throw New UnauthorizedAccessException("La délégation est désactivée ou aucune action de prix n'est autorisée pour cette session.")
             Dim t As TarifDelegue = service.Consulter(produitId, typeVente, typeTarifId)
             Dim resultat As ResultatPrixException = Nothing
             Using form As New Form With {.Text = "Modification rapide du prix", .Size = New Size(780, 780), .MinimumSize = New Size(740, 640), .StartPosition = FormStartPosition.CenterParent, .BackColor = Color.FromArgb(245, 247, 250), .Font = New Font("Segoe UI", 10)}
-                Dim root As New TableLayoutPanel With {.Dock = DockStyle.Fill, .AutoScroll = True, .Padding = New Padding(20), .ColumnCount = 1, .RowCount = 8}
+                form.Text = If(perimetre = "TARIF", "Modifier le prix de vente — tarif officiel", If(perimetre = "FACTURE", "Prix exceptionnel — article de facture", "Modification rapide du prix"))
+                Dim root As New TableLayoutPanel With {.Dock = DockStyle.Fill, .AutoScroll = True, .Padding = New Padding(20), .ColumnCount = 1, .RowCount = 9}
                 root.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
-                For Each h As Integer In New Integer() {44, 116, 46, 54, 72, 70, 36, 140}
+                For Each h As Integer In New Integer() {44, 116, 46, 54, 72, 62, 70, 36, 140}
                     root.RowStyles.Add(New RowStyle(SizeType.Absolute, h))
                 Next
-                root.Controls.Add(New Label With {.Text = t.Produit & " — " & t.TypeVente, .Dock = DockStyle.Fill, .ForeColor = Color.FromArgb(41, 128, 185), .Font = New Font("Segoe UI", 14, FontStyle.Bold)}, 0, 0)
+                root.Controls.Add(New Label With {.Text = t.Produit & " — " & t.TypeVente & " | " & t.CodeBarres, .Dock = DockStyle.Fill, .ForeColor = Color.FromArgb(41, 128, 185), .Font = New Font("Segoe UI", 12, FontStyle.Bold)}, 0, 0)
                 root.Controls.Add(New Label With {.Text = "Tarif officiel : " & t.Prix.ToString("N2") & " FC" & Environment.NewLine & "Coût comparable pour ce type de vente : " & t.Cout.ToString("N2") & " FC" & If(prixArticle.HasValue, Environment.NewLine & "Prix actuel de cet article : " & prixArticle.GetValueOrDefault().ToString("N2") & " FC — Quantité : " & quantite.ToString("0.########"), "") & Environment.NewLine & "Demandeur : " & SessionUtilisateur.NomUtilisateur & " (ID " & SessionUtilisateur.UtilisateurId.ToString() & ")", .Dock = DockStyle.Fill}, 0, 1)
                 Dim prix As New NumericUpDown With {.Dock = DockStyle.Fill, .DecimalPlaces = 2, .Maximum = 9999999999999999.99D, .Minimum = 0.01D, .Value = Math.Max(0.01D, If(prixArticle, t.Prix))}
                 root.Controls.Add(prix, 0, 2)
@@ -44,19 +45,30 @@ Namespace DevCommerc8ak
                 root.Controls.Add(variation, 0, 3)
                 Dim motif As New TextBox With {.Dock = DockStyle.Fill, .Multiline = True, .MaxLength = 1000}
                 root.Controls.Add(motif, 0, 4)
-                root.Controls.Add(New Label With {.Text = "Motif obligatoire. Tarif officiel : nouvelles ventes uniquement. Exception facture : seule la ligne de ce panier sera modifiée. Les autres lignes restent inchangées.", .Dock = DockStyle.Fill}, 0, 5)
+                Dim responsable As New TextBox With {.Dock = DockStyle.Bottom, .MaxLength = 120}
+                Dim instruction As New Panel With {.Dock = DockStyle.Fill}
+                instruction.Controls.Add(responsable)
+                instruction.Controls.Add(New Label With {.Text = "Responsable ayant donné l'instruction (facultatif, ne vaut pas approbation)", .Dock = DockStyle.Top, .Height = 32})
+                root.Controls.Add(instruction, 0, 5)
+                Dim lireMotif As Func(Of String) = Function()
+                                                     Dim raison As String = AuditMetierService.ValiderMotif(motif.Text)
+                                                     Return AuditMetierService.ValiderMotif(raison & If(responsable.Text.Trim() = "", "", Environment.NewLine & "Instruction déclarée : " & responsable.Text.Trim()))
+                                                 End Function
+                root.Controls.Add(New Label With {.Text = "Motif obligatoire. Tarif officiel : nouvelles ventes uniquement. Exception facture : seule la ligne de ce panier sera modifiée. Les autres lignes restent inchangées.", .Dock = DockStyle.Fill}, 0, 6)
                 Dim actions As New FlowLayoutPanel With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft}
                 actions.WrapContents = True
                 Dim annuler As New Button With {.Text = "ANNULER", .Width = 100, .Height = 36, .DialogResult = DialogResult.Cancel}
                 actions.Controls.Add(annuler)
                 For Each code As String In New String() {"PRIX_TARIF_MODIFIER", "PRIX_DEMANDER", "PRIX_FACTURE_EXCEPTION"}
+                    If perimetre = "TARIF" AndAlso code = "PRIX_FACTURE_EXCEPTION" Then Continue For
+                    If perimetre = "FACTURE" AndAlso code <> "PRIX_FACTURE_EXCEPTION" Then Continue For
                     If Not disponibles.Contains(code) Then Continue For
                     If code = "PRIX_FACTURE_EXCEPTION" AndAlso contexte = Guid.Empty Then Continue For
                     Dim action As String = code
                     Dim button As New Button With {.Text = If(code = "PRIX_TARIF_MODIFIER", "MODIFIER LE TARIF OFFICIEL", If(code = "PRIX_DEMANDER", "DEMANDER UN TARIF OFFICIEL", "PRIX POUR CET ARTICLE")), .Width = 215, .Height = 36, .BackColor = Color.FromArgb(41, 128, 185), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
                     AddHandler button.Click, Sub()
                                                  Try
-                                                     Dim raison As String = AuditMetierService.ValiderMotif(motif.Text)
+                                                     Dim raison As String = lireMotif()
                                                      If MessageBox.Show(form, "Confirmer ce prix et le motif ?", "Confirmation", MessageBoxButtons.YesNo, MessageBoxIcon.Question) <> DialogResult.Yes Then Return
                                                      If action = "PRIX_FACTURE_EXCEPTION" Then
                                                          service.VerifierExceptionProposee(t, prix.Value, raison, If(contexteCommercial Is Nothing, Nothing, contexteCommercial(prix.Value)))
@@ -72,11 +84,11 @@ Namespace DevCommerc8ak
                                              End Sub
                     actions.Controls.Add(button)
                 Next
-                If contexte <> Guid.Empty AndAlso disponibles.Contains("PRIX_DEMANDER_FACTURE") Then
+                If perimetre <> "TARIF" AndAlso contexte <> Guid.Empty AndAlso disponibles.Contains("PRIX_DEMANDER_FACTURE") Then
                     Dim demander As New Button With {.Text = "DEMANDER POUR CET ARTICLE", .Width = 240, .Height = 36}
                     AddHandler demander.Click, Sub()
                                                    Try
-                                                       Dim raison As String = AuditMetierService.ValiderMotif(motif.Text)
+                                                       Dim raison As String = lireMotif()
                                                        If MessageBox.Show(form, "Soumettre une exception limitée à cet article et cette quantité ? Le tarif officiel restera inchangé.", "Demande d'approbation", MessageBoxButtons.YesNo, MessageBoxIcon.Question) <> DialogResult.Yes Then Return
                                                        Dim commercial As ContexteCommercialPrix = If(contexteCommercial Is Nothing, Nothing, contexteCommercial(prix.Value))
                                                        Dim id As Integer = service.DemanderException(t, prix.Value, raison, contexte, quantite, commercial)
@@ -111,8 +123,8 @@ Namespace DevCommerc8ak
                                                       MessageBox.Show(form, ex.Message, "Demandes indisponibles", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                                                   End Try
                                               End Sub
-                root.Controls.Add(suivi, 0, 6)
-                root.Controls.Add(actions, 0, 7)
+                root.Controls.Add(suivi, 0, 7)
+                root.Controls.Add(actions, 0, 8)
                 form.CancelButton = annuler
                 form.Controls.Add(root)
                 form.ShowDialog(owner)

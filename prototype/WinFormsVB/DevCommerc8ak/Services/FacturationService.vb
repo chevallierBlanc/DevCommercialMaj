@@ -182,139 +182,158 @@ Namespace DevCommerc8ak
 
         ' Encaissement avec transaction: paiement + stock + statut facture.
         Public Sub EncaisserFacture(factureVenteId As Integer, modePaiement As String, referencePaiement As String, montantRecuFc As Decimal, monnaieRendueFc As Decimal, devise As String, payePar As Integer, Optional montantRecuOrigine As Decimal? = Nothing, Optional tauxConversion As Decimal? = Nothing)
-            Dim correlation As Guid = Guid.NewGuid()
             Using cn As SqlConnection = _dal.CreerConnexion()
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
                     Try
-                        AutorisationActionService.Exiger(cn, tx, "ENCAISSEMENT_CREER", "CAISSE")
-                        If payePar <> SessionUtilisateur.UtilisateurId Then Throw New UnauthorizedAccessException("L'auteur du paiement doit être l'utilisateur connecté.")
-                        Dim total As Decimal = 0D
-                        Dim statut As String = ""
-                        Dim numeroFacture As String = ""
-                        Using cmdTotal As New SqlCommand("SELECT MontantTotal, Statut, NumeroFacture FROM FacturesVente WITH (UPDLOCK, HOLDLOCK) WHERE FactureVenteId=@id", cn, tx)
-                            cmdTotal.Parameters.AddWithValue("@id", factureVenteId)
-                            Using r As SqlDataReader = cmdTotal.ExecuteReader()
-                                If Not r.Read() Then
-                                    Throw New Exception("Facture introuvable.")
-                                End If
-                                total = Convert.ToDecimal(r("MontantTotal"))
-                                statut = Convert.ToString(r("Statut"))
-                                numeroFacture = Convert.ToString(r("NumeroFacture"))
-                            End Using
-                        End Using
-
-                        If statut <> "EN_ATTENTE" Then
-                            Throw New Exception("Facture deja payee ou invalide.")
-                        End If
-
-                        Dim dejaPaye As Decimal
-                        Using cmd As New SqlCommand("SELECT ISNULL(SUM(Montant),0) FROM dbo.Paiements WITH (UPDLOCK,HOLDLOCK) WHERE FactureVenteId=@id", cn, tx)
-                            cmd.Parameters.AddWithValue("@id", factureVenteId)
-                            dejaPaye = Convert.ToDecimal(cmd.ExecuteScalar())
-                        End Using
-                        EncaissementAuditRegles.Verifier(total, dejaPaye, montantRecuFc, monnaieRendueFc)
-                        If montantRecuOrigine.HasValue <> tauxConversion.HasValue Then Throw New ArgumentException("Montant d'origine et taux doivent être renseignés ensemble.")
-                        If tauxConversion.HasValue AndAlso (tauxConversion.Value <= 0D OrElse montantRecuOrigine.Value * tauxConversion.Value <> montantRecuFc) Then Throw New ArgumentException("Conversion du montant reçu incohérente.")
-                        If montantRecuOrigine.HasValue AndAlso (Decimal.Round(montantRecuOrigine.Value, 8) <> montantRecuOrigine.Value OrElse Decimal.Round(tauxConversion.Value, 8) <> tauxConversion.Value) Then Throw New ArgumentException("La précision du montant d'origine ou du taux dépasse huit décimales.")
-                        If String.IsNullOrWhiteSpace(modePaiement) Then Throw New ArgumentException("Mode de paiement obligatoire.")
-
-                        Dim lignes As New List(Of Tuple(Of Integer, Decimal))()
-                        Using cmdL As New SqlCommand("SELECT ProduitId, ISNULL(QuantiteBase, Quantite) AS QuantiteBase FROM LignesFactureVente WHERE FactureVenteId=@id", cn, tx)
-                            cmdL.Parameters.AddWithValue("@id", factureVenteId)
-                            Using r As SqlDataReader = cmdL.ExecuteReader()
-                                While r.Read()
-                                    lignes.Add(New Tuple(Of Integer, Decimal)(Convert.ToInt32(r("ProduitId")), Convert.ToDecimal(r("QuantiteBase"))))
-                                End While
-                            End Using
-                        End Using
-
-                        ' Plusieurs types de vente peuvent viser le même produit.
-                        ' Vérifier leur besoin total évite un stock négatif, sans
-                        ' changer les lignes de sortie ni leur QuantiteBase.
-                        Dim besoins As IEnumerable(Of Tuple(Of Integer, Decimal)) = lignes.GroupBy(Function(l) l.Item1).
-                            Select(Function(g) New Tuple(Of Integer, Decimal)(g.Key, g.Sum(Function(l) l.Item2))).OrderBy(Function(l) l.Item1)
-                        For Each l As Tuple(Of Integer, Decimal) In besoins
-                            Dim stock As Decimal = 0D
-                            Using cmdS As New SqlCommand("" &
-                                "SELECT ISNULL(e.Entree,0) - ISNULL(s.Sortie,0) - ISNULL(p.Perte,0) AS Stock " &
-                                "FROM Produits pr " &
-                                "LEFT JOIN (SELECT ProduitId, SUM(QuantiteBase) AS Entree FROM StockEntree WITH (UPDLOCK, HOLDLOCK) WHERE ProduitId=@id GROUP BY ProduitId) e ON e.ProduitId = pr.ProduitId " &
-                                "LEFT JOIN (SELECT ProduitId, SUM(QuantiteBase) AS Sortie FROM StockSortie WITH (UPDLOCK, HOLDLOCK) WHERE ProduitId=@id GROUP BY ProduitId) s ON s.ProduitId = pr.ProduitId " &
-                                "LEFT JOIN (SELECT ProduitId, SUM(QuantiteBase) AS Perte FROM StockPerte WITH (UPDLOCK, HOLDLOCK) WHERE ProduitId=@id GROUP BY ProduitId) p ON p.ProduitId = pr.ProduitId " &
-                                "WHERE pr.ProduitId=@id", cn, tx)
-                                cmdS.Parameters.AddWithValue("@id", l.Item1)
-                                Dim v As Object = cmdS.ExecuteScalar()
-                                stock = If(v Is Nothing, 0D, Convert.ToDecimal(v))
-                            End Using
-                            If stock < l.Item2 Then
-                                Throw New Exception("Stock insuffisant pour un produit.")
-                            End If
-                        Next
-
-                        For Each l As Tuple(Of Integer, Decimal) In lignes
-                            Using cmdU As New SqlCommand("INSERT INTO StockSortie (ProduitId, QuantiteSaisie, Unite, QuantiteBase, DateSortie, Source, RefSource, CreePar) " &
-                                                         "VALUES (@ProduitId, @QuantiteSaisie, @Unite, @QuantiteBase, GETDATE(), @Source, @RefSource, @CreePar)", cn, tx)
-                                cmdU.Parameters.AddWithValue("@ProduitId", l.Item1)
-                                cmdU.Parameters.AddWithValue("@QuantiteSaisie", l.Item2)
-                                cmdU.Parameters.AddWithValue("@Unite", "base")
-                                cmdU.Parameters.AddWithValue("@QuantiteBase", l.Item2)
-                                cmdU.Parameters.AddWithValue("@Source", "VENTE")
-                                cmdU.Parameters.AddWithValue("@RefSource", numeroFacture)
-                                cmdU.Parameters.AddWithValue("@CreePar", payePar)
-                                cmdU.ExecuteNonQuery()
-                            End Using
-                        Next
-
-                        Dim paiementId As Integer
-                        Using cmdP As New SqlCommand("INSERT INTO Paiements (FactureVenteId, ModePaiement, ReferencePaiement, Montant, MontantRecu, MonnaieRendue, Devise, PayePar, ModifierPar,MontantRecuOrigine,TauxConversionApplique,DeviseMontants) " &
-                                                     "VALUES (@FactureVenteId, @ModePaiement, @ReferencePaiement, @Montant, @MontantRecu, @MonnaieRendue, @Devise, @PayePar, @ModifierPar,@origine,@taux,'FC'); SELECT CAST(SCOPE_IDENTITY() AS int);", cn, tx)
-                            cmdP.Parameters.AddWithValue("@FactureVenteId", factureVenteId)
-                            cmdP.Parameters.AddWithValue("@ModePaiement", modePaiement)
-                            cmdP.Parameters.AddWithValue("@ReferencePaiement", If(referencePaiement, CType(DBNull.Value, Object)))
-                            cmdP.Parameters.AddWithValue("@Montant", total)
-                            cmdP.Parameters.AddWithValue("@MontantRecu", montantRecuFc)
-                            cmdP.Parameters.AddWithValue("@MonnaieRendue", monnaieRendueFc)
-                            cmdP.Parameters.AddWithValue("@Devise", If(devise, CType(DBNull.Value, Object)))
-                            cmdP.Parameters.AddWithValue("@PayePar", payePar)
-                            cmdP.Parameters.AddWithValue("@ModifierPar", SessionUtilisateur.NomUtilisateur)
-                            cmdP.Parameters.AddWithValue("@origine", If(montantRecuOrigine.HasValue, CType(montantRecuOrigine.Value, Object), DBNull.Value))
-                            cmdP.Parameters.AddWithValue("@taux", If(tauxConversion.HasValue, CType(tauxConversion.Value, Object), DBNull.Value))
-                            paiementId = Convert.ToInt32(cmdP.ExecuteScalar())
-                        End Using
-
-                        Using cmdF As New SqlCommand("UPDATE FacturesVente SET Statut='PAYEE', ValideLe=GETDATE(), ModifierPar=@ModifierPar WHERE FactureVenteId=@id AND Statut='EN_ATTENTE'", cn, tx)
-                            cmdF.Parameters.AddWithValue("@id", factureVenteId)
-                            cmdF.Parameters.AddWithValue("@ModifierPar", SessionUtilisateur.NomUtilisateur)
-                            If cmdF.ExecuteNonQuery() <> 1 Then
-                                Throw New Exception("Facture deja payee ou invalide.")
-                            End If
-                        End Using
-
-                        ' Paiement et audit sont validés ensemble : un échec
-                        ' d'écriture du journal annule toute la transaction.
-                        Dim apres As Dictionary(Of String, Object) = EncaissementAuditRegles.Snapshot(total, dejaPaye, total, montantRecuFc, monnaieRendueFc, modePaiement, referencePaiement)
-                        apres.Add("PaiementId", paiementId)
-                        apres.Add("Statut", "PAYEE")
-                        apres.Add("DeviseSaisie", devise)
-                        apres.Add("MontantRecuOrigine", If(montantRecuOrigine.HasValue, CType(montantRecuOrigine.Value, Object), Nothing))
-                        apres.Add("TauxConversionApplique", If(tauxConversion.HasValue, CType(tauxConversion.Value, Object), Nothing))
-                        Dim auteur As Integer = LireAuteurFacture(cn, tx, factureVenteId)
-                        apres.Add("FactureCreePar", auteur)
-                        apres.Add("FactureCreeParNom", AuditMetierService.LireNomUtilisateur(cn, tx, auteur))
-                        apres.Add("EncaissePar", payePar)
-                        apres.Add("EncaisseParNom", AuditMetierService.LireNomUtilisateur(cn, tx, payePar))
-                        Dim avant As New Dictionary(Of String, Object) From {{"Statut", statut}, {"TotalFacture", total}, {"DejaPayeAvant", dejaPaye}, {"ResteAvant", total - dejaPaye}, {"DeviseMontants", "FC"}}
-                        AuditMetierService.Enregistrer(cn, tx, "ENCAISSEMENT_VALIDE", "CAISSE", "Facture", factureVenteId, numeroFacture,
-                            avant, apres, String.Empty, correlation)
+                        EncaisserDansTransaction(cn, tx, factureVenteId, modePaiement, referencePaiement, montantRecuFc, monnaieRendueFc, devise, payePar, montantRecuOrigine, tauxConversion)
                         tx.Commit()
                     Catch ex As Exception
                         If tx.Connection IsNot Nothing Then tx.Rollback()
-                        AuditMetierService.Echec(_dal, "ENCAISSEMENT_REFUSE", factureVenteId, correlation, ex)
+                        AuditMetierService.Echec(_dal, "ENCAISSEMENT_REFUSE", factureVenteId, Guid.NewGuid(), ex)
                         Throw
                     End Try
                 End Using
             End Using
+            NotifierEncaissement()
+        End Sub
+
+        Friend Sub EncaisserDansTransaction(cn As SqlConnection, tx As SqlTransaction, factureVenteId As Integer, modePaiement As String, referencePaiement As String, montantRecuFc As Decimal, monnaieRendueFc As Decimal, devise As String, payePar As Integer, montantRecuOrigine As Decimal?, tauxConversion As Decimal?)
+            If tx Is Nothing OrElse tx.Connection IsNot cn Then Throw New ArgumentException("Transaction d'encaissement obligatoire.")
+            Dim correlation As Guid = Guid.NewGuid()
+            AutorisationActionService.Exiger(cn, tx, "ENCAISSEMENT_CREER", "CAISSE")
+            If payePar <> SessionUtilisateur.UtilisateurId Then Throw New UnauthorizedAccessException("L'auteur du paiement doit être l'utilisateur connecté.")
+            Dim total As Decimal = 0D
+            Dim statut As String = ""
+            Dim numeroFacture As String = ""
+            Using cmdTotal As New SqlCommand("SELECT MontantTotal, Statut, NumeroFacture FROM FacturesVente WITH (UPDLOCK, HOLDLOCK) WHERE FactureVenteId=@id", cn, tx)
+                cmdTotal.Parameters.AddWithValue("@id", factureVenteId)
+                Using r As SqlDataReader = cmdTotal.ExecuteReader()
+                    If Not r.Read() Then
+                        Throw New Exception("Facture introuvable.")
+                    End If
+                    total = Convert.ToDecimal(r("MontantTotal"))
+                    statut = Convert.ToString(r("Statut"))
+                    numeroFacture = Convert.ToString(r("NumeroFacture"))
+                End Using
+            End Using
+
+            If statut <> "EN_ATTENTE" Then
+                Throw New Exception("Facture deja payee ou invalide.")
+            End If
+
+            Dim dejaPaye As Decimal
+            Using cmd As New SqlCommand("SELECT ISNULL(SUM(Montant),0) FROM dbo.Paiements WITH (UPDLOCK,HOLDLOCK) WHERE FactureVenteId=@id", cn, tx)
+                cmd.Parameters.AddWithValue("@id", factureVenteId)
+                dejaPaye = Convert.ToDecimal(cmd.ExecuteScalar())
+            End Using
+            EncaissementAuditRegles.Verifier(total, dejaPaye, montantRecuFc, monnaieRendueFc)
+            If montantRecuOrigine.HasValue <> tauxConversion.HasValue Then Throw New ArgumentException("Montant d'origine et taux doivent être renseignés ensemble.")
+            If tauxConversion.HasValue AndAlso (tauxConversion.Value <= 0D OrElse montantRecuOrigine.Value * tauxConversion.Value <> montantRecuFc) Then Throw New ArgumentException("Conversion du montant reçu incohérente.")
+            If montantRecuOrigine.HasValue AndAlso (Decimal.Round(montantRecuOrigine.Value, 8) <> montantRecuOrigine.Value OrElse Decimal.Round(tauxConversion.Value, 8) <> tauxConversion.Value) Then Throw New ArgumentException("La précision du montant d'origine ou du taux dépasse huit décimales.")
+            If String.IsNullOrWhiteSpace(modePaiement) Then Throw New ArgumentException("Mode de paiement obligatoire.")
+
+            Dim lignes As New List(Of Tuple(Of Integer, Decimal))()
+            Using cmdL As New SqlCommand("SELECT ProduitId, ISNULL(QuantiteBase, Quantite) AS QuantiteBase FROM LignesFactureVente WHERE FactureVenteId=@id", cn, tx)
+                cmdL.Parameters.AddWithValue("@id", factureVenteId)
+                Using r As SqlDataReader = cmdL.ExecuteReader()
+                    While r.Read()
+                        lignes.Add(New Tuple(Of Integer, Decimal)(Convert.ToInt32(r("ProduitId")), Convert.ToDecimal(r("QuantiteBase"))))
+                    End While
+                End Using
+            End Using
+
+            ' Plusieurs types de vente peuvent viser le même produit.
+            ' Vérifier leur besoin total évite un stock négatif, sans
+            ' changer les lignes de sortie ni leur QuantiteBase.
+            Dim besoins As IEnumerable(Of Tuple(Of Integer, Decimal)) = lignes.GroupBy(Function(l) l.Item1).
+                Select(Function(g) New Tuple(Of Integer, Decimal)(g.Key, g.Sum(Function(l) l.Item2))).OrderBy(Function(l) l.Item1)
+            For Each l As Tuple(Of Integer, Decimal) In besoins
+                Dim stock As Decimal = 0D
+                Using cmdS As New SqlCommand("" &
+                    "SELECT ISNULL(e.Entree,0) - ISNULL(s.Sortie,0) - ISNULL(p.Perte,0) AS Stock " &
+                    "FROM Produits pr " &
+                    "LEFT JOIN (SELECT ProduitId, SUM(QuantiteBase) AS Entree FROM StockEntree WITH (UPDLOCK, HOLDLOCK) WHERE ProduitId=@id GROUP BY ProduitId) e ON e.ProduitId = pr.ProduitId " &
+                    "LEFT JOIN (SELECT ProduitId, SUM(QuantiteBase) AS Sortie FROM StockSortie WITH (UPDLOCK, HOLDLOCK) WHERE ProduitId=@id GROUP BY ProduitId) s ON s.ProduitId = pr.ProduitId " &
+                    "LEFT JOIN (SELECT ProduitId, SUM(QuantiteBase) AS Perte FROM StockPerte WITH (UPDLOCK, HOLDLOCK) WHERE ProduitId=@id GROUP BY ProduitId) p ON p.ProduitId = pr.ProduitId " &
+                    "WHERE pr.ProduitId=@id", cn, tx)
+                    cmdS.Parameters.AddWithValue("@id", l.Item1)
+                    Dim v As Object = cmdS.ExecuteScalar()
+                    stock = If(v Is Nothing, 0D, Convert.ToDecimal(v))
+                End Using
+                If stock < l.Item2 Then
+                    Throw New Exception("Stock insuffisant pour un produit.")
+                End If
+            Next
+
+            For Each l As Tuple(Of Integer, Decimal) In lignes
+                Using cmdU As New SqlCommand("INSERT INTO StockSortie (ProduitId, QuantiteSaisie, Unite, QuantiteBase, DateSortie, Source, RefSource, CreePar) " &
+                                             "VALUES (@ProduitId, @QuantiteSaisie, @Unite, @QuantiteBase, GETDATE(), @Source, @RefSource, @CreePar)", cn, tx)
+                    cmdU.Parameters.AddWithValue("@ProduitId", l.Item1)
+                    cmdU.Parameters.AddWithValue("@QuantiteSaisie", l.Item2)
+                    cmdU.Parameters.AddWithValue("@Unite", "base")
+                    cmdU.Parameters.AddWithValue("@QuantiteBase", l.Item2)
+                    cmdU.Parameters.AddWithValue("@Source", "VENTE")
+                    cmdU.Parameters.AddWithValue("@RefSource", numeroFacture)
+                    cmdU.Parameters.AddWithValue("@CreePar", payePar)
+                    cmdU.ExecuteNonQuery()
+                End Using
+            Next
+
+            Dim paiementId As Integer
+            Using cmdP As New SqlCommand("INSERT INTO Paiements (FactureVenteId, ModePaiement, ReferencePaiement, Montant, MontantRecu, MonnaieRendue, Devise, PayePar, ModifierPar,MontantRecuOrigine,TauxConversionApplique,DeviseMontants) " &
+                                         "VALUES (@FactureVenteId, @ModePaiement, @ReferencePaiement, @Montant, @MontantRecu, @MonnaieRendue, @Devise, @PayePar, @ModifierPar,@origine,@taux,'FC'); SELECT CAST(SCOPE_IDENTITY() AS int);", cn, tx)
+                cmdP.Parameters.AddWithValue("@FactureVenteId", factureVenteId)
+                cmdP.Parameters.AddWithValue("@ModePaiement", modePaiement)
+                cmdP.Parameters.AddWithValue("@ReferencePaiement", If(referencePaiement, CType(DBNull.Value, Object)))
+                cmdP.Parameters.AddWithValue("@Montant", total)
+                cmdP.Parameters.AddWithValue("@MontantRecu", montantRecuFc)
+                cmdP.Parameters.AddWithValue("@MonnaieRendue", monnaieRendueFc)
+                cmdP.Parameters.AddWithValue("@Devise", If(devise, CType(DBNull.Value, Object)))
+                cmdP.Parameters.AddWithValue("@PayePar", payePar)
+                cmdP.Parameters.AddWithValue("@ModifierPar", SessionUtilisateur.NomUtilisateur)
+                cmdP.Parameters.AddWithValue("@origine", If(montantRecuOrigine.HasValue, CType(montantRecuOrigine.Value, Object), DBNull.Value))
+                cmdP.Parameters.AddWithValue("@taux", If(tauxConversion.HasValue, CType(tauxConversion.Value, Object), DBNull.Value))
+                paiementId = Convert.ToInt32(cmdP.ExecuteScalar())
+            End Using
+
+            Using cmdF As New SqlCommand("UPDATE FacturesVente SET Statut='PAYEE', ValideLe=GETDATE(), ModifierPar=@ModifierPar WHERE FactureVenteId=@id AND Statut='EN_ATTENTE'", cn, tx)
+                cmdF.Parameters.AddWithValue("@id", factureVenteId)
+                cmdF.Parameters.AddWithValue("@ModifierPar", SessionUtilisateur.NomUtilisateur)
+                If cmdF.ExecuteNonQuery() <> 1 Then
+                    Throw New Exception("Facture deja payee ou invalide.")
+                End If
+            End Using
+
+            ' Paiement et audit sont validés ensemble : un échec
+            ' d'écriture du journal annule toute la transaction.
+            Dim apres As Dictionary(Of String, Object) = EncaissementAuditRegles.Snapshot(total, dejaPaye, total, montantRecuFc, monnaieRendueFc, modePaiement, referencePaiement)
+            apres.Add("PaiementId", paiementId)
+            apres.Add("Statut", "PAYEE")
+            apres.Add("DeviseSaisie", devise)
+            apres.Add("MontantRecuOrigine", If(montantRecuOrigine.HasValue, CType(montantRecuOrigine.Value, Object), Nothing))
+            apres.Add("TauxConversionApplique", If(tauxConversion.HasValue, CType(tauxConversion.Value, Object), Nothing))
+            Dim auteur As Integer = LireAuteurFacture(cn, tx, factureVenteId)
+            apres.Add("FactureCreePar", auteur)
+            apres.Add("FactureCreeParNom", AuditMetierService.LireNomUtilisateur(cn, tx, auteur))
+            Using validateur As New SqlCommand("SELECT f.ValideeParUtilisateurId,u.NomUtilisateur,f.OperationComptoirId FROM dbo.FacturesVente f LEFT JOIN dbo.Utilisateurs u ON u.UtilisateurId=f.ValideeParUtilisateurId WHERE f.FactureVenteId=@id", cn, tx)
+                validateur.Parameters.AddWithValue("@id", factureVenteId)
+                Using lecteur As SqlDataReader = validateur.ExecuteReader()
+                    If lecteur.Read() Then
+                        apres.Add("FactureValideePar", If(lecteur.IsDBNull(0), Nothing, lecteur.GetValue(0)))
+                        apres.Add("FactureValideeParNom", If(lecteur.IsDBNull(1), Nothing, lecteur.GetValue(1)))
+                        apres.Add("OperationComptoirId", If(lecteur.IsDBNull(2), Nothing, lecteur.GetValue(2)))
+                    End If
+                End Using
+            End Using
+            apres.Add("EncaissePar", payePar)
+            apres.Add("EncaisseParNom", AuditMetierService.LireNomUtilisateur(cn, tx, payePar))
+            Dim avant As New Dictionary(Of String, Object) From {{"Statut", statut}, {"TotalFacture", total}, {"DejaPayeAvant", dejaPaye}, {"ResteAvant", total - dejaPaye}, {"DeviseMontants", "FC"}}
+            AuditMetierService.Enregistrer(cn, tx, "ENCAISSEMENT_VALIDE", "CAISSE", "Facture", factureVenteId, numeroFacture,
+                avant, apres, String.Empty, correlation)
+        End Sub
+
+        Friend Shared Sub NotifierEncaissement()
             ' Les notifications UI sont émises après la transaction : une
             ' erreur d'affichage ne doit pas être classée comme un rollback SQL.
             AppEvents.OnVenteValidee()

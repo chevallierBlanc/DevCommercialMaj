@@ -185,8 +185,15 @@ Namespace DevCommerc8ak
             Next
             Dim rolePrincipalId As Integer = _roleRepo.ObtenirIdParNom(rolePrincipal.Trim())
 
-            MettreAJourUtilisateur(utilisateurId, nomUtilisateur, rolePrincipal, estActif, nouveauMotDePasse)
-            _utilisateurRepo.MettreAJourRolesUtilisateur(utilisateurId, roleIds, rolePrincipalId)
+            If String.IsNullOrWhiteSpace(nomUtilisateur) Then Throw New ArgumentException("Nom utilisateur obligatoire.")
+            Dim sel As Byte() = Nothing, hash As Byte() = Nothing
+            If Not String.IsNullOrWhiteSpace(nouveauMotDePasse) Then
+                sel = GenererSel()
+                hash = HashMotDePasse(nouveauMotDePasse, sel)
+            End If
+            ' Compte, principal et associations sont modifies ensemble, sans
+            ' desactivation intermediaire des autres roles conserves.
+            _utilisateurRepo.MettreAJour(utilisateurId, nomUtilisateur.Trim(), estActif, rolePrincipalId, hash, sel, roleIds)
             AuditActionService.Enregistrer("Utilisateurs", "Modification rôles utilisateur", "Rôles autorisés mis à jour pour " & nomUtilisateur.Trim() & ". Rôle principal : " & rolePrincipal.Trim().ToUpperInvariant() & ".")
         End Sub
 

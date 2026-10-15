@@ -49,8 +49,9 @@ Namespace DevCommerc8ak
         End Sub
 
         ' Met a jour le compte et le role associe.
-        Public Sub MettreAJour(utilisateurId As Integer, nomUtilisateur As String, estActif As Boolean, roleId As Integer, Optional hash As Byte() = Nothing, Optional sel As Byte() = Nothing)
-            VerifierModificationCompteProtege(utilisateurId, estActif, New List(Of Integer) From {roleId}, hash IsNot Nothing AndAlso sel IsNot Nothing)
+        Public Sub MettreAJour(utilisateurId As Integer, nomUtilisateur As String, estActif As Boolean, roleId As Integer, Optional hash As Byte() = Nothing, Optional sel As Byte() = Nothing, Optional tousRoles As IEnumerable(Of Integer) = Nothing)
+            Dim roles As IEnumerable(Of Integer) = If(tousRoles, New List(Of Integer) From {roleId})
+            VerifierModificationCompteProtege(utilisateurId, estActif, roles, hash IsNot Nothing AndAlso sel IsNot Nothing)
             Using cn As SqlConnection = _dal.CreerConnexion()
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
@@ -72,7 +73,7 @@ Namespace DevCommerc8ak
                             cmdUpdate.ExecuteNonQuery()
                         End Using
 
-                        EnregistrerRolesUtilisateurTransaction(cn, tx, utilisateurId, New List(Of Integer) From {roleId}, roleId)
+                        EnregistrerRolesUtilisateurTransaction(cn, tx, utilisateurId, roles, roleId)
 
                         tx.Commit()
                     Catch
@@ -363,6 +364,20 @@ Namespace DevCommerc8ak
                     cmd.Parameters.AddWithValue("@ModifiePar", If(String.IsNullOrWhiteSpace(SessionUtilisateur.NomUtilisateur), CType(DBNull.Value, Object), SessionUtilisateur.NomUtilisateur))
                     cmd.ExecuteNonQuery()
                 End Using
+            Next
+            ' Un role retire perd son attribution sensible. La reactiver plus
+            ' tard ne doit pas restaurer silencieusement le mode comptoir.
+            Dim retires As New List(Of Integer)()
+            Using cmd As New SqlCommand("DECLARE @retires TABLE(RoleId int); UPDATE dbo.UtilisateurRoles SET VenteEncaissementAutorise=0 OUTPUT deleted.RoleId INTO @retires WHERE UtilisateurId=@u AND EstActif=0 AND VenteEncaissementAutorise=1; SELECT RoleId FROM @retires;", cn, tx)
+                cmd.Parameters.AddWithValue("@u", utilisateurId)
+                Using lecteur As SqlDataReader = cmd.ExecuteReader()
+                    While lecteur.Read()
+                        retires.Add(CInt(lecteur(0)))
+                    End While
+                End Using
+            End Using
+            For Each roleRetire As Integer In retires
+                AuditMetierService.Enregistrer(cn, tx, "MODE_UTILISATEUR_RETIRE", "AUTORISATIONS", "Utilisateur", utilisateurId, utilisateurId.ToString(), New With {.RoleId = roleRetire, .Autorise = True}, New With {.RoleId = roleRetire, .Autorise = False}, "Retrait du rôle autorisé", Guid.NewGuid())
             Next
         End Sub
 
