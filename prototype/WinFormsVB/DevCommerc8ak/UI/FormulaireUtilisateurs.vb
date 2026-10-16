@@ -32,7 +32,6 @@ Namespace DevCommerc8ak
 
         Private ReadOnly ColorPrimary As Color = Color.FromArgb(52, 73, 94) ' Gris Foncé
         Private ReadOnly ColorSecondary As Color = Color.FromArgb(41, 128, 185) ' Bleu Moderne
-        Private ReadOnly ColorAccent As Color = Color.FromArgb(39, 174, 96) ' Vert Succès
         Private ReadOnly ColorDanger As Color = Color.FromArgb(192, 57, 43) ' Rouge Annuler
         Private ReadOnly ColorBg As Color = Color.FromArgb(245, 247, 250) ' Gris très clair
         Private ReadOnly ColorWhite As Color = Color.White
@@ -51,6 +50,7 @@ Namespace DevCommerc8ak
         Private ReadOnly cmbRole As ComboBox
         Private ReadOnly clbRolesAutorises As CheckedListBox
         Private ReadOnly chkActif As CheckBox
+        Private ReadOnly lblEtatCompte As Label
         Private ReadOnly btnAjouter As Button
         Private ReadOnly btnModifier As Button
         Private ReadOnly btnDesactiver As Button
@@ -81,9 +81,12 @@ Namespace DevCommerc8ak
             Me.StartPosition = FormStartPosition.CenterScreen
             Me.BackColor = ColorBackground
             Me.DoubleBuffered = True
+            Me.AutoScaleMode = AutoScaleMode.Dpi
+            Me.AutoScaleDimensions = New SizeF(96, 96)
+            Me.MinimumSize = New Size(900, 650)
 
             ' --- Header / Hero Section ---
-            panelHero = New Panel() With {.Dock = DockStyle.Top, .Height = 90, .BackColor = ColorPrimary}
+            panelHero = New Panel() With {.Dock = DockStyle.Top, .Height = 90, .BackColor = ColorSecondary}
             lblHeroTitre = New Label() With {.Text = "Administration Utilisateurs", .Font = FontTitle, .AutoSize = True, .Left = 20, .Top = 15, .ForeColor = Color.White}
             lblHeroSousTitre = New Label() With {.Text = "Gérez les accès, les rôles et surveillez les sessions actives en temps réel.", .Left = 27, .Top = 54, .AutoSize = True, .Font = FontSubTitle, .ForeColor = Color.FromArgb(210, 210, 255)}
             panelHero.Controls.Add(lblHeroTitre)
@@ -93,16 +96,17 @@ Namespace DevCommerc8ak
             mainTableLayout = New TableLayoutPanel() With {
                 .Dock = DockStyle.Fill,
                 .ColumnCount = 2,
-                .RowCount = 3,
+                .RowCount = 4,
                 .AutoScroll = True,
-                .AutoScrollMinSize = New Size(980, 600),
+                .AutoScrollMinSize = New Size(980, 780),
                 .Padding = New Padding(20)
             }
-            mainTableLayout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 64))
-            mainTableLayout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 36))
-            mainTableLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 170)) ' Carte Formulaire
-            mainTableLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 60))  ' Boutons
+            mainTableLayout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 62))
+            mainTableLayout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 38))
+            mainTableLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 190)) ' Informations du compte
+            mainTableLayout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
             mainTableLayout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))  ' Grilles
+            mainTableLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 150)) ' Sessions compactes
 
             ' --- Carte de Formulaire ---
             cardForm = New Panel() With {
@@ -121,6 +125,8 @@ Namespace DevCommerc8ak
             formTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 20))
             formTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 23))
             formTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 12))
+            formTable.RowStyles.Add(New RowStyle(SizeType.Absolute, 30))
+            formTable.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
 
             ' Initialisation des contrôles (Noms conservés)
             txtNom = CreateStyledTextBox()
@@ -153,42 +159,53 @@ Namespace DevCommerc8ak
             formTable.Controls.Add(CreateLabel("Nom d'utilisateur"), 0, 0)
             formTable.Controls.Add(txtNom, 0, 1)
             formTable.Controls.Add(CreateLabel("Mot de passe"), 1, 0)
-            formTable.Controls.Add(txtMotDePasse, 1, 1)
-            formTable.Controls.Add(CreateLabel("Rôle / Privilège"), 2, 0)
+            Dim motDePassePanel As New Panel With {.Dock = DockStyle.Fill}
+            motDePassePanel.Controls.Add(New Label With {.Text = "Vide : conserver le mot de passe actuel. Obligatoire pour un nouveau compte.", .Dock = DockStyle.Fill, .Padding = New Padding(0, 32, 8, 0), .Font = New Font("Segoe UI", 8.5F), .ForeColor = ColorTextSecondary})
+            motDePassePanel.Controls.Add(txtMotDePasse)
+            formTable.Controls.Add(motDePassePanel, 1, 1)
+            formTable.Controls.Add(CreateLabel("Rôle principal"), 2, 0)
             formTable.Controls.Add(cmbRole, 2, 1)
             formTable.Controls.Add(CreateLabel("Rôles autorisés"), 3, 0)
             formTable.Controls.Add(clbRolesAutorises, 3, 1)
-            formTable.Controls.Add(chkActif, 4, 1)
+            formTable.Controls.Add(CreateLabel("État du compte"), 4, 0)
+            lblEtatCompte = New Label With {.Dock = DockStyle.Fill, .Padding = New Padding(0, 12, 0, 0), .ForeColor = ColorPrimary, .Font = FontLabel, .Text = "Sélectionnez un compte"}
+            Dim etatPanel As New Panel With {.Dock = DockStyle.Fill}
+            chkActif.Dock = DockStyle.Top
+            etatPanel.Controls.Add(lblEtatCompte)
+            etatPanel.Controls.Add(chkActif)
+            formTable.Controls.Add(etatPanel, 4, 1)
 
             cardForm.Controls.Add(formTable)
 
             ' --- Barre de Boutons (FlowLayout) ---
             flowButtons = New FlowLayoutPanel() With {
-                .Dock = DockStyle.Fill,
+                .Dock = DockStyle.Top,
                 .FlowDirection = FlowDirection.LeftToRight,
-                .AutoScroll = True, .WrapContents = False,
-                .Padding = New Padding(0, 10, 0, 0)
+                .AutoSize = True, .WrapContents = True,
+                .Padding = New Padding(0, 8, 0, 8)
             }
 
             btnAjouter = CreateStyledButton("Ajouter", ColorPrimary)
-            btnModifier = CreateStyledButton("Modifier", ColorAccent)
+            btnModifier = CreateStyledButton("Enregistrer les modifications", ColorSecondary, True)
             btnDesactiver = CreateStyledButton("Désactiver", ColorDanger)
-            btnResetMdp = CreateStyledButton("Reset MDP", ColorSecondary)
-            btnDeverrouiller = CreateStyledButton("Déverrouiller", ColorAccent)
+            btnResetMdp = CreateStyledButton("Réinitialiser le mot de passe", ColorPrimary)
+            btnDeverrouiller = CreateStyledButton("Déverrouiller", ColorPrimary)
             btnSupprimer = CreateStyledButton("Supprimer", ColorDanger)
-            btnRafraichir = CreateStyledButton("Rafraîchir", Color.Gray)
+            btnRafraichir = CreateStyledButton("Actualiser", ColorPrimary)
 
-            flowButtons.Controls.AddRange(New Control() {btnAjouter, btnModifier, btnDesactiver, btnResetMdp, btnDeverrouiller, btnSupprimer, btnRafraichir})
+            flowButtons.Controls.AddRange(New Control() {btnModifier, btnAjouter, btnResetMdp, btnDeverrouiller, btnRafraichir, btnDesactiver, btnSupprimer})
             modesUtilisateur = New ModesUtilisateurPanel(New AttributionModeService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)))
 
             ' --- Grilles (Split Vertical) ---
             splitGrids = New TableLayoutPanel() With {
                 .Dock = DockStyle.Fill,
                 .ColumnCount = 1,
-                .RowCount = 2
+                .RowCount = 1
             }
-            splitGrids.RowStyles.Add(New RowStyle(SizeType.Percent, 60)) ' Liste Utilisateurs
-            splitGrids.RowStyles.Add(New RowStyle(SizeType.Percent, 40)) ' Sessions Actives
+            splitGrids.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+            splitGrids.MinimumSize = New Size(0, 280)
+            modesUtilisateur.MinimumSize = New Size(0, 280)
+            modesUtilisateur.Margin = New Padding(12, 0, 0, 0)
 
             grid = CreateStyledGrid("Liste des Utilisateurs")
             gridConnectes = CreateStyledGrid("Sessions Actives (Temps Réel)")
@@ -200,10 +217,9 @@ Namespace DevCommerc8ak
 
             Dim p2 As New Panel() With {.Dock = DockStyle.Fill, .Padding = New Padding(0, 10, 0, 0)}
             p2.Controls.Add(gridConnectes)
-            p2.Controls.Add(New Label() With {.Text = "Utilisateurs actuellement connectés", .Dock = DockStyle.Top, .Height = 25, .Font = FontLabel, .ForeColor = ColorAccent})
+            p2.Controls.Add(New Label() With {.Text = "Sessions actives · suivi en temps réel", .Dock = DockStyle.Top, .Height = 25, .Font = FontLabel, .ForeColor = ColorPrimary})
 
             splitGrids.Controls.Add(p1, 0, 0)
-            splitGrids.Controls.Add(p2, 0, 1)
 
             ' Assemblage final
             mainTableLayout.Controls.Add(cardForm, 0, 0)
@@ -212,6 +228,8 @@ Namespace DevCommerc8ak
             mainTableLayout.SetColumnSpan(flowButtons, 2)
             mainTableLayout.Controls.Add(splitGrids, 0, 2)
             mainTableLayout.Controls.Add(modesUtilisateur, 1, 2)
+            mainTableLayout.Controls.Add(p2, 0, 3)
+            mainTableLayout.SetColumnSpan(p2, 2)
 
             Me.Controls.Add(mainTableLayout)
             Me.Controls.Add(panelHero)
@@ -224,7 +242,9 @@ Namespace DevCommerc8ak
             AddHandler btnDeverrouiller.Click, AddressOf DeverrouillerUtilisateur
             AddHandler btnSupprimer.Click, AddressOf SupprimerUtilisateur
             AddHandler btnRafraichir.Click, AddressOf Charger
-            AddHandler grid.SelectionChanged, AddressOf ChargerSelectionUtilisateur
+            AddHandler grid.SelectionChanged, Sub()
+                                                  If Not _chargementUtilisateursEnCours Then ChargerSelectionUtilisateur(Nothing, EventArgs.Empty)
+                                              End Sub
             AddHandler grid.CellClick, AddressOf Grid_CellClick
 
             ' --- Initialisation ---
@@ -259,19 +279,25 @@ Namespace DevCommerc8ak
             }
         End Function
 
-        Private Function CreateStyledButton(text As String, backColor As Color) As Button
+        Private Function CreateStyledButton(text As String, backColor As Color, Optional principale As Boolean = False) As Button
             Dim btn As New Button() With {
                 .Text = text,
-                .Width = 120,
+                .AutoSize = True,
+                .MinimumSize = New Size(110, 38),
                 .Height = 38,
-                .BackColor = backColor,
-                .ForeColor = Color.White,
+                .BackColor = If(principale, ColorSecondary, Color.White),
+                .ForeColor = If(principale, Color.White, backColor),
                 .FlatStyle = FlatStyle.Flat,
                 .Font = FontLabel,
                 .Cursor = Cursors.Hand,
-                .Margin = New Padding(0, 0, 10, 0)
+                .Padding = New Padding(10, 0, 10, 0),
+                .Margin = New Padding(0, 0, 8, 8)
             }
-            btn.FlatAppearance.BorderSize = 0
+            btn.FlatAppearance.BorderSize = 1
+            btn.FlatAppearance.BorderColor = If(backColor = ColorDanger, ColorDanger, If(principale, ColorSecondary, ColorBorder))
+            btn.FlatAppearance.MouseOverBackColor = If(backColor = ColorDanger, Color.FromArgb(253, 240, 238), Color.FromArgb(232, 242, 250))
+            If principale Then btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(34, 110, 160)
+            btn.FlatAppearance.MouseDownBackColor = If(principale, Color.FromArgb(28, 94, 140), Color.FromArgb(220, 232, 242))
             Return btn
         End Function
 
@@ -288,14 +314,18 @@ Namespace DevCommerc8ak
                 .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 .GridColor = ColorBorder
             }
-            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245)
-            dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(245, 245, 245)
+            dgv.MultiSelect = False
+            dgv.ColumnHeadersDefaultCellStyle.BackColor = ColorSecondary
+            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White
+            dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = ColorSecondary
             dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
             dgv.ColumnHeadersHeight = 40
-            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(232, 234, 246)
+            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(225, 239, 250)
             dgv.DefaultCellStyle.SelectionForeColor = ColorPrimary
             dgv.DefaultCellStyle.Font = FontControl
-            dgv.RowTemplate.Height = 32
+            dgv.DefaultCellStyle.Padding = New Padding(6, 3, 6, 3)
+            dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252)
+            dgv.RowTemplate.Height = 36
             Return dgv
         End Function
 
@@ -383,6 +413,10 @@ Namespace DevCommerc8ak
             End If
 
             _chargementUtilisateursEnCours = True
+            Dim compteAvant As Integer = _utilisateurSelectionneId
+            flowButtons.Enabled = False
+            cardForm.Enabled = False
+            modesUtilisateur.Enabled = False
             Try
                 Await ChargerRolesDisponiblesAsync()
                 Dim service As UtilisateurService = ObtenirService()
@@ -392,12 +426,24 @@ Namespace DevCommerc8ak
                 End If
                 grid.DataSource = utilisateurs
                 ConfigurerGrilleUtilisateurs()
-                ChargerSelectionUtilisateur(Nothing, EventArgs.Empty)
+                For Each ligne As DataGridViewRow In grid.Rows
+                    If Convert.ToInt32(ligne.Cells("UtilisateurId").Value) <> compteAvant Then Continue For
+                    grid.ClearSelection()
+                    grid.CurrentCell = ligne.Cells("NomUtilisateur")
+                    ligne.Selected = True
+                    Exit For
+                Next
                 AppliquerDroitsActions()
+                ChargerSelectionUtilisateur(Nothing, EventArgs.Empty)
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement utilisateurs: " & ex.Message)
             Finally
                 _chargementUtilisateursEnCours = False
+                If Not IsDisposed Then
+                    flowButtons.Enabled = True
+                    cardForm.Enabled = True
+                    modesUtilisateur.Enabled = True
+                End If
             End Try
         End Sub
 
@@ -577,6 +623,10 @@ Namespace DevCommerc8ak
         Private Sub ChargerSelectionUtilisateur(sender As Object, e As EventArgs)
             Try
                 If grid.CurrentRow Is Nothing OrElse grid.CurrentRow.IsNewRow Then
+                    _utilisateurSelectionneId = -1
+                    btnModifier.Enabled = False
+                    btnDeverrouiller.Enabled = False
+                    lblEtatCompte.Text = "Aucun compte sélectionné"
                     modesUtilisateur.ChargerCompte(0, "Sélectionnez un compte.")
                     Return
                 End If
@@ -586,6 +636,8 @@ Namespace DevCommerc8ak
                 End If
 
                 _utilisateurSelectionneId = Convert.ToInt32(grid.CurrentRow.Cells("UtilisateurId").Value)
+                btnModifier.Enabled = True
+                lblEtatCompte.Text = If(grid.Columns.Contains("EtatCompte"), Convert.ToString(grid.CurrentRow.Cells("EtatCompte").Value), "État indisponible")
                 txtNom.Text = Convert.ToString(grid.CurrentRow.Cells("NomUtilisateur").Value)
                 Dim valeurActif As Object = grid.CurrentRow.Cells("EstActif").Value
                 chkActif.Checked = If(valeurActif Is Nothing OrElse Convert.IsDBNull(valeurActif), False, Convert.ToBoolean(valeurActif))

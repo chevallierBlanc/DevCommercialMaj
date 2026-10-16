@@ -130,6 +130,18 @@ Module Program
         Dim droitsPrix As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {"PRIX_CONSULTER", "PRIX_DEMANDER_FACTURE"}
         Verifie(DelegationPrixRegles.AutoriseCommande("PRIX_DEMANDER_FACTURE", True, True, False, droitsPrix), "Demande facture autorisee sans modification directe")
         Verifie(Not DelegationPrixRegles.AutoriseCommande("PRIX_DEMANDER", True, True, True, droitsPrix), "Demande facture ne donne pas acces au tarif officiel")
+        Dim actionsLigne As New HashSet(Of String) From {"PRIX_DEMANDER_FACTURE"}
+        Verifie(DelegationPrixRegles.CommandeDisponible(actionsLigne, "FACTURE", True), "Commande ligne pour demandeur habilite")
+        Verifie(Not DelegationPrixRegles.CommandeDisponible(actionsLigne, "TARIF", True), "Aucun heritage de la ligne vers le catalogue")
+        Verifie(Not DelegationPrixRegles.CommandeDisponible(actionsLigne, "FACTURE", False), "Panier vide ou selection absente : commande desactivee")
+        Dim actionsTarif As New HashSet(Of String) From {"PRIX_TARIF_MODIFIER"}
+        Verifie(DelegationPrixRegles.CommandeDisponible(actionsTarif, "TARIF", True), "Commande catalogue avant ajout au panier")
+        Verifie(Not DelegationPrixRegles.CommandeDisponible(actionsTarif, "FACTURE", True), "Aucun heritage du catalogue vers la ligne")
+        Verifie(Not DelegationPrixRegles.CommandeDisponible(actionsTarif, "TARIF", False), "Type de vente absent : commande desactivee")
+        actionsTarif.Clear()
+        Verifie(Not DelegationPrixRegles.CommandeDisponible(actionsTarif, "TARIF", True), "Permission retiree : selection ne reactive pas le bouton")
+        Verifie(Not DelegationPrixRegles.CommandeDisponible(Nothing, "TARIF", True), "Diagnostic indisponible : refus ferme")
+        Verifie(Not DelegationPrixRegles.CommandeDisponible(actionsLigne, "TOUS", True), "Perimetre inconnu : aucune extension de droits")
         For Each code As String In New String() {"PRIX_DEMANDER", "PRIX_DEMANDER_FACTURE", "PRIX_TARIF_MODIFIER", "PRIX_FACTURE_EXCEPTION"}
             droitsPrix.Add(code)
             Verifie(Not DelegationPrixRegles.AutoriseCommande(code, False, True, True, droitsPrix), "Delegation desactivee : " & code)

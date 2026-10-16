@@ -54,6 +54,7 @@ Namespace DevCommerc8ak
         Private ReadOnly prixArticle As ToolStripMenuItem
         Private ReadOnly lblDelegationPrix As Label
         Private ReadOnly aideDelegationPrix As New ToolTip()
+        Private _actionsPrix As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
         Private ReadOnly txtRemise As TextBox
         Private ReadOnly lblSousTotal As Label
         Private ReadOnly lblTotal As Label
@@ -183,7 +184,8 @@ Namespace DevCommerc8ak
             Dim pnlLeft As New Panel() With {
                 .Width = 550,
                 .Dock = DockStyle.Left,
-                .MinimumSize = New Size(520, 0)
+                .MinimumSize = New Size(520, 0),
+                .AutoScroll = True
             }
 
             ' GroupBox Client
@@ -210,7 +212,8 @@ Namespace DevCommerc8ak
             ' GroupBox Produits
             Dim grpProduits As New GroupBox() With {
                 .Text = "SÉLECTION DES PRODUITS",
-                .Dock = DockStyle.Fill,
+                .Dock = DockStyle.Top,
+                .Height = 545,
                 .Font = FontBold,
                 .ForeColor = ColorSecondary,
                 .Padding = New Padding(10),
@@ -267,7 +270,7 @@ Namespace DevCommerc8ak
 
             grpProduits.Controls.AddRange({lblRecherche, txtRecherche, btnActualiser, gridProduits, lblQuantite, txtQuantite, lblUnite, cmbUnite, lblPrix, txtPrixUnitaire, lblStock, lblEquivalent, lblTotalReel, btnAjouter, btnRetirer})
             btnRetirer.Width = 110
-            btnPrixDelegue = New Button With {.Text = "MODIFIER LE" & Environment.NewLine & "PRIX DE VENTE", .Visible = False, .Enabled = False, .Left = 400, .Top = 477, .Width = 120, .Height = 45, .FlatStyle = FlatStyle.Flat, .BackColor = ColorPrimary, .ForeColor = ColorWhite}
+            btnPrixDelegue = New Button With {.Text = "Modifier le prix" & Environment.NewLine & "Tarif officiel", .Enabled = False, .Left = 400, .Top = 477, .Width = 120, .Height = 45, .Font = FontControl, .FlatStyle = FlatStyle.Flat, .BackColor = ColorPrimary, .ForeColor = ColorWhite}
             grpProduits.Controls.Add(btnPrixDelegue)
             AddHandler btnPrixDelegue.Click, AddressOf ModifierPrixDelegue
             Dim menuPrix As New ContextMenuStrip()
@@ -316,7 +319,7 @@ Namespace DevCommerc8ak
             gridPanier.Dock = DockStyle.Fill
             gridPanier.MultiSelect = False
             Dim menuArticle As New ContextMenuStrip()
-            prixArticle = New ToolStripMenuItem("Demander une modification de prix pour cet article") With {.Visible = False}
+            prixArticle = New ToolStripMenuItem("Modifier le prix — cette ligne uniquement") With {.Enabled = False}
             menuArticle.Items.Add(prixArticle)
             gridPanier.ContextMenuStrip = menuArticle
             AddHandler gridPanier.MouseDown, Sub(sender, e)
@@ -328,11 +331,13 @@ Namespace DevCommerc8ak
 
 
             grpPanier.Controls.Add(gridPanier)
-            prixDeLigne = New Button With {.Text = "DEMANDER UNE MODIFICATION DE PRIX POUR L'ARTICLE SÉLECTIONNÉ", .Visible = False, .Dock = DockStyle.Bottom, .Height = 40, .BackColor = ColorPrimary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+            prixDeLigne = New Button With {.Text = "MODIFIER LE PRIX — CETTE LIGNE UNIQUEMENT", .Enabled = False, .Dock = DockStyle.Bottom, .Height = 40, .BackColor = ColorPrimary, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
             AddHandler prixDeLigne.Click, AddressOf ModifierPrixArticle
             grpPanier.Controls.Add(prixDeLigne)
             lblDelegationPrix = New Label With {.Dock = DockStyle.Bottom, .Height = 46, .Padding = New Padding(8), .AutoEllipsis = True, .Text = "Chargement des autorisations de prix…", .Font = FontControl, .ForeColor = ColorSecondary}
             grpPanier.Controls.Add(lblDelegationPrix)
+            AddHandler gridPanier.CellClick, Sub() ActualiserSelectionCommandesPrix()
+            AddHandler gridPanier.KeyUp, Sub() ActualiserSelectionCommandesPrix()
 
             ' Totaux Panel
             Dim pnlTotals As New Panel() With {
@@ -778,7 +783,7 @@ Namespace DevCommerc8ak
         End Function
 
         Private Sub MiseAJourPrixUnitaire(sender As Object, e As EventArgs)
-            btnPrixDelegue.Enabled = gridProduits.CurrentRow IsNot Nothing AndAlso ObtenirTypeVenteSelectionne() IsNot Nothing
+            ActualiserSelectionCommandesPrix()
             If gridProduits.CurrentRow Is Nothing Then Return
             Dim typeChoisi As TypeVenteDTO = ObtenirTypeVenteSelectionne()
             Dim prix As Decimal = PrixSelonUnite()
@@ -809,22 +814,27 @@ Namespace DevCommerc8ak
                 Dim service As New DelegationPrixService(New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString))
                 Dim diagnostic As DiagnosticActionsPrix = service.DiagnostiquerActions()
                 Dim actions As HashSet(Of String) = diagnostic.Actions
+                _actionsPrix = actions
                 lblDelegationPrix.Text = diagnostic.ExplicationTarif & Environment.NewLine & diagnostic.Explication
                 aideDelegationPrix.SetToolTip(lblDelegationPrix, lblDelegationPrix.Text)
                 aideDelegationPrix.SetToolTip(btnPrixDelegue, diagnostic.ExplicationTarif & " Sélectionnez un produit et son type de vente, même avec un panier vide.")
-                btnPrixDelegue.Visible = actions.Contains("PRIX_TARIF_MODIFIER") OrElse actions.Contains("PRIX_DEMANDER")
-                btnPrixDelegue.Enabled = gridProduits.CurrentRow IsNot Nothing AndAlso ObtenirTypeVenteSelectionne() IsNot Nothing
-                Dim autoriseArticle As Boolean = actions.Contains("PRIX_FACTURE_EXCEPTION") OrElse actions.Contains("PRIX_DEMANDER_FACTURE")
-                prixDeLigne.Visible = autoriseArticle
-                prixArticle.Visible = autoriseArticle
+                ActualiserSelectionCommandesPrix()
             Catch ex As Exception
-                btnPrixDelegue.Visible = False
-                prixDeLigne.Visible = False
-                prixArticle.Visible = False
+                _actionsPrix.Clear()
+                ActualiserSelectionCommandesPrix()
                 lblDelegationPrix.Text = "Commandes de prix indisponibles. Vérifiez la connexion et reconnectez-vous ou utilisez Actualiser."
                 Dim log As New ProductionLogService()
                 log.Warn("FacturationForm", "DelegationPrix", "Configuration ou autorisation des commandes de prix indisponible.")
             End Try
+        End Sub
+
+        Private Sub ActualiserSelectionCommandesPrix()
+            ' Presentation seulement : le service reverifie les droits en SQL.
+            btnPrixDelegue.Enabled = DelegationPrixRegles.CommandeDisponible(_actionsPrix, "TARIF", gridProduits.CurrentRow IsNot Nothing AndAlso ObtenirTypeVenteSelectionne() IsNot Nothing)
+            Dim selection As PanierLigne = If(gridPanier.CurrentRow Is Nothing, Nothing, TryCast(gridPanier.CurrentRow.DataBoundItem, PanierLigne))
+            prixDeLigne.Enabled = DelegationPrixRegles.CommandeDisponible(_actionsPrix, "FACTURE", DelegationPrixRegles.ChoisirArticle(_panier, selection) IsNot Nothing)
+            prixArticle.Visible = True : prixArticle.Enabled = prixDeLigne.Enabled
+            aideDelegationPrix.SetToolTip(prixDeLigne, "Prix exceptionnel limité à la ligne sélectionnée ; le catalogue reste inchangé. " & If(prixDeLigne.Enabled, "", "Vérifiez la sélection, la délégation et les permissions décrites ci-dessous."))
         End Sub
 
         Private Sub ModifierPrixArticle(sender As Object, e As EventArgs)
@@ -841,6 +851,7 @@ Namespace DevCommerc8ak
             Try
                 ActualiserCommandesPrix()
                 Dim ligne As PanierLigne = TryCast(sender, PanierLigne)
+                If Not DelegationPrixRegles.CommandeDisponible(_actionsPrix, If(ligne Is Nothing, "TARIF", "FACTURE"), True) Then Throw New UnauthorizedAccessException(lblDelegationPrix.Text)
                 Dim id As Integer
                 Dim nomType As String
                 Dim typeTarifId As Integer?
@@ -1114,6 +1125,7 @@ Namespace DevCommerc8ak
             lblTotal.Text = "Total: " & total.ToString()
             MettreAJourAffichageStockProduit()
             MettreAJourBoutonsPanier()
+            ActualiserSelectionCommandesPrix()
         End Sub
 
         Private Sub MettreAJourBoutonsPanier()

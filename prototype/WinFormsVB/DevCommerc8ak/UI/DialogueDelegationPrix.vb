@@ -18,6 +18,7 @@ Namespace DevCommerc8ak
         Public Shared Function Afficher(owner As IWin32Window, service As DelegationPrixService, produitId As Integer, typeVente As String, Optional contexte As Guid = Nothing, Optional quantite As Decimal = 0D, Optional prixArticle As Decimal? = Nothing, Optional contexteCommercial As Func(Of Decimal, ContexteCommercialPrix) = Nothing, Optional typeTarifId As Integer? = Nothing, Optional perimetre As String = "TOUS") As ResultatPrixException
             Dim disponibles As System.Collections.Generic.HashSet(Of String) = service.ActionsDisponibles()
             If disponibles.Count = 0 Then Throw New UnauthorizedAccessException("La délégation est désactivée ou aucune action de prix n'est autorisée pour cette session.")
+            If perimetre <> "TOUS" AndAlso Not DelegationPrixRegles.CommandeDisponible(disponibles, perimetre, True) Then Throw New UnauthorizedAccessException("Aucune action autorisée pour ce périmètre. Un droit sur une facture ne donne pas accès au tarif officiel.")
             Dim t As TarifDelegue = service.Consulter(produitId, typeVente, typeTarifId)
             Dim resultat As ResultatPrixException = Nothing
             Using form As New Form With {.Text = "Modification rapide du prix", .Size = New Size(780, 780), .MinimumSize = New Size(740, 640), .StartPosition = FormStartPosition.CenterParent, .BackColor = Color.FromArgb(245, 247, 250), .Font = New Font("Segoe UI", 10)}
@@ -44,6 +45,7 @@ Namespace DevCommerc8ak
                 actualiserVariation()
                 root.Controls.Add(variation, 0, 3)
                 Dim motif As New TextBox With {.Dock = DockStyle.Fill, .Multiline = True, .MaxLength = 1000}
+                motif.AccessibleName = "Motif obligatoire de modification du prix"
                 root.Controls.Add(motif, 0, 4)
                 Dim responsable As New TextBox With {.Dock = DockStyle.Bottom, .MaxLength = 120}
                 Dim instruction As New Panel With {.Dock = DockStyle.Fill}
@@ -67,6 +69,7 @@ Namespace DevCommerc8ak
                     Dim action As String = code
                     Dim button As New Button With {.Text = If(code = "PRIX_TARIF_MODIFIER", "MODIFIER LE TARIF OFFICIEL", If(code = "PRIX_DEMANDER", "DEMANDER UN TARIF OFFICIEL", "PRIX POUR CET ARTICLE")), .Width = 215, .Height = 36, .BackColor = Color.FromArgb(41, 128, 185), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
                     AddHandler button.Click, Sub()
+                                                 button.Enabled = False
                                                  Try
                                                      Dim raison As String = lireMotif()
                                                      If MessageBox.Show(form, "Confirmer ce prix et le motif ?", "Confirmation", MessageBoxButtons.YesNo, MessageBoxIcon.Question) <> DialogResult.Yes Then Return
@@ -80,6 +83,8 @@ Namespace DevCommerc8ak
                                                      form.DialogResult = DialogResult.OK
                                                  Catch ex As Exception
                                                      MessageBox.Show(form, ex.Message, "Modification refusée", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                                                 Finally
+                                                     button.Enabled = True
                                                  End Try
                                              End Sub
                     actions.Controls.Add(button)
@@ -87,14 +92,18 @@ Namespace DevCommerc8ak
                 If perimetre <> "TARIF" AndAlso contexte <> Guid.Empty AndAlso disponibles.Contains("PRIX_DEMANDER_FACTURE") Then
                     Dim demander As New Button With {.Text = "DEMANDER POUR CET ARTICLE", .Width = 240, .Height = 36}
                     AddHandler demander.Click, Sub()
+                                                   demander.Enabled = False
                                                    Try
                                                        Dim raison As String = lireMotif()
                                                        If MessageBox.Show(form, "Soumettre une exception limitée à cet article et cette quantité ? Le tarif officiel restera inchangé.", "Demande d'approbation", MessageBoxButtons.YesNo, MessageBoxIcon.Question) <> DialogResult.Yes Then Return
                                                        Dim commercial As ContexteCommercialPrix = If(contexteCommercial Is Nothing, Nothing, contexteCommercial(prix.Value))
                                                        Dim id As Integer = service.DemanderException(t, prix.Value, raison, contexte, quantite, commercial)
                                                        MessageBox.Show(form, "Demande " & id.ToString() & " EN ATTENTE. Conservez le panier, puis utilisez APPLIQUER L'APPROBATION après décision du responsable.")
+                                                       form.DialogResult = DialogResult.OK
                                                    Catch ex As Exception
                                                        MessageBox.Show(form, ex.Message, "Demande refusée")
+                                                   Finally
+                                                       demander.Enabled = True
                                                    End Try
                                                End Sub
                     Dim appliquer As New Button With {.Text = "APPLIQUER L'APPROBATION", .Width = 240, .Height = 36}

@@ -33,6 +33,14 @@ Namespace DevCommerc8ak
                 Case Else : Return False
             End Select
         End Function
+        Public Shared Function CommandeDisponible(actions As ISet(Of String), perimetre As String, selectionValide As Boolean) As Boolean
+            If Not selectionValide OrElse actions Is Nothing Then Return False
+            Select Case perimetre
+                Case "TARIF" : Return actions.Contains("PRIX_TARIF_MODIFIER") OrElse actions.Contains("PRIX_DEMANDER")
+                Case "FACTURE" : Return actions.Contains("PRIX_FACTURE_EXCEPTION") OrElse actions.Contains("PRIX_DEMANDER_FACTURE")
+                Case Else : Return False
+            End Select
+        End Function
         Public Shared Sub VerifierPrix(prix As Decimal)
             If prix <= 0D OrElse prix > 9999999999999999.99D OrElse Decimal.Round(prix, 2) <> prix Then Throw New ArgumentException("Saisissez un prix positif avec au maximum deux décimales.")
         End Sub

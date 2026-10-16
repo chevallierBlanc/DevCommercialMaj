@@ -306,6 +306,7 @@ Namespace DevCommerc8ak
                 cn.Open()
                 Using tx As SqlTransaction = cn.BeginTransaction()
                     AutorisationActionService.Exiger(cn, tx, If(demande, "PRIX_DEMANDER", "PRIX_TARIF_MODIFIER"), "FACTURIER")
+                    AutorisationActionService.Exiger(cn, tx, "PRIX_CONSULTER", "FACTURIER")
                     Dim p As ConfigurationPrix = LireConfiguration(cn, tx)
                     If Not p.Active Then Throw New UnauthorizedAccessException("Délégation des prix désactivée.")
                     Dim actuel As TarifDelegue = LireTarif(cn, tx, t.ProduitId, t.TypeVente, t.TypeId)
@@ -314,6 +315,22 @@ Namespace DevCommerc8ak
                     VerifierSousCout(cn, tx, p, actuel, nouveau, "FACTURIER")
                     If demande Then
                         If Not p.Demandes Then Throw New UnauthorizedAccessException("Les demandes sont désactivées.")
+                        ' Le verrou produit pris par LireTarif serialise les
+                        ' soumissions concurrentes ; un rejeu ne cree pas de doublon.
+                        Using existante As New SqlCommand("SELECT TOP(1) DemandeId FROM dbo.DemandesModificationPrix WHERE ProduitId=@p AND TypeVente=@type AND ISNULL(TypeTarifId,0)=@tarif AND Perimetre='TARIF' AND DemandePar=@u AND EmpreinteTarif=@hash AND NouveauPrix=@prix AND Motif=@motif AND Etat='EN_ATTENTE' AND ExpireLe>SYSUTCDATETIME() ORDER BY DemandeId DESC", cn, tx)
+                            existante.Parameters.AddWithValue("@p", actuel.ProduitId)
+                            existante.Parameters.AddWithValue("@type", actuel.TypeVente)
+                            existante.Parameters.AddWithValue("@tarif", actuel.TypeId)
+                            existante.Parameters.AddWithValue("@u", SessionUtilisateur.UtilisateurId)
+                            existante.Parameters.AddWithValue("@hash", actuel.Empreinte)
+                            existante.Parameters.AddWithValue("@prix", nouveau)
+                            existante.Parameters.AddWithValue("@motif", motif)
+                            Dim idExistant As Object = existante.ExecuteScalar()
+                            If idExistant IsNot Nothing Then
+                                tx.Commit()
+                                Return "Demande " & Convert.ToInt32(idExistant).ToString() & " déjà en attente. Le tarif actif est inchangé."
+                            End If
+                        End Using
                         Using cmd As New SqlCommand("INSERT dbo.DemandesModificationPrix(ProduitId,TypeVente,AncienPrix,NouveauPrix,EmpreinteTarif,Motif,DemandePar,ExpireLe,CoutReferenceDemande,TypeTarifId) VALUES(@p,@type,@a,@n,@hash,@motif,@u,DATEADD(HOUR,@heures,SYSUTCDATETIME()),@cout,@tarifId); SELECT CAST(SCOPE_IDENTITY() AS int)", cn, tx)
                             cmd.Parameters.AddWithValue("@p", actuel.ProduitId)
                             cmd.Parameters.AddWithValue("@type", actuel.TypeVente)
@@ -556,6 +573,7 @@ Namespace DevCommerc8ak
                     ' Meme ordre de verrouillage que les autres operations :
                     ' contexte de securite avant la ligne produit.
                     AutorisationActionService.Exiger(cn, tx, "PRIX_FACTURE_EXCEPTION", "FACTURIER")
+                    AutorisationActionService.Exiger(cn, tx, "PRIX_CONSULTER", "FACTURIER")
                     Dim actuel As TarifDelegue = LireTarif(cn, tx, t.ProduitId, t.TypeVente, t.TypeId)
                     If actuel.Empreinte <> t.Empreinte Then Throw New DBConcurrencyException("Le tarif a changé. Rechargez.")
                     VerifierException(cn, tx, New LigneFactureVente With {.ProduitId = t.ProduitId, .TypeVente = t.TypeVente, .TypeTarifId = t.TypeId, .PrixUnitaire = prix, .MotifPrixException = motif})

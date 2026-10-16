@@ -10,7 +10,7 @@ Namespace DevCommerc8ak
         Inherits UserControl
         Private ReadOnly _service As AttributionModeService
         Private ReadOnly roles As New ComboBox With {.DropDownStyle = ComboBoxStyle.DropDownList, .Dock = DockStyle.Fill}
-        Private ReadOnly compte As New Label With {.AutoSize = True, .MaximumSize = New Size(600, 0)}
+        Private ReadOnly compte As New Label With {.AutoSize = True, .MaximumSize = New Size(600, 0), .Font = New Font("Segoe UI", 11, FontStyle.Bold), .ForeColor = Color.FromArgb(52, 73, 94)}
         Private ReadOnly etat As New Label With {.AutoSize = True, .MaximumSize = New Size(600, 0)}
         Private ReadOnly combine As New CheckBox With {.Text = "Autoriser Vente & Encaissement pour ce rôle", .AutoSize = True}
         Private ReadOnly motif As New TextBox With {.Multiline = True, .Height = 55, .MaxLength = 1000, .Dock = DockStyle.Fill}
@@ -23,22 +23,41 @@ Namespace DevCommerc8ak
         Public Sub New(service As AttributionModeService)
             _service = service
             Dock = DockStyle.Fill : BackColor = Color.White : Padding = New Padding(14)
+            BorderStyle = BorderStyle.FixedSingle
+            AutoScaleMode = AutoScaleMode.Dpi
             Font = New Font("Segoe UI", 9.5F)
             Dim root As New TableLayoutPanel With {.Dock = DockStyle.Fill, .ColumnCount = 1, .AutoScroll = True}
             root.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
             Dim titre As New Label With {.Text = "MODES PAR RÔLE", .AutoSize = True, .ForeColor = Color.FromArgb(41, 128, 185), .Font = New Font(Font, FontStyle.Bold)}
-            Dim aide As New Label With {.Text = "Dans le répertoire à gauche, sélectionnez un compte, puis choisissez ici l'un de ses rôles enregistrés. Le mode combiné n'est jamais hérité d'un autre rôle. Motif obligatoire ; reconnexion après modification.", .AutoSize = True, .MaximumSize = New Size(600, 0)}
+            Dim aide As New Label With {.Text = "Sélectionnez un compte à gauche puis son rôle ci-dessous. Chaque attribution est indépendante. Elle prend effet à la prochaine connexion.", .AutoSize = True, .MaximumSize = New Size(600, 0), .ForeColor = Color.FromArgb(90, 100, 110)}
             Dim actualiser As New Button With {.Text = "ACTUALISER LES AUTORISATIONS", .AutoSize = True}
             For Each c As Control In New Control() {titre, compte, aide, New Label With {.Text = "Rôle du compte sélectionné dans le répertoire", .AutoSize = True}, roles, etat, accorder, combine, New Label With {.Text = "Motif de l'attribution ou du retrait", .AutoSize = True}, motif, enregistrer, actualiser}
                 root.RowStyles.Add(New RowStyle(SizeType.AutoSize))
                 root.Controls.Add(c, 0, root.Controls.Count)
                 c.Margin = New Padding(0, 0, 0, 10)
+                If TypeOf c Is Button Then
+                    Dim bouton As Button = DirectCast(c, Button)
+                    bouton.FlatStyle = FlatStyle.Flat
+                    bouton.MinimumSize = New Size(0, 38)
+                    bouton.Padding = New Padding(6)
+                    bouton.Dock = DockStyle.Top
+                    bouton.FlatAppearance.BorderColor = Color.FromArgb(220, 225, 230)
+                    If bouton IsNot enregistrer Then
+                        bouton.BackColor = Color.White
+                        bouton.ForeColor = Color.FromArgb(52, 73, 94)
+                        bouton.FlatAppearance.MouseOverBackColor = Color.FromArgb(232, 242, 250)
+                    End If
+                End If
             Next
             Controls.Add(root)
             AddHandler roles.SelectedIndexChanged, Sub() AfficherRole()
             AddHandler combine.CheckedChanged, Sub() ActualiserBouton()
             AddHandler motif.TextChanged, Sub() ActualiserBouton()
-            AddHandler actualiser.Click, Sub() ChargerCompte(_id, compte.Text)
+            AddHandler actualiser.Click, Sub()
+                                             Dim roleAvant As Object = roles.SelectedValue
+                                             ChargerCompte(_id, compte.Text)
+                                             If roleAvant IsNot Nothing AndAlso _table IsNot Nothing Then roles.SelectedValue = roleAvant
+                                         End Sub
             AddHandler enregistrer.Click, AddressOf EnregistrerAttribution
             AddHandler accorder.Click, Sub()
                                           If MessageBox.Show(Me, "Ajouter uniquement le privilège d'administration des modes au rôle ACTIF « " & SessionUtilisateur.NomRoleActif & " » ? Cela concerne tous les comptes de ce rôle, mais n'attribue Vente & Encaissement à aucun utilisateur. Les autres privilèges restent inchangés.", "Attribution explicite d'un privilège", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) <> DialogResult.Yes Then Return

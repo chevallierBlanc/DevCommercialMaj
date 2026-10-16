@@ -242,6 +242,14 @@ Module Program
             prix.Configurer(New ConfigurationPrix With {.Active = True, .Demandes = True, .Immediate = True, .Variation = 10D}, initialPrix, "Configuration de fixture isolée")
             Dim t As TarifDelegue = prix.Consulter(produitPrix, "piece")
             Verifier(prix.ActionsDisponibles().Contains("PRIX_TARIF_MODIFIER"), "Session valide et action explicite : commande disponible")
+            Exec("DELETE ri FROM dbo.RoleInterfaces ri JOIN dbo.InterfacesApplication i ON i.InterfaceId=ri.InterfaceId WHERE ri.RoleId=" & role.ToString() & " AND i.CodeInterface='PRIX_CONSULTER'")
+            Try
+                Verifier(prix.ActionsDisponibles().Count = 0, "Consulter revoque : commandes refusees meme avec selection")
+                Refus(Of UnauthorizedAccessException)(Sub() prix.Modifier(t, 16D, "Permission consulter revoquee", False))
+                Refus(Of UnauthorizedAccessException)(Sub() prix.VerifierExceptionProposee(t, 16D, "Permission consulter revoquee"))
+            Finally
+                Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & role.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface='PRIX_CONSULTER'")
+            End Try
             Dim sessionValide As Integer = SessionUtilisateur.SessionId
             SessionUtilisateur.SessionId = -1
             Try
@@ -284,6 +292,11 @@ Module Program
             Refus(Of UnauthorizedAccessException)(Sub() prix.Modifier(t, 20D, "Variation hors seuil", False))
             prix.Modifier(t, 20D, "Demande à approuver", True)
             Dim demande As Integer = Scalar("SELECT MAX(DemandeId) FROM dbo.DemandesModificationPrix WHERE ProduitId=" & produitPrix.ToString())
+            Dim demandesAvant As Integer = Scalar("SELECT COUNT(*) FROM dbo.DemandesModificationPrix WHERE ProduitId=" & produitPrix.ToString())
+            Dim auditsAvant As Integer = Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE [Action]='PRIX_MODIFICATION_DEMANDEE'")
+            Parallel.For(0, 2, Sub(i) prix.Modifier(t, 20D, "Demande à approuver", True))
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.DemandesModificationPrix WHERE ProduitId=" & produitPrix.ToString()) = demandesAvant, "Rejeux concurrents de demande officielle sans doublon")
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE [Action]='PRIX_MODIFICATION_DEMANDEE'") = auditsAvant, "Rejeu sans double audit de succes")
             Verifier(prix.Consulter(produitPrix, "piece").Prix = t.Prix, "Une demande ne change pas le tarif actif")
             Refus(Of UnauthorizedAccessException)(Sub() prix.Decider(demande, True, "Auto-approbation interdite"))
             Dim reviewer As Integer = Scalar("INSERT dbo.Utilisateurs(NomUtilisateur,MotDePasseHash,MotDePasseSel,EstActif) SELECT TOP(1) 'REV_' + @s,MotDePasseHash,MotDePasseSel,1 FROM dbo.Utilisateurs; SELECT CAST(SCOPE_IDENTITY() AS int)", suffix)
