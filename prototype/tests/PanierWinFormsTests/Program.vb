@@ -16,6 +16,7 @@ Module Program
     <STAThread>
     Sub Main()
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException)
+        TesterCharteCommerciale()
         TesterChoixMode()
         TesterReglement()
         TesterChoixRole()
@@ -42,6 +43,39 @@ Module Program
             If evenements < 80 Then Throw New Exception("Evenements de liaison non executes")
             Console.WriteLine("PASS Windows : 40 cycles suppression / selection / validation vide sans masquer DataError.")
         End Using
+    End Sub
+    Private Sub TesterCharteCommerciale()
+        Using grille As New DataGridView With {.AllowUserToAddRows = False}, bouton As New Button With {.Bounds = New System.Drawing.Rectangle(12, 18, 150, 40), .Visible = False, .Enabled = False}
+            Dim selection As System.Drawing.Color = System.Drawing.Color.FromArgb(225, 239, 250)
+            grille.DefaultCellStyle.SelectionBackColor = selection
+            grille.DefaultCellStyle.SelectionForeColor = System.Drawing.Color.Navy
+            ThemeHelper1.StyliserEnteteCommerciale(grille)
+            grille.DataSource = New List(Of Article) From {New Article With {.Libelle = "Article", .Quantite = 1D}}
+            grille.ClearSelection() : grille.DataSource = Nothing
+            grille.DataSource = New List(Of Article)()
+            With grille.ColumnHeadersDefaultCellStyle
+                If .BackColor <> System.Drawing.Color.FromArgb(245, 245, 245) OrElse .SelectionBackColor <> .BackColor Then Throw New Exception("Fond des entetes non conforme apres liaison")
+                If .ForeColor <> System.Drawing.Color.FromArgb(52, 73, 94) OrElse .SelectionForeColor <> .ForeColor Then Throw New Exception("Texte des entetes non conforme")
+            End With
+            If grille.EnableHeadersVisualStyles OrElse grille.DefaultCellStyle.SelectionBackColor <> selection OrElse grille.DefaultCellStyle.SelectionForeColor <> System.Drawing.Color.Navy Then Throw New Exception("Selection des lignes modifiee par la charte")
+            Dim bornes As System.Drawing.Rectangle = bouton.Bounds
+            Dim clics As Integer = 0
+            AddHandler bouton.Click, Sub() clics += 1
+            ThemeHelper1.StyliserActionCommerciale(bouton, principale:=True)
+            If bouton.Enabled OrElse bouton.Visible OrElse bouton.Bounds <> bornes Then Throw New Exception("Le style a modifie l'etat ou la position du bouton")
+            If bouton.BackColor <> System.Drawing.Color.FromArgb(245, 245, 245) Then Throw New Exception("Etat desactive non distingue")
+            bouton.Enabled = True
+            If bouton.BackColor <> System.Drawing.Color.FromArgb(41, 128, 185) Then Throw New Exception("Action principale non restauree")
+            bouton.Visible = True : bouton.PerformClick()
+            If clics <> 1 Then Throw New Exception("Evenement Click perturbe par le style")
+            Using secondaire As New Button(), destructif As New Button()
+                ThemeHelper1.StyliserActionCommerciale(secondaire)
+                ThemeHelper1.StyliserActionCommerciale(destructif, destructive:=True)
+                If secondaire.BackColor <> System.Drawing.Color.White OrElse secondaire.ForeColor <> System.Drawing.Color.FromArgb(52, 73, 94) Then Throw New Exception("Action secondaire non neutre")
+                If destructif.BackColor <> System.Drawing.Color.White OrElse destructif.ForeColor <> System.Drawing.Color.FromArgb(192, 57, 43) Then Throw New Exception("Action destructive non conforme")
+            End Using
+        End Using
+        Console.WriteLine("PASS Windows : couleurs exactes, selection conservee, etats et Click preserves.")
     End Sub
     Private Sub TesterReglement()
         Dim culture As CultureInfo = CultureInfo.CurrentCulture

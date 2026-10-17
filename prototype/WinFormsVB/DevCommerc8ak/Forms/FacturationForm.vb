@@ -398,6 +398,13 @@ Namespace DevCommerc8ak
                 btn.FlatAppearance.BorderSize = 0
                 pnlActions.Controls.Add(btn)
             Next
+            For Each bouton As Button In {btnAjouter, btnValider}
+                ThemeHelper1.StyliserActionCommerciale(bouton, principale:=True)
+            Next
+            For Each bouton As Button In {btnActualiser, btnPrixDelegue, prixDeLigne, btnImprimer, btnPdf, btnHistorique, btnAnnuler, btnDeconnexion}
+                ThemeHelper1.StyliserActionCommerciale(bouton)
+            Next
+            ThemeHelper1.StyliserActionCommerciale(btnRetirer, destructive:=True)
 
             Dim pnlRaccourcis As New Panel() With {.Dock = DockStyle.Bottom, .Height = 44, .BackColor = Color.White, .Padding = New Padding(6, 0, 0, 0)}
             Dim lblRaccourcis As New Label() With {
@@ -547,6 +554,7 @@ Namespace DevCommerc8ak
             dgv.ColumnHeadersHeight = 38
             dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(232, 234, 246)
             dgv.DefaultCellStyle.SelectionForeColor = ColorPrimary
+            ThemeHelper1.StyliserEnteteCommerciale(dgv)
             Return dgv
         End Function
         Private Function CreateStyledGrid() As DataGridView
@@ -568,6 +576,7 @@ Namespace DevCommerc8ak
             dgv.DefaultCellStyle.SelectionForeColor = ColorPrimary
             dgv.DefaultCellStyle.Font = FontControl
             dgv.RowTemplate.Height = 35
+            ThemeHelper1.StyliserEnteteCommerciale(dgv)
             Return dgv
         End Function
         Private Sub ChargerParametres()

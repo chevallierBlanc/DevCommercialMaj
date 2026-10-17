@@ -21,18 +21,32 @@ Namespace DevCommerc8ak
             If perimetre <> "TOUS" AndAlso Not DelegationPrixRegles.CommandeDisponible(disponibles, perimetre, True) Then Throw New UnauthorizedAccessException("Aucune action autorisée pour ce périmètre. Un droit sur une facture ne donne pas accès au tarif officiel.")
             Dim t As TarifDelegue = service.Consulter(produitId, typeVente, typeTarifId)
             Dim resultat As ResultatPrixException = Nothing
-            Using form As New Form With {.Text = "Modification rapide du prix", .Size = New Size(780, 780), .MinimumSize = New Size(740, 640), .StartPosition = FormStartPosition.CenterParent, .BackColor = Color.FromArgb(245, 247, 250), .Font = New Font("Segoe UI", 10)}
+            Using form As New Form With {.Text = "Modification du prix de vente", .ClientSize = New Size(680, 620), .MinimumSize = New Size(600, 460), .StartPosition = FormStartPosition.CenterParent, .BackColor = Color.FromArgb(245, 247, 250), .Font = New Font("Segoe UI", 10), .AutoScaleMode = AutoScaleMode.Dpi, .AutoScaleDimensions = New SizeF(96, 96)}
                 form.Text = If(perimetre = "TARIF", "Modifier le prix de vente — tarif officiel", If(perimetre = "FACTURE", "Prix exceptionnel — article de facture", "Modification rapide du prix"))
-                Dim root As New TableLayoutPanel With {.Dock = DockStyle.Fill, .AutoScroll = True, .Padding = New Padding(20), .ColumnCount = 1, .RowCount = 9}
+                Dim cadre As New TableLayoutPanel With {.Dock = DockStyle.Fill, .ColumnCount = 1, .RowCount = 3}
+                cadre.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
+                cadre.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+                cadre.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+                cadre.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+                Dim entete As New TableLayoutPanel With {.Dock = DockStyle.Fill, .AutoSize = True, .ColumnCount = 1, .BackColor = ThemeHelper1.CommercialEntete, .Padding = New Padding(16, 12, 16, 12), .Margin = New Padding(0)}
+                entete.Controls.Add(New Label With {.Text = "Modification du prix de vente", .AutoSize = True, .Font = New Font("Segoe UI", 13, FontStyle.Bold), .ForeColor = Color.White})
+                Dim identite As New Label With {.Text = t.Produit & " — " & t.TypeVente & " | " & t.CodeBarres, .AutoSize = True, .ForeColor = Color.White, .MaximumSize = New Size(610, 0)}
+                entete.Controls.Add(identite)
+                cadre.Controls.Add(entete, 0, 0)
+                Dim corps As New Panel With {.Dock = DockStyle.Fill, .AutoScroll = True, .Margin = New Padding(0)}
+                Dim root As New TableLayoutPanel With {.Dock = DockStyle.Top, .AutoSize = True, .Padding = New Padding(16, 12, 16, 6), .ColumnCount = 1, .RowCount = 7}
                 root.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
-                For Each h As Integer In New Integer() {44, 116, 46, 54, 72, 62, 70, 36, 140}
-                    root.RowStyles.Add(New RowStyle(SizeType.Absolute, h))
+                For ligne As Integer = 0 To 6
+                    root.RowStyles.Add(New RowStyle(SizeType.AutoSize))
                 Next
-                root.Controls.Add(New Label With {.Text = t.Produit & " — " & t.TypeVente & " | " & t.CodeBarres, .Dock = DockStyle.Fill, .ForeColor = Color.FromArgb(41, 128, 185), .Font = New Font("Segoe UI", 12, FontStyle.Bold)}, 0, 0)
-                root.Controls.Add(New Label With {.Text = "Tarif officiel : " & t.Prix.ToString("N2") & " FC" & Environment.NewLine & "Coût comparable pour ce type de vente : " & t.Cout.ToString("N2") & " FC" & If(prixArticle.HasValue, Environment.NewLine & "Prix actuel de cet article : " & prixArticle.GetValueOrDefault().ToString("N2") & " FC — Quantité : " & quantite.ToString("0.########"), "") & Environment.NewLine & "Demandeur : " & SessionUtilisateur.NomUtilisateur & " (ID " & SessionUtilisateur.UtilisateurId.ToString() & ")", .Dock = DockStyle.Fill}, 0, 1)
-                Dim prix As New NumericUpDown With {.Dock = DockStyle.Fill, .DecimalPlaces = 2, .Maximum = 9999999999999999.99D, .Minimum = 0.01D, .Value = Math.Max(0.01D, If(prixArticle, t.Prix))}
-                root.Controls.Add(prix, 0, 2)
-                Dim variation As New Label With {.Dock = DockStyle.Fill}
+                root.Controls.Add(New Label With {.Text = "INFORMATIONS TARIFAIRES", .AutoSize = True, .ForeColor = ThemeHelper1.CommercialEntete, .Font = New Font("Segoe UI", 10, FontStyle.Bold)}, 0, 0)
+                root.Controls.Add(New Label With {.Text = "Tarif officiel : " & t.Prix.ToString("N2") & " FC" & Environment.NewLine & "Coût comparable pour ce type de vente : " & t.Cout.ToString("N2") & " FC" & If(prixArticle.HasValue, Environment.NewLine & "Prix actuel de cet article : " & prixArticle.GetValueOrDefault().ToString("N2") & " FC — Quantité : " & quantite.ToString("0.########"), "") & Environment.NewLine & "Demandeur : " & SessionUtilisateur.NomUtilisateur & " (ID " & SessionUtilisateur.UtilisateurId.ToString() & ")", .AutoSize = True}, 0, 1)
+                Dim prix As New NumericUpDown With {.Width = 210, .DecimalPlaces = 2, .Maximum = 9999999999999999.99D, .Minimum = 0.01D, .Value = Math.Max(0.01D, If(prixArticle, t.Prix)), .TextAlign = HorizontalAlignment.Right}
+                Dim proposition As New FlowLayoutPanel With {.Dock = DockStyle.Top, .AutoSize = True, .WrapContents = True, .Padding = New Padding(0, 6, 0, 6)}
+                proposition.Controls.Add(New Label With {.Text = "Prix proposé (FC)", .AutoSize = True, .Margin = New Padding(0, 5, 16, 0)})
+                proposition.Controls.Add(prix)
+                root.Controls.Add(proposition, 0, 2)
+                Dim variation As New Label With {.AutoSize = True, .ForeColor = ThemeHelper1.CommercialEntete}
                 Dim actualiserVariation As Action = Sub()
                                                        Try
                                                            Dim net As Decimal = If(contexteCommercial Is Nothing, prix.Value, DelegationPrixRegles.PrixNet(prix.Value, contexteCommercial(prix.Value)))
@@ -44,22 +58,41 @@ Namespace DevCommerc8ak
                 AddHandler prix.ValueChanged, Sub() actualiserVariation()
                 actualiserVariation()
                 root.Controls.Add(variation, 0, 3)
-                Dim motif As New TextBox With {.Dock = DockStyle.Fill, .Multiline = True, .MaxLength = 1000}
+                Dim motif As New TextBox With {.Dock = DockStyle.Top, .Height = 54, .Multiline = True, .MaxLength = 1000, .ScrollBars = ScrollBars.Vertical}
                 motif.AccessibleName = "Motif obligatoire de modification du prix"
-                root.Controls.Add(motif, 0, 4)
-                Dim responsable As New TextBox With {.Dock = DockStyle.Bottom, .MaxLength = 120}
-                Dim instruction As New Panel With {.Dock = DockStyle.Fill}
+                Dim justification As New TableLayoutPanel With {.Dock = DockStyle.Top, .AutoSize = True, .ColumnCount = 1}
+                justification.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
+                justification.Controls.Add(New Label With {.Text = "JUSTIFICATION — Motif obligatoire", .AutoSize = True, .Font = New Font("Segoe UI", 10, FontStyle.Bold), .ForeColor = ThemeHelper1.CommercialEntete})
+                justification.Controls.Add(motif)
+                Dim erreurMotif As New Label With {.AutoSize = True, .Visible = False, .ForeColor = Color.FromArgb(192, 57, 43)}
+                justification.Controls.Add(erreurMotif)
+                root.Controls.Add(justification, 0, 4)
+                Dim responsable As New TextBox With {.Dock = DockStyle.Top, .MaxLength = 120, .MaximumSize = New Size(360, 0)}
+                Dim instruction As New TableLayoutPanel With {.Dock = DockStyle.Top, .AutoSize = True, .ColumnCount = 1}
+                instruction.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
+                instruction.Controls.Add(New Label With {.Text = "Responsable ayant donné l'instruction (facultatif, ne vaut pas approbation)", .AutoSize = True})
                 instruction.Controls.Add(responsable)
-                instruction.Controls.Add(New Label With {.Text = "Responsable ayant donné l'instruction (facultatif, ne vaut pas approbation)", .Dock = DockStyle.Top, .Height = 32})
                 root.Controls.Add(instruction, 0, 5)
                 Dim lireMotif As Func(Of String) = Function()
-                                                     Dim raison As String = AuditMetierService.ValiderMotif(motif.Text)
-                                                     Return AuditMetierService.ValiderMotif(raison & If(responsable.Text.Trim() = "", "", Environment.NewLine & "Instruction déclarée : " & responsable.Text.Trim()))
+                                                     ' La validation existante reste souveraine ; seule
+                                                     ' sa presentation est rapprochee du champ concerne.
+                                                     erreurMotif.Visible = False
+                                                     Try
+                                                         Dim raison As String = AuditMetierService.ValiderMotif(motif.Text)
+                                                         Return AuditMetierService.ValiderMotif(raison & If(responsable.Text.Trim() = "", "", Environment.NewLine & "Instruction déclarée : " & responsable.Text.Trim()))
+                                                     Catch ex As ArgumentException
+                                                         erreurMotif.Text = ex.Message : erreurMotif.Visible = True
+                                                         motif.Focus()
+                                                         Throw
+                                                     End Try
                                                  End Function
-                root.Controls.Add(New Label With {.Text = "Motif obligatoire. Tarif officiel : nouvelles ventes uniquement. Exception facture : seule la ligne de ce panier sera modifiée. Les autres lignes restent inchangées.", .Dock = DockStyle.Fill}, 0, 6)
-                Dim actions As New FlowLayoutPanel With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft}
+                root.Controls.Add(New Label With {.Text = "Motif obligatoire. Tarif officiel : nouvelles ventes uniquement. Exception facture : seule la ligne de ce panier sera modifiée. Les autres lignes restent inchangées.", .AutoSize = True, .ForeColor = Color.FromArgb(90, 100, 110)}, 0, 6)
+                Dim pied As New TableLayoutPanel With {.Dock = DockStyle.Fill, .AutoSize = True, .ColumnCount = 1, .Padding = New Padding(16, 8, 16, 12), .BackColor = Color.White, .Margin = New Padding(0)}
+                pied.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
+                Dim actions As New FlowLayoutPanel With {.Dock = DockStyle.Top, .AutoSize = True, .FlowDirection = FlowDirection.RightToLeft}
                 actions.WrapContents = True
                 Dim annuler As New Button With {.Text = "ANNULER", .Width = 100, .Height = 36, .DialogResult = DialogResult.Cancel}
+                ThemeHelper1.StyliserActionCommerciale(annuler)
                 actions.Controls.Add(annuler)
                 For Each code As String In New String() {"PRIX_TARIF_MODIFIER", "PRIX_DEMANDER", "PRIX_FACTURE_EXCEPTION"}
                     If perimetre = "TARIF" AndAlso code = "PRIX_FACTURE_EXCEPTION" Then Continue For
@@ -68,6 +101,7 @@ Namespace DevCommerc8ak
                     If code = "PRIX_FACTURE_EXCEPTION" AndAlso contexte = Guid.Empty Then Continue For
                     Dim action As String = code
                     Dim button As New Button With {.Text = If(code = "PRIX_TARIF_MODIFIER", "MODIFIER LE TARIF OFFICIEL", If(code = "PRIX_DEMANDER", "DEMANDER UN TARIF OFFICIEL", "PRIX POUR CET ARTICLE")), .Width = 215, .Height = 36, .BackColor = Color.FromArgb(41, 128, 185), .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat}
+                    ThemeHelper1.StyliserActionCommerciale(button, principale:=code <> "PRIX_DEMANDER")
                     AddHandler button.Click, Sub()
                                                  button.Enabled = False
                                                  Try
@@ -91,6 +125,7 @@ Namespace DevCommerc8ak
                 Next
                 If perimetre <> "TARIF" AndAlso contexte <> Guid.Empty AndAlso disponibles.Contains("PRIX_DEMANDER_FACTURE") Then
                     Dim demander As New Button With {.Text = "DEMANDER POUR CET ARTICLE", .Width = 240, .Height = 36}
+                    ThemeHelper1.StyliserActionCommerciale(demander)
                     AddHandler demander.Click, Sub()
                                                    demander.Enabled = False
                                                    Try
@@ -107,6 +142,7 @@ Namespace DevCommerc8ak
                                                    End Try
                                                End Sub
                     Dim appliquer As New Button With {.Text = "APPLIQUER L'APPROBATION", .Width = 240, .Height = 36}
+                    ThemeHelper1.StyliserActionCommerciale(appliquer, principale:=True)
                     AddHandler appliquer.Click, Sub()
                                                     Try
                                                         Dim approuvee As ApprobationPrixArticle = service.LireExceptionApprouvee(produitId, typeVente, contexte, quantite)
@@ -124,7 +160,7 @@ Namespace DevCommerc8ak
                                                 End Sub
                     actions.Controls.Add(demander) : actions.Controls.Add(appliquer)
                 End If
-                Dim suivi As New LinkLabel With {.Text = "MES DEMANDES DE PRIX", .Dock = DockStyle.Fill}
+                Dim suivi As New LinkLabel With {.Text = "Consulter mes demandes", .AutoSize = True, .Margin = New Padding(0, 0, 0, 8)}
                 AddHandler suivi.LinkClicked, Sub()
                                                   Try
                                                       Demandes(form, service, "FACTURIER")
@@ -132,10 +168,33 @@ Namespace DevCommerc8ak
                                                       MessageBox.Show(form, ex.Message, "Demandes indisponibles", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                                                   End Try
                                               End Sub
-                root.Controls.Add(suivi, 0, 7)
-                root.Controls.Add(actions, 0, 8)
+                pied.Controls.Add(suivi, 0, 0)
+                pied.Controls.Add(actions, 0, 1)
                 form.CancelButton = annuler
-                form.Controls.Add(root)
+                corps.Controls.Add(root) : cadre.Controls.Add(corps, 0, 1)
+                cadre.Controls.Add(pied, 0, 2) : form.Controls.Add(cadre)
+                ' Le corps seul defile ; les commandes restent accessibles.
+                Dim adapter As EventHandler = Sub(sender, e)
+                                            Dim largeur As Integer = Math.Max(240, corps.ClientSize.Width - 48)
+                                            For Each libelle As Label In New Label() {identite, variation, erreurMotif}
+                                                libelle.MaximumSize = New Size(largeur, 0)
+                                            Next
+                                            For Each conteneur As Control In New Control() {root, instruction, justification}
+                                                For Each element As Control In conteneur.Controls
+                                                    If TypeOf element Is Label Then element.MaximumSize = New Size(largeur, 0)
+                                                Next
+                                            Next
+                                            actions.MaximumSize = New Size(Math.Max(240, form.ClientSize.Width - 40), 0)
+                                              End Sub
+                AddHandler form.Resize, adapter
+                AddHandler form.Shown, Sub()
+                                          Dim surface As Rectangle = Screen.FromControl(form).WorkingArea
+                                          form.MinimumSize = New Size(Math.Min(form.MinimumSize.Width, surface.Width - 24), Math.Min(form.MinimumSize.Height, surface.Height - 24))
+                                          form.Size = New Size(Math.Min(form.Width, surface.Width - 24), Math.Min(form.Height, surface.Height - 24))
+                                          adapter(form, EventArgs.Empty)
+                                      End Sub
+                form.PerformLayout()
+                adapter(form, EventArgs.Empty)
                 form.ShowDialog(owner)
                 Return resultat
             End Using

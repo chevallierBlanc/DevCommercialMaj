@@ -7,6 +7,7 @@
     <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ThemeHelper.vb" Link="ThemeHelper.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Repositories/RoleRepository.vb" Link="RoleRepository.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/UtilisateurService.vb" Link="UtilisateurService.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Entities/Utilisateur.vb" Link="Utilisateur.vb" />

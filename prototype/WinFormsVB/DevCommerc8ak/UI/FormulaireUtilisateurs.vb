@@ -86,7 +86,7 @@ Namespace DevCommerc8ak
             Me.MinimumSize = New Size(900, 650)
 
             ' --- Header / Hero Section ---
-            panelHero = New Panel() With {.Dock = DockStyle.Top, .Height = 90, .BackColor = ColorSecondary}
+            panelHero = New Panel() With {.Dock = DockStyle.Top, .Height = 90, .BackColor = ColorPrimary}
             lblHeroTitre = New Label() With {.Text = "Administration Utilisateurs", .Font = FontTitle, .AutoSize = True, .Left = 20, .Top = 15, .ForeColor = Color.White}
             lblHeroSousTitre = New Label() With {.Text = "Gérez les accès, les rôles et surveillez les sessions actives en temps réel.", .Left = 27, .Top = 54, .AutoSize = True, .Font = FontSubTitle, .ForeColor = Color.FromArgb(210, 210, 255)}
             panelHero.Controls.Add(lblHeroTitre)
@@ -315,9 +315,7 @@ Namespace DevCommerc8ak
                 .GridColor = ColorBorder
             }
             dgv.MultiSelect = False
-            dgv.ColumnHeadersDefaultCellStyle.BackColor = ColorSecondary
-            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White
-            dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = ColorSecondary
+            ThemeHelper1.StyliserEnteteCommerciale(dgv)
             dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
             dgv.ColumnHeadersHeight = 40
             dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(225, 239, 250)

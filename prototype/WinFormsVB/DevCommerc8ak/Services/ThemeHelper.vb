@@ -10,6 +10,37 @@ Namespace DevCommerc8ak
     ''' Module centralisé pour la gestion de l'identité visuelle et de l'UX moderne.
     ''' </summary>
     Public Module ThemeHelper1
+        Public ReadOnly CommercialEntete As Color = Color.FromArgb(52, 73, 94)
+        Public ReadOnly CommercialEnteteGrille As Color = Color.FromArgb(245, 245, 245)
+        Public ReadOnly CommercialAction As Color = Color.FromArgb(41, 128, 185)
+
+        ' Application explicite seulement : ne change ni le theme global ni
+        ' la selection des lignes ou les dimensions des controles existants.
+        Public Sub StyliserEnteteCommerciale(grille As DataGridView)
+            grille.EnableHeadersVisualStyles = False
+            With grille.ColumnHeadersDefaultCellStyle
+                .BackColor = CommercialEnteteGrille
+                .SelectionBackColor = CommercialEnteteGrille
+                .ForeColor = CommercialEntete
+                .SelectionForeColor = CommercialEntete
+            End With
+        End Sub
+
+        Public Sub StyliserActionCommerciale(bouton As Button, Optional principale As Boolean = False, Optional destructive As Boolean = False)
+            bouton.FlatStyle = FlatStyle.Flat
+            bouton.UseVisualStyleBackColor = False
+            bouton.FlatAppearance.BorderSize = 1
+            Dim actualiser As System.EventHandler = Sub(sender, e)
+                                                       bouton.BackColor = If(Not bouton.Enabled, CommercialEnteteGrille, If(principale, CommercialAction, Color.White))
+                                                       bouton.ForeColor = If(Not bouton.Enabled, Color.FromArgb(117, 117, 117), If(principale, Color.White, If(destructive, Color.FromArgb(192, 57, 43), CommercialEntete)))
+                                                       bouton.FlatAppearance.BorderColor = If(Not bouton.Enabled, ColorBorder, If(principale, CommercialAction, If(destructive, Color.FromArgb(192, 57, 43), ColorBorder)))
+                                                   End Sub
+            bouton.FlatAppearance.MouseOverBackColor = If(principale, Color.FromArgb(34, 110, 160), If(destructive, Color.FromArgb(253, 240, 238), Color.FromArgb(232, 242, 250)))
+            bouton.FlatAppearance.MouseDownBackColor = If(principale, Color.FromArgb(28, 94, 140), Color.FromArgb(225, 234, 242))
+            AddHandler bouton.EnabledChanged, actualiser
+            actualiser(bouton, System.EventArgs.Empty)
+        End Sub
+
         ' --- Palette de Couleurs Windows 11 / Premium ---
         Public ReadOnly ColorPrimary As Color = Color.FromArgb(0, 120, 212)      ' Bleu Windows
         Public ReadOnly ColorAccent As Color = Color.FromArgb(0, 90, 158)       ' Bleu Foncé

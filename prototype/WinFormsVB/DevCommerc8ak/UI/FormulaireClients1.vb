@@ -32,11 +32,11 @@ Namespace DevCommerc8ak
 
 
 
-        Private ReadOnly ColorPrimary As Color = Color.FromArgb(52, 73, 94) ' Gris Foncé
+        Private ReadOnly ColorPrimary As Color = Color.FromArgb(52, 73, 94) ' Gris FoncÃ©
         Private ReadOnly ColorSecondary As Color = Color.FromArgb(41, 128, 185) ' Bleu Moderne
-        Private ReadOnly ColorAccent As Color = Color.FromArgb(39, 174, 96) ' Vert Succès
+        Private ReadOnly ColorAccent As Color = Color.FromArgb(39, 174, 96) ' Vert SuccÃ¨s
         Private ReadOnly ColorDanger As Color = Color.FromArgb(192, 57, 43) ' Rouge Annuler
-        Private ReadOnly ColorBg As Color = Color.FromArgb(245, 247, 250) ' Gris très clair
+        Private ReadOnly ColorBg As Color = Color.FromArgb(245, 247, 250) ' Gris trÃ¨s clair
         Private ReadOnly ColorWhite As Color = Color.White
         Private ReadOnly FontMain As New Font("Segoe UI", 10)
         Private ReadOnly FontBold As New Font("Segoe UI", 10, FontStyle.Bold)
@@ -44,7 +44,7 @@ Namespace DevCommerc8ak
         Private ReadOnly FontTotal As New Font("Segoe UI", 22, FontStyle.Bold)
 
 
-        ' --- Composants UI (Noms conservés) ---
+        ' --- Composants UI (Noms conservÃ©s) ---
         Private ReadOnly grid As DataGridView
         Private ReadOnly gridActifs As DataGridView
         Private ReadOnly btnAjouter As Button
@@ -78,11 +78,14 @@ Namespace DevCommerc8ak
             Me.StartPosition = FormStartPosition.CenterScreen
             Me.BackColor = ColorBackground
             Me.DoubleBuffered = True
+            Me.AutoScaleMode = AutoScaleMode.Dpi
+            Me.AutoScaleDimensions = New SizeF(96, 96)
+            Me.MinimumSize = New Size(900, 650)
 
             ' --- Header / Hero Section ---
             panelHero = New Panel() With {.Dock = DockStyle.Top, .Height = 90, .BackColor = ColorPrimary}
-            lblHeroTitre = New Label() With {.Text = "Répertoire Clients", .Left = 25, .Top = 18, .AutoSize = True, .Font = FontTitle, .ForeColor = Color.White}
-            lblHeroSousTitre = New Label() With {.Text = "Gérez vos relations clients, suivez les limites de crédit et analysez les performances.", .Left = 27, .Top = 54, .AutoSize = True, .Font = FontSubTitle, .ForeColor = Color.FromArgb(210, 210, 255)}
+            lblHeroTitre = New Label() With {.Text = "RÃ©pertoire Clients", .Left = 25, .Top = 18, .AutoSize = True, .Font = FontTitle, .ForeColor = Color.White}
+            lblHeroSousTitre = New Label() With {.Text = "GÃ©rez vos relations clients, suivez les limites de crÃ©dit et analysez les performances.", .Left = 27, .Top = 54, .AutoSize = True, .Font = FontSubTitle, .ForeColor = Color.FromArgb(210, 210, 255)}
             panelHero.Controls.Add(lblHeroTitre)
             panelHero.Controls.Add(lblHeroSousTitre)
 
@@ -96,27 +99,47 @@ Namespace DevCommerc8ak
             txtLimiteCredit = CreateStyledTextBox(420, 105, 120)
             chkActif = New CheckBox() With {.Left = 560, .Top = 108, .Text = "Client Actif", .Font = FontControl, .ForeColor = ColorText, .AutoSize = True}
 
-            panelFormCard.Controls.Add(CreateLabel("Nom complet", 20, 22))
-            panelFormCard.Controls.Add(CreateLabel("Téléphone", 240, 22))
-            panelFormCard.Controls.Add(CreateLabel("Email", 420, 22))
-            panelFormCard.Controls.Add(CreateLabel("Adresse physique", 20, 82))
-            panelFormCard.Controls.Add(CreateLabel("Limite de crédit", 420, 82))
-
-            panelFormCard.Controls.Add(txtNom)
-            panelFormCard.Controls.Add(txtTelephone)
-            panelFormCard.Controls.Add(txtEmail)
-            panelFormCard.Controls.Add(txtAdresse)
-            panelFormCard.Controls.Add(txtLimiteCredit)
-            panelFormCard.Controls.Add(chkActif)
+            Dim saisie As New TableLayoutPanel With {.Dock = DockStyle.Fill, .ColumnCount = 3, .RowCount = 4, .MaximumSize = New Size(1080, 0)}
+            saisie.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 38))
+            saisie.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 27))
+            saisie.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 35))
+            For Each hauteur As Integer In New Integer() {22, 34, 22, 34}
+                saisie.RowStyles.Add(New RowStyle(SizeType.Absolute, hauteur))
+            Next
+            saisie.Controls.Add(CreateLabel("Nom complet", 0, 0), 0, 0)
+            saisie.Controls.Add(CreateLabel("TÃ©lÃ©phone", 0, 0), 1, 0)
+            saisie.Controls.Add(CreateLabel("Email", 0, 0), 2, 0)
+            saisie.Controls.Add(txtNom, 0, 1)
+            saisie.Controls.Add(txtTelephone, 1, 1)
+            saisie.Controls.Add(txtEmail, 2, 1)
+            saisie.Controls.Add(CreateLabel("Adresse physique", 0, 0), 0, 2)
+            saisie.Controls.Add(CreateLabel("Limite de crÃ©dit", 0, 0), 2, 2)
+            saisie.Controls.Add(txtAdresse, 0, 3) : saisie.SetColumnSpan(txtAdresse, 2)
+            Dim credit As New FlowLayoutPanel With {.Dock = DockStyle.Fill, .WrapContents = False, .AutoScroll = True, .Margin = New Padding(0)}
+            txtLimiteCredit.Width = 130 : txtLimiteCredit.TextAlign = HorizontalAlignment.Right
+            chkActif.Margin = New Padding(12, 4, 0, 0)
+            credit.Controls.Add(txtLimiteCredit) : credit.Controls.Add(chkActif)
+            saisie.Controls.Add(credit, 2, 3)
+            For Each champ As TextBox In New TextBox() {txtNom, txtTelephone, txtEmail, txtAdresse}
+                champ.Dock = DockStyle.Top : champ.Margin = New Padding(0, 0, 18, 0)
+            Next
+            txtNom.MaximumSize = New Size(320, 0) : txtTelephone.MaximumSize = New Size(190, 0)
+            txtEmail.MaximumSize = New Size(320, 0) : txtAdresse.MaximumSize = New Size(500, 0)
+            panelFormCard.Controls.Add(saisie)
 
             ' --- Barre d'Actions ---
             panelActions = New Panel() With {.Dock = DockStyle.Top, .Height = 60, .BackColor = ColorCard, .Padding = New Padding(20, 10, 20, 10)}
 
             btnAjouter = CreateStyledButton("Ajouter", 20, 12, 100, ColorPrimary)
             btnModifier = CreateStyledButton("Modifier", 130, 12, 100, ColorSecondary)
-            btnSupprimer = CreateStyledButton("Supprimer", 240, 12, 100, Color.Crimson)
-            btnRafraichir = CreateStyledButton("Rafraîchir", 350, 12, 100, Color.Gray)
-            btnStats = CreateStyledButton("Top Clients", 460, 12, 120, Color.SlateGray)
+            btnSupprimer = CreateStyledButton("Supprimer", 240, 12, 100, ColorDanger)
+            btnRafraichir = CreateStyledButton("RafraÃ®chir", 350, 12, 100, ColorPrimary)
+            btnStats = CreateStyledButton("Top Clients", 460, 12, 120, ColorPrimary)
+            ThemeHelper1.StyliserActionCommerciale(btnAjouter, principale:=True)
+            ThemeHelper1.StyliserActionCommerciale(btnModifier)
+            ThemeHelper1.StyliserActionCommerciale(btnSupprimer, destructive:=True)
+            ThemeHelper1.StyliserActionCommerciale(btnRafraichir)
+            ThemeHelper1.StyliserActionCommerciale(btnStats)
 
             panelActions.Controls.Add(btnAjouter)
             panelActions.Controls.Add(btnModifier)
@@ -131,7 +154,7 @@ Namespace DevCommerc8ak
 
             ' --- Section Basse (Stats & Graphiques) ---
 
-            Dim panelBas As New Panel() With {.Dock = DockStyle.Fill, .Padding = New Padding(10)}
+            Dim panelBas As New Panel() With {.Dock = DockStyle.Fill, .Padding = New Padding(10), .AutoScroll = True}
 
             gridActifs = CreateStyledGrid(0, 0, 600, 250)
             gridActifs.Dock = DockStyle.Fill
@@ -144,12 +167,18 @@ Namespace DevCommerc8ak
             chartProduits.ChartAreas.Add(area)
 
             chartProduits.Series.Add(New Series("TopProduits") With {.ChartType = SeriesChartType.Doughnut, .Palette = ChartColorPalette.Pastel})
-            chartProduits.Titles.Add(New Title("Répartition des Achats par Produit", Docking.Top, New Font("Segoe UI", 12.0F, FontStyle.Bold), ColorPrimary))
+            chartProduits.Titles.Add(New Title("RÃ©partition des Achats par Produit", Docking.Top, New Font("Segoe UI", 12.0F, FontStyle.Bold), ColorPrimary))
+            chartProduits.Titles(0).Font = New Font("Segoe UI", 10, FontStyle.Bold)
+            chartProduits.Legends.Add(New Legend With {.Docking = Docking.Bottom, .Font = New Font("Segoe UI", 8.5F), .IsTextAutoFit = False, .MaximumAutoSize = 40})
+            chartProduits.Series("TopProduits").ToolTip = "#VALX : #VALY"
 
 
             Dim layout As New TableLayoutPanel()
             layout.Dock = DockStyle.Fill
             layout.ColumnCount = 2
+            layout.RowCount = 1
+            layout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+            layout.MinimumSize = New Size(780, 240)
             layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50))
             layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50))
 
@@ -158,14 +187,14 @@ Namespace DevCommerc8ak
 
             panelBas.Controls.Add(layout)
 
-            ' Ajout des contrôles au formulaire
+            ' Ajout des contrÃ´les au formulaire
             Me.Controls.Add(panelBas)
             Me.Controls.Add(grid)
             Me.Controls.Add(panelActions)
             Me.Controls.Add(panelFormCard)
             Me.Controls.Add(panelHero)
 
-            ' --- Liaison des événements (Logique conservée) ---
+            ' --- Liaison des Ã©vÃ©nements (Logique conservÃ©e) ---
             AddHandler btnAjouter.Click, AddressOf AjouterClient
             AddHandler btnModifier.Click, AddressOf ModifierClient
             AddHandler btnSupprimer.Click, AddressOf SupprimerClient
@@ -196,7 +225,7 @@ Namespace DevCommerc8ak
 
         Private Function CreateStyledButton(text As String, x As Integer, y As Integer, w As Integer, backColor As Color) As Button
             Dim btn As New Button() With {
-                .Text = text, .Left = x, .Top = y, .Width = w, .Height = 35,
+                .Text = text, .Left = x, .Top = y, .Width = w, .Height = 38,
                 .BackColor = backColor, .ForeColor = Color.White,
                 .FlatStyle = FlatStyle.Flat, .Font = FontLabel, .Cursor = Cursors.Hand
             }
@@ -215,14 +244,36 @@ Namespace DevCommerc8ak
             dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245)
             dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(245, 245, 245)
             dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI Semibold", 9.5F)
+            ThemeHelper1.StyliserEnteteCommerciale(dgv)
             dgv.ColumnHeadersHeight = 40
             dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(232, 234, 246)
             dgv.DefaultCellStyle.SelectionForeColor = ColorPrimary
             dgv.DefaultCellStyle.Font = FontControl
+            dgv.RowTemplate.Height = 34
+            AddHandler dgv.DataBindingComplete, Sub() DimensionnerColonnes(dgv)
             Return dgv
         End Function
 
-        ' --- LOGIQUE MÉTIER (STRICTEMENT IDENTIQUE À L'ORIGINAL) ---
+        ' Mise en forme seulement : ni requete ni modification de donnees.
+        Private Sub DimensionnerColonnes(dgv As DataGridView)
+            For Each colonne As DataGridViewColumn In dgv.Columns
+                Select Case colonne.Name
+                    Case "NomClient", "Adresse", "Email"
+                        colonne.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+                        colonne.MinimumWidth = If(colonne.Name = "NomClient", 160, 150)
+                        colonne.FillWeight = If(colonne.Name = "Adresse", 30, 24)
+                    Case Else
+                        colonne.AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+                        colonne.Width = If(colonne.Name = "ClientId" OrElse colonne.Name = "EstActif" OrElse colonne.Name = "NbAchats", 75, 125)
+                End Select
+                If colonne.Name = "LimiteCredit" OrElse colonne.Name = "TotalAchats" OrElse colonne.Name = "MoyenneAchat" Then
+                    colonne.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+                    colonne.DefaultCellStyle.Format = "N2"
+                End If
+            Next
+        End Sub
+
+        ' --- LOGIQUE MÃ‰TIER (STRICTEMENT IDENTIQUE Ã€ L'ORIGINAL) ---
 
         Private Function ObtenirService() As ClientService
             Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
@@ -350,7 +401,7 @@ Namespace DevCommerc8ak
                                     "WHERE f.ClientId=@id AND f.CreeLe >= DATEADD(DAY,-30,GETDATE()) AND f.Statut='PAYEE' " &
                                     "GROUP BY p.Libelle ORDER BY SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) DESC"
 
-                ' Note: Utilisation de paramètres SQL selon votre structure originale
+                ' Note: Utilisation de paramÃ¨tres SQL selon votre structure originale
                 Dim p As New List(Of System.Data.SqlClient.SqlParameter) From {
                     New System.Data.SqlClient.SqlParameter("@id", clientId)
                 }
