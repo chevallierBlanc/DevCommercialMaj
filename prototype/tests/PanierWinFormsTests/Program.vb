@@ -71,8 +71,8 @@ Module Program
             Using secondaire As New Button(), destructif As New Button()
                 ThemeHelper1.StyliserActionCommerciale(secondaire)
                 ThemeHelper1.StyliserActionCommerciale(destructif, destructive:=True)
-                If secondaire.BackColor <> System.Drawing.Color.White OrElse secondaire.ForeColor <> System.Drawing.Color.FromArgb(52, 73, 94) Then Throw New Exception("Action secondaire non neutre")
-                If destructif.BackColor <> System.Drawing.Color.White OrElse destructif.ForeColor <> System.Drawing.Color.FromArgb(192, 57, 43) Then Throw New Exception("Action destructive non conforme")
+                If secondaire.BackColor <> System.Drawing.Color.FromArgb(240, 244, 248) OrElse secondaire.ForeColor <> System.Drawing.Color.FromArgb(52, 73, 94) Then Throw New Exception("Action secondaire non neutre")
+                If destructif.BackColor <> System.Drawing.Color.FromArgb(252, 244, 242) OrElse destructif.ForeColor <> System.Drawing.Color.FromArgb(192, 57, 43) Then Throw New Exception("Action destructive non conforme")
             End Using
         End Using
         Console.WriteLine("PASS Windows : couleurs exactes, selection conservee, etats et Click preserves.")

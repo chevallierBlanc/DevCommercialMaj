@@ -167,6 +167,8 @@ Namespace DevCommerc8ak
         Private ReadOnly statut As New ComboBox With {.DropDownStyle = ComboBoxStyle.DropDownList, .Width = 130}
         Private ReadOnly synthese As New Label With {.Dock = DockStyle.Top, .Height = 50}
         Private ReadOnly position As New Label With {.AutoSize = True}
+        Private ReadOnly boutonPrecedent As New Button With {.Text = "Précédent", .AutoSize = True}
+        Private ReadOnly boutonSuivant As New Button With {.Text = "Suivant", .AutoSize = True}
         Private _page As Integer
         Private _total As Integer
         Private _occupe As Boolean
@@ -177,10 +179,15 @@ Namespace DevCommerc8ak
         End Property
         Public Sub New(service As DelegationPrixService, Optional ecran As String = "PARAMETRES")
             _service = service : _ecran = ecran : Dock = DockStyle.Fill
-            Dim outils As New FlowLayoutPanel With {.Dock = DockStyle.Top, .Height = 70, .AutoScroll = True}
+            BackColor = Color.FromArgb(245, 247, 250) : Padding = New Padding(12) : Font = New Font("Segoe UI", 9.5F)
+            Dim entete As New Label With {.Text = If(ecran = "FACTURIER", "Mes demandes de prix", "Demandes et approbations de prix"), .Dock = DockStyle.Top, .Height = 54, .Padding = New Padding(12), .Font = New Font("Segoe UI", 13, FontStyle.Bold), .BackColor = ThemeHelper1.CommercialEntete, .ForeColor = Color.White}
+            synthese.BackColor = Color.White : synthese.Padding = New Padding(8) : synthese.Height = 58
+            Dim outils As New FlowLayoutPanel With {.Dock = DockStyle.Top, .Height = 54, .Padding = New Padding(0, 10, 0, 6), .WrapContents = False, .AutoScroll = True}
+            Dim actionsMetier As New FlowLayoutPanel With {.Dock = DockStyle.Bottom, .AutoSize = True, .FlowDirection = FlowDirection.RightToLeft}
             statut.Items.AddRange(New Object() {"Tous", "En attente", "Approuvées", "Refusées", "Annulées", "Expirées"}) : statut.SelectedIndex = 0
             outils.Controls.AddRange(New Control() {New Label With {.Text = "Produit / demandeur", .AutoSize = True}, recherche, statut})
             Dim filtrer As New Button With {.Text = "Rechercher", .AutoSize = True}
+            ThemeHelper1.StyliserActionCommerciale(filtrer, principale:=True)
             AddHandler filtrer.Click, Async Sub(sender, e)
                                          If _occupe Then Return
                                          _page = 0
@@ -190,6 +197,7 @@ Namespace DevCommerc8ak
             For Each approuver As Boolean In New Boolean() {True, False}
                 Dim decision As Boolean = approuver
                 Dim bouton As New Button With {.Text = If(decision, "Approuver", "Refuser"), .AutoSize = True}
+                ThemeHelper1.StyliserActionCommerciale(bouton, principale:=decision)
                 bouton.Visible = ecran = "PARAMETRES"
                 AddHandler bouton.Click, Async Sub(sender, e)
                                              If _occupe OrElse grille.CurrentRow Is Nothing Then Return
@@ -206,7 +214,7 @@ Namespace DevCommerc8ak
                                              End Try
                                              Await ChargerAsync()
                                          End Sub
-                outils.Controls.Add(bouton)
+                actionsMetier.Controls.Add(bouton)
                 AddHandler Load, Async Sub(sender, e)
                                      Try
                                          bouton.Visible = ecran = "PARAMETRES" AndAlso Await Task.Run(Function() _service.Autorise(If(decision, "PRIX_APPROUVER", "PRIX_REFUSER"), "PARAMETRES"))
@@ -218,6 +226,7 @@ Namespace DevCommerc8ak
             Dim bas As New FlowLayoutPanel With {.Dock = DockStyle.Bottom, .Height = 38}
             If ecran = "FACTURIER" Then
                 Dim annuler As New Button With {.Text = "Annuler ma demande", .AutoSize = True}
+                ThemeHelper1.StyliserActionCommerciale(annuler)
                 AddHandler annuler.Click, Async Sub(sender, e)
                                              If _occupe OrElse grille.CurrentRow Is Nothing Then Return
                                              Dim id As Integer = CInt(grille.CurrentRow.Cells("DemandeId").Value)
@@ -235,8 +244,9 @@ Namespace DevCommerc8ak
                                          End Sub
                 bas.Controls.Add(annuler)
             End If
-            Dim precedent As New Button With {.Text = "Précédent", .AutoSize = True}
-            Dim suivant As New Button With {.Text = "Suivant", .AutoSize = True}
+            Dim precedent As Button = boutonPrecedent
+            Dim suivant As Button = boutonSuivant
+            ThemeHelper1.StyliserActionCommerciale(precedent) : ThemeHelper1.StyliserActionCommerciale(suivant)
             AddHandler precedent.Click, Async Sub(sender, e)
                                            If _occupe Then Return
                                            _page = Math.Max(0, _page - 1)
@@ -248,21 +258,26 @@ Namespace DevCommerc8ak
                                          Await ChargerAsync()
                                      End Sub
             bas.Controls.AddRange(New Control() {precedent, suivant, position})
-            grille.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(0, 120, 212)
-            grille.ColumnHeadersDefaultCellStyle.ForeColor = Color.White : grille.RowTemplate.Height = 36
+            ThemeHelper1.StyliserEnteteCommerciale(grille)
+            grille.RowTemplate.Height = 36
             grille.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI", 9.5F, FontStyle.Bold)
             grille.DefaultCellStyle.Padding = New Padding(6)
             grille.DefaultCellStyle.SelectionBackColor = Color.FromArgb(225, 239, 250)
             grille.DefaultCellStyle.SelectionForeColor = Color.FromArgb(32, 32, 32)
             grille.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252)
             AddHandler grille.CellFormatting, Sub(sender, e)
+                                                 If grille.Columns(e.ColumnIndex).Name = "Statut" AndAlso e.Value IsNot Nothing Then
+                                                     Dim code As String = Convert.ToString(e.Value)
+                                                     e.CellStyle.ForeColor = If(code = "REFUSEE" OrElse code = "ANNULEE", Color.FromArgb(160, 55, 45), If(code = "APPROUVEE", ThemeHelper1.CommercialAction, ThemeHelper1.CommercialEntete))
+                                                 End If
                                                  If grille.Columns(e.ColumnIndex).Name <> "Perimetre" OrElse e.Value Is Nothing Then Return
                                                  e.Value = If(Convert.ToString(e.Value) = "TARIF", "Tarif officiel", "Article de facture")
                                                  e.FormattingApplied = True
                                              End Sub
             AddHandler grille.CellDoubleClick, Sub(sender, e)
-                                                  If e.RowIndex < 0 Then Return
+                                                  If _occupe OrElse e.RowIndex < 0 Then Return
                                                   Dim ligne As DataGridViewRow = grille.Rows(e.RowIndex)
+                                                  Dim demandeId As Integer = CInt(ligne.Cells("DemandeId").Value)
                                                   Using detail As New Form With {.Text = "Détails de la demande de prix", .Size = New Size(760, 550), .MinimumSize = New Size(650, 420), .StartPosition = FormStartPosition.CenterParent, .BackColor = Color.FromArgb(245, 247, 250)}
                                                       Dim zone As New TextBox With {.Dock = DockStyle.Fill, .ReadOnly = True, .Multiline = True, .ScrollBars = ScrollBars.Vertical, .Font = New Font("Segoe UI", 11), .BackColor = Color.White}
                                                       Dim nouveau As Decimal = CDec(ligne.Cells("NouveauPrix").Value)
@@ -274,16 +289,29 @@ Namespace DevCommerc8ak
                                                       zone.Text = Convert.ToString(ligne.Cells("Produit").Value) & " — " & Convert.ToString(ligne.Cells("Conditionnement").Value) & Environment.NewLine & "Périmètre : " & Convert.ToString(ligne.Cells("Perimetre").Value) & Environment.NewLine & "Demandeur : " & Convert.ToString(ligne.Cells("Demandeur").Value) & Environment.NewLine & "État : " & Convert.ToString(ligne.Cells("Statut").Value) & Environment.NewLine & "Ancien prix : " & ancien.ToString("N2") & " FC" & Environment.NewLine & "Prix demandé : " & nouveau.ToString("N2") & " FC" & Environment.NewLine & "Variation : " & (nouveau - ancien).ToString("N2") & " FC" & Environment.NewLine & "Marge sur coût enregistré : " & marge & Environment.NewLine & "Motif : " & Convert.ToString(ligne.Cells("Motif").Value) & Environment.NewLine & "Décision : " & Convert.ToString(ligne.Cells("MotifDecision").Value) & Environment.NewLine & "Date : " & Convert.ToString(ligne.Cells("DemandeLe").Value) & Environment.NewLine & "Expire le : " & Convert.ToString(ligne.Cells("ExpireLe").Value)
                                                       Dim fermer As New Button With {.Text = "FERMER", .Dock = DockStyle.Bottom, .Height = 38, .DialogResult = DialogResult.Cancel}
                                                       detail.Padding = New Padding(18) : detail.Controls.Add(zone) : detail.Controls.Add(fermer)
+                                                      Dim decideur As String = Convert.ToString(ligne.Cells("Decideur").Value)
+                                                      If Not Convert.IsDBNull(ligne.Cells("DecisionPar").Value) Then
+                                                          zone.AppendText(Environment.NewLine & "Décision par : " & If(String.IsNullOrWhiteSpace(decideur), "Compte non disponible", decideur) & " (ID " & Convert.ToString(ligne.Cells("DecisionPar").Value) & ")" & Environment.NewLine & "Décision le (UTC) : " & Convert.ToString(ligne.Cells("DecisionLe").Value))
+                                                      End If
                                                       zone.AppendText(Environment.NewLine & "Prix net par unité après remise : " & net.ToString("N2") & " FC" & Environment.NewLine & "Sous-total du panier approuvé : " & Convert.ToString(ligne.Cells("SousTotalContexte").Value) & Environment.NewLine & "Remise globale approuvée : " & Convert.ToString(ligne.Cells("RemiseContexte").Value))
+                                                      AddHandler detail.Shown, Async Sub(s, args)
+                                                                                   Try
+                                                                                       Dim tarif As TarifDelegue = Await Task.Run(Function() _service.ConsulterTarifDemande(demandeId, _ecran))
+                                                                                       If Not detail.IsDisposed Then zone.AppendText(Environment.NewLine & "Tarif officiel courant (consultation SQL) : " & tarif.Prix.ToString("N2") & " FC" & If(tarif.TypeActif, "", " — type désactivé"))
+                                                                                   Catch ex As Exception
+                                                                                       If Not detail.IsDisposed Then zone.AppendText(Environment.NewLine & "Tarif courant non consultable : " & ex.Message)
+                                                                                   End Try
+                                                                               End Sub
                                                       detail.CancelButton = fermer : detail.ShowDialog(Me)
                                                   End Using
                                               End Sub
-            Controls.Add(grille) : Controls.Add(bas) : Controls.Add(outils) : Controls.Add(synthese)
+            Controls.Add(grille) : Controls.Add(bas) : Controls.Add(actionsMetier) : Controls.Add(outils) : Controls.Add(synthese) : Controls.Add(entete)
             AddHandler Load, Async Sub(sender, e) Await ChargerAsync()
         End Sub
         Public Async Function ChargerAsync() As Task
             If _occupe Then Return
             _occupe = True
+            boutonPrecedent.Enabled = False : boutonSuivant.Enabled = False
             synthese.Text = "Chargement des demandes…"
             Dim q As String = recherche.Text
             Dim etats As String() = {"", "EN_ATTENTE", "APPROUVEE", "REFUSEE", "ANNULEE", "EXPIREE"}
@@ -292,9 +320,19 @@ Namespace DevCommerc8ak
                 Dim resultat As PageDemandesPrix = Await Task.Run(Function() _service.ListerPage(_page, 25, q, etat, _ecran))
                 If IsDisposed Then Return
                 _total = resultat.Total : grille.DataSource = resultat.Lignes
+                grille.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+                For Each colonne As DataGridViewColumn In grille.Columns
+                    colonne.Width = If(colonne.Name = "Produit", 190, If(colonne.Name = "Conditionnement", 145, 125))
+                    If colonne.Name = "Motif" Then
+                        colonne.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill : colonne.MinimumWidth = 200
+                    End If
+                Next
                 grille.Columns("DemandeId").Visible = False
                 grille.Columns("CoutReferenceDemande").Visible = False
                 grille.Columns("MotifDecision").Visible = False
+                grille.Columns("DecisionPar").Visible = False
+                grille.Columns("Decideur").Visible = False
+                grille.Columns("DecisionLe").Visible = False
                 grille.Columns("SousTotalContexte").Visible = False
                 grille.Columns("RemiseContexte").Visible = False
                 grille.Columns("TypeTarifId").Visible = False
@@ -303,7 +341,7 @@ Namespace DevCommerc8ak
                     grille.Columns(nom).DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
                 Next
                 grille.Columns("Perimetre").HeaderText = "Périmètre"
-                grille.Columns("AncienPrix").HeaderText = "Ancien prix"
+                grille.Columns("AncienPrix").HeaderText = "Prix de référence"
                 grille.Columns("NouveauPrix").HeaderText = "Prix demandé"
                 grille.Columns("DemandeLe").HeaderText = "Demandée le (UTC)"
                 grille.Columns("ExpireLe").HeaderText = "Expire le (UTC)"
@@ -311,10 +349,14 @@ Namespace DevCommerc8ak
                 grille.Columns("QuantiteContexte").HeaderText = "Quantité de l'article"
                 synthese.Text = "Demandes des employés : " & resultat.EnAttente.ToString() & " en attente • " & resultat.Approuvees.ToString() & " approuvées • " & resultat.Refusees.ToString() & " refusées" & Environment.NewLine & "TARIF : prix officiel • FACTURE : article uniquement, application après approbation"
                 position.Text = "Page " & (_page + 1).ToString() & " • " & _total.ToString() & " résultat(s)"
+                If _total = 0 Then synthese.Text = "Aucune demande pour ces filtres. Modifiez la recherche ou le statut."
             Catch ex As Exception
                 grille.DataSource = Nothing : synthese.Text = "Demandes indisponibles : " & ex.Message
+                _total = 0 : position.Text = "Consultation indisponible"
             Finally
                 _occupe = False
+                boutonPrecedent.Enabled = _page > 0
+                boutonSuivant.Enabled = (_page + 1) * 25 < _total
             End Try
         End Function
     End Class

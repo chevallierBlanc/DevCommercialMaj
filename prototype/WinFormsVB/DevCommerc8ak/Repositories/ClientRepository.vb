@@ -8,6 +8,7 @@ Imports System.Collections.Generic
 
 Namespace DevCommerc8ak
     Public Class ClientRepository
+        Friend Const RequeteClassementAchats As String = "SELECT TOP(20) c.ClientId,c.NomClient,c.Telephone,COUNT_BIG(*) AS NbAchats,SUM(CAST(f.MontantTotal AS decimal(28,2))) AS TotalAchats,AVG(CAST(f.MontantTotal AS decimal(28,2))) AS MoyenneAchat FROM dbo.Clients c JOIN dbo.FacturesVente f ON f.ClientId=c.ClientId WHERE f.Statut='PAYEE' AND f.CreeLe>=@du AND f.CreeLe<@au GROUP BY c.ClientId,c.NomClient,c.Telephone ORDER BY TotalAchats DESC,c.ClientId"
         Private ReadOnly _dal As DAL
 
         Public Sub New(dal As DAL)
@@ -48,6 +49,15 @@ Namespace DevCommerc8ak
         End Function
 
         ' Retourne la liste des clients.
+        Public Function ClasserAchats(du As DateTime, auExclu As DateTime) As DataTable
+            Return _dal.ExecuterTable(RequeteClassementAchats, CommandType.Text, New List(Of SqlParameter) From {New SqlParameter("@du", du), New SqlParameter("@au", auExclu)})
+        End Function
+
+        Public Function RepartirAchats(clientId As Integer, du As DateTime, auExclu As DateTime) As DataTable
+            Dim sql As String = "SELECT TOP(10) p.Libelle,SUM(ISNULL(l.QuantiteBase,ISNULL(l.Quantite,0))) AS Quantite FROM dbo.LignesFactureVente l JOIN dbo.FacturesVente f ON f.FactureVenteId=l.FactureVenteId JOIN dbo.Produits p ON p.ProduitId=l.ProduitId WHERE f.ClientId=@id AND f.Statut='PAYEE' AND f.CreeLe>=@du AND f.CreeLe<@au GROUP BY p.Libelle ORDER BY Quantite DESC,p.Libelle"
+            Return _dal.ExecuterTable(sql, CommandType.Text, New List(Of SqlParameter) From {New SqlParameter("@id", clientId), New SqlParameter("@du", du), New SqlParameter("@au", auExclu)})
+        End Function
+
         Public Function Lister() As List(Of ClientDTO)
             Dim sql As String = "SELECT ClientId, NomClient, Telephone, Email, Adresse, LimiteCredit, EstActif FROM Clients"
             Dim dt As DataTable = _dal.ExecuterTable(sql, CommandType.Text, Nothing)

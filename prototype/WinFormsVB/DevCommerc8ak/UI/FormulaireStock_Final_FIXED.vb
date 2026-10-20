@@ -19,6 +19,7 @@ Imports Microsoft.VisualBasic
 Namespace DevCommerc8ak
     Public Class FormulaireStock
         Inherits Form
+        Private ReadOnly alerteTarifs As New AlerteTarifsPanel
 
         ' --- DESIGN CONSTANTS ---
         Private ReadOnly ColorPrimary As Color = Color.FromArgb(52, 73, 94)
@@ -807,6 +808,9 @@ Namespace DevCommerc8ak
             btnValiderInventaire.Enabled = False
             AddHandler AppEvents.StockModifie, AddressOf RafraichirDepuisEvenement
             AddHandler AppEvents.ProduitModifie, AddressOf RafraichirDepuisEvenement
+            Controls.Add(alerteTarifs)
+            AddHandler Me.Shown, Sub() alerteTarifs.Demarrer()
+            AddHandler alerteTarifs.RechargementDemande, Sub() ChargerProduits()
         End Sub
 
         ' --- DESIGN HELPERS ---
@@ -1179,6 +1183,7 @@ Namespace DevCommerc8ak
             Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
             Dim dal As New DAL(cs)
             Dim repo As New ProduitRepository(dal)
+            alerteTarifs.DebutChargement()
             _produitsTable = repo.ListerTable()
             _produitsAutoCompleteSource = New AutoCompleteStringCollection()
             For Each row As DataRow In _produitsTable.Rows
@@ -1209,6 +1214,7 @@ Namespace DevCommerc8ak
                 ChargerSortiesDuMois(Nothing, EventArgs.Empty)
                 ChargerRapportEntrees(Nothing, EventArgs.Empty)
             End If
+            alerteTarifs.Acquitter()
         End Sub
 
 
@@ -2716,6 +2722,9 @@ Namespace DevCommerc8ak
         '    End Try
         'End Sub
         Private Sub EnregistrerEntree(sender As Object, e As EventArgs)
+            If alerteTarifs.TarifsPerimes Then
+                MessageBox.Show("Les tarifs ont changé. Rechargez-les avec le bandeau avant d'enregistrer ; la saisie est conservée.") : Return
+            End If
             Try
                 If cmbUniteBase.SelectedIndex < 0 OrElse String.IsNullOrWhiteSpace(cmbUniteBase.Text) Then
                     MessageBox.Show("Sélectionnez l'unité de base avant d'enregistrer l'entrée.")
@@ -3402,6 +3411,7 @@ Namespace DevCommerc8ak
 
         Private Sub RafraichirDepuisEvenement(sender As Object, e As EventArgs)
             If IsDisposed Then Return
+            If alerteTarifs.TarifsPerimes Then Return
             If InvokeRequired Then
                 BeginInvoke(New MethodInvoker(Sub() RafraichirDepuisEvenement(Nothing, EventArgs.Empty)))
                 Return

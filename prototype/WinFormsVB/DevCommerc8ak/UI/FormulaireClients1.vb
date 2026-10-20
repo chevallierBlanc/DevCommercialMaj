@@ -69,6 +69,9 @@ Namespace DevCommerc8ak
         Private ReadOnly lblHeroSousTitre As Label
         Private ReadOnly panelFormCard As Panel
         Private ReadOnly panelActions As Panel
+        Private ReadOnly anneeAnalyse As New NumericUpDown With {.Minimum = 1900, .Maximum = 9998, .Width = 85, .Value = DateTime.Now.Year}
+        Private ReadOnly moisAnalyse As New ComboBox With {.DropDownStyle = ComboBoxStyle.DropDownList, .Width = 140}
+        Private ReadOnly periodeAnalyse As New Label With {.AutoSize = True, .Margin = New Padding(12, 5, 0, 0)}
 
         Public Sub New()
             ' Configuration de base du formulaire
@@ -179,13 +182,21 @@ Namespace DevCommerc8ak
             layout.RowCount = 1
             layout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
             layout.MinimumSize = New Size(780, 240)
-            layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50))
-            layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50))
+            layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 62))
+            layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 38))
 
             layout.Controls.Add(gridActifs, 0, 0)
             layout.Controls.Add(chartProduits, 1, 0)
 
             panelBas.Controls.Add(layout)
+            Dim filtres As New FlowLayoutPanel With {.Dock = DockStyle.Top, .Height = 42, .WrapContents = False, .AutoScroll = True}
+            moisAnalyse.Items.Add("Toute l'année")
+            moisAnalyse.Items.AddRange(New Object() {"Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"})
+            moisAnalyse.SelectedIndex = DateTime.Now.Month
+            filtres.Controls.AddRange(New Control() {New Label With {.Text = "Top Clients · Année", .AutoSize = True, .Margin = New Padding(0, 5, 6, 0)}, anneeAnalyse, moisAnalyse, periodeAnalyse})
+            panelBas.Controls.Add(filtres)
+            AddHandler anneeAnalyse.ValueChanged, AddressOf ChargerClientsActifs
+            AddHandler moisAnalyse.SelectedIndexChanged, AddressOf ChargerClientsActifs
 
             ' Ajout des contrôles au formulaire
             Me.Controls.Add(panelBas)
@@ -257,6 +268,7 @@ Namespace DevCommerc8ak
         ' Mise en forme seulement : ni requete ni modification de donnees.
         Private Sub DimensionnerColonnes(dgv As DataGridView)
             For Each colonne As DataGridViewColumn In dgv.Columns
+                If colonne.Name = "ClientId" Then colonne.Visible = False
                 Select Case colonne.Name
                     Case "NomClient", "Adresse", "Email"
                         colonne.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
@@ -373,16 +385,13 @@ Namespace DevCommerc8ak
 
         Private Sub ChargerClientsActifs(sender As Object, e As EventArgs)
             Try
-                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
-                Dim dal As New DAL(cs)
-                Dim sql As String = "SELECT TOP 20 c.ClientId, c.NomClient, COUNT(*) AS NbAchats, " &
-                                    "cast(SUM(f.MontantTotal) as int ) AS TotalAchats, cast( AVG(f.MontantTotal) as int) AS MoyenneAchat " &
-                                    "FROM Clients c JOIN FacturesVente f ON f.ClientId=c.ClientId " &
-                                    "WHERE f.Statut='PAYEE' AND f.CreeLe >= DATEADD(DAY,-30,GETDATE()) " &
-                                    "GROUP BY c.ClientId, c.NomClient ORDER BY TotalAchats DESC"
-                gridActifs.DataSource = dal.ExecuterTable(sql, CommandType.Text, Nothing)
+                chartProduits.Series("TopProduits").Points.Clear()
+                gridActifs.DataSource = ObtenirService().ClasserAchats(CInt(anneeAnalyse.Value), moisAnalyse.SelectedIndex)
+                periodeAnalyse.Text = CStr(moisAnalyse.SelectedItem) & " " & anneeAnalyse.Value.ToString("0") & " · montants FC"
                 'gridActifs.Columns("MoyenneAchat").DefaultCellStyle.Format = "NO"
             Catch ex As Exception
+                gridActifs.DataSource = Nothing
+                periodeAnalyse.Text = "Analyse indisponible pour cette période"
                 MessageBox.Show("Erreur clients actifs: " & ex.Message)
             End Try
         End Sub
@@ -391,27 +400,19 @@ Namespace DevCommerc8ak
             Try
                 If gridActifs.CurrentRow Is Nothing Then Return
                 Dim clientId As Integer = Convert.ToInt32(gridActifs.CurrentRow.Cells("ClientId").Value)
-
-                Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
-                Dim dal As New DAL(cs)
-                Dim sql As String = "SELECT TOP 10 p.Libelle, SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) AS Quantite " &
-                                    "FROM LignesFactureVente l " &
-                                    "JOIN FacturesVente f ON f.FactureVenteId = l.FactureVenteId " &
-                                    "JOIN Produits p ON p.ProduitId = l.ProduitId " &
-                                    "WHERE f.ClientId=@id AND f.CreeLe >= DATEADD(DAY,-30,GETDATE()) AND f.Statut='PAYEE' " &
-                                    "GROUP BY p.Libelle ORDER BY SUM(ISNULL(l.QuantiteBase, ISNULL(l.Quantite, 0))) DESC"
-
-                ' Note: Utilisation de paramètres SQL selon votre structure originale
-                Dim p As New List(Of System.Data.SqlClient.SqlParameter) From {
-                    New System.Data.SqlClient.SqlParameter("@id", clientId)
-                }
-                Dim dt As DataTable = dal.ExecuterTable(sql, CommandType.Text, p)
+                chartProduits.Series("TopProduits").Points.Clear()
+                Dim dt As DataTable = ObtenirService().RepartirAchats(clientId, CInt(anneeAnalyse.Value), moisAnalyse.SelectedIndex)
 
                 chartProduits.Series("TopProduits").Points.Clear()
+                chartProduits.Titles(0).Text = "Répartition des Achats par Produit"
                 For Each row As DataRow In dt.Rows
                     chartProduits.Series("TopProduits").Points.AddXY(Convert.ToString(row("Libelle")), Convert.ToDecimal(row("Quantite")))
                 Next
-            Catch
+            Catch ex As Exception
+                chartProduits.Series("TopProduits").Points.Clear()
+                chartProduits.Titles(0).Text = "Achats par produit — données indisponibles"
+                Dim log As New ProductionLogService()
+                log.Warn("FormulaireClients", "RepartitionAchats", ex.Message)
             End Try
         End Sub
     End Class

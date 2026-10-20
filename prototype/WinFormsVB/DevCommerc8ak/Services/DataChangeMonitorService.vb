@@ -47,6 +47,17 @@ Namespace DevCommerc8ak
             _timer = New Timer(AddressOf Tick, Nothing, 250, _intervalMs)
         End Sub
 
+        ' Facultatif, avant Start uniquement : evite de perdre un changement
+        ' survenu entre la lecture d'une fiche et le premier passage du timer.
+        Public Sub InitialiserVersions(versions As IDictionary(Of String, Long))
+            If _timer IsNot Nothing Then Throw New InvalidOperationException("Le suivi est déjà démarré.")
+            For Each domaine As String In _domaines
+                Dim version As Long = 0
+                If versions IsNot Nothing Then versions.TryGetValue(domaine, version)
+                _versions(domaine) = version
+            Next
+        End Sub
+
         Private Sub Tick(state As Object)
             If _disposed Then Return
             If Interlocked.Exchange(_isChecking, 1) = 1 Then

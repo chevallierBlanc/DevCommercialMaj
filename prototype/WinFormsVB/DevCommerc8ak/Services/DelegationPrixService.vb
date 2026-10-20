@@ -50,6 +50,12 @@ Namespace DevCommerc8ak
         Public Property Cout As Decimal
         Public Property CoutCoefficient As Decimal
         Public Property Empreinte As String
+        <ScriptIgnore>
+        Public Property PrixAchatReference As Decimal
+        <ScriptIgnore>
+        Public Property UnitePrincipale As String
+        <ScriptIgnore>
+        Public Property TypeActif As Boolean
     End Class
 
     Public Class DelegationPrixService
@@ -207,15 +213,72 @@ Namespace DevCommerc8ak
             End Using
         End Function
 
-        Public Shared Function LireTarif(cn As SqlConnection, tx As SqlTransaction, id As Integer, typeVente As String, Optional typeTarifId As Integer? = Nothing, Optional exigerCout As Boolean = True) As TarifDelegue
-            If typeTarifId.HasValue AndAlso typeTarifId.Value < 0 Then Throw New ArgumentException("Identifiant tarif invalide.")
-            Dim produit As New DataTable()
-            Using cmd As New SqlCommand("SELECT * FROM dbo.Produits WITH(UPDLOCK,HOLDLOCK) WHERE ProduitId=@id AND EstActif=1", cn, tx)
-                cmd.Parameters.AddWithValue("@id", id)
-                Using reader As SqlDataReader = cmd.ExecuteReader()
-                    produit.Load(reader)
+        Public Function ListerTarifsActifs(produitId As Integer) As List(Of TarifDelegue)
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    AutorisationActionService.Exiger(cn, tx, "PRIX_CONSULTER", "FACTURIER")
+                    Dim produit As New DataTable
+                    Using cmd As New SqlCommand("SELECT * FROM dbo.Produits WITH(UPDLOCK,HOLDLOCK) WHERE ProduitId=@p AND EstActif=1", cn, tx)
+                        cmd.Parameters.AddWithValue("@p", produitId)
+                        Using r As SqlDataReader = cmd.ExecuteReader()
+                            produit.Load(r)
+                        End Using
+                    End Using
+                    If produit.Rows.Count <> 1 Then Throw New InvalidOperationException("Produit inactif ou introuvable.")
+                    Dim p As DataRow = produit.Rows(0)
+                    Dim types As New DataTable
+                    Using cmd As New SqlCommand("SELECT t.* FROM dbo.TypesVenteProduit t WITH(HOLDLOCK) LEFT JOIN dbo.ProduitConditionnements c ON c.ProduitConditionnementId=t.ProduitConditionnementId AND c.ProduitId=t.ProduitId WHERE t.ProduitId=@p AND t.Actif=1 AND (t.ProduitConditionnementId IS NULL OR (c.EstActif=1 AND c.EstVendable=1)) ORDER BY t.TypeVenteProduitId", cn, tx)
+                        cmd.Parameters.AddWithValue("@p", produitId)
+                        Using r As SqlDataReader = cmd.ExecuteReader()
+                            types.Load(r)
+                        End Using
+                    End Using
+                    Dim conditionnements As New DataTable
+                    Using cmd As New SqlCommand("SELECT ProduitConditionnementId,FacteurVersBase FROM dbo.ProduitConditionnements WITH(HOLDLOCK) WHERE ProduitId=@p AND EstActif=1 AND EstVendable=1", cn, tx)
+                        cmd.Parameters.AddWithValue("@p", produitId)
+                        Using r As SqlDataReader = cmd.ExecuteReader()
+                            conditionnements.Load(r)
+                        End Using
+                    End Using
+                    Dim noms As List(Of String) = TarifCatalogueRegles.StandardsDepuisProduit(p)
+                    Dim resultat As New List(Of TarifDelegue)
+                    For Each nom As String In noms
+                        Dim typeConversion As String = If(nom = "speciale" OrElse nom = "promo", "PIECE", nom.ToUpperInvariant())
+                        Dim conversion As Decimal = If(p.IsNull("ConversionUnite"), 1D, CDec(p("ConversionUnite")))
+                        Dim principal As Decimal = If(p.IsNull("ContenuUnitePrincipale"), conversion, CDec(p("ContenuUnitePrincipale")))
+                        Dim secondaire As Decimal = If(p.IsNull("ContenuUniteSecondaire"), 0D, CDec(p("ContenuUniteSecondaire")))
+                        If StockUnitConversionService.CalculerQuantiteBaseTypeStandard(typeConversion, If(conversion > 0D, conversion, 1D), Convert.ToString(p("TypeGestionStock")), principal, secondaire).HasValue Then resultat.Add(LireTarifInterne(cn, tx, produitId, nom, 0, True, produit, types, conditionnements))
+                    Next
+                    For Each row As DataRow In types.Rows
+                        Dim nom As String = CStr(row("Nom"))
+                        If resultat.Exists(Function(t) String.Equals(t.TypeVente, nom, StringComparison.OrdinalIgnoreCase)) Then Continue For
+                        resultat.Add(LireTarifInterne(cn, tx, produitId, nom, CInt(row("TypeVenteProduitId")), True, produit, types, conditionnements))
+                    Next
+                    tx.Commit()
+                    Return resultat
                 End Using
             End Using
+        End Function
+
+        Public Shared Function LireTarif(cn As SqlConnection, tx As SqlTransaction, id As Integer, typeVente As String, Optional typeTarifId As Integer? = Nothing, Optional exigerCout As Boolean = True) As TarifDelegue
+            Return LireTarifInterne(cn, tx, id, typeVente, typeTarifId, exigerCout)
+        End Function
+
+        Private Shared Function LireTarifInterne(cn As SqlConnection, tx As SqlTransaction, id As Integer, typeVente As String, typeTarifId As Integer?, exigerCout As Boolean, Optional produitCharge As DataTable = Nothing, Optional typesCharges As DataTable = Nothing, Optional conditionnementsCharges As DataTable = Nothing) As TarifDelegue
+            ' Le catalogue charge les trois jeux une seule fois. Les ecritures
+            ' passent toujours sans cache, avec relecture et verrous existants.
+            If typeTarifId.HasValue AndAlso typeTarifId.Value < 0 Then Throw New ArgumentException("Identifiant tarif invalide.")
+            Dim produit As DataTable = produitCharge
+            If produit Is Nothing Then
+                produit = New DataTable()
+                Using cmd As New SqlCommand("SELECT * FROM dbo.Produits WITH(UPDLOCK,HOLDLOCK) WHERE ProduitId=@id AND EstActif=1", cn, tx)
+                    cmd.Parameters.AddWithValue("@id", id)
+                    Using reader As SqlDataReader = cmd.ExecuteReader()
+                        produit.Load(reader)
+                    End Using
+                End Using
+            End If
             If produit.Rows.Count <> 1 Then Throw New InvalidOperationException("Produit inactif ou introuvable.")
             Dim row As DataRow = produit.Rows(0)
             Dim conversion As Decimal = If(row.IsNull("ConversionUnite"), 1D, CDec(row("ConversionUnite")))
@@ -243,14 +306,21 @@ Namespace DevCommerc8ak
             Else
                 Dim types As New DataTable()
                 If typeTarifId.HasValue AndAlso typeTarifId.Value = 0 Then Throw New InvalidOperationException("Tarif standard introuvable.")
-                Using cmd As New SqlCommand("SELECT * FROM dbo.TypesVenteProduit WITH(UPDLOCK,HOLDLOCK) WHERE ProduitId=@p AND Nom=@nom AND Actif=1 AND (@id IS NULL OR TypeVenteProduitId=@id)", cn, tx)
-                    cmd.Parameters.AddWithValue("@p", id)
-                    cmd.Parameters.AddWithValue("@nom", typeVente)
-                    cmd.Parameters.AddWithValue("@id", If(typeTarifId.HasValue, CType(typeTarifId.Value, Object), DBNull.Value))
-                    Using reader As SqlDataReader = cmd.ExecuteReader()
-                        types.Load(reader)
+                If typesCharges IsNot Nothing AndAlso typeTarifId.HasValue Then
+                    types = typesCharges.Clone()
+                    For Each ligne As DataRow In typesCharges.Select("TypeVenteProduitId=" & typeTarifId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                        types.ImportRow(ligne)
+                    Next
+                Else
+                    Using cmd As New SqlCommand("SELECT * FROM dbo.TypesVenteProduit WITH(UPDLOCK,HOLDLOCK) WHERE ProduitId=@p AND Nom=@nom AND Actif=1 AND (@id IS NULL OR TypeVenteProduitId=@id)", cn, tx)
+                        cmd.Parameters.AddWithValue("@p", id)
+                        cmd.Parameters.AddWithValue("@nom", typeVente)
+                        cmd.Parameters.AddWithValue("@id", If(typeTarifId.HasValue, CType(typeTarifId.Value, Object), DBNull.Value))
+                        Using reader As SqlDataReader = cmd.ExecuteReader()
+                            types.Load(reader)
+                        End Using
                     End Using
-                End Using
+                End If
                 If types.Rows.Count <> 1 Then Throw New InvalidOperationException("Type de vente introuvable ou ambigu.")
                 Dim tr As DataRow = types.Rows(0)
                 t.TypeId = CInt(tr("TypeVenteProduitId"))
@@ -258,14 +328,20 @@ Namespace DevCommerc8ak
                 t.Coefficient = If(tr.IsNull("Coefficient"), 0D, CDec(tr("Coefficient")))
                 t.Prix = CDec(tr("PrixVente"))
                 If Not tr.IsNull("ProduitConditionnementId") Then
-                    Using cmd As New SqlCommand("SELECT FacteurVersBase FROM dbo.ProduitConditionnements WITH(UPDLOCK,HOLDLOCK) WHERE ProduitConditionnementId=@id AND ProduitId=@p AND EstActif=1 AND EstVendable=1", cn, tx)
-                        cmd.Parameters.AddWithValue("@id", CInt(tr("ProduitConditionnementId")))
-                        cmd.Parameters.AddWithValue("@p", id)
-                        Dim facteur As Object = cmd.ExecuteScalar()
-                        If facteur Is Nothing Then Throw New InvalidOperationException("Conditionnement non vendable.")
-                        Dim dto As New TypeVenteProduitDTO With {.QuantiteEquivalent = CDec(tr("QuantiteEquivalent")), .ProduitConditionnementId = CInt(tr("ProduitConditionnementId"))}
-                        t.QuantiteBase = ConversionUniteService.CalculerQuantiteBase(1D, dto, New ProduitConditionnementDTO With {.ProduitConditionnementId = dto.ProduitConditionnementId.Value, .FacteurVersBase = CDec(facteur)})
-                    End Using
+                    Dim facteur As Object = Nothing
+                    If conditionnementsCharges IsNot Nothing Then
+                        Dim correspondances As DataRow() = conditionnementsCharges.Select("ProduitConditionnementId=" & CInt(tr("ProduitConditionnementId")).ToString(System.Globalization.CultureInfo.InvariantCulture))
+                        If correspondances.Length = 1 Then facteur = correspondances(0)("FacteurVersBase")
+                    Else
+                        Using cmd As New SqlCommand("SELECT FacteurVersBase FROM dbo.ProduitConditionnements WITH(UPDLOCK,HOLDLOCK) WHERE ProduitConditionnementId=@id AND ProduitId=@p AND EstActif=1 AND EstVendable=1", cn, tx)
+                            cmd.Parameters.AddWithValue("@id", CInt(tr("ProduitConditionnementId")))
+                            cmd.Parameters.AddWithValue("@p", id)
+                            facteur = cmd.ExecuteScalar()
+                        End Using
+                    End If
+                    If facteur Is Nothing Then Throw New InvalidOperationException("Conditionnement non vendable.")
+                    Dim dto As New TypeVenteProduitDTO With {.QuantiteEquivalent = CDec(tr("QuantiteEquivalent")), .ProduitConditionnementId = CInt(tr("ProduitConditionnementId"))}
+                    t.QuantiteBase = ConversionUniteService.CalculerQuantiteBase(1D, dto, New ProduitConditionnementDTO With {.ProduitConditionnementId = dto.ProduitConditionnementId.Value, .FacteurVersBase = CDec(facteur)})
                 Else
                     Dim unite As String = If(tr.IsNull("TypeQuantiteEquivalent"), Convert.ToString(tr("TypeUniteEquivalent")), Convert.ToString(tr("TypeQuantiteEquivalent")))
                     t.QuantiteBase = CalculVenteService.CalculerQuantiteBaseTypeVente(CDec(tr("QuantiteEquivalent")), unite, conversion, If(principal > 0D, principal, conversion), secondaire)
@@ -277,6 +353,8 @@ Namespace DevCommerc8ak
             If t.QuantiteBase <= 0D Then Throw New InvalidOperationException("Équivalent physique invalide.")
             If exigerCout AndAlso (Not coutBase.HasValue OrElse coutBase.Value <= 0D) Then Throw New InvalidOperationException("Coût comparable indisponible : délégation refusée.")
             t.Cout = If(coutBase.HasValue AndAlso coutBase.Value > 0D, coutBase.GetValueOrDefault() * t.QuantiteBase, 0D)
+            t.PrixAchatReference = achat : t.UnitePrincipale = Convert.ToString(row("UnitePrincipale"))
+            t.TypeActif = t.TypeId > 0 OrElse TarifCatalogueRegles.StandardsDepuisProduit(row).Contains(typeVente.ToLowerInvariant())
             ' L'empreinte couvre le prix, son coût et son équivalent physique.
             ' Une approbation ne s'applique pas sur une autre configuration.
             Using sha As SHA256 = SHA256.Create()
@@ -311,6 +389,7 @@ Namespace DevCommerc8ak
                     If Not p.Active Then Throw New UnauthorizedAccessException("Délégation des prix désactivée.")
                     Dim actuel As TarifDelegue = LireTarif(cn, tx, t.ProduitId, t.TypeVente, t.TypeId)
                     If actuel.Empreinte <> t.Empreinte Then Throw New DBConcurrencyException("Le tarif ou sa configuration a changé. Rechargez.")
+                    If Not actuel.TypeActif Then Throw New UnauthorizedAccessException("Ce type de vente est désactivé pour le produit.")
                     Dim approbation As Boolean = DelegationPrixRegles.NecessiteApprobation(actuel.Prix, nouveau, actuel.Cout, p.Variation, p.Marge)
                     VerifierSousCout(cn, tx, p, actuel, nouveau, "FACTURIER")
                     If demande Then
@@ -388,8 +467,11 @@ Namespace DevCommerc8ak
                 cmd.Parameters.AddWithValue("@id", If(t.TypeId = 0, t.ProduitId, t.TypeId))
                 If CInt(cmd.ExecuteNonQuery()) <> 1 Then Throw New DBConcurrencyException("Tarif introuvable.")
             End Using
-            AuditMetierService.Enregistrer(cn, tx, "PRIX_MODIFICATION_APPLIQUEE", "PRIX", "Produit", t.ProduitId, t.Produit & " / " & t.TypeVente, t, New With {.Prix = nouveau, .Coefficient = coefficient}, motif, Guid.NewGuid())
-            AppDataVersionService.Touch(cn, tx, "PRODUITS")
+            Dim serializer As New JavaScriptSerializer()
+            Dim avantTarif As Dictionary(Of String, Object) = serializer.Deserialize(Of Dictionary(Of String, Object))(serializer.Serialize(t))
+            avantTarif("Marge") = TarifCatalogueRegles.Marge(t.Prix, t.Cout)
+            AuditMetierService.Enregistrer(cn, tx, "PRIX_MODIFICATION_APPLIQUEE", "PRIX", "Produit", t.ProduitId, t.Produit & " / " & t.TypeVente, avantTarif, New With {.Prix = nouveau, .Coefficient = coefficient, .Marge = TarifCatalogueRegles.Marge(nouveau, t.Cout), .TypeVente = t.TypeVente, .ProduitId = t.ProduitId}, motif, Guid.NewGuid())
+            AppDataVersionService.Touch(cn, tx, "PRODUITS", "TYPES_VENTE")
         End Sub
 
         Public Function ListerDemandes(Optional ecran As String = "PARAMETRES") As DataTable
@@ -429,6 +511,29 @@ Namespace DevCommerc8ak
             End Using
         End Function
 
+        Public Function ConsulterTarifDemande(id As Integer, ecran As String) As TarifDelegue
+            If ecran <> "PARAMETRES" AndAlso ecran <> "FACTURIER" Then Throw New ArgumentException("Contexte de consultation invalide.")
+            Using cn As SqlConnection = _dal.CreerConnexion()
+                cn.Open()
+                Using tx As SqlTransaction = cn.BeginTransaction()
+                    AutorisationActionService.Exiger(cn, tx, "PRIX_CONSULTER", ecran)
+                    Dim demande As New DataTable
+                    Using cmd As New SqlCommand("SELECT ProduitId,TypeVente,TypeTarifId FROM dbo.DemandesModificationPrix WHERE DemandeId=@id AND (@responsable=1 OR DemandePar=@u)", cn, tx)
+                        cmd.Parameters.AddWithValue("@id", id) : cmd.Parameters.AddWithValue("@u", SessionUtilisateur.UtilisateurId)
+                        cmd.Parameters.AddWithValue("@responsable", ecran = "PARAMETRES")
+                        Using r As SqlDataReader = cmd.ExecuteReader()
+                            demande.Load(r)
+                        End Using
+                    End Using
+                    If demande.Rows.Count <> 1 Then Throw New UnauthorizedAccessException("Demande inaccessible.")
+                    Dim row As DataRow = demande.Rows(0)
+                    Dim tarif As TarifDelegue = LireTarif(cn, tx, CInt(row("ProduitId")), CStr(row("TypeVente")), If(row.IsNull("TypeTarifId"), CType(Nothing, Integer?), CInt(row("TypeTarifId"))))
+                    tx.Commit()
+                    Return tarif
+                End Using
+            End Using
+        End Function
+
         Public Function ListerPage(page As Integer, taille As Integer, recherche As String, etat As String, Optional ecran As String = "PARAMETRES") As PageDemandesPrix
             DelegationPrixRegles.VerifierPagination(page, taille)
             If If(recherche, "").Length > 200 Then Throw New ArgumentException("Recherche limitée à 200 caractères.")
@@ -441,12 +546,12 @@ Namespace DevCommerc8ak
                     AutorisationActionService.Exiger(cn, tx, "PRIX_CONSULTER", ecran)
                     ' L'expiration effective est presentee sans ecriture lors de
                     ' cette consultation paginee. La decision recontrole l'heure SQL.
-                    Dim source As String = " FROM dbo.DemandesModificationPrix d JOIN dbo.Produits p ON p.ProduitId=d.ProduitId JOIN dbo.Utilisateurs u ON u.UtilisateurId=d.DemandePar WHERE (@mes=0 OR d.DemandePar=@u)"
+                    Dim source As String = " FROM dbo.DemandesModificationPrix d JOIN dbo.Produits p ON p.ProduitId=d.ProduitId JOIN dbo.Utilisateurs u ON u.UtilisateurId=d.DemandePar LEFT JOIN dbo.Utilisateurs decideur ON decideur.UtilisateurId=d.DecisionPar WHERE (@mes=0 OR d.DemandePar=@u)"
                     Dim statut As String = "CASE WHEN d.Etat='EN_ATTENTE' AND d.ExpireLe<=SYSUTCDATETIME() THEN 'EXPIREE' ELSE d.Etat END"
                     Dim filtre As String = " AND (@q='' OR CHARINDEX(@q,p.Libelle COLLATE Latin1_General_CI_AI)>0 OR CHARINDEX(@q,u.NomUtilisateur COLLATE Latin1_General_CI_AI)>0 OR CHARINDEX(@q,d.TypeVente COLLATE Latin1_General_CI_AI)>0) AND (@etat='' OR " & statut & "=@etat)"
                     Dim compteurs As String = "SELECT COUNT(*),ISNULL(SUM(CASE WHEN " & statut & "='EN_ATTENTE' THEN 1 ELSE 0 END),0),ISNULL(SUM(CASE WHEN d.Etat='APPROUVEE' THEN 1 ELSE 0 END),0),ISNULL(SUM(CASE WHEN d.Etat='REFUSEE' THEN 1 ELSE 0 END),0)" & source
                     Dim total As String = "SELECT COUNT(*)" & source & filtre
-                    Dim lignes As String = "SELECT d.DemandeId,d.Perimetre,u.NomUtilisateur AS Demandeur,p.Libelle AS Produit,d.TypeVente AS Conditionnement,d.AncienPrix,d.NouveauPrix,d.CoutReferenceDemande,d.QuantiteContexte,d.SousTotalContexte,d.RemiseContexte,d.TypeTarifId,d.Motif,d.DemandeLe,d.ExpireLe,d.UtiliseeLe,d.MotifDecision," & statut & " AS Statut" & source & filtre & " ORDER BY d.DemandeId DESC OFFSET @offset ROWS FETCH NEXT @taille ROWS ONLY"
+                    Dim lignes As String = "SELECT d.DemandeId,d.Perimetre,u.NomUtilisateur AS Demandeur,p.Libelle AS Produit,d.TypeVente AS Conditionnement,d.AncienPrix,d.NouveauPrix,d.CoutReferenceDemande,d.QuantiteContexte,d.SousTotalContexte,d.RemiseContexte,d.TypeTarifId,d.Motif,d.DemandeLe,d.ExpireLe,d.UtiliseeLe,d.MotifDecision,d.DecisionPar,decideur.NomUtilisateur AS Decideur,d.DecisionLe," & statut & " AS Statut" & source & filtre & " ORDER BY d.DemandeId DESC OFFSET @offset ROWS FETCH NEXT @taille ROWS ONLY"
                     Using cmd As New SqlCommand(compteurs & ";" & total & ";" & lignes & ";", cn, tx)
                         cmd.Parameters.AddWithValue("@mes", ecran = "FACTURIER")
                         cmd.Parameters.AddWithValue("@u", SessionUtilisateur.UtilisateurId)
@@ -524,6 +629,7 @@ Namespace DevCommerc8ak
                         Dim p As ConfigurationPrix = LireConfiguration(cn, tx)
                         If Not p.Active OrElse Not p.Demandes Then Throw New UnauthorizedAccessException("Délégation ou demandes désactivées.")
                         Dim actuel As TarifDelegue = LireTarif(cn, tx, CInt(row("ProduitId")), Convert.ToString(row("TypeVente")), If(row.IsNull("TypeTarifId"), CType(Nothing, Integer?), CInt(row("TypeTarifId"))))
+                        If Not actuel.TypeActif Then Throw New UnauthorizedAccessException("Type de vente désactivé : nouvelle demande nécessaire après réactivation.")
                         If actuel.Empreinte <> Convert.ToString(row("EmpreinteTarif")) Then Throw New DBConcurrencyException("Tarif ou coût modifié depuis la demande : nouvelle demande nécessaire.")
                         Dim nouveau As Decimal = CDec(row("NouveauPrix"))
                         DelegationPrixRegles.VerifierPrix(nouveau)
@@ -553,6 +659,7 @@ Namespace DevCommerc8ak
             AutorisationActionService.Exiger(cn, tx, "PRIX_FACTURE_EXCEPTION", "FACTURIER")
             ligne.MotifPrixException = AuditMetierService.ValiderMotif(ligne.MotifPrixException)
             Dim t As TarifDelegue = LireTarif(cn, tx, ligne.ProduitId, ligne.TypeVente, ligne.TypeTarifId)
+            If Not t.TypeActif Then Throw New UnauthorizedAccessException("Ce type de vente est désactivé pour une nouvelle exception.")
             If DelegationPrixRegles.NecessiteApprobation(t.Prix, ligne.PrixUnitaire, t.Cout, p.Variation, p.Marge) Then Throw New UnauthorizedAccessException("Exception hors seuil : soumettez une demande d'approbation pour cet article. Le tarif officiel reste inchangé.")
             VerifierSousCout(cn, tx, p, t, ligne.PrixUnitaire, "FACTURIER")
         End Sub
@@ -576,6 +683,7 @@ Namespace DevCommerc8ak
                     AutorisationActionService.Exiger(cn, tx, "PRIX_CONSULTER", "FACTURIER")
                     Dim actuel As TarifDelegue = LireTarif(cn, tx, t.ProduitId, t.TypeVente, t.TypeId)
                     If actuel.Empreinte <> t.Empreinte Then Throw New DBConcurrencyException("Le tarif a changé. Rechargez.")
+                    If Not actuel.TypeActif Then Throw New UnauthorizedAccessException("Ce type de vente est désactivé.")
                     VerifierException(cn, tx, New LigneFactureVente With {.ProduitId = t.ProduitId, .TypeVente = t.TypeVente, .TypeTarifId = t.TypeId, .PrixUnitaire = prix, .MotifPrixException = motif})
                     If commercial IsNot Nothing Then
                         Dim p As ConfigurationPrix = LireConfiguration(cn, tx)
@@ -669,6 +777,7 @@ Namespace DevCommerc8ak
                     If Not p.Active OrElse Not p.Demandes Then Throw New UnauthorizedAccessException("Les demandes de prix sont désactivées.")
                     Dim actuel As TarifDelegue = LireTarif(cn, tx, t.ProduitId, t.TypeVente, t.TypeId)
                     If actuel.Empreinte <> t.Empreinte Then Throw New DBConcurrencyException("Le tarif a changé. Rechargez.")
+                    If Not actuel.TypeActif Then Throw New UnauthorizedAccessException("Ce type de vente est désactivé.")
                     If net < actuel.Cout AndAlso Not p.SousCout Then Throw New UnauthorizedAccessException("Vente sous coût interdite, remise comprise.")
                     Using cmd As New SqlCommand("INSERT dbo.DemandesModificationPrix(ProduitId,TypeVente,AncienPrix,NouveauPrix,EmpreinteTarif,Motif,DemandePar,Perimetre,ContexteFacture,QuantiteContexte,ExpireLe,CoutReferenceDemande,SousTotalContexte,RemiseContexte,TypeTarifId) VALUES(@p,@type,@a,@n,@hash,@motif,@u,'FACTURE',@contexte,@qte,DATEADD(HOUR,@heures,SYSUTCDATETIME()),@cout,@st,@remise,@tarifId); SELECT CAST(SCOPE_IDENTITY() AS int)", cn, tx)
                         cmd.Parameters.AddWithValue("@p", actuel.ProduitId) : cmd.Parameters.AddWithValue("@type", actuel.TypeVente)
@@ -715,6 +824,7 @@ Namespace DevCommerc8ak
         End Function
 
         Private Shared Sub VerifierApprobation(cn As SqlConnection, tx As SqlTransaction, ligne As LigneFactureVente, tarif As TarifDelegue, commercial As ContexteCommercialPrix)
+            If Not tarif.TypeActif Then Throw New UnauthorizedAccessException("Type de vente désactivé : l'approbation ne peut plus être appliquée.")
             DelegationPrixRegles.VerifierPrix(ligne.PrixUnitaire)
             Dim net As Decimal = DelegationPrixRegles.PrixNet(ligne.PrixUnitaire, commercial)
             If ligne.QuantiteBase <> tarif.QuantiteBase * If(ligne.QteSaisie, ligne.Quantite) Then Throw New UnauthorizedAccessException("L'article ne correspond pas à la quantité physique approuvée.")

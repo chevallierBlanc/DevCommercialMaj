@@ -33,6 +33,7 @@ Namespace DevCommerc8ak
                                              Optional contenuUniteSecondaire As Decimal = 0D,
                                              Optional uniteSecondaire As String = "") As List(Of TypeVenteDTO)
             Dim liste As New List(Of TypeVenteDTO)()
+            Dim actifs As List(Of String) = TarifCatalogueRegles.Standards(prixGros, prixDemi, prixPiece, prixQuart, prixDouzaine, prixSpecial, venteGros, venteDemi, venteDetail, venteDouzaine)
             Dim nb As Decimal = If(nbUniteParBase > 0D, nbUniteParBase, 1D)
             Dim coeffGros As Decimal = CalculerCoefficient(prixAchat, prixGros)
             Dim coeffDetail As Decimal = CalculerCoefficient(prixAchat, prixPiece * nb)
@@ -43,7 +44,7 @@ Namespace DevCommerc8ak
             Dim quantiteDetail As Decimal? = StockUnitConversionService.CalculerQuantiteBaseTypeStandard("DETAIL", nb, typeGestionStock, contenuUnitePrincipale, contenuUniteSecondaire)
             Dim quantiteDouzaine As Decimal? = StockUnitConversionService.CalculerQuantiteBaseTypeStandard("DOUZAINE", nb, typeGestionStock, contenuUnitePrincipale, contenuUniteSecondaire)
 
-            If venteGros AndAlso prixGros > 0D AndAlso quantiteGros.HasValue Then
+            If actifs.Contains("gros") AndAlso quantiteGros.HasValue Then
                 liste.Add(New TypeVenteDTO With {
                     .Nom = "gros",
                     .QuantiteEquivalent = quantiteGros.Value,
@@ -58,7 +59,7 @@ Namespace DevCommerc8ak
                 })
             End If
 
-            If venteDemi AndAlso prixDemi > 0D AndAlso quantiteDemi.HasValue Then
+            If actifs.Contains("demi") AndAlso quantiteDemi.HasValue Then
                 liste.Add(New TypeVenteDTO With {
                     .Nom = "demi",
                     .QuantiteEquivalent = quantiteDemi.Value,
@@ -73,7 +74,7 @@ Namespace DevCommerc8ak
                 })
             End If
 
-            If prixQuart > 0D AndAlso quantiteQuart.HasValue Then
+            If actifs.Contains("quart") AndAlso quantiteQuart.HasValue Then
                 liste.Add(New TypeVenteDTO With {
                     .Nom = "quart",
                     .QuantiteEquivalent = quantiteQuart.Value,
@@ -88,7 +89,7 @@ Namespace DevCommerc8ak
                 })
             End If
 
-            If venteDetail AndAlso prixPiece > 0D AndAlso quantiteDetail.HasValue Then
+            If actifs.Contains("piece") AndAlso quantiteDetail.HasValue Then
                 liste.Add(New TypeVenteDTO With {
                     .Nom = "piece",
                     .QuantiteEquivalent = quantiteDetail.Value,
@@ -104,7 +105,7 @@ Namespace DevCommerc8ak
                 })
             End If
 
-            If venteDouzaine AndAlso prixDouzaine > 0D AndAlso quantiteDouzaine.HasValue Then
+            If actifs.Contains("douzaine") AndAlso quantiteDouzaine.HasValue Then
                 liste.Add(New TypeVenteDTO With {
                     .Nom = "douzaine",
                     .QuantiteEquivalent = quantiteDouzaine.Value,
@@ -119,7 +120,7 @@ Namespace DevCommerc8ak
                 })
             End If
 
-            If prixSpecial > 0D AndAlso quantiteDetail.HasValue Then
+            If actifs.Contains("speciale") AndAlso quantiteDetail.HasValue Then
                 liste.Add(New TypeVenteDTO With {
                     .Nom = "speciale",
                     .QuantiteEquivalent = quantiteDetail.Value,

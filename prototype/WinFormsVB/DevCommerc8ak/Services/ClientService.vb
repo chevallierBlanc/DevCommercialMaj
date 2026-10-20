@@ -25,6 +25,13 @@ Namespace DevCommerc8ak
         Public Function Lister() As List(Of ClientDTO)
             Return _repo.Lister()
         End Function
+        Public Function ClasserAchats(annee As Integer, mois As Integer) As DataTable
+            Return _repo.ClasserAchats(ClientAnalyseRegles.DebutPeriode(annee, mois), ClientAnalyseRegles.FinPeriode(annee, mois))
+        End Function
+        Public Function RepartirAchats(clientId As Integer, annee As Integer, mois As Integer) As DataTable
+            If clientId <= 0 Then Throw New ArgumentException("Client invalide.")
+            Return _repo.RepartirAchats(clientId, ClientAnalyseRegles.DebutPeriode(annee, mois), ClientAnalyseRegles.FinPeriode(annee, mois))
+        End Function
 
         ' Met a jour un client.
         Public Function MettreAJour(client As Client) As Integer

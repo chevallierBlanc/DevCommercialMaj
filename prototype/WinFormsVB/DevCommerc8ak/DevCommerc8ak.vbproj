@@ -84,6 +84,9 @@
     <Compile Include="Services\ConfigurationModesService.vb" />
     <Compile Include="UI\DialogueConfigurationModes.vb" />
     <Compile Include="Services\DelegationPrixRegles.vb" />
+    <Compile Include="Services\TarifCatalogueRegles.vb" />
+    <Compile Include="Services\ClientAnalyseRegles.vb" />
+    <Compile Include="UI\AlerteTarifsPanel.vb" />
     <Compile Include="Services\DelegationPrixService.vb" />
     <Compile Include="UI\DialogueDelegationPrix.vb" />
     <EmbeddedResource Include="Migrations\2026100904_DelegationPrix.sql">

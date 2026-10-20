@@ -405,6 +405,11 @@ Namespace DevCommerc8ak
                 ThemeHelper1.StyliserActionCommerciale(bouton)
             Next
             ThemeHelper1.StyliserActionCommerciale(btnRetirer, destructive:=True)
+            For Each bouton As Button In {btnAjouter, btnValider, btnActualiser, btnPrixDelegue, prixDeLigne, btnImprimer, btnPdf, btnHistorique, btnAnnuler, btnDeconnexion, btnRetirer}
+                bouton.Font = FontBold
+                bouton.Padding = New Padding(4, 0, 4, 0)
+            Next
+            btnPrixDelegue.Text = "MODIFIER PRIX" & Environment.NewLine & "TARIF OFFICIEL"
 
             Dim pnlRaccourcis As New Panel() With {.Dock = DockStyle.Bottom, .Height = 44, .BackColor = Color.White, .Padding = New Padding(6, 0, 0, 0)}
             Dim lblRaccourcis As New Label() With {

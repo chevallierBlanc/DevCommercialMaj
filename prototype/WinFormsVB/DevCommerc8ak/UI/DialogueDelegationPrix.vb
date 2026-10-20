@@ -20,6 +20,9 @@ Namespace DevCommerc8ak
             If disponibles.Count = 0 Then Throw New UnauthorizedAccessException("La délégation est désactivée ou aucune action de prix n'est autorisée pour cette session.")
             If perimetre <> "TOUS" AndAlso Not DelegationPrixRegles.CommandeDisponible(disponibles, perimetre, True) Then Throw New UnauthorizedAccessException("Aucune action autorisée pour ce périmètre. Un droit sur une facture ne donne pas accès au tarif officiel.")
             Dim t As TarifDelegue = service.Consulter(produitId, typeVente, typeTarifId)
+            If Not t.TypeActif Then Throw New UnauthorizedAccessException("Ce type de vente est désactivé. Sa consultation historique reste disponible, mais aucune nouvelle modification de prix n'est autorisée.")
+            Dim tarifs As System.Collections.Generic.List(Of TarifDelegue) = If(perimetre = "TARIF", service.ListerTarifsActifs(produitId), New System.Collections.Generic.List(Of TarifDelegue) From {t})
+            If Not tarifs.Exists(Function(x) x.TypeId = t.TypeId AndAlso String.Equals(x.TypeVente, t.TypeVente, StringComparison.OrdinalIgnoreCase)) Then Throw New InvalidOperationException("Ce type n'est pas proposé par le catalogue actif : vérifiez son activation et les éventuels noms identiques à un tarif standard.")
             Dim resultat As ResultatPrixException = Nothing
             Using form As New Form With {.Text = "Modification du prix de vente", .ClientSize = New Size(680, 620), .MinimumSize = New Size(600, 460), .StartPosition = FormStartPosition.CenterParent, .BackColor = Color.FromArgb(245, 247, 250), .Font = New Font("Segoe UI", 10), .AutoScaleMode = AutoScaleMode.Dpi, .AutoScaleDimensions = New SizeF(96, 96)}
                 form.Text = If(perimetre = "TARIF", "Modifier le prix de vente — tarif officiel", If(perimetre = "FACTURE", "Prix exceptionnel — article de facture", "Modification rapide du prix"))
@@ -34,30 +37,77 @@ Namespace DevCommerc8ak
                 entete.Controls.Add(identite)
                 cadre.Controls.Add(entete, 0, 0)
                 Dim corps As New Panel With {.Dock = DockStyle.Fill, .AutoScroll = True, .Margin = New Padding(0)}
-                Dim root As New TableLayoutPanel With {.Dock = DockStyle.Top, .AutoSize = True, .Padding = New Padding(16, 12, 16, 6), .ColumnCount = 1, .RowCount = 7}
+                Dim root As New TableLayoutPanel With {.Dock = DockStyle.Top, .AutoSize = True, .Padding = New Padding(16, 12, 16, 6), .ColumnCount = 1, .RowCount = 8}
                 root.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
-                For ligne As Integer = 0 To 6
+                For ligne As Integer = 0 To 7
                     root.RowStyles.Add(New RowStyle(SizeType.AutoSize))
                 Next
                 root.Controls.Add(New Label With {.Text = "INFORMATIONS TARIFAIRES", .AutoSize = True, .ForeColor = ThemeHelper1.CommercialEntete, .Font = New Font("Segoe UI", 10, FontStyle.Bold)}, 0, 0)
-                root.Controls.Add(New Label With {.Text = "Tarif officiel : " & t.Prix.ToString("N2") & " FC" & Environment.NewLine & "Coût comparable pour ce type de vente : " & t.Cout.ToString("N2") & " FC" & If(prixArticle.HasValue, Environment.NewLine & "Prix actuel de cet article : " & prixArticle.GetValueOrDefault().ToString("N2") & " FC — Quantité : " & quantite.ToString("0.########"), "") & Environment.NewLine & "Demandeur : " & SessionUtilisateur.NomUtilisateur & " (ID " & SessionUtilisateur.UtilisateurId.ToString() & ")", .AutoSize = True}, 0, 1)
+                Dim tableau As New System.Data.DataTable
+                tableau.Columns.Add("Type de vente") : tableau.Columns.Add("Prix FC", GetType(Decimal)) : tableau.Columns.Add("Coût comparable FC", GetType(Decimal)) : tableau.Columns.Add("Marge %", GetType(Decimal)) : tableau.Columns.Add("Mode") : tableau.Columns.Add("Coeff. / ratio", GetType(Decimal))
+                For Each tarif As TarifDelegue In tarifs
+                    Dim baseCoeff As Decimal = If(tarif.TypeId > 0 AndAlso String.Equals(tarif.ModePrix, "COEFFICIENT", StringComparison.OrdinalIgnoreCase), tarif.CoutCoefficient, tarif.Cout)
+                    tableau.Rows.Add(tarif.TypeVente, tarif.Prix, tarif.Cout, If(TarifCatalogueRegles.Marge(tarif.Prix, tarif.Cout).HasValue, CType(TarifCatalogueRegles.Marge(tarif.Prix, tarif.Cout).Value, Object), DBNull.Value), If(tarif.TypeId > 0, tarif.ModePrix, If(tarif.ChampPrix = "PrixGros", "COEFFICIENT", "FIXE")), If(baseCoeff > 0D, CType(TarifCatalogueRegles.Coefficient(tarif.Prix, baseCoeff).GetValueOrDefault(), Object), DBNull.Value))
+                Next
+                Dim catalogue As New DataGridView With {.Dock = DockStyle.Top, .Height = 40 + Math.Min(5, tarifs.Count) * 30, .DataSource = tableau, .ReadOnly = True, .AllowUserToAddRows = False, .AllowUserToDeleteRows = False, .RowHeadersVisible = False, .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, .BackgroundColor = Color.White, .RowTemplate = New DataGridViewRow With {.Height = 30}}
+                ThemeHelper1.StyliserEnteteCommerciale(catalogue)
+                Dim formaterCatalogue As Action = Sub()
+                                                             For Each colonne As DataGridViewColumn In catalogue.Columns
+                                                                 If colonne.ValueType Is GetType(Decimal) Then
+                                                                     colonne.DefaultCellStyle.Format = If(colonne.Name = "Coeff. / ratio", "N4", "N2")
+                                                                     colonne.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+                                                                 End If
+                                                             Next
+                                                         End Sub
+                AddHandler catalogue.DataBindingComplete, Sub() formaterCatalogue()
+                formaterCatalogue()
+                root.Controls.Add(catalogue, 0, 1)
+                Dim informations As New Label With {.AutoSize = True}
+                root.Controls.Add(informations, 0, 2)
                 Dim prix As New NumericUpDown With {.Width = 210, .DecimalPlaces = 2, .Maximum = 9999999999999999.99D, .Minimum = 0.01D, .Value = Math.Max(0.01D, If(prixArticle, t.Prix)), .TextAlign = HorizontalAlignment.Right}
                 Dim proposition As New FlowLayoutPanel With {.Dock = DockStyle.Top, .AutoSize = True, .WrapContents = True, .Padding = New Padding(0, 6, 0, 6)}
+                Dim choixTarif As New ComboBox With {.DropDownStyle = ComboBoxStyle.DropDownList, .Width = 180, .DisplayMember = "TypeVente", .DataSource = tarifs, .Enabled = perimetre = "TARIF"}
+                choixTarif.SelectedIndex = tarifs.FindIndex(Function(x) x.TypeId = t.TypeId AndAlso String.Equals(x.TypeVente, t.TypeVente, StringComparison.OrdinalIgnoreCase))
+                proposition.Controls.Add(choixTarif)
                 proposition.Controls.Add(New Label With {.Text = "Prix proposé (FC)", .AutoSize = True, .Margin = New Padding(0, 5, 16, 0)})
                 proposition.Controls.Add(prix)
-                root.Controls.Add(proposition, 0, 2)
+                root.Controls.Add(proposition, 0, 3)
                 Dim variation As New Label With {.AutoSize = True, .ForeColor = ThemeHelper1.CommercialEntete}
                 Dim actualiserVariation As Action = Sub()
                                                        Try
-                                                           Dim net As Decimal = If(contexteCommercial Is Nothing, prix.Value, DelegationPrixRegles.PrixNet(prix.Value, contexteCommercial(prix.Value)))
-                                                           variation.Text = "Écart au tarif : " & (prix.Value - t.Prix).ToString("N2") & " FC • " & If(t.Prix > 0D, ((prix.Value - t.Prix) / t.Prix * 100D).ToString("N2"), "?") & " %" & Environment.NewLine & "Marge après remise : " & If(t.Cout > 0D, ((net - t.Cout) / t.Cout * 100D).ToString("N2"), "?") & " %"
-                                                       Catch ex As ArgumentException
+                                                           Dim propose As Decimal
+                                                           If Not Decimal.TryParse(prix.Text, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.CurrentCulture, propose) OrElse propose <= 0D Then
+                                                               variation.Text = "Saisissez un prix positif valide." : Return
+                                                           End If
+                                                           Dim net As Decimal = If(contexteCommercial Is Nothing, propose, DelegationPrixRegles.PrixNet(propose, contexteCommercial(propose)))
+                                                           Dim baseCoefficient As Decimal = If(t.TypeId > 0 AndAlso String.Equals(t.ModePrix, "COEFFICIENT", StringComparison.OrdinalIgnoreCase), t.CoutCoefficient, t.Cout)
+                                                           variation.Text = "Écart au tarif : " & (propose - t.Prix).ToString("N2") & " FC • " & If(t.Prix > 0D, ((propose - t.Prix) / t.Prix * 100D).ToString("N2"), "?") & " %" & Environment.NewLine & "Marge après remise : " & If(t.Cout > 0D, TarifCatalogueRegles.Marge(net, t.Cout).GetValueOrDefault().ToString("N2"), "?") & " % | Coefficient équivalent : " & TarifCatalogueRegles.Coefficient(propose, baseCoefficient).GetValueOrDefault().ToString("N4") & If(t.TypeId = 0 AndAlso t.ChampPrix <> "PrixGros", " (tarif indépendant)", "")
+                                                           variation.ForeColor = ThemeHelper1.CommercialEntete
+                                                           If t.TypeId > 0 AndAlso String.Equals(t.ModePrix, "COEFFICIENT", StringComparison.OrdinalIgnoreCase) AndAlso baseCoefficient > 0D AndAlso Math.Round(baseCoefficient * TarifCatalogueRegles.Coefficient(propose, baseCoefficient).Value, 2) <> propose Then
+                                                               variation.Text &= Environment.NewLine & "Ce prix n'est pas représentable par le coefficient à quatre décimales. Choisissez un prix compatible."
+                                                               variation.ForeColor = Color.FromArgb(160, 55, 45)
+                                                           End If
+                                                       Catch ex As Exception When TypeOf ex Is ArgumentException OrElse TypeOf ex Is OverflowException
                                                            variation.Text = "Contrôlez le panier et la remise avant de soumettre un prix."
                                                        End Try
                                                    End Sub
                 AddHandler prix.ValueChanged, Sub() actualiserVariation()
+                AddHandler prix.TextChanged, Sub() actualiserVariation()
+                Dim afficherTarif As Action = Sub()
+                                                 identite.Text = t.Produit & " | " & t.CodeBarres & " | " & t.UnitePrincipale & " | " & t.TypeVente
+                                                 informations.Text = "Achat de référence : " & t.PrixAchatReference.ToString("N2") & " FC (lecture seule)" & Environment.NewLine & "Tarif officiel : " & t.Prix.ToString("N2") & " FC | Coût comparable : " & t.Cout.ToString("N2") & " FC" & Environment.NewLine & "Demandeur : " & SessionUtilisateur.NomUtilisateur & If(prixArticle.HasValue, " | Quantité : " & quantite.ToString("0.########"), "")
+                                                 actualiserVariation()
+                                             End Sub
+                AddHandler choixTarif.SelectionChangeCommitted, Sub()
+                                                                  If prix.Value <> t.Prix AndAlso MessageBox.Show(form, "Abandonner la proposition non enregistrée pour choisir un autre tarif ?", "Changer de type", MessageBoxButtons.YesNo, MessageBoxIcon.Question) <> DialogResult.Yes Then
+                                                                      choixTarif.SelectedItem = tarifs.Find(Function(x) x.TypeId = t.TypeId AndAlso x.TypeVente = t.TypeVente) : Return
+                                                                  End If
+                                                                  t = DirectCast(choixTarif.SelectedItem, TarifDelegue)
+                                                                  prix.Value = Math.Max(0.01D, t.Prix) : afficherTarif()
+                                                              End Sub
+                afficherTarif()
                 actualiserVariation()
-                root.Controls.Add(variation, 0, 3)
+                root.Controls.Add(variation, 0, 4)
                 Dim motif As New TextBox With {.Dock = DockStyle.Top, .Height = 54, .Multiline = True, .MaxLength = 1000, .ScrollBars = ScrollBars.Vertical}
                 motif.AccessibleName = "Motif obligatoire de modification du prix"
                 Dim justification As New TableLayoutPanel With {.Dock = DockStyle.Top, .AutoSize = True, .ColumnCount = 1}
@@ -66,13 +116,13 @@ Namespace DevCommerc8ak
                 justification.Controls.Add(motif)
                 Dim erreurMotif As New Label With {.AutoSize = True, .Visible = False, .ForeColor = Color.FromArgb(192, 57, 43)}
                 justification.Controls.Add(erreurMotif)
-                root.Controls.Add(justification, 0, 4)
+                root.Controls.Add(justification, 0, 5)
                 Dim responsable As New TextBox With {.Dock = DockStyle.Top, .MaxLength = 120, .MaximumSize = New Size(360, 0)}
                 Dim instruction As New TableLayoutPanel With {.Dock = DockStyle.Top, .AutoSize = True, .ColumnCount = 1}
                 instruction.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
                 instruction.Controls.Add(New Label With {.Text = "Responsable ayant donné l'instruction (facultatif, ne vaut pas approbation)", .AutoSize = True})
                 instruction.Controls.Add(responsable)
-                root.Controls.Add(instruction, 0, 5)
+                root.Controls.Add(instruction, 0, 6)
                 Dim lireMotif As Func(Of String) = Function()
                                                      ' La validation existante reste souveraine ; seule
                                                      ' sa presentation est rapprochee du champ concerne.
@@ -86,7 +136,7 @@ Namespace DevCommerc8ak
                                                          Throw
                                                      End Try
                                                  End Function
-                root.Controls.Add(New Label With {.Text = "Motif obligatoire. Tarif officiel : nouvelles ventes uniquement. Exception facture : seule la ligne de ce panier sera modifiée. Les autres lignes restent inchangées.", .AutoSize = True, .ForeColor = Color.FromArgb(90, 100, 110)}, 0, 6)
+                root.Controls.Add(New Label With {.Text = "Enregistrement d'un tarif à la fois, selon ses règles et approbations. Aucun autre prix n'est recalculé. L'exception de facture ne modifie que la ligne concernée.", .AutoSize = True, .ForeColor = Color.FromArgb(90, 100, 110)}, 0, 7)
                 Dim pied As New TableLayoutPanel With {.Dock = DockStyle.Fill, .AutoSize = True, .ColumnCount = 1, .Padding = New Padding(16, 8, 16, 12), .BackColor = Color.White, .Margin = New Padding(0)}
                 pied.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
                 Dim actions As New FlowLayoutPanel With {.Dock = DockStyle.Top, .AutoSize = True, .FlowDirection = FlowDirection.RightToLeft}

@@ -340,6 +340,8 @@ Namespace DevCommerc8ak
             cmbCategorieDepense = New ComboBox() With {.Dock = DockStyle.Fill, .DropDownStyle = ComboBoxStyle.DropDownList, .Font = FontControl, .Margin = New Padding(0, 0, 8, 0)}
             btnAddCategorie = New Button() With {.Text = "+", .Dock = DockStyle.Right, .Width = 35, .BackColor = ColorAccent, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat, .Cursor = Cursors.Hand}
             btnAddCategorie.FlatAppearance.BorderSize = 0
+            btnAddCategorie.Font = FontButton
+            ThemeHelper1.StyliserActionCommerciale(btnAddCategorie)
             pnlCat.Controls.Add(cmbCategorieDepense)
             pnlCat.Controls.Add(btnAddCategorie)
             layoutSaisie.Controls.Add(pnlCat, 0, 2)
@@ -385,15 +387,11 @@ Namespace DevCommerc8ak
             Dim pnlValidation As New Panel() With {.Dock = DockStyle.Fill, .Margin = New Padding(0, 4, 0, 0)}
             btnValiderDepense = CreateStyledButton("Valider la dépense", ColorDanger)
             btnValiderDepense.Width = 190
-            btnValiderDepense.Height = 32
-            btnValiderDepense.Dock = DockStyle.None
-            btnValiderDepense.Anchor = AnchorStyles.None
+            btnValiderDepense.Height = 38
+            btnValiderDepense.Dock = DockStyle.Top
+            btnValiderDepense.Font = FontButton
+            ThemeHelper1.StyliserActionCommerciale(btnValiderDepense, principale:=True)
             pnlValidation.Controls.Add(btnValiderDepense)
-            AddHandler pnlValidation.Resize,
-                Sub()
-                    btnValiderDepense.Left = (pnlValidation.ClientSize.Width - btnValiderDepense.Width) \ 2
-                    btnValiderDepense.Top = (pnlValidation.ClientSize.Height - btnValiderDepense.Height) \ 2
-                End Sub
             layoutSaisie.Controls.Add(pnlValidation, 0, 11)
 
             pnlSaisie.Controls.Add(layoutSaisie)
@@ -433,13 +431,17 @@ Namespace DevCommerc8ak
             cmbMoisRapport.SelectedIndex = DateTime.Now.Month
             pnlPrintTools.Controls.Add(cmbMoisRapport)
 
-            btnImprimerRapport = CreateStyledButton("🖨️ Imprimer Rapport", ColorAccent)
-            btnImprimerRapport.Width = 150
-            btnImprimerRapport.Margin = New Padding(20, 0, 0, 0)
+            btnImprimerRapport = CreateStyledButton("Imprimer", ColorPrimary)
+            btnImprimerRapport.Width = 130
+            btnImprimerRapport.Height = 34
+            btnImprimerRapport.Font = FontButton
+            ThemeHelper1.StyliserActionCommerciale(btnImprimerRapport)
+            btnImprimerRapport.Margin = New Padding(12, 0, 0, 0)
             pnlPrintTools.Controls.Add(btnImprimerRapport)
             layoutHistorique.Controls.Add(pnlPrintTools, 0, 1)
 
             gridHistoriqueDepenses = CreerGrille()
+            ThemeHelper1.StyliserEnteteCommerciale(gridHistoriqueDepenses)
             layoutHistorique.Controls.Add(gridHistoriqueDepenses, 0, 2)
 
             pnlHistorique.Controls.Add(layoutHistorique)
@@ -1314,8 +1316,8 @@ Namespace DevCommerc8ak
                 .Width = 135,
                 .Height = 24,
                 .Font = FontLabel,
-                .BackColor = ColorWarning,
-                .ForeColor = Color.White,
+                .BackColor = Color.FromArgb(245, 245, 245),
+                .ForeColor = ColorTextPrimary,
                 .TextAlign = ContentAlignment.MiddleCenter
             }
 
@@ -1337,6 +1339,7 @@ Namespace DevCommerc8ak
                 .Cursor = Cursors.Hand
             }
             btnControleCaissePhysique.FlatAppearance.BorderSize = 0
+            ThemeHelper1.StyliserActionCommerciale(btnControleCaissePhysique, principale:=True)
             AddHandler btnControleCaissePhysique.Click, AddressOf OuvrirControleCaissePhysique
 
             lblControleTheorique = CreerLibelleControle("Solde théorique : 0 FC")
@@ -1392,6 +1395,7 @@ Namespace DevCommerc8ak
 
                 lblControleTheorique.Text = "Solde théorique : " & FormatMontant(soldeTheorique, "FC")
                 If controle Is Nothing Then
+                    lblStatusCloture.Text = "Clôture du compte : aucun enregistrement pour ce jour."
                     AppliquerStatutControle("A_VERIFIER", "NON EFFECTUÉ", ColorWarning, "Effectuer le contrôle")
                     lblControlePhysique.Text = "Montant physique : -"
                     lblControleEcart.Text = "Écart : -"
@@ -1402,6 +1406,7 @@ Namespace DevCommerc8ak
                 End If
 
                 Dim statut As String = LireString(controle, "Statut")
+                lblStatusCloture.Text = "Clôture du compte : " & If(controle.IsNull("EstCloturee"), "état non enregistré", If(CBool(controle("EstCloturee")), "CLÔTURÉE", "OUVERTE"))
                 Dim montantPhysique As Decimal? = LireDecimalNullable(controle, "MontantPhysiqueFC")
                 Dim ecart As Decimal? = LireDecimalNullable(controle, "EcartFC")
                 Dim validePar As String = LireString(controle, "ValidePar")
@@ -1432,11 +1437,11 @@ Namespace DevCommerc8ak
         Private Sub AppliquerStatutControle(statut As String, texteBadge As String, couleur As Color, texteBouton As String)
             If lblControleBadge IsNot Nothing Then
                 lblControleBadge.Text = texteBadge
-                lblControleBadge.BackColor = couleur
+                lblControleBadge.BackColor = Color.FromArgb(245, 245, 245)
+                lblControleBadge.ForeColor = If(couleur = ColorWarning, ColorTextPrimary, couleur)
             End If
             If btnControleCaissePhysique IsNot Nothing Then
                 btnControleCaissePhysique.Text = texteBouton
-                btnControleCaissePhysique.BackColor = couleur
             End If
         End Sub
 

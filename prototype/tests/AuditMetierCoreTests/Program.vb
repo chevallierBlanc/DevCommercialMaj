@@ -9,6 +9,19 @@ Imports DevCommerc8ak
 Module Program
     Private compte As Integer
     Sub Main()
+        Dim standards As List(Of String) = TarifCatalogueRegles.Standards(100D, 50D, 10D, 0D, 0D, 0D, True, False, True, False)
+        Verifie(standards.Count = 2 AndAlso standards.Contains("gros") AndAlso standards.Contains("piece"), "Gros et detail seulement : pas de types fictifs")
+        Verifie(TarifCatalogueRegles.Standards(100D, 50D, 10D, 25D, 120D, 8D, True, True, True, True).Count = 7, "Standards et aliases existants preserves")
+        Verifie(TarifCatalogueRegles.Standards(100D, 50D, 10D, 0D, 0D, 0D, False, False, False, False).Count = 0, "Prix positifs sans autorisation de vente masques")
+        Verifie(TarifCatalogueRegles.Marge(150D, 100D).Value = 50D AndAlso TarifCatalogueRegles.Coefficient(150D, 100D).Value = 1.5D, "Marge sur cout et coefficient comparables")
+        Verifie(TarifCatalogueRegles.Marge(10D, 0D) Is Nothing, "Cout absent : pas de marge inventee")
+        Dim ancienProduit As New DataTable
+        ancienProduit.Columns.Add("PrixDetail", GetType(Decimal)) : ancienProduit.Columns.Add("VenteDetail", GetType(Boolean))
+        ancienProduit.Rows.Add(DBNull.Value, DBNull.Value)
+        Verifie(TarifCatalogueRegles.StandardsDepuisProduit(ancienProduit.Rows(0)).Count = 0, "Anciennes colonnes nulles ou absentes sans exception ni type invente")
+        Verifie(ClientAnalyseRegles.DebutPeriode(2024, 2) = New DateTime(2024, 2, 1) AndAlso ClientAnalyseRegles.FinPeriode(2024, 2) = New DateTime(2024, 3, 1), "Mois bissextile borne exclusive")
+        Verifie(ClientAnalyseRegles.FinPeriode(2026, 0) = New DateTime(2027, 1, 1), "Annee entiere sans perte du dernier jour")
+        Refuse(Of ArgumentException)(Sub() ClientAnalyseRegles.DebutPeriode(2026, 13))
         Refuse(Of ArgumentException)(Sub() AuditMetierRegles.ValiderMotif(Nothing))
         Refuse(Of ArgumentException)(Sub() AuditMetierRegles.ValiderMotif("   " & vbTab))
         Refuse(Of ArgumentException)(Sub() AuditMetierRegles.ValiderMotif(New String("x"c, 1001)))

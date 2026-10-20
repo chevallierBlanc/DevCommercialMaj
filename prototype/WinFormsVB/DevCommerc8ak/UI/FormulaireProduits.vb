@@ -16,6 +16,7 @@ Imports System.Collections.Generic
 Namespace DevCommerc8ak
     Public Class FormulaireProduits
         Inherits Form
+        Private ReadOnly alerteTarifs As New AlerteTarifsPanel
 
         ' --- Constantes de Design ---
         'Private ReadOnly ColorPrimary As Color = Color.FromArgb(63, 81, 181) ' Indigo
@@ -393,6 +394,9 @@ Namespace DevCommerc8ak
             ChargerDonnees(Nothing, EventArgs.Empty)
             AddHandler AppEvents.ProduitModifie, AddressOf RafraichirDepuisEvenement
             AddHandler AppEvents.StockModifie, AddressOf RafraichirDepuisEvenement
+            Controls.Add(alerteTarifs)
+            AddHandler Me.Shown, Sub() alerteTarifs.Demarrer()
+            AddHandler alerteTarifs.RechargementDemande, AddressOf ChargerDonnees
         End Sub
 
         ' --- Helpers de Design ---
@@ -588,6 +592,7 @@ Namespace DevCommerc8ak
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
                 Dim repo As New ProduitRepository(dal)
+                alerteTarifs.DebutChargement()
                 _produitsTable = repo.ListerTable()
                 _categoriesTable = (New SuperAdminService()).ListerCategories()
                 If Not _produitsTable.Columns.Contains("MargePourcent") Then
@@ -623,6 +628,7 @@ Namespace DevCommerc8ak
                 MettreAJourPagination()
                 RemplirComboAnnees()
                 ChargerTypesPersonnalisesProduit()
+                alerteTarifs.Acquitter()
             Catch ex As Exception
                 MessageBox.Show("Erreur chargement produits: " & ex.Message)
             End Try
@@ -864,6 +870,9 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub EnregistrerProduit(sender As Object, e As EventArgs)
+            If alerteTarifs.TarifsPerimes Then
+                MessageBox.Show("Les tarifs ont changé. Rechargez-les avec le bandeau avant d'enregistrer ; votre saisie est conservée.") : Return
+            End If
             Try
                 If _produitId <= 0 Then
                     MessageBox.Show("Sélectionnez un produit existant à modifier.")
@@ -1144,6 +1153,7 @@ Namespace DevCommerc8ak
 
         Private Sub RafraichirDepuisEvenement(sender As Object, e As EventArgs)
             If IsDisposed Then Return
+            If alerteTarifs.TarifsPerimes Then Return
             If InvokeRequired Then
                 BeginInvoke(New MethodInvoker(Sub() RafraichirDepuisEvenement(Nothing, EventArgs.Empty)))
                 Return

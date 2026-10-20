@@ -230,7 +230,7 @@ Module Program
         Verifier(Not String.IsNullOrWhiteSpace(prix.DiagnostiquerActions().ExplicationTarif), "Tarif officiel : refus explique avant activation ou attribution des droits")
         Dim modes As New ModeTravailService(dal)
         Dim configModes As New ConfigurationModesService(dal)
-        Dim produitPrix As Integer = Scalar("INSERT dbo.Produits(CodeBarres,Libelle,PrixDetail,PrixGros,PrixAchat,ConversionUnite,TypeGestionStock,ContenuUnitePrincipale,ContenuUniteSecondaire,VenteGros) VALUES('PRIX_' + @s,'PRIX TEST',15,150,100,10,'UNITE',10,1,1); SELECT CAST(SCOPE_IDENTITY() AS int)", suffix)
+        Dim produitPrix As Integer = Scalar("INSERT dbo.Produits(CodeBarres,Libelle,PrixDetail,PrixGros,PrixAchat,ConversionUnite,TypeGestionStock,ContenuUnitePrincipale,ContenuUniteSecondaire,VenteGros,VenteDetail) VALUES('PRIX_' + @s,'PRIX TEST',15,150,100,10,'UNITE',10,1,1,1); SELECT CAST(SCOPE_IDENTITY() AS int)", suffix)
         Refus(Of UnauthorizedAccessException)(Sub() prix.Consulter(produitPrix, "piece"))
         Exec("INSERT dbo.RoleInterfaces(RoleId,InterfaceId) SELECT " & role.ToString() & ",InterfaceId FROM dbo.InterfacesApplication WHERE CodeInterface IN('PRIX_CONSULTER','PRIX_TARIF_MODIFIER','PRIX_DEMANDER','PRIX_APPROUVER','PRIX_REFUSER','PRIX_FACTURE_EXCEPTION','PARAMETRES','PARAMETRES_PRIX','PARAMETRES_SECURITE','MODE_FACTURATION','UTILISATEUR_MODES','ADMINISTRATION')")
         Dim initialPrix As ConfigurationPrix = prix.Configuration()
@@ -241,6 +241,15 @@ Module Program
             Verifier(prix.ActionsDisponibles().Count = 0, "Delegation desactivee : commandes masquees meme avec privileges")
             prix.Configurer(New ConfigurationPrix With {.Active = True, .Demandes = True, .Immediate = True, .Variation = 10D}, initialPrix, "Configuration de fixture isolée")
             Dim t As TarifDelegue = prix.Consulter(produitPrix, "piece")
+            Dim catalogue As List(Of TarifDelegue) = prix.ListerTarifsActifs(produitPrix)
+            Verifier(catalogue.Exists(Function(x) x.TypeVente = "piece") AndAlso catalogue.Exists(Function(x) x.TypeVente = "gros") AndAlso Not catalogue.Exists(Function(x) x.TypeVente = "demi"), "Catalogue delegue : seulement types actifs reels")
+            Exec("UPDATE dbo.Produits SET VenteDetail=0 WHERE ProduitId=" & produitPrix.ToString())
+            Try
+                Verifier(Not prix.ListerTarifsActifs(produitPrix).Exists(Function(x) x.TypeVente = "piece"), "Type desactive retire du dialogue")
+                Refus(Of UnauthorizedAccessException)(Sub() prix.Modifier(t, 16D, "Type devenu inactif", False))
+            Finally
+                Exec("UPDATE dbo.Produits SET VenteDetail=1 WHERE ProduitId=" & produitPrix.ToString())
+            End Try
             Verifier(prix.ActionsDisponibles().Contains("PRIX_TARIF_MODIFIER"), "Session valide et action explicite : commande disponible")
             Exec("DELETE ri FROM dbo.RoleInterfaces ri JOIN dbo.InterfacesApplication i ON i.InterfaceId=ri.InterfaceId WHERE ri.RoleId=" & role.ToString() & " AND i.CodeInterface='PRIX_CONSULTER'")
             Try
@@ -274,6 +283,7 @@ Module Program
             Refus(Of ArgumentException)(Sub() prix.Modifier(t, 16D, "  ", False))
             Refus(Of UnauthorizedAccessException)(Sub() prix.Modifier(t, 9D, "Sous coût interdit", True))
             prix.Modifier(t, 16.5D, "Variation autorisée", False)
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE [Action]='PRIX_MODIFICATION_APPLIQUEE' AND EntiteId='" & produitPrix.ToString() & "' AND EffectuePar=" & user.ToString() & " AND AnciennesValeurs LIKE '%""Marge"":50%' AND NouvellesValeurs LIKE '%""Marge"":65%'") = 1, "Ancienne/nouvelle marge et auteur reel audites")
             Verifier(prix.Consulter(produitPrix, "piece").Prix = 16.5D, "Tarif officiel persisté")
             Refus(Of DBConcurrencyException)(Sub() prix.Modifier(t, 16D, "Tarif obsolète", False))
             t = prix.Consulter(produitPrix, "piece")
@@ -292,6 +302,9 @@ Module Program
             Refus(Of UnauthorizedAccessException)(Sub() prix.Modifier(t, 20D, "Variation hors seuil", False))
             prix.Modifier(t, 20D, "Demande à approuver", True)
             Dim demande As Integer = Scalar("SELECT MAX(DemandeId) FROM dbo.DemandesModificationPrix WHERE ProduitId=" & produitPrix.ToString())
+            Dim lecturesAvant As Integer = Scalar("SELECT COUNT(*) FROM dbo.JournalAudit")
+            Verifier(prix.ConsulterTarifDemande(demande, "FACTURIER").Prix = t.Prix, "Detail demande : tarif courant relu par le service")
+            Verifier(Scalar("SELECT COUNT(*) FROM dbo.JournalAudit") = lecturesAvant, "Consultation sans evenement de succes fictif")
             Dim demandesAvant As Integer = Scalar("SELECT COUNT(*) FROM dbo.DemandesModificationPrix WHERE ProduitId=" & produitPrix.ToString())
             Dim auditsAvant As Integer = Scalar("SELECT COUNT(*) FROM dbo.JournalAudit WHERE [Action]='PRIX_MODIFICATION_DEMANDEE'")
             Parallel.For(0, 2, Sub(i) prix.Modifier(t, 20D, "Demande à approuver", True))
@@ -451,6 +464,8 @@ Module Program
             SessionUtilisateur.UtilisateurId = reviewer : SessionUtilisateur.NomUtilisateur = "REV_" & suffix : SessionUtilisateur.SessionId = reviewerSession
             prix.Decider(demandeArticle, True, "Prix exceptionnel approuvé, pas de nouveau tarif")
             SessionUtilisateur.UtilisateurId = user : SessionUtilisateur.NomUtilisateur = "TEST_" & suffix : SessionUtilisateur.SessionId = sessionCombinee
+            Dim decisionAffichee As DataRow = prix.ListerPage(0, 100, "PRIX TEST", "APPROUVEE", "FACTURIER").Lignes.Rows.Cast(Of DataRow)().Single(Function(r) CInt(r("DemandeId")) = demandeArticle)
+            Verifier(CInt(decisionAffichee("DecisionPar")) = reviewer AndAlso CStr(decisionAffichee("Decideur")) = "REV_" & suffix AndAlso Not decisionAffichee.IsNull("DecisionLe"), "Detail : decideur persiste distinct de l'utilisateur qui consulte")
             Verifier(prix.Consulter(produitPrix, "piece").Prix = 20D, "Approbation facture sans changement du tarif officiel")
             Refus(Of InvalidOperationException)(Sub() prix.LireExceptionApprouvee(produitPrix, "piece", Guid.NewGuid(), 1D))
             Refus(Of InvalidOperationException)(Sub() prix.LireExceptionApprouvee(produitPrix, "piece", contexte, 2D))
@@ -498,6 +513,10 @@ Module Program
             Dim typePersonnel As Integer = Scalar("INSERT dbo.TypesVenteProduit(ProduitId,Nom,QuantiteEquivalent,TypeUniteEquivalent,TypeQuantiteEquivalent,ModePrix,Coefficient,PrixVente,Actif) VALUES(" & produitPrix.ToString() & ",'piece',6,'SECONDAIRE','SECONDAIRE','coefficient',2,123,1); SELECT CAST(SCOPE_IDENTITY() AS int)")
             Refus(Of InvalidOperationException)(Sub() prix.Consulter(produitPrix, "piece"))
             Dim personnel As TarifDelegue = prix.Consulter(produitPrix, "piece", typePersonnel)
+            Dim sachet As Integer = Scalar("INSERT dbo.TypesVenteProduit(ProduitId,Nom,QuantiteEquivalent,TypeUniteEquivalent,TypeQuantiteEquivalent,ModePrix,Coefficient,PrixVente,Actif) VALUES(" & produitPrix.ToString() & ",'Sachet Test',6,'SECONDAIRE','SECONDAIRE','coefficient',2,123,1); SELECT CAST(SCOPE_IDENTITY() AS int)")
+            Verifier(prix.ListerTarifsActifs(produitPrix).Exists(Function(x) x.TypeId = sachet AndAlso x.Prix = 120D AndAlso x.CoutCoefficient = 60D), "Type personnalise coefficient charge sans cout unitaire incompatible")
+            Dim jsonTarif As String = New System.Web.Script.Serialization.JavaScriptSerializer().Serialize(personnel)
+            Verifier(Not jsonTarif.Contains("PrixAchatReference") AndAlso Not jsonTarif.Contains("TypeActif") AndAlso Not jsonTarif.Contains("UnitePrincipale"), "Metadonnees UI exclues de l'empreinte des anciennes approbations")
             Verifier(personnel.Prix = 120D AndAlso personnel.TypeId = typePersonnel, "Type personnalisé homonyme et coefficient insensible à la casse")
             prix.Modifier(personnel, 125D, "Tarif personnalisé uniquement", False)
             Verifier(prix.Consulter(produitPrix, "piece", 0).Prix = 20D AndAlso prix.Consulter(produitPrix, "piece", typePersonnel).Prix = 125D, "Tarif officiel standard intact, prix personnalisé appliqué effectivement")
@@ -599,6 +618,7 @@ Module Program
     End Sub
 
     Private Sub TesterComptoir(role As Integer, user As Integer, reviewer As Integer, reviewerSession As Integer, produitPrix As Integer, suffix As String)
+        TesterClassementClients()
         Dim service As New VenteEncaissementService(dal)
         TesterAttenteComptoir(produitPrix, suffix)
         Dim operation As Guid = Guid.NewGuid()
@@ -664,6 +684,38 @@ Module Program
             SessionUtilisateur.SessionId = sid
             SessionUtilisateur.ModeActif = "FACTURATION_ET_CAISSE"
         End Try
+    End Sub
+
+    Private Sub TesterClassementClients()
+        ' Meme requete que le repository, mais seulement des tables temporaires.
+        Using cn As SqlConnection = dal.CreerConnexion()
+            cn.Open()
+            Using cmd As New SqlCommand("CREATE TABLE #Clients(ClientId int,NomClient nvarchar(100),Telephone nvarchar(30)); CREATE TABLE #FacturesVente(FactureVenteId int,ClientId int NULL,CreeLe datetime2,Statut nvarchar(30),MontantTotal decimal(18,2)); INSERT #Clients VALUES(1,N'Même nom','111'),(2,N'Même nom','222'); INSERT #FacturesVente VALUES(1,1,'20260201','PAYEE',10.75),(2,1,'20260228 23:59:59','PAYEE',20.50),(3,2,'20260210','PAYEE',7.75),(4,1,'20260131','PAYEE',3.50),(5,1,'20260211','ANNULEE',999),(6,NULL,'20260212','PAYEE',500),(7,1,'20260301','PAYEE',800),(8,1,'20260220','EN_ATTENTE',300);", cn)
+                cmd.ExecuteNonQuery()
+            End Using
+            Dim requete As String = ClientRepository.RequeteClassementAchats.Replace("dbo.Clients", "#Clients").Replace("dbo.FacturesVente", "#FacturesVente")
+            Using cmd As New SqlCommand("CREATE TABLE #LignesFactureVente(LigneFactureVenteId int,FactureVenteId int); INSERT #LignesFactureVente VALUES(1,1),(2,1),(3,2),(4,3);", cn)
+                cmd.ExecuteNonQuery()
+            End Using
+            requete = requete.Replace("dbo.LignesFactureVente", "#LignesFactureVente")
+            Using cmd As New SqlCommand(requete, cn)
+                cmd.Parameters.AddWithValue("@du", New DateTime(2026, 2, 1))
+                cmd.Parameters.AddWithValue("@au", New DateTime(2026, 3, 1))
+                Dim table As New DataTable
+                Using lecteur As SqlDataReader = cmd.ExecuteReader()
+                    table.Load(lecteur)
+                End Using
+                Verifier(table.Rows.Count = 2 AndAlso CInt(table.Rows(0)("ClientId")) = 1 AndAlso CInt(table.Rows(1)("ClientId")) = 2, "Deux identites de meme nom non fusionnees")
+                Verifier(CLng(table.Rows(0)("NbAchats")) = 2 AndAlso CDec(table.Rows(0)("TotalAchats")) = 31.25D AndAlso CDec(table.Rows(0)("MoyenneAchat")) = 15.625D, "Agregation facture, decimals et periode sans annulation ni dette")
+                cmd.Parameters("@du").Value = New DateTime(2026, 1, 1)
+                cmd.Parameters("@au").Value = New DateTime(2026, 2, 1)
+                table.Clear()
+                Using lecteur As SqlDataReader = cmd.ExecuteReader()
+                    table.Load(lecteur)
+                End Using
+                Verifier(table.Rows.Count = 1 AndAlso CDec(table.Rows(0)("TotalAchats")) = 3.5D, "Analyse de plusieurs mois sans cumul silencieux")
+            End Using
+        End Using
     End Sub
 
     Private Sub TesterAttenteComptoir(produitPrix As Integer, suffix As String)
