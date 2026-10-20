@@ -89,6 +89,7 @@
     <Compile Include="UI\AlerteTarifsPanel.vb" />
     <Compile Include="Services\DelegationPrixService.vb" />
     <Compile Include="UI\DialogueDelegationPrix.vb" />
+    <Compile Include="UI\DialogueDelegationPrix.Selection.vb" />
     <EmbeddedResource Include="Migrations\2026100904_DelegationPrix.sql">
       <LogicalName>DelegationPrixMigration.sql</LogicalName>
     </EmbeddedResource>

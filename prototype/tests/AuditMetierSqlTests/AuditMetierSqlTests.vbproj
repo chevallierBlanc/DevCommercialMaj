@@ -39,6 +39,7 @@
     <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/TypeVenteDTO.vb" Link="TypeVenteDTO.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/ProduitConditionnementDTO.vb" Link="ProduitConditionnementDTO.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueDelegationPrix.vb" Link="DialogueDelegationPrix.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueDelegationPrix.Selection.vb" Link="DialogueDelegationPrix.Selection.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ConfigurationModesService.vb" Link="ConfigurationModesService.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/DialogueModeTravail.vb" Link="DialogueModeTravail.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/UI/CartesSecuriteAutorisations.vb" Link="CartesSecuriteAutorisations.vb" />

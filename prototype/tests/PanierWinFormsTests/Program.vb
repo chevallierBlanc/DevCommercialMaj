@@ -13,6 +13,14 @@ Module Program
         Public Property Quantite As Decimal
         Public Property Prix As Decimal
     End Class
+    Public Class TarifSelectionTest
+        Public Property TypeId As Integer
+        Public Property TypeVente As String
+        Public Property Prix As Decimal
+        Public Property PrixAchatReference As Decimal
+        Public Property Cout As Decimal
+        Public Property Coefficient As Decimal
+    End Class
     <STAThread>
     Sub Main()
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException)
@@ -20,6 +28,7 @@ Module Program
         TesterChoixMode()
         TesterReglement()
         TesterChoixRole()
+        TesterChoixTarif()
         Using fenetre As New Form(), grille As New DataGridView With {.Dock = DockStyle.Fill, .AllowUserToAddRows = False, .ReadOnly = True}
             fenetre.Controls.Add(grille) : fenetre.Show()
             Dim evenements As Integer = 0
@@ -43,6 +52,43 @@ Module Program
             If evenements < 80 Then Throw New Exception("Evenements de liaison non executes")
             Console.WriteLine("PASS Windows : 40 cycles suppression / selection / validation vide sans masquer DataError.")
         End Using
+    End Sub
+    Private Sub TesterChoixTarif()
+        Dim piece As New TarifSelectionTest With {.TypeId = 0, .TypeVente = "piece", .Prix = 150D, .PrixAchatReference = 1000D, .Cout = 100D, .Coefficient = 1.5D}
+        Dim gros As New TarifSelectionTest With {.TypeId = 0, .TypeVente = "gros", .Prix = 1500D}
+        Dim personnalise As New TarifSelectionTest With {.TypeId = 12, .TypeVente = "piece", .Prix = 900D, .PrixAchatReference = 1000D, .Cout = 600D, .Coefficient = 1.5D}
+        Using choix As New ComboBox With {.DropDownStyle = ComboBoxStyle.DropDownList}
+            Dim engagements As Integer = 0
+            AddHandler choix.SelectionChangeCommitted, Sub() engagements += 1
+            ' Le controle n'a encore ni parent ni handle : ordre exact du dialogue.
+            Dim selection As TarifSelectionTest = DialogueDelegationPrix.InitialiserChoixTarif(choix, New List(Of TarifSelectionTest) From {piece}, Function(t) t.TypeId = 0 AndAlso t.TypeVente = "piece", True)
+            If choix.Parent IsNot Nothing OrElse choix.IsHandleCreated Then Throw New Exception("Le test doit initialiser avant rattachement au formulaire")
+            If choix.Items.Count <> 1 OrElse choix.SelectedIndex <> 0 OrElse Not Object.ReferenceEquals(selection, piece) Then Throw New Exception("Tarif unique non selectionne avant affichage")
+            If choix.DataSource IsNot Nothing OrElse choix.GetItemText(selection) <> "piece" Then Throw New Exception("Liste encore dependante d'une liaison differee")
+            Using fenetre As New Form()
+                fenetre.Controls.Add(choix) : fenetre.Show() : Application.DoEvents()
+                If choix.SelectedIndex <> 0 OrElse Not Object.ReferenceEquals(choix.SelectedItem, piece) Then Throw New Exception("Selection perdue apres creation du contexte WinForms")
+                Dim liste As New List(Of TarifSelectionTest) From {piece, gros, personnalise}
+                selection = DialogueDelegationPrix.InitialiserChoixTarif(choix, liste, Function(t) t.TypeId = 12 AndAlso t.TypeVente = "piece", True)
+                If choix.SelectedIndex <> 2 OrElse Not Object.ReferenceEquals(selection, personnalise) OrElse Not choix.Enabled Then Throw New Exception("Type personnalise homonyme confondu avec le standard")
+                liste.Clear() : Application.DoEvents()
+                If choix.Items.Count <> 3 OrElse Not Object.ReferenceEquals(choix.SelectedItem, personnalise) Then Throw New Exception("Liste alteree par la source apres chargement")
+                If selection.Prix <> 900D OrElse selection.Cout <> 600D OrElse selection.PrixAchatReference <> 1000D OrElse selection.Coefficient <> 1.5D Then Throw New Exception("Donnees tarifaires alterees pendant la selection")
+                selection = DialogueDelegationPrix.InitialiserChoixTarif(choix, New List(Of TarifSelectionTest) From {piece, gros}, Function(t) t.TypeVente = "gros", True)
+                If choix.SelectedIndex <> 1 OrElse Not Object.ReferenceEquals(selection, gros) Then Throw New Exception("Mauvais type standard parmi plusieurs tarifs")
+                selection = DialogueDelegationPrix.InitialiserChoixTarif(choix, New List(Of TarifSelectionTest)(), Function(t) True, True)
+                If selection IsNot Nothing OrElse choix.SelectedIndex <> -1 OrElse choix.Enabled OrElse choix.Items.Count <> 0 Then Throw New Exception("Liste vide non traitee explicitement")
+                selection = DialogueDelegationPrix.InitialiserChoixTarif(choix, CType(Nothing, List(Of TarifSelectionTest)), Function(t) True, True)
+                If selection IsNot Nothing OrElse choix.SelectedIndex <> -1 OrElse choix.Enabled Then Throw New Exception("Chargement absent non traite")
+                selection = DialogueDelegationPrix.InitialiserChoixTarif(choix, New List(Of TarifSelectionTest) From {piece}, Function(t) t.TypeId = 99, True)
+                If selection IsNot Nothing OrElse choix.SelectedIndex <> -1 OrElse choix.Enabled Then Throw New Exception("Tarif absent remplace silencieusement par l'index zero")
+                selection = DialogueDelegationPrix.InitialiserChoixTarif(choix, New List(Of TarifSelectionTest) From {piece}, Function(t) True, False)
+                If Not Object.ReferenceEquals(selection, piece) OrElse choix.SelectedIndex <> 0 OrElse choix.Enabled Then Throw New Exception("Exception de facture non verrouillee sur sa ligne")
+                If engagements <> 0 Then Throw New Exception("Initialisation traitee comme un changement utilisateur")
+                fenetre.Controls.Remove(choix)
+            End Using
+        End Using
+        Console.WriteLine("PASS Windows : tarifs unique/multiples/personnalise, avant parent, listes vide/absente/rechargee et exception verrouillee.")
     End Sub
     Private Sub TesterCharteCommerciale()
         Using grille As New DataGridView With {.AllowUserToAddRows = False}, bouton As New Button With {.Bounds = New System.Drawing.Rectangle(12, 18, 150, 40), .Visible = False, .Enabled = False}

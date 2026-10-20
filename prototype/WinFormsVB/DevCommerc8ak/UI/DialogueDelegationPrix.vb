@@ -11,7 +11,7 @@ Namespace DevCommerc8ak
         Public Property Motif As String
         Public Property DemandePrixId As Integer?
     End Class
-    Public NotInheritable Class DialogueDelegationPrix
+    Partial Public NotInheritable Class DialogueDelegationPrix
         Private Sub New()
         End Sub
 
@@ -22,6 +22,7 @@ Namespace DevCommerc8ak
             Dim t As TarifDelegue = service.Consulter(produitId, typeVente, typeTarifId)
             If Not t.TypeActif Then Throw New UnauthorizedAccessException("Ce type de vente est désactivé. Sa consultation historique reste disponible, mais aucune nouvelle modification de prix n'est autorisée.")
             Dim tarifs As System.Collections.Generic.List(Of TarifDelegue) = If(perimetre = "TARIF", service.ListerTarifsActifs(produitId), New System.Collections.Generic.List(Of TarifDelegue) From {t})
+            If tarifs Is Nothing OrElse tarifs.Count = 0 Then Throw New InvalidOperationException("Aucun type de vente actif disponible pour ce produit. Rechargez les tarifs et vérifiez leur configuration.")
             If Not tarifs.Exists(Function(x) x.TypeId = t.TypeId AndAlso String.Equals(x.TypeVente, t.TypeVente, StringComparison.OrdinalIgnoreCase)) Then Throw New InvalidOperationException("Ce type n'est pas proposé par le catalogue actif : vérifiez son activation et les éventuels noms identiques à un tarif standard.")
             Dim resultat As ResultatPrixException = Nothing
             Using form As New Form With {.Text = "Modification du prix de vente", .ClientSize = New Size(680, 620), .MinimumSize = New Size(600, 460), .StartPosition = FormStartPosition.CenterParent, .BackColor = Color.FromArgb(245, 247, 250), .Font = New Font("Segoe UI", 10), .AutoScaleMode = AutoScaleMode.Dpi, .AutoScaleDimensions = New SizeF(96, 96)}
@@ -66,8 +67,11 @@ Namespace DevCommerc8ak
                 root.Controls.Add(informations, 0, 2)
                 Dim prix As New NumericUpDown With {.Width = 210, .DecimalPlaces = 2, .Maximum = 9999999999999999.99D, .Minimum = 0.01D, .Value = Math.Max(0.01D, If(prixArticle, t.Prix)), .TextAlign = HorizontalAlignment.Right}
                 Dim proposition As New FlowLayoutPanel With {.Dock = DockStyle.Top, .AutoSize = True, .WrapContents = True, .Padding = New Padding(0, 6, 0, 6)}
-                Dim choixTarif As New ComboBox With {.DropDownStyle = ComboBoxStyle.DropDownList, .Width = 180, .DisplayMember = "TypeVente", .DataSource = tarifs, .Enabled = perimetre = "TARIF"}
-                choixTarif.SelectedIndex = tarifs.FindIndex(Function(x) x.TypeId = t.TypeId AndAlso String.Equals(x.TypeVente, t.TypeVente, StringComparison.OrdinalIgnoreCase))
+                Dim choixTarif As New ComboBox With {.DropDownStyle = ComboBoxStyle.DropDownList, .Width = 180}
+                Dim selectionInitiale As TarifDelegue = InitialiserChoixTarif(choixTarif, tarifs, Function(x) x.TypeId = t.TypeId AndAlso String.Equals(x.TypeVente, t.TypeVente, StringComparison.OrdinalIgnoreCase), perimetre = "TARIF")
+                If selectionInitiale Is Nothing Then Throw New InvalidOperationException("Le tarif sélectionné n'est plus disponible. Rechargez les tarifs du produit.")
+                t = selectionInitiale
+                prix.Value = Math.Max(0.01D, If(prixArticle, t.Prix))
                 proposition.Controls.Add(choixTarif)
                 proposition.Controls.Add(New Label With {.Text = "Prix proposé (FC)", .AutoSize = True, .Margin = New Padding(0, 5, 16, 0)})
                 proposition.Controls.Add(prix)
@@ -99,10 +103,12 @@ Namespace DevCommerc8ak
                                                  actualiserVariation()
                                              End Sub
                 AddHandler choixTarif.SelectionChangeCommitted, Sub()
+                                                                  Dim selection As TarifDelegue = TryCast(choixTarif.SelectedItem, TarifDelegue)
+                                                                  If selection Is Nothing OrElse Object.ReferenceEquals(selection, t) Then Return
                                                                   If prix.Value <> t.Prix AndAlso MessageBox.Show(form, "Abandonner la proposition non enregistrée pour choisir un autre tarif ?", "Changer de type", MessageBoxButtons.YesNo, MessageBoxIcon.Question) <> DialogResult.Yes Then
                                                                       choixTarif.SelectedItem = tarifs.Find(Function(x) x.TypeId = t.TypeId AndAlso x.TypeVente = t.TypeVente) : Return
                                                                   End If
-                                                                  t = DirectCast(choixTarif.SelectedItem, TarifDelegue)
+                                                                  t = selection
                                                                   prix.Value = Math.Max(0.01D, t.Prix) : afficherTarif()
                                                               End Sub
                 afficherTarif()
