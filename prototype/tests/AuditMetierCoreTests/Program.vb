@@ -9,6 +9,7 @@ Imports DevCommerc8ak
 Module Program
     Private compte As Integer
     Sub Main()
+        TesterCoutsEtReseau()
         Dim standards As List(Of String) = TarifCatalogueRegles.Standards(100D, 50D, 10D, 0D, 0D, 0D, True, False, True, False)
         Verifie(standards.Count = 2 AndAlso standards.Contains("gros") AndAlso standards.Contains("piece"), "Gros et detail seulement : pas de types fictifs")
         Verifie(TarifCatalogueRegles.Standards(100D, 50D, 10D, 25D, 120D, 8D, True, True, True, True).Count = 7, "Standards et aliases existants preserves")
@@ -199,6 +200,44 @@ Module Program
         compte += 1
         Refuse(Of ArgumentException)(Sub() DelegationPrixRegles.VerifierTotauxException(50.275D, 49D, 0D, 0D, 49D, 50.28D))
         Console.WriteLine("PASS : " & compte.ToString() & " contrôles métier réels, sans connexion SQL.")
+    End Sub
+
+    Private Sub TesterCoutsEtReseau()
+        Dim achat As Decimal = 23000D
+        Verifie(CalculVenteService.CalculerCoutComparable(achat, 30D, 30D, "UNITE", 30D).Value = 23000D, "Cout gros sans arrondi intermediaire")
+        Verifie(CalculVenteService.CalculerCoutComparable(achat, 15D, 30D, "UNITE", 30D).Value = 11500D, "Cout demi sur reference achat")
+        Verifie(Math.Round(CalculVenteService.CalculerCoutComparable(achat, 1D, 30D, "UNITE", 30D).Value, 2) = 766.67D, "Cout piece")
+        Dim type As New TypeVenteProduitDTO With {.QuantiteEquivalent = 11D, .ProduitConditionnementId = 1}
+        Dim piece As New ProduitConditionnementDTO With {.ProduitConditionnementId = 1, .FacteurVersBase = 1D}
+        Dim qte As Decimal = ConversionUniteService.CalculerQuantiteBase(1D, type, piece)
+        Dim cout As Decimal = CalculVenteService.CalculerCoutComparable(achat, qte, 30D, "UNITE", 30D).Value
+        Verifie(qte = 11D AndAlso Math.Round(cout, 2) = 8433.33D, "11 pieces dans un carton de 30, pas 11 cartons")
+        Verifie(TarifCatalogueRegles.Marge(14000D, cout).Value = 66.01D AndAlso TarifCatalogueRegles.Coefficient(14000D, cout).Value = 1.6601D, "Marge et coefficient du meme conditionnement")
+        Dim carton As New ProduitConditionnementDTO With {.ProduitConditionnementId = 2, .FacteurVersBase = 30D}
+        type.ProduitConditionnementId = 2
+        Dim qteCartons As Decimal = ConversionUniteService.CalculerQuantiteBase(1D, type, carton)
+        Verifie(qteCartons = 330D AndAlso CalculVenteService.CalculerCoutComparable(achat, qteCartons, 30D, "UNITE", 30D).Value = 253000D, "Reference carton conservee, pas de correction implicite selon le nom")
+        Verifie(Math.Round(CalculVenteService.CalculerCoutUnitaireBase(achat, 30D).Value * qteCartons, 2) = 253000.01D, "Reproduction exacte de l'anomalie signalee avec reference 330")
+        Verifie(14000D < CalculVenteService.CalculerCoutComparable(achat, qteCartons, 30D, "UNITE", 30D).Value, "Une hausse ne contourne pas le cout reel de 11 cartons")
+        Verifie(CalculVenteService.CalculerQuantiteBaseTypeVente(11D, "SECONDAIRE", 30D, 30D, 1D) = 11D, "Type historique secondaire")
+        Verifie(CalculVenteService.CalculerQuantiteBaseTypeVente(11D, "PRINCIPALE", 30D, 30D, 1D) = 330D, "Type historique principal distinct")
+        Verifie(CalculVenteService.CalculerCoutComparable(25000D, 5D, 1D, "POIDS", 25D).Value = 5000D, "Cout mesure utilise contenu principal et non nombre de colis")
+        Verifie(Not CalculVenteService.CalculerCoutComparable(0D, 11D, 30D, "UNITE", 30D).HasValue, "Achat inconnu jamais invente")
+        Refuse(Of ArgumentOutOfRangeException)(Sub() CalculVenteService.CalculerCoutComparable(achat, 0D, 30D, "UNITE", 30D))
+        Verifie(SqlDiagnosticRegles.Classer(-2, True) = "DELAI_CONNEXION" AndAlso SqlDiagnosticRegles.Classer(-2, False) = "DELAI_COMMANDE", "Timeout ouverture distinct de commande")
+        Verifie(SqlDiagnosticRegles.Classer(1205, False) = "INTERBLOCAGE" AndAlso SqlDiagnosticRegles.Classer(1222, False) = "ATTENTE_VERROU", "Verrous distincts du reseau")
+        Verifie(SqlDiagnosticRegles.Classer(18456, True) = "AUTHENTIFICATION" AndAlso SqlDiagnosticRegles.Classer(4060, True) = "BASE_INDISPONIBLE", "Authentification et base inaccessibles")
+        Verifie(SqlDiagnosticRegles.Classer(10054, False) = "TRANSPORT" AndAlso SqlDiagnosticRegles.Classer(207, False) = "SQL_APPLICATIF", "Erreur schema jamais masquee comme panne reseau")
+        Verifie(SqlDiagnosticRegles.ResultatIncertain(-2, True) AndAlso SqlDiagnosticRegles.ResultatIncertain(10054, True) AndAlso Not SqlDiagnosticRegles.ResultatIncertain(10054, False), "Ecriture envoyee potentiellement validee, ouverture sans commande non executee")
+        Verifie(Not SqlDiagnosticRegles.ResultatIncertain(1205, True), "Victime interblocage distincte du COMMIT incertain")
+        Dim delais As New TemporisationSondeSql
+        Dim maintenant As New DateTime(2026, 10, 22, 12, 0, 0, DateTimeKind.Utc)
+        For Each secondes As Integer In New Integer() {15, 30, 60, 60}
+            delais.Enregistrer(False, maintenant)
+            Verifie(delais.ProchaineVerificationUtc = maintenant.AddSeconds(secondes), "Temporisation bornee apres interruption")
+        Next
+        delais.Enregistrer(True, maintenant)
+        Verifie(delais.ProchaineVerificationUtc = maintenant.AddSeconds(15), "Reseau retabli : surveillance normale, sans action metier")
     End Sub
 
     Private Function Snapshot(qte As Decimal, total As Decimal) As Object

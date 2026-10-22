@@ -56,6 +56,8 @@ Namespace DevCommerc8ak
         Public Property UnitePrincipale As String
         <ScriptIgnore>
         Public Property TypeActif As Boolean
+        <ScriptIgnore>
+        Public Property ReferenceQuantite As String
     End Class
 
     Public Class DelegationPrixService
@@ -342,17 +344,19 @@ Namespace DevCommerc8ak
                     If facteur Is Nothing Then Throw New InvalidOperationException("Conditionnement non vendable.")
                     Dim dto As New TypeVenteProduitDTO With {.QuantiteEquivalent = CDec(tr("QuantiteEquivalent")), .ProduitConditionnementId = CInt(tr("ProduitConditionnementId"))}
                     t.QuantiteBase = ConversionUniteService.CalculerQuantiteBase(1D, dto, New ProduitConditionnementDTO With {.ProduitConditionnementId = dto.ProduitConditionnementId.Value, .FacteurVersBase = CDec(facteur)})
+                    t.ReferenceQuantite = dto.QuantiteEquivalent.ToString("0.####") & " × facteur " & CDec(facteur).ToString("0.####") & " (conditionnement ID " & dto.ProduitConditionnementId.Value.ToString() & ")"
                 Else
                     Dim unite As String = If(tr.IsNull("TypeQuantiteEquivalent"), Convert.ToString(tr("TypeUniteEquivalent")), Convert.ToString(tr("TypeQuantiteEquivalent")))
                     t.QuantiteBase = CalculVenteService.CalculerQuantiteBaseTypeVente(CDec(tr("QuantiteEquivalent")), unite, conversion, If(principal > 0D, principal, conversion), secondaire)
+                    t.ReferenceQuantite = CDec(tr("QuantiteEquivalent")).ToString("0.####") & " en référence " & unite
                 End If
                 t.CoutCoefficient = CalculVenteService.CalculerCoutEquivalentCoefficient(achat, t.QuantiteBase, If(principal > 0D, principal, If(conversion > 0D, conversion, 1D)))
                 If String.Equals(t.ModePrix, "COEFFICIENT", StringComparison.OrdinalIgnoreCase) AndAlso t.Coefficient > 0D AndAlso t.CoutCoefficient > 0D Then t.Prix = Math.Round(t.CoutCoefficient * t.Coefficient, 2)
             End If
-            Dim coutBase As Decimal? = CalculVenteService.CalculerCoutUnitaireBase(achat, conversion, gestion, principal)
             If t.QuantiteBase <= 0D Then Throw New InvalidOperationException("Équivalent physique invalide.")
-            If exigerCout AndAlso (Not coutBase.HasValue OrElse coutBase.Value <= 0D) Then Throw New InvalidOperationException("Coût comparable indisponible : délégation refusée.")
-            t.Cout = If(coutBase.HasValue AndAlso coutBase.Value > 0D, coutBase.GetValueOrDefault() * t.QuantiteBase, 0D)
+            Dim coutComparable As Decimal? = CalculVenteService.CalculerCoutComparable(achat, t.QuantiteBase, conversion, gestion, principal)
+            If exigerCout AndAlso (Not coutComparable.HasValue OrElse coutComparable.Value <= 0D) Then Throw New InvalidOperationException("Coût comparable indisponible : délégation refusée.")
+            t.Cout = coutComparable.GetValueOrDefault()
             t.PrixAchatReference = achat : t.UnitePrincipale = Convert.ToString(row("UnitePrincipale"))
             t.TypeActif = t.TypeId > 0 OrElse TarifCatalogueRegles.StandardsDepuisProduit(row).Contains(typeVente.ToLowerInvariant())
             ' L'empreinte couvre le prix, son coût et son équivalent physique.
@@ -365,7 +369,7 @@ Namespace DevCommerc8ak
 
         Private Shared Sub VerifierSousCout(cn As SqlConnection, tx As SqlTransaction, p As ConfigurationPrix, t As TarifDelegue, prix As Decimal, ecran As String)
             If prix >= t.Cout Then Return
-            If Not p.SousCout Then Throw New UnauthorizedAccessException("La vente sous coût est interdite par l'entreprise.")
+            If Not p.SousCout Then Throw New UnauthorizedAccessException("La vente sous coût est interdite par l'entreprise. Coût : " & t.Cout.ToString("N2") & " FC pour " & t.QuantiteBase.ToString("0.####") & " unité(s) de base. Vérifiez la référence physique du type de vente si cet équivalent ne correspond pas au conditionnement souhaité.")
             AutorisationActionService.Exiger(cn, tx, "PRIX_SOUS_COUT", ecran)
         End Sub
 

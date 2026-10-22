@@ -4,7 +4,6 @@ Imports System.Configuration
 Imports System.Data
 Imports System.Collections.Generic
 Imports System.Threading.Tasks
-Imports System.Net.NetworkInformation
 Imports System
 
 Namespace DevCommerc8ak
@@ -169,6 +168,7 @@ Namespace DevCommerc8ak
         Private ReadOnly _backupService As BackupService
         Private ReadOnly _backupTimer As Timer
         Private ReadOnly _etatTimer As Timer
+        Private ReadOnly _suiviSql As New SqlDisponibiliteService()
         Private ReadOnly _statusStrip As StatusStrip
         Private ReadOnly _lblServeurStatus As ToolStripStatusLabel
         Private ReadOnly _lblSqlStatus As ToolStripStatusLabel
@@ -215,6 +215,7 @@ Namespace DevCommerc8ak
             }
             _lblServeurStatus = New ToolStripStatusLabel("Serveur : ...") With {.Spring = True}
             _lblSqlStatus = New ToolStripStatusLabel("SQL : ...") With {.Spring = True}
+            _statusStrip.ShowItemToolTips = True
             _lblBackupStatus = New ToolStripStatusLabel("Sauvegarde : en attente") With {.Spring = True}
             _statusStrip.Items.Add(_lblServeurStatus)
             _statusStrip.Items.Add(_lblSqlStatus)
@@ -364,7 +365,7 @@ Namespace DevCommerc8ak
             AddHandler timer.Tick, AddressOf PingSession
             timer.Start()
 
-            _etatTimer = New Timer() With {.Interval = 60000}
+            _etatTimer = New Timer() With {.Interval = 15000}
             AddHandler _etatTimer.Tick, AddressOf ActualiserEtatPlateformeTick
             _etatTimer.Start()
 
@@ -825,21 +826,16 @@ Namespace DevCommerc8ak
             If _isCheckingStatus Then Return
             _isCheckingStatus = True
             Try
-                Dim etat As Tuple(Of Boolean, Boolean) = Await Task.Run(Function()
-                                                                            Dim settings As SqlConnectionSettings = SqlConfigurationService.LoadSettings()
-                                                                            Dim serveurConnecte As Boolean = TesterHoteServeur(If(settings Is Nothing, String.Empty, settings.Server))
-                                                                            Dim erreurSql As String = Nothing
-                                                                            Dim sqlConnecte As Boolean = SqlConfigurationService.HasValidConnection(erreurSql)
-                                                                            Return Tuple.Create(serveurConnecte, sqlConnecte)
-                                                                        End Function)
-
-                If etat Is Nothing Then
-                    MettreAJourStatusServeur(False)
-                    MettreAJourStatusSql(False)
-                Else
-                    MettreAJourStatusServeur(etat.Item1)
-                    MettreAJourStatusSql(etat.Item2)
-                End If
+                Dim chaine As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
+                Dim etat As ResultatDisponibiliteSql = Await _suiviSql.VerifierAsync(chaine)
+                If IsDisposed OrElse Disposing Then Return
+                ' ICMP peut etre filtre alors que SQL fonctionne. Seule une
+                ' vraie requete SQL determine ici la disponibilite observee.
+                MettreAJourStatusServeur(etat.Disponible)
+                MettreAJourStatusSql(etat.Disponible)
+                _lblSqlStatus.Text = If(etat.Disponible, "SQL : disponible", "SQL : " & SqlDiagnosticRegles.LibelleCourt(etat.Categorie)) & " · " & etat.VerifieLeUtc.ToLocalTime().ToString("HH:mm:ss")
+                _lblSqlStatus.ToolTipText = etat.Message & " Dernier test : " & etat.VerifieLeUtc.ToLocalTime().ToString("g") & " Référence : " & etat.Correlation.ToString("D")
+                _lblServeurStatus.Text = If(etat.Disponible, "Serveur : joignable par SQL", "Serveur : liaison SQL à vérifier")
                 MettreAJourStatusSauvegarde()
             Catch ex As Exception
                 Dim log As New ProductionLogService()
@@ -855,31 +851,6 @@ Namespace DevCommerc8ak
         Private Sub ActualiserEtatPlateforme()
             Dim t As Task = ActualiserEtatPlateformeAsync()
         End Sub
-
-        Private Function TesterHoteServeur(serveur As String) As Boolean
-            If String.IsNullOrWhiteSpace(serveur) Then
-                Return False
-            End If
-
-            Dim normalise As String = serveur.Trim()
-            If normalise = "." OrElse normalise.Equals("(local)", StringComparison.OrdinalIgnoreCase) OrElse normalise.Equals("localhost", StringComparison.OrdinalIgnoreCase) Then
-                Return True
-            End If
-
-            Dim indexPort As Integer = normalise.IndexOf(","c)
-            If indexPort > 0 Then
-                normalise = normalise.Substring(0, indexPort).Trim()
-            End If
-
-            Try
-                Using ping As New Ping()
-                    Dim reply As PingReply = ping.Send(normalise, 1000)
-                    Return reply IsNot Nothing AndAlso reply.Status = IPStatus.Success
-                End Using
-            Catch
-                Return False
-            End Try
-        End Function
 
         Private Sub MettreAJourStatusServeur(connecte As Boolean)
             If _lblServeurStatus Is Nothing Then Return

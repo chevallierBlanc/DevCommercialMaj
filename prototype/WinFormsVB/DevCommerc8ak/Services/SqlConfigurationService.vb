@@ -122,30 +122,22 @@ Namespace DevCommerc8ak
 
         Public Shared Function TestConnection(settings As SqlConnectionSettings, Optional ByRef errorMessage As String = Nothing) As Boolean
             Try
-                Dim connectionString As String = BuildConnectionString(settings)
-                Dim builder As New SqlConnectionStringBuilder(connectionString) With {
-                    .ConnectTimeout = 5
-                }
-
-                Using cn As New SqlConnection(builder.ConnectionString)
-                    cn.Open()
-                End Using
-
-                errorMessage = String.Empty
-                _log.Info("SqlConfigurationService", "TestConnection", "Test de connexion SQL réussi pour " & settings.Server)
-                Return True
-            Catch ex As Exception
-                errorMessage = ex.Message
-                _log.Error("SqlConfigurationService", "TestConnection", "Test de connexion SQL échoué.", ex)
+                Dim resultat As ResultatDisponibiliteSql = SqlDisponibiliteService.TesterUneFois(BuildConnectionString(settings))
+                errorMessage = If(resultat.Disponible, String.Empty, resultat.Message & " Référence : " & resultat.Correlation.ToString("D"))
+                Return resultat.Disponible
+            Catch ex As ArgumentException
+                errorMessage = "Configuration SQL invalide. Vérifiez le serveur, la base et le mode d'authentification."
                 Return False
             End Try
         End Function
 
         Public Shared Function HasValidConnection(Optional ByRef errorMessage As String = Nothing) As Boolean
             InitializeConfiguration()
-
-            Dim settings As SqlConnectionSettings = LoadSettings()
-            Return TestConnection(settings, errorMessage)
+            ' Tester la chaine active, sans la reconstruire depuis les seuls
+            ' champs visibles (ce qui perdrait des options TLS/reseau existantes).
+            Dim resultat As ResultatDisponibiliteSql = SqlDisponibiliteService.TesterUneFois(GetActiveConnectionString())
+            errorMessage = If(resultat.Disponible, String.Empty, resultat.Message)
+            Return resultat.Disponible
         End Function
 
         Public Shared Sub SaveSettings(settings As SqlConnectionSettings)

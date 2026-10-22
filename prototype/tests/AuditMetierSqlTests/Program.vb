@@ -30,6 +30,7 @@ Module Program
         ' Aucun fichier de connexion de production ne doit être repris par le banc.
         If ConfigurationManager.ConnectionStrings("CommercialMagDB") IsNot Nothing Then Throw New InvalidOperationException("Ne pas copier app.config de production dans le banc de tests.")
         dal = New DAL(cs)
+        TesterDisponibiliteEtAbsenceRejeu()
         Exec("IF NOT EXISTS(SELECT 1 FROM dbo.SchemaVersion WHERE Version=2026101301) THROW 51000, 'Migration integration 2026101301 requise sur la copie de test.', 1;")
         Exec("IF NOT EXISTS(SELECT 1 FROM dbo.SchemaVersion WHERE Version=2026101501) THROW 51000, 'Migration Vente et Encaissement 2026101501 requise sur la copie.', 1;")
         Verifier(Scalar("SELECT COUNT(*) FROM dbo.Parametres WHERE GestionModesActive=0 AND DelegationPrixActive=0") = 1, "Copie de test en parcours classique, migrations 0902/0903/0904 requises")
@@ -516,10 +517,11 @@ Module Program
             Dim sachet As Integer = Scalar("INSERT dbo.TypesVenteProduit(ProduitId,Nom,QuantiteEquivalent,TypeUniteEquivalent,TypeQuantiteEquivalent,ModePrix,Coefficient,PrixVente,Actif) VALUES(" & produitPrix.ToString() & ",'Sachet Test',6,'SECONDAIRE','SECONDAIRE','coefficient',2,123,1); SELECT CAST(SCOPE_IDENTITY() AS int)")
             Verifier(prix.ListerTarifsActifs(produitPrix).Exists(Function(x) x.TypeId = sachet AndAlso x.Prix = 120D AndAlso x.CoutCoefficient = 60D), "Type personnalise coefficient charge sans cout unitaire incompatible")
             Dim jsonTarif As String = New System.Web.Script.Serialization.JavaScriptSerializer().Serialize(personnel)
-            Verifier(Not jsonTarif.Contains("PrixAchatReference") AndAlso Not jsonTarif.Contains("TypeActif") AndAlso Not jsonTarif.Contains("UnitePrincipale"), "Metadonnees UI exclues de l'empreinte des anciennes approbations")
+            Verifier(Not jsonTarif.Contains("PrixAchatReference") AndAlso Not jsonTarif.Contains("TypeActif") AndAlso Not jsonTarif.Contains("UnitePrincipale") AndAlso Not jsonTarif.Contains("ReferenceQuantite"), "Metadonnees UI exclues de l'empreinte des anciennes approbations")
             Verifier(personnel.Prix = 120D AndAlso personnel.TypeId = typePersonnel, "Type personnalisé homonyme et coefficient insensible à la casse")
             prix.Modifier(personnel, 125D, "Tarif personnalisé uniquement", False)
             Verifier(prix.Consulter(produitPrix, "piece", 0).Prix = 20D AndAlso prix.Consulter(produitPrix, "piece", typePersonnel).Prix = 125D, "Tarif officiel standard intact, prix personnalisé appliqué effectivement")
+            TesterCoutsPersonnalises(prix, suffix)
         Finally
             SessionUtilisateur.UtilisateurId = user
             SessionUtilisateur.NomUtilisateur = "TEST_" & suffix
@@ -529,6 +531,62 @@ Module Program
             configModes.Enregistrer(initialModes, actuels, "Restaurer les modes de la copie")
             SessionUtilisateur.ModeActif = ""
         End Try
+    End Sub
+
+    Private Sub TesterCoutsPersonnalises(prix As DelegationPrixService, suffix As String)
+        Dim id As Integer = Scalar("INSERT dbo.Produits(CodeBarres,Libelle,PrixDetail,PrixGros,PrixDemi,PrixAchat,ConversionUnite,TypeGestionStock,ContenuUnitePrincipale,ContenuUniteSecondaire,VenteGros,VenteDemi,VenteDetail) VALUES('STYLO_'+@s,'Paquet stylo test',814,24200,12100,23000,30,'UNITE',30,1,1,1,1); SELECT CAST(SCOPE_IDENTITY() AS int)", suffix)
+        Dim tarifId As Integer = Scalar("INSERT dbo.TypesVenteProduit(ProduitId,Nom,QuantiteEquivalent,TypeUniteEquivalent,TypeQuantiteEquivalent,ModePrix,Coefficient,PrixVente,Actif) VALUES(" & id.ToString() & ",'Paquets 10+1',11,'SECONDAIRE','SECONDAIRE','FIXE',0,14000,1); SELECT CAST(SCOPE_IDENTITY() AS int)")
+        Dim t As TarifDelegue = prix.Consulter(id, "Paquets 10+1", tarifId)
+        Verifier(t.QuantiteBase = 11D AndAlso Math.Round(t.Cout, 2) = 8433.33D, "SQL : cout du paquet secondaire, pas onze cartons")
+        Verifier(prix.Consulter(id, "gros", 0).Cout = 23000D AndAlso prix.Consulter(id, "demi", 0).Cout = 11500D, "SQL : references gros et demi sans centime fictif")
+        prix.Modifier(t, 14500D, "Correction de tarif sur onze pieces reelles", False)
+        Verifier(prix.Consulter(id, "Paquets 10+1", tarifId).Prix = 14500D, "SQL : nouveau tarif reellement persiste")
+        Refus(Of UnauthorizedAccessException)(Sub() prix.Modifier(prix.Consulter(id, "Paquets 10+1", tarifId), 8000D, "Vente reellement sous cout refusee", False))
+        Exec("UPDATE dbo.TypesVenteProduit SET TypeUniteEquivalent='PRINCIPALE',TypeQuantiteEquivalent='PRINCIPALE' WHERE TypeVenteProduitId=" & tarifId.ToString())
+        Dim principal As TarifDelegue = prix.Consulter(id, "Paquets 10+1", tarifId)
+        Verifier(principal.QuantiteBase = 330D AndAlso principal.Cout = 253000D, "SQL : nom commercial non utilise pour reinterpretation du stock")
+        Refus(Of UnauthorizedAccessException)(Sub() prix.Modifier(principal, 15000D, "Reference principale conservee, perte reelle", False))
+    End Sub
+
+    Private Sub TesterDisponibiliteEtAbsenceRejeu()
+        Verifier(SqlDisponibiliteService.TesterUneFois(cs).Disponible, "Sonde SQL SELECT 1 sur copie autorisee")
+        Verifier(SqlDisponibiliteService.TesterUneFois("").Categorie = "CONFIGURATION", "Sonde configuration absente sans attente reseau")
+        ' Table temporaire globale, unique et gardee par cette connexion de test.
+        Dim nom As String = "##ERP_Reseau_" & Guid.NewGuid().ToString("N")
+        Using cn As New SqlConnection(cs)
+            cn.Open()
+            Using cmd As New SqlCommand("CREATE TABLE " & nom & "(Id int NOT NULL)", cn)
+                cmd.ExecuteNonQuery()
+            End Using
+            Try
+                Dim appels As Integer = 0
+                Refus(Of SqlException)(Sub() dal.ExecuterUneFois(Of Integer)("INSERT INTO " & nom & " VALUES(1); WAITFOR DELAY '00:00:03'", CommandType.Text, Nothing, Function(cmd)
+                                                                                                                                                                           appels += 1
+                                                                                                                                                                           cmd.CommandTimeout = 1
+                                                                                                                                                                           Return cmd.ExecuteNonQuery()
+                                                                                                                                                                       End Function, "TestTimeoutSansRejeu"))
+                Using cmd As New SqlCommand("SELECT COUNT(*) FROM " & nom, cn)
+                    Verifier(appels = 1 AndAlso CInt(cmd.ExecuteScalar()) = 1, "Timeout apres ecriture autocommit : pas de double execution DAL")
+                End Using
+                Refus(Of SqlException)(Sub() dal.ExecuterUneFois(Of Integer)("INSERT INTO " & nom & " VALUES(2); WAITFOR DELAY '00:00:03'", CommandType.Text, Nothing, Function(cmd)
+                                                                                                                                                                           appels += 1
+                                                                                                                                                                           Using tx As SqlTransaction = cmd.Connection.BeginTransaction()
+                                                                                                                                                                               cmd.Transaction = tx : cmd.CommandTimeout = 1
+                                                                                                                                                                               Dim resultat As Integer = cmd.ExecuteNonQuery()
+                                                                                                                                                                               tx.Commit()
+                                                                                                                                                                               Return resultat
+                                                                                                                                                                           End Using
+                                                                                                                                                                       End Function, "TestRollbackSansRejeu"))
+                Using cmd As New SqlCommand("SELECT COUNT(*) FROM " & nom, cn)
+                    Verifier(appels = 2 AndAlso CInt(cmd.ExecuteScalar()) = 1, "Timeout transactionnel : aucune seconde ecriture conservee ni rejeu")
+                End Using
+                Verifier(SqlDisponibiliteService.TesterUneFois(cs).Disponible, "Sonde reussie apres erreur SQL sans reprise des ecritures")
+            Finally
+                Using cmd As New SqlCommand("DROP TABLE " & nom, cn)
+                    cmd.ExecuteNonQuery()
+                End Using
+            End Try
+        End Using
     End Sub
 
     Private Function NouvelleFacture(suffix As String) As FactureVente

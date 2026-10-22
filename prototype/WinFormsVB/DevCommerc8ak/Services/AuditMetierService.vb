@@ -90,6 +90,12 @@ Namespace DevCommerc8ak
         End Sub
 
         Public Shared Sub Echec(dal As DAL, evenement As String, id As Integer, correlation As Guid, ex As Exception, Optional entite As String = "Facture", Optional reference As String = Nothing)
+            Dim sqlErreur As SqlException = TryCast(ex, SqlException)
+            If sqlErreur IsNot Nothing Then
+                ' La trace locale precede la tentative d'audit SQL : elle reste
+                ' disponible meme si la liaison ne permet plus d'ecrire le refus.
+                SqlDiagnosticService.Signaler(evenement, sqlErreur, False, True, -1, correlation, phaseConnue:=False)
+            End If
             ' Après rollback, l'échec a sa propre transaction et ne peut jamais
             ' être présenté comme un succès. Aucun texte d'exception SQL brut
             ' (qui pourrait contenir une donnée confidentielle) n'est stocké.

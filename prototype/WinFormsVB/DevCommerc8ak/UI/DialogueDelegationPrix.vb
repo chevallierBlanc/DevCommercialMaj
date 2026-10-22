@@ -100,6 +100,7 @@ Namespace DevCommerc8ak
                 Dim afficherTarif As Action = Sub()
                                                  identite.Text = t.Produit & " | " & t.CodeBarres & " | " & t.UnitePrincipale & " | " & t.TypeVente
                                                  informations.Text = "Achat de référence : " & t.PrixAchatReference.ToString("N2") & " FC (lecture seule)" & Environment.NewLine & "Tarif officiel : " & t.Prix.ToString("N2") & " FC | Coût comparable : " & t.Cout.ToString("N2") & " FC" & Environment.NewLine & "Demandeur : " & SessionUtilisateur.NomUtilisateur & If(prixArticle.HasValue, " | Quantité : " & quantite.ToString("0.########"), "")
+                                                 informations.Text &= Environment.NewLine & "Équivalent physique : " & t.QuantiteBase.ToString("0.####") & " unité(s) de base" & If(String.IsNullOrWhiteSpace(t.ReferenceQuantite), "", " — " & t.ReferenceQuantite)
                                                  actualiserVariation()
                                              End Sub
                 AddHandler choixTarif.SelectionChangeCommitted, Sub()

@@ -7,6 +7,9 @@
     <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/SqlDiagnosticRegles.vb" Link="SqlDiagnosticRegles.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/SqlDiagnosticService.vb" Link="SqlDiagnosticService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/SqlDisponibiliteService.vb" Link="SqlDisponibiliteService.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ClientAnalyseRegles.vb" Link="ClientAnalyseRegles.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/TarifCatalogueRegles.vb" Link="TarifCatalogueRegles.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ThemeHelper.vb" Link="ThemeHelper.vb" />

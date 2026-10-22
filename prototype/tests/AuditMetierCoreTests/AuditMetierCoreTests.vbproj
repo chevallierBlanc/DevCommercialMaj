@@ -6,6 +6,11 @@
     <OptionStrict>On</OptionStrict>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/SqlDiagnosticRegles.vb" Link="SqlDiagnosticRegles.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ConversionUniteService.vb" Link="ConversionUniteService.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/ProduitConditionnementDTO.vb" Link="ProduitConditionnementDTO.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/TypeVenteProduitDTO.vb" Link="TypeVenteProduitDTO.vb" />
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/DTOs/TypeVenteDTO.vb" Link="TypeVenteDTO.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ClientAnalyseRegles.vb" Link="ClientAnalyseRegles.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/TarifCatalogueRegles.vb" Link="TarifCatalogueRegles.vb" />
     <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ModeTravailRegles.vb" Link="ModeTravailRegles.vb" />

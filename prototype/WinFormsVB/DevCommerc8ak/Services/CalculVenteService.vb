@@ -15,6 +15,15 @@ Namespace DevCommerc8ak
             Return prixAchat * (quantiteBase / contenuPrincipal)
         End Function
 
+        Public Shared Function CalculerCoutComparable(prixAchat As Decimal, quantiteBase As Decimal, conversionUnite As Decimal, typeGestionStock As String, contenuPrincipal As Decimal) As Decimal?
+            If prixAchat <= 0D Then Return Nothing
+            If quantiteBase <= 0D Then Throw New ArgumentOutOfRangeException(NameOf(quantiteBase))
+            ' Meme reference d'achat que CalculerCoutUnitaireStock, sans arrondir
+            ' chaque piece avant multiplication. Ne change aucune quantite physique.
+            Dim reference As Decimal = If(StockUnitConversionService.EstGestionMesuree(typeGestionStock) AndAlso contenuPrincipal > 0D, contenuPrincipal, If(conversionUnite > 0D, conversionUnite, 1D))
+            Return CalculerCoutEquivalentCoefficient(prixAchat, quantiteBase, reference)
+        End Function
+
         Public Shared Function CalculerCoutUnitaireBase(prixAchat As Decimal, conversionUnite As Decimal) As Decimal?
             Return StockUnitConversionService.CalculerCoutUnitaireStock(prixAchat, conversionUnite, "UNITE", 0D)
         End Function
