@@ -1031,9 +1031,17 @@ Namespace DevCommerc8ak
         ''' Afficher admin
         ''' </summary>
         Private Sub Dashbord(sender As Object, e As EventArgs)
-
-
-            LoadForm(New AdminForm())
+            ' Ne pas reconstruire ni relancer une lecture deja en cours.
+            If panelContent IsNot Nothing Then
+                For Each controle As Control In panelContent.Controls
+                    If TypeOf controle Is AdminForm Then Return
+                Next
+            End If
+            Dim creation As System.Diagnostics.Stopwatch = System.Diagnostics.Stopwatch.StartNew()
+            Dim formulaire As New AdminForm()
+            Dim journal As New ProductionLogService()
+            journal.Info("MainForm", "CreationAdmin", "Ms=" & creation.ElapsedMilliseconds.ToString() & " | Correlation=" & formulaire.CorrelationOuverture.ToString("D"))
+            LoadForm(formulaire)
 
         End Sub
 

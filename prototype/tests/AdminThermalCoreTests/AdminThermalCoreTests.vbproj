@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace></RootNamespace>
+    <OptionStrict>On</OptionStrict>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../WinFormsVB/DevCommerc8ak/Services/ThermiqueMiseEnPage.vb" Link="ThermiqueMiseEnPage.vb" />
+  </ItemGroup>
+</Project>

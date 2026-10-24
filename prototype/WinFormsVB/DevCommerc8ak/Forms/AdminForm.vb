@@ -1,8 +1,13 @@
+Imports System
 Imports System.Windows.Forms
 Imports System.Drawing
 Imports System.Drawing.Drawing2D
 Imports System.Configuration
 Imports Microsoft.VisualBasic
+Imports System.Collections.Generic
+Imports System.Diagnostics
+Imports System.Threading
+Imports System.Threading.Tasks
 
 Namespace DevCommerc8ak
     Public Class AdminForm
@@ -34,6 +39,22 @@ Namespace DevCommerc8ak
         Private ReadOnly btnParametres As Button
         Private ReadOnly btnUtilisateurs As Button
         Private ReadOnly btnFinance As Button
+        Private ReadOnly _cartes As New FlowLayoutPanel()
+        Private ReadOnly _etatChargement As New Label()
+        Private ReadOnly _annulation As New CancellationTokenSource()
+        Private ReadOnly _correlation As Guid = Guid.NewGuid()
+        Private ReadOnly _ouverture As Stopwatch = Stopwatch.StartNew()
+        Private _charge As Boolean
+        Private _premierAffichage As Boolean
+        Private _libere As Boolean
+        Private _droitsAffiches As Boolean
+        Private _renduDroitsMesure As Boolean
+
+        Public ReadOnly Property CorrelationOuverture As Guid
+            Get
+                Return _correlation
+            End Get
+        End Property
 
         Public Sub New()
             ' Configuration de la Form
@@ -68,12 +89,17 @@ Namespace DevCommerc8ak
             pnlHeader.Controls.AddRange({lbl, lblSub})
 
             ' --- Grille de fonctionnalités (FlowLayoutPanel pour la fluidité) ---
-            Dim flowMain As New FlowLayoutPanel() With {
-                .Dock = DockStyle.Fill,
-                .Padding = New Padding(30),
-                .AutoScroll = True,
-                .BackColor = Color.Transparent
-            }
+            Dim flowMain As FlowLayoutPanel = _cartes
+            flowMain.Dock = DockStyle.Fill
+            flowMain.Padding = New Padding(30)
+            flowMain.AutoScroll = True
+            flowMain.BackColor = Color.Transparent
+            AddHandler flowMain.Paint, Sub()
+                                           If Not _droitsAffiches OrElse _renduDroitsMesure Then Return
+                                           _renduDroitsMesure = True
+                                           Dim journal As New ProductionLogService()
+                                           journal.Info("Administration", "RenduCartes", "Correlation=" & _correlation.ToString("D") & " | TotalMs=" & _ouverture.ElapsedMilliseconds.ToString())
+                                       End Sub
 
             ' Initialisation des boutons (Noms conservés)
             btnDashboard = CreerBoutonCard("Tableau de Bord", "Vue globale de l'activité", Color.FromArgb(76, 175, 80))
@@ -105,23 +131,17 @@ Namespace DevCommerc8ak
             AddHandler btnUtilisateurs.Click, Sub() OuvrirFenetre(New FormulaireUtilisateurs())
             AddHandler btnFinance.Click, Sub() OuvrirFenetre(New FormulaireFinance())
 
-            If VerifierPermission("ADMINISTRATION") Then flowMain.Controls.Add(btnDashboard)
-            If VerifierPermission("STOCK_INVENTAIRE") Then flowMain.Controls.Add(btnProduits)
-            If VerifierPermission("ADMINISTRATION") Then flowMain.Controls.Add(btnClients)
-            If VerifierPermission("ADMINISTRATION") Then flowMain.Controls.Add(btnFournisseurs)
-            If VerifierPermission("HISTORIQUE_FACTURES") Then flowMain.Controls.Add(btnFactures)
-            If VerifierPermission("ANALYSE_CAISSE_PHYSIQUE") Then flowMain.Controls.Add(btnPaiements)
-            If VerifierPermission("FINANCE") Then flowMain.Controls.Add(btnFinance)
-            If VerifierPermission("STOCK_INVENTAIRE") Then flowMain.Controls.Add(btnStock)
-            If VerifierPermission("ANALYSE_VENTES") Then flowMain.Controls.Add(btnVentes)
-            If VerifierPermission("STOCK_INVENTAIRE") Then flowMain.Controls.Add(btnAppro)
-            If VerifierPermission("ADMINISTRATION") Then flowMain.Controls.Add(btnRapports)
-            If VerifierPermission("ADMINISTRATION") Then flowMain.Controls.Add(btnUtilisateurs)
-            If VerifierPermission("PARAMETRES") Then flowMain.Controls.Add(btnParametres)
+            ' Les cartes ne sont pas ajoutees avant le retour des droits reels.
+            _etatChargement.Dock = DockStyle.Bottom
+            _etatChargement.Height = 36
+            _etatChargement.Padding = New Padding(30, 8, 0, 0)
+            _etatChargement.ForeColor = ColorTextSecondary
+            _etatChargement.Text = "Chargement des autorisations..."
 
             ' Assemblage final
             Me.Controls.Add(flowMain)
             Me.Controls.Add(pnlHeader)
+            Me.Controls.Add(_etatChargement)
 
             ' Thèmes et Icônes (Logique conservée)
             'ThemeHelper.AppliquerTheme(Me)
@@ -134,6 +154,8 @@ Namespace DevCommerc8ak
             'IconsHelper.AppliquerIconeBouton(btnRapports, "RAPPORTS")
             'IconsHelper.AppliquerIconeBouton(btnParametres, "PARAMETRES")
             'IconsHelper.AppliquerIconeBouton(btnUtilisateurs, "UTILISATEURS")
+            Dim log As New ProductionLogService()
+            log.Info("Administration", "ConstructionUI", "Correlation=" & _correlation.ToString("D") & " | Ms=" & _ouverture.ElapsedMilliseconds.ToString())
         End Sub
 
         ' --- Helper pour créer des boutons sous forme de cartes ---
@@ -189,21 +211,78 @@ Namespace DevCommerc8ak
             f.ShowDialog(Me)
         End Sub
 
-        Private Function VerifierPermission(fonctionnalite As String) As Boolean
+        Protected Overrides Async Sub OnShown(e As EventArgs)
+            MyBase.OnShown(e)
+            If _charge Then Return
+            _charge = True
             Dim role As String = If(SessionUtilisateur.Role, String.Empty).Trim().ToUpperInvariant()
-            Dim codePermission As String = fonctionnalite.Trim().ToUpperInvariant()
+            Dim session As Integer = SessionUtilisateur.SessionId
+            Dim utilisateur As Integer = SessionUtilisateur.UtilisateurId
+            Dim roleId As Integer = SessionUtilisateur.RoleIdActif
+            Dim log As New ProductionLogService()
+            log.Info("Administration", "Shown", "Correlation=" & _correlation.ToString("D") & " | Ms=" & _ouverture.ElapsedMilliseconds.ToString())
+            Dim attente As New System.Windows.Forms.Timer() With {.Interval = 1000}
+            AddHandler attente.Tick, Sub()
+                                        If IsDisposed Then Return
+                                        If _ouverture.Elapsed.TotalSeconds >= 5 Then _etatChargement.Text = "Vérification des droits en cours... Vous pouvez quitter ce module."
+                                    End Sub
+            attente.Start()
             Try
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim repo As New SuperAdminRepository(New DAL(cs))
-                repo.AssurerInfrastructure()
-                If repo.RoleUtilisePermissions(role) Then
-                    Return repo.RoleAutoriseInterface(role, codePermission)
+                Dim droits As HashSet(Of String) = Await repo.ListerCodesInterfacesAutoriseesAsync(role, _annulation.Token, _correlation)
+                If IsDisposed OrElse _annulation.IsCancellationRequested Then Return
+                If session <> SessionUtilisateur.SessionId OrElse utilisateur <> SessionUtilisateur.UtilisateurId OrElse roleId <> SessionUtilisateur.RoleIdActif OrElse role <> If(SessionUtilisateur.Role, String.Empty).Trim().ToUpperInvariant() Then
+                    _etatChargement.Text = "La session a changé. Rouvrez Administration."
+                    Return
                 End If
-            Catch
-                Return False
+                Dim chrono As Stopwatch = Stopwatch.StartNew()
+                Dim cartes As Button() = {btnDashboard, btnProduits, btnClients, btnFournisseurs, btnFactures, btnPaiements, btnFinance, btnStock, btnVentes, btnAppro, btnRapports, btnUtilisateurs, btnParametres}
+                Dim codes As String() = {"ADMINISTRATION", "STOCK_INVENTAIRE", "ADMINISTRATION", "ADMINISTRATION", "HISTORIQUE_FACTURES", "ANALYSE_CAISSE_PHYSIQUE", "FINANCE", "STOCK_INVENTAIRE", "ANALYSE_VENTES", "STOCK_INVENTAIRE", "ADMINISTRATION", "ADMINISTRATION", "PARAMETRES"}
+                _cartes.SuspendLayout()
+                Try
+                    For i As Integer = 0 To cartes.Length - 1
+                        If droits.Contains(codes(i)) Then _cartes.Controls.Add(cartes(i))
+                    Next
+                Finally
+                    _cartes.ResumeLayout(True)
+                End Try
+                _etatChargement.Text = If(_cartes.Controls.Count = 0, "Aucun module autorisé pour ce rôle.", String.Empty)
+                _droitsAffiches = True
+                _cartes.Invalidate()
+                log.Info("Administration", "RemplissageUI", "Correlation=" & _correlation.ToString("D") & " | Ms=" & chrono.ElapsedMilliseconds.ToString())
+                BeginInvoke(New MethodInvoker(Sub()
+                                                 If Not IsDisposed Then log.Info("Administration", "RetourBoucleUI", "Correlation=" & _correlation.ToString("D") & " | TotalMs=" & _ouverture.ElapsedMilliseconds.ToString())
+                                             End Sub))
+            Catch ex As OperationCanceledException
+                ' Quitter le module annule uniquement cette lecture.
+            Catch ex As Exception
+                If Not IsDisposed Then _etatChargement.Text = "Chargement impossible. Quittez puis rouvrez Administration ; si le problème persiste, contactez le support."
+                log.Warn("Administration", "ChargementRefuse", "Correlation=" & _correlation.ToString("D") & " | Type=" & ex.GetType().Name)
+            Finally
+                attente.Stop()
+                attente.Dispose()
             End Try
+        End Sub
 
-            Return False
-        End Function
+        Protected Overrides Sub OnPaint(e As PaintEventArgs)
+            MyBase.OnPaint(e)
+            If _premierAffichage Then Return
+            _premierAffichage = True
+            Dim log As New ProductionLogService()
+            log.Info("Administration", "PremierPaint", "Correlation=" & _correlation.ToString("D") & " | Ms=" & _ouverture.ElapsedMilliseconds.ToString())
+        End Sub
+
+        Protected Overrides Sub Dispose(disposing As Boolean)
+            If disposing AndAlso Not _libere Then
+                _libere = True
+                _annulation.Cancel()
+                _annulation.Dispose()
+                For Each bouton As Button In New Button() {btnDashboard, btnProduits, btnClients, btnFournisseurs, btnFactures, btnPaiements, btnFinance, btnStock, btnVentes, btnAppro, btnRapports, btnUtilisateurs, btnParametres}
+                    If bouton IsNot Nothing AndAlso bouton.Parent Is Nothing Then bouton.Dispose()
+                Next
+            End If
+            MyBase.Dispose(disposing)
+        End Sub
     End Class
 End Namespace

@@ -188,6 +188,9 @@
     <Compile Include="Services\ConversionUniteService.vb" />
     <Compile Include="Services\PdfHelper.vb" />
     <Compile Include="Services\FacturePrintRenderer.vb" />
+    <Compile Include="Services\ThermiqueMiseEnPage.vb" />
+    <Compile Include="UI\FormChoixImpressionDocument.vb" />
+    <Compile Include="Repositories\FactureImpressionRepository.vb" />
     <Compile Include="Services\FormatageGlobal.vb" />
     <Compile Include="Services\ProductionLogService.vb" />
     <Compile Include="Services\AuditActionService.vb" />

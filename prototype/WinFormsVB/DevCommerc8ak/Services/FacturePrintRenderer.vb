@@ -29,9 +29,20 @@ Namespace DevCommerc8ak
         Public Property Remise As Decimal
         Public Property Total As Decimal
         Public Property Lignes As List(Of FacturePrintLine)
+        ' Metadonnees exclusivement thermiques ; le rendu A4 n'en depend pas.
+        Public Property ProformaThermique As Boolean
+        Public Property TitreThermique As String
+        Public Property MentionThermique As String
+        Public Property LibelleTotalThermique As String
+        Public Property MasquerRemiseThermique As Boolean
+        Public Property InformationsThermiques As New List(Of KeyValuePair(Of String, String))()
+        Public Property ReglementsThermiques As New List(Of KeyValuePair(Of String, String))()
     End Class
 
     Public NotInheritable Class FacturePrintRenderer
+        ' Marge interne de 3 mm comme le ticket de caisse de reference,
+        ' exprimee une seule fois en centiemes de pouce, sans facteur DPI.
+        Private Const MargeInterneThermique As Single = 12.0F
         Private Sub New()
         End Sub
 
@@ -50,14 +61,39 @@ Namespace DevCommerc8ak
         End Function
 
         Public Shared Function CreerDocumentThermique(data As FacturePrintData, param As ParametreDTO, owner As IWin32Window, moduleName As String, actionName As String) As PrintDocument
+            If data Is Nothing OrElse data.Lignes Is Nothing OrElse data.Lignes.Count = 0 Then Throw New InvalidOperationException("Aucun article a imprimer.")
             Dim doc As New PrintDocument()
-            Dim hauteur As Integer = CalculerHauteurThermique(data, param, 315)
-            PrintConfigurationHelper.ConfigurerDocumentThermique(doc, owner, moduleName, actionName, 315, hauteur)
-            AddHandler doc.PrintPage,
-                Sub(sender As Object, e As PrintPageEventArgs)
-                    DessinerThermique(e, data, param)
-                End Sub
-            Return doc
+            Try
+                param = PrintConfigurationHelper.ConfigurerDocumentThermique(doc, owner, moduleName, actionName, 315, 1200)
+                doc.OriginAtMargins = False
+                doc.DefaultPageSettings.Landscape = False
+                doc.DefaultPageSettings.Margins = New Margins(2, 2, 2, 2)
+                doc.DefaultPageSettings.Color = If(param IsNot Nothing, param.ImpressionCouleur, True)
+                doc.PrinterSettings.Copies = 1S
+                Dim blocs As List(Of BlocThermique) = ConstruireBlocsThermiques(data, param)
+                Dim largeur As Single = ThermiqueMiseEnPage.LargeurUtile(315, doc.DefaultPageSettings.PrintableArea.Left, doc.DefaultPageSettings.PrintableArea.Width, MargeInterneThermique)
+                Dim hauteur As Single = 0
+                Using bmp As New Bitmap(1, 1)
+                    bmp.SetResolution(100, 100)
+                    Using g As Graphics = Graphics.FromImage(bmp)
+                        For Each bloc As BlocThermique In blocs
+                            hauteur += TraiterBlocThermique(g, bloc, 0, 0, largeur, False)
+                        Next
+                    End Using
+                End Using
+                doc.DefaultPageSettings.PaperSize = New PaperSize("Ticket80mm", 315, CInt(Math.Max(420, Math.Min(5000, Math.Ceiling(hauteur + 40)))))
+                Dim index As Integer = 0
+                Dim suite As String = If(EstAnnulee(data), "FACTURE ANNULÉE", If(data.ProformaThermique, "PROFORMA", "FACTURE")) & " " & Safe(data.Numero) & " (suite)"
+                AddHandler doc.BeginPrint, Sub(s, e) index = 0
+                AddHandler doc.PrintPage,
+                    Sub(s, e)
+                        DessinerPageThermique(e, blocs, index, suite)
+                    End Sub
+                Return doc
+            Catch
+                doc.Dispose()
+                Throw
+            End Try
         End Function
 
         Private Shared Sub DessinerA4(e As PrintPageEventArgs, data As FacturePrintData, param As ParametreDTO, ByRef index As Integer)
@@ -186,129 +222,164 @@ Namespace DevCommerc8ak
             Next
         End Sub
 
-        Private Shared Function CalculerHauteurThermique(data As FacturePrintData, param As ParametreDTO, largeurPapier As Integer) As Integer
-            Using bmp As New Bitmap(1, 1),
-                  g As Graphics = Graphics.FromImage(bmp),
-                  fontTitre As New Font("Segoe UI", 10, FontStyle.Bold),
-                  fontSection As New Font("Segoe UI", 7.5F, FontStyle.Bold),
-                  fontLigne As New Font("Segoe UI", 7.5F),
-                  fontTotal As New Font("Segoe UI", 8.5F, FontStyle.Bold)
+        Private Class BlocThermique
+            Public Property Genre As String
+            Public Property Texte As String
+            Public Property Valeur As String
+            Public Property Detail As String
+            Public Property Police As Integer = 2
+        End Class
 
-                Dim largeur As Integer = Math.Max(220, largeurPapier - 16)
-                Dim hauteur As Integer = 8
-                If LogoDisponible(param) Then hauteur += 48
-                hauteur += HauteurTexte(g, If(param IsNot Nothing AndAlso param.NomMagasin <> "", param.NomMagasin, "COMMERCIAL PRO"), fontTitre, largeur)
-                If param IsNot Nothing AndAlso param.AdresseMagasin <> "" Then hauteur += HauteurTexte(g, param.AdresseMagasin, fontLigne, largeur)
-                If param IsNot Nothing AndAlso param.TelephoneMagasin <> "" Then hauteur += HauteurTexte(g, param.TelephoneMagasin, fontLigne, largeur)
-                hauteur += HauteurTexte(g, TitreDocument(data), fontSection, largeur) + 10
-                hauteur += 18 * 5 + 22
-                For Each ligne As FacturePrintLine In If(data.Lignes, New List(Of FacturePrintLine)())
-                    hauteur += HauteurTexte(g, Safe(ligne.Produit), fontSection, largeur)
-                    hauteur += HauteurTexte(g, FormaterQuantite(ligne.Quantite) & " " & Safe(ligne.Conditionnement) & " x " & FormatMontant(ligne.PrixUnitaire), fontLigne, largeur - 4)
-                    hauteur += 18
+        Private Shared Function ConstruireBlocsThermiques(data As FacturePrintData, param As ParametreDTO) As List(Of BlocThermique)
+            Dim blocs As New List(Of BlocThermique)()
+            Dim texte As Action(Of String, Integer) = Sub(t, f)
+                                                         If Not String.IsNullOrWhiteSpace(t) Then blocs.Add(New BlocThermique With {.Genre = "CENTRE", .Texte = t, .Police = f})
+                                                     End Sub
+            Dim paire As Action(Of String, String) = Sub(t, v) blocs.Add(New BlocThermique With {.Genre = "PAIRE", .Texte = t, .Valeur = v})
+            Dim separer As Action = Sub() blocs.Add(New BlocThermique With {.Genre = "SEPARATEUR"})
+            If LogoDisponible(param) Then blocs.Add(New BlocThermique With {.Genre = "LOGO", .Texte = LogoPathHelper.GetLogoPath(param)})
+            texte(If(param Is Nothing OrElse String.IsNullOrWhiteSpace(param.NomMagasin), "MAGASIN", param.NomMagasin), 0)
+            If param IsNot Nothing Then
+                texte(param.AdresseMagasin, 2)
+                texte(param.TelephoneMagasin, 2)
+            End If
+            Dim titre As String = If(EstAnnulee(data), "FACTURE ANNULÉE", If(data.ProformaThermique, "PROFORMA", If(String.IsNullOrWhiteSpace(data.TitreThermique), "FACTURE", data.TitreThermique)))
+            texte(titre, 1)
+            separer()
+            paire("Facture", Safe(data.Numero))
+            paire("Date", data.DateDocument.ToString("dd/MM/yyyy HH:mm"))
+            If Not String.IsNullOrWhiteSpace(data.Facturier) Then paire("Facturier", data.Facturier)
+            If Not String.IsNullOrWhiteSpace(data.Client) Then paire("Client", data.Client)
+            If Not String.IsNullOrWhiteSpace(data.Telephone) Then paire("Téléphone", data.Telephone)
+            If Not data.ProformaThermique AndAlso Not String.IsNullOrWhiteSpace(data.Statut) Then paire("Statut", StatutAffichage(data.Statut))
+            For Each info As KeyValuePair(Of String, String) In data.InformationsThermiques
+                paire(info.Key, info.Value)
+            Next
+            separer()
+            For Each ligne As FacturePrintLine In data.Lignes
+                blocs.Add(New BlocThermique With {
+                    .Genre = "ARTICLE", .Texte = Safe(ligne.Produit),
+                    .Detail = FormaterQuantite(ligne.Quantite) & " " & Safe(ligne.Conditionnement) & " (" & MontantThermique(ligne.PrixUnitaire) & ")",
+                    .Valeur = MontantThermique(ligne.Montant)})
+            Next
+            separer()
+            paire("Sous-total", MontantThermique(data.SousTotal))
+            If Not data.MasquerRemiseThermique Then paire("Remise", MontantThermique(data.Remise))
+            blocs.Add(New BlocThermique With {.Genre = "PAIRE", .Texte = If(String.IsNullOrWhiteSpace(data.LibelleTotalThermique), "TOTAL", data.LibelleTotalThermique), .Valeur = MontantThermique(data.Total), .Police = 3})
+            ' Une proforma ne peut afficher aucun paiement, meme si un appelant
+            ' lui fournissait par erreur des metadonnees de reglement.
+            If Not data.ProformaThermique Then
+                For Each reglement As KeyValuePair(Of String, String) In data.ReglementsThermiques
+                    paire(reglement.Key, reglement.Value)
                 Next
-                hauteur += 12 + (20 * 3) + 12
-                hauteur += HauteurTexte(g, TexteBasDocument(data), fontSection, largeur)
-                hauteur += HauteurTexte(g, Application.ProductName & " - v" & PrintConfigurationHelper.ObtenirVersionApplication(), fontLigne, largeur)
-                hauteur += HauteurTexte(g, "Développé par : Andy Ntanta", fontLigne, largeur)
-                Return Math.Max(420, hauteur + 44)
+            End If
+            separer()
+            texte(If(EstAnnulee(data), "FACTURE ANNULÉE", If(data.ProformaThermique, "DOCUMENT PROFORMA - NON ACQUITTÉ", If(String.IsNullOrWhiteSpace(data.MentionThermique), "DOCUMENT FACTURE", data.MentionThermique))), 1)
+            If Not data.ProformaThermique AndAlso Not EstAnnulee(data) Then texte("Merci pour votre confiance", 1)
+            texte(Application.ProductName & " - v" & PrintConfigurationHelper.ObtenirVersionApplication(), 2)
+            texte("Développé par : Andy NTANTA", 2)
+            texte("Imprimé le " & Date.Now.ToString("dd/MM/yyyy HH:mm"), 2)
+            Return blocs
+        End Function
+
+        Private Shared Sub DessinerPageThermique(e As PrintPageEventArgs, blocs As List(Of BlocThermique), ByRef index As Integer, suite As String)
+            e.Graphics.PageUnit = GraphicsUnit.Display
+            Dim zone As RectangleF = e.PageSettings.PrintableArea
+            Dim largeur As Single = ThermiqueMiseEnPage.LargeurUtile(e.PageBounds.Width, zone.Left, zone.Width, MargeInterneThermique)
+            ' OriginAtMargins=False : origine du Graphics au coin imprimable.
+            ' Les metadonnees du pilote sont en coordonnees papier ; soustraire
+            ' les hard margins une seule fois, pour l'apercu comme pour l'impression.
+            Dim x As Single = Math.Max(0, zone.Left) + MargeInterneThermique - e.PageSettings.HardMarginX
+            Dim y As Single = Math.Max(0, zone.Top) + 2 - e.PageSettings.HardMarginY
+            Dim bas As Single = Math.Min(e.PageBounds.Bottom, zone.Bottom) - 2 - e.PageSettings.HardMarginY
+            Dim debut As Integer = index
+            If index > 0 Then
+                Dim rappel As New BlocThermique With {.Genre = "CENTRE", .Texte = suite, .Police = 1}
+                y += TraiterBlocThermique(e.Graphics, rappel, x, y, largeur, True)
+            End If
+            While index < blocs.Count
+                Dim hauteur As Single = TraiterBlocThermique(e.Graphics, blocs(index), x, y, largeur, False)
+                If ThermiqueMiseEnPage.DoitReporter(hauteur, bas - y, index = debut) Then
+                    e.HasMorePages = True
+                    Return
+                End If
+                TraiterBlocThermique(e.Graphics, blocs(index), x, y, largeur, True)
+                y += hauteur
+                index += 1
+            End While
+            e.HasMorePages = False
+        End Sub
+
+        Private Shared Function TraiterBlocThermique(g As Graphics, bloc As BlocThermique, x As Single, y As Single, largeur As Single, dessiner As Boolean) As Single
+            If bloc.Genre = "LOGO" Then
+                If dessiner AndAlso File.Exists(bloc.Texte) Then
+                    Using image As Image = Image.FromFile(bloc.Texte)
+                        Dim largeurLogo As Single = Math.Min(90, 50.0F * image.Width / image.Height)
+                        g.DrawImage(image, x + (largeur - largeurLogo) / 2, y, largeurLogo, 50)
+                    End Using
+                End If
+                Return 54
+            End If
+            Dim taille As Single = If(bloc.Police = 0, 10.0F, If(bloc.Police = 3, 8.5F, 7.5F))
+            Using font As New Font("Segoe UI", taille, If(bloc.Police = 2, FontStyle.Regular, FontStyle.Bold)),
+                  normal As New Font("Segoe UI", 7.5F),
+                  article As New Font("Segoe UI", 7.5F, FontStyle.Bold)
+                If bloc.Genre = "SEPARATEUR" Then
+                    If dessiner Then g.DrawLine(Pens.Black, x, y + 3, x + largeur, y + 3)
+                    Return CSng(Math.Ceiling(g.MeasureString("Ag", normal).Height)) + 2
+                End If
+                If bloc.Genre = "PAIRE" Then
+                    Dim labelWidth As Single = Math.Min(82, largeur * 0.38F)
+                    Dim hauteur As Single = Math.Max(MesurerTexteThermique(g, bloc.Texte & " :", font, labelWidth), MesurerTexteThermique(g, bloc.Valeur, font, largeur - labelWidth)) + 3
+                    If dessiner Then
+                        EcrireTexteThermique(g, bloc.Texte & " :", font, x, y, labelWidth, hauteur, StringAlignment.Near)
+                        EcrireTexteThermique(g, bloc.Valeur, font, x + labelWidth, y, largeur - labelWidth, hauteur, StringAlignment.Far)
+                    End If
+                    Return hauteur
+                End If
+                If bloc.Genre = "ARTICLE" Then
+                    Dim nomHeight As Single = MesurerTexteThermique(g, bloc.Texte, article, largeur) + 2
+                    Dim montantSouhaite As Single = g.MeasureString(Safe(bloc.Valeur), normal).Width + 8
+                    If montantSouhaite > largeur * 0.45F Then
+                        ' Un grand montant garde toute la largeur sur sa propre
+                        ' ligne, plutot qu'une colonne trop etroite ou une police minuscule.
+                        Dim detailLong As Single = MesurerTexteThermique(g, bloc.Detail, normal, largeur - 4) + 3
+                        Dim montantLong As Single = MesurerTexteThermique(g, bloc.Valeur, normal, largeur) + 3
+                        If dessiner Then
+                            EcrireTexteThermique(g, bloc.Texte, article, x, y, largeur, nomHeight, StringAlignment.Near)
+                            EcrireTexteThermique(g, bloc.Detail, normal, x + 4, y + nomHeight, largeur - 4, detailLong, StringAlignment.Near)
+                            EcrireTexteThermique(g, bloc.Valeur, normal, x, y + nomHeight + detailLong, largeur, montantLong, StringAlignment.Far)
+                        End If
+                        Return nomHeight + detailLong + montantLong + 2
+                    End If
+                    Dim montantWidth As Single = Math.Min(largeur * 0.45F, Math.Max(70, montantSouhaite))
+                    Dim detailWidth As Single = largeur - montantWidth - 6
+                    Dim detailHeight As Single = Math.Max(MesurerTexteThermique(g, bloc.Detail, normal, detailWidth - 4), MesurerTexteThermique(g, bloc.Valeur, normal, montantWidth)) + 3
+                    If dessiner Then
+                        EcrireTexteThermique(g, bloc.Texte, article, x, y, largeur, nomHeight, StringAlignment.Near)
+                        EcrireTexteThermique(g, bloc.Detail, normal, x + 4, y + nomHeight, detailWidth - 4, detailHeight, StringAlignment.Near)
+                        EcrireTexteThermique(g, bloc.Valeur, normal, x + largeur - montantWidth, y + nomHeight, montantWidth, detailHeight, StringAlignment.Far)
+                    End If
+                    Return nomHeight + detailHeight + 2
+                End If
+                Dim textHeight As Single = MesurerTexteThermique(g, bloc.Texte, font, largeur) + 2
+                If dessiner Then EcrireTexteThermique(g, bloc.Texte, font, x, y, largeur, textHeight, StringAlignment.Center)
+                Return textHeight
             End Using
         End Function
 
-        Private Shared Sub DessinerThermique(e As PrintPageEventArgs, data As FacturePrintData, param As ParametreDTO)
-            e.Graphics.PageUnit = GraphicsUnit.Display
-            Dim page As RectangleF = e.PageBounds
-            Dim contentMargin As Single = 8.0F
-            Dim contentLeft As Single = page.Left + contentMargin
-            Dim contentWidth As Single = Math.Max(220.0F, page.Width - (2.0F * contentMargin))
-            Dim y As Single = page.Top + 6.0F
+        Private Shared Function MesurerTexteThermique(g As Graphics, texte As String, font As Font, largeur As Single) As Single
+            Return CSng(Math.Ceiling(g.MeasureString(Safe(texte), font, New SizeF(largeur, 100000)).Height))
+        End Function
 
-            Using fontTitre As New Font("Segoe UI", 10, FontStyle.Bold),
-                  fontSection As New Font("Segoe UI", 7.5F, FontStyle.Bold),
-                  fontLigne As New Font("Segoe UI", 7.5F),
-                  fontTotal As New Font("Segoe UI", 8.5F, FontStyle.Bold)
-
-                Dim logoPath As String = If(param Is Nothing, String.Empty, LogoPathHelper.GetLogoPath(param))
-                If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
-                    Using img As Image = Image.FromFile(logoPath)
-                        e.Graphics.DrawImage(img, contentLeft + ((contentWidth - 42) / 2.0F), y, 42, 42)
-                    End Using
-                    y += 46
-                End If
-
-                y = DessinerTexteCentreTicket(e.Graphics, If(param IsNot Nothing AndAlso param.NomMagasin <> "", param.NomMagasin, "COMMERCIAL PRO"), fontTitre, contentLeft, contentWidth, y)
-                If param IsNot Nothing AndAlso param.AdresseMagasin <> "" Then y = DessinerTexteCentreTicket(e.Graphics, param.AdresseMagasin, fontLigne, contentLeft, contentWidth, y)
-                If param IsNot Nothing AndAlso param.TelephoneMagasin <> "" Then y = DessinerTexteCentreTicket(e.Graphics, param.TelephoneMagasin, fontLigne, contentLeft, contentWidth, y)
-                y = DessinerSeparateurTicket(e.Graphics, contentLeft, contentWidth, y)
-                y = DessinerTexteCentreTicket(e.Graphics, TitreDocument(data), fontSection, contentLeft, contentWidth, y + 2)
-                y = DessinerSeparateurTicket(e.Graphics, contentLeft, contentWidth, y)
-                y = DessinerPaireTicket(e.Graphics, "N°", Safe(data.Numero), fontLigne, contentLeft, contentWidth, y)
-                y = DessinerPaireTicket(e.Graphics, "Date", data.DateDocument.ToString("dd/MM/yyyy HH:mm"), fontLigne, contentLeft, contentWidth, y)
-                y = DessinerPaireTicket(e.Graphics, "Client", If(String.IsNullOrWhiteSpace(data.Client), "CLIENT", data.Client), fontLigne, contentLeft, contentWidth, y)
-                If Not String.IsNullOrWhiteSpace(data.Telephone) Then y = DessinerPaireTicket(e.Graphics, "Téléphone", data.Telephone, fontLigne, contentLeft, contentWidth, y)
-                y = DessinerPaireTicket(e.Graphics, "Facturier", Safe(data.Facturier), fontLigne, contentLeft, contentWidth, y)
-                y = DessinerSeparateurTicket(e.Graphics, contentLeft, contentWidth, y)
-                y = DessinerTexteGaucheTicket(e.Graphics, "ARTICLE", fontSection, contentLeft, contentWidth, y)
-
-                For Each ligne As FacturePrintLine In If(data.Lignes, New List(Of FacturePrintLine)())
-                    y = DessinerTexteGaucheTicket(e.Graphics, Safe(ligne.Produit), fontSection, contentLeft, contentWidth, y + 2)
-                    y = DessinerTexteGaucheTicket(e.Graphics, FormaterQuantite(ligne.Quantite) & " " & Safe(ligne.Conditionnement) & " x " & FormatMontant(ligne.PrixUnitaire), fontLigne, contentLeft + 4, contentWidth - 4, y)
-                    y = DessinerTexteDroiteTicket(e.Graphics, FormatMontant(ligne.Montant), fontLigne, contentLeft, contentWidth, y)
-                Next
-
-                y = DessinerSeparateurTicket(e.Graphics, contentLeft, contentWidth, y)
-                y = DessinerPaireTicket(e.Graphics, "Sous-total", FormatMontant(data.SousTotal), fontLigne, contentLeft, contentWidth, y)
-                y = DessinerPaireTicket(e.Graphics, "Remise", FormatMontant(data.Remise), fontLigne, contentLeft, contentWidth, y)
-                y = DessinerPaireTicket(e.Graphics, "TOTAL", FormatMontant(data.Total), fontTotal, contentLeft, contentWidth, y)
-                y = DessinerSeparateurDoubleTicket(e.Graphics, contentLeft, contentWidth, y)
-                y = DessinerTexteCentreTicket(e.Graphics, TexteBasDocument(data), fontSection, contentLeft, contentWidth, y)
-                y = DessinerTexteCentreTicket(e.Graphics, Application.ProductName & " - v" & PrintConfigurationHelper.ObtenirVersionApplication(), fontLigne, contentLeft, contentWidth, y)
-                y = DessinerTexteCentreTicket(e.Graphics, "Développé par : Andy Ntanta", fontLigne, contentLeft, contentWidth, y)
+        Private Shared Sub EcrireTexteThermique(g As Graphics, texte As String, font As Font, x As Single, y As Single, largeur As Single, hauteur As Single, alignement As StringAlignment)
+            Using format As New StringFormat() With {.Alignment = alignement}
+                g.DrawString(Safe(texte), font, Brushes.Black, New RectangleF(x, y, largeur, hauteur), format)
             End Using
         End Sub
 
-        Private Shared Function DessinerTexteCentreTicket(g As Graphics, texte As String, font As Font, x As Single, largeur As Single, y As Single) As Single
-            Dim size As SizeF = g.MeasureString(Safe(texte), font, New SizeF(largeur, 1000))
-            Using fmtCentre As New StringFormat()
-                fmtCentre.Alignment = StringAlignment.Center
-                g.DrawString(Safe(texte), font, Brushes.Black, New RectangleF(x, y, largeur, size.Height), fmtCentre)
-            End Using
-            Return y + CSng(Math.Ceiling(size.Height)) + 2
-        End Function
-
-        Private Shared Function DessinerTexteGaucheTicket(g As Graphics, texte As String, font As Font, x As Single, largeur As Single, y As Single) As Single
-            Dim size As SizeF = g.MeasureString(Safe(texte), font, New SizeF(largeur, 1000))
-            g.DrawString(Safe(texte), font, Brushes.Black, New RectangleF(x, y, largeur, size.Height))
-            Return y + CSng(Math.Ceiling(size.Height)) + 2
-        End Function
-
-        Private Shared Function DessinerTexteDroiteTicket(g As Graphics, texte As String, font As Font, x As Single, largeur As Single, y As Single) As Single
-            Using fmtDroite As New StringFormat()
-                fmtDroite.Alignment = StringAlignment.Far
-                g.DrawString(Safe(texte), font, Brushes.Black, New RectangleF(x, y, largeur, 18), fmtDroite)
-            End Using
-            Return y + 18
-        End Function
-
-        Private Shared Function DessinerPaireTicket(g As Graphics, libelle As String, valeur As String, font As Font, x As Single, largeur As Single, y As Single) As Single
-            Dim largeurLibelle As Single = Math.Min(82.0F, largeur * 0.38F)
-            g.DrawString(libelle & " :", font, Brushes.Black, New RectangleF(x, y, largeurLibelle, 18))
-            Using fmtDroite As New StringFormat()
-                fmtDroite.Alignment = StringAlignment.Far
-                g.DrawString(Safe(valeur), font, Brushes.Black, New RectangleF(x + largeurLibelle, y, largeur - largeurLibelle, 34), fmtDroite)
-            End Using
-            Return y + 18
-        End Function
-
-        Private Shared Function DessinerSeparateurTicket(g As Graphics, x As Single, largeur As Single, y As Single) As Single
-            g.DrawLine(Pens.Black, x, y + 4, x + largeur - 1, y + 4)
-            Return y + 10
-        End Function
-
-        Private Shared Function DessinerSeparateurDoubleTicket(g As Graphics, x As Single, largeur As Single, y As Single) As Single
-            g.DrawLine(Pens.Black, x, y + 4, x + largeur - 1, y + 4)
-            g.DrawLine(Pens.Black, x, y + 8, x + largeur - 1, y + 8)
-            Return y + 14
+        Private Shared Function MontantThermique(valeur As Decimal) As String
+            Return valeur.ToString("#,##0", Globalization.CultureInfo.GetCultureInfo("fr-FR")) & " FC"
         End Function
 
         Private Shared Sub DessinerTexteCentre(g As Graphics, texte As String, font As Font, brush As Brush, rect As RectangleF)

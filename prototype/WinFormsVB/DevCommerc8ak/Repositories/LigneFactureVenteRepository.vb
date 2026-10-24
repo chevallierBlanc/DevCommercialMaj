@@ -11,8 +11,12 @@ Namespace DevCommerc8ak
         Private ReadOnly _dal As DAL
 
         Public Sub New(dal As DAL)
+            Me.New(dal, True)
+        End Sub
+
+        Public Sub New(dal As DAL, assurerSchema As Boolean)
             _dal = dal
-            AssurerSchema()
+            If assurerSchema Then Me.AssurerSchema()
         End Sub
 
         Private Sub AssurerSchema()

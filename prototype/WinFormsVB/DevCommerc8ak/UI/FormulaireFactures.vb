@@ -48,6 +48,7 @@ Namespace DevCommerc8ak
         Private ReadOnly lblTotalAttente As Label
         Private ReadOnly lblTotalPaye As Label
         Private _isRefreshingFromEvent As Boolean
+        Private _impressionEnCours As Boolean
 
         Public Sub New()
             ' Configuration de la Form
@@ -584,7 +585,23 @@ Namespace DevCommerc8ak
         End Class
 
         Private Sub ImprimerFacture(factureId As Integer, numero As String, client As String, tel As String)
+            If _impressionEnCours Then Return
+            _impressionEnCours = True
             Try
+                If factureId <= 0 Then Throw New InvalidOperationException("Sélectionnez une facture valide.")
+                Using choix As New FormChoixImpressionDocument("Imprimer la facture", "Facture A4")
+                    If choix.ShowDialog(Me) <> DialogResult.OK Then Return
+                    If choix.FormatSelectionne = "THERMIQUE" Then
+                        Dim ticket As FacturePrintData = ConstruireDonneesFacture(factureId, numero, client, tel, lectureSeule:=True)
+                        CompleterTicketHistorique(factureId, ticket)
+                        Using doc As Printing.PrintDocument = FacturePrintRenderer.CreerDocumentThermique(ticket, PrintConfigurationHelper.ChargerParametres(), Me, "FormulaireFactures", "TicketHistorique")
+                            Using preview As New FormApercuTicket(doc, Sub() doc.Print())
+                                preview.ShowDialog(Me)
+                            End Using
+                        End Using
+                        Return
+                    End If
+                End Using
                 Dim data As FacturePrintData = ConstruireDonneesFacture(factureId, numero, client, tel)
                 Dim param As ParametreDTO = PrintConfigurationHelper.ChargerParametres()
                 Using doc As Printing.PrintDocument = FacturePrintRenderer.CreerDocumentA4(data, param)
@@ -601,14 +618,35 @@ Namespace DevCommerc8ak
                 End Using
             Catch ex As Exception
                 MessageBox.Show("Erreur impression facture: " & ex.Message)
+            Finally
+                _impressionEnCours = False
             End Try
         End Sub
 
-        Private Function ConstruireDonneesFacture(factureId As Integer, numero As String, client As String, tel As String) As FacturePrintData
+        Private Sub CompleterTicketHistorique(factureId As Integer, data As FacturePrintData)
+            Dim infos As DataTable = New FactureImpressionRepository(ObtenirDAL()).LireReglementsEtAuteur(factureId)
+            If infos.Rows.Count = 0 Then Throw New InvalidOperationException("Facture introuvable.")
+            Dim auteur As DataRow = infos.Rows(0)
+            data.Facturier = If(auteur.IsNull("Facturier"), "Auteur historique #" & Convert.ToString(auteur("CreePar")), Convert.ToString(auteur("Facturier")))
+            For Each paiement As DataRow In infos.Rows
+                If paiement.IsNull("PaiementId") Then Continue For
+                Dim devise As String = Convert.ToString(paiement("DeviseMontants"))
+                If String.IsNullOrWhiteSpace(devise) Then devise = "(devise historique non renseignée)"
+                Dim montant As String = Convert.ToDecimal(paiement("Montant")).ToString("N2") & " " & devise
+                data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Règlement #" & Convert.ToString(paiement("PaiementId")), montant))
+                data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Mode paiement", Convert.ToString(paiement("ModePaiement"))))
+                data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Caissier", If(paiement.IsNull("Caissier"), "Utilisateur #" & Convert.ToString(paiement("PayePar")), Convert.ToString(paiement("Caissier")))))
+                If Not paiement.IsNull("PayeLe") Then data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Payé le", Convert.ToDateTime(paiement("PayeLe")).ToString("dd/MM/yyyy HH:mm")))
+                If Not paiement.IsNull("ReferencePaiement") Then data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Référence", Convert.ToString(paiement("ReferencePaiement"))))
+            Next
+        End Sub
+
+        Private Function ConstruireDonneesFacture(factureId As Integer, numero As String, client As String, tel As String, Optional lectureSeule As Boolean = False) As FacturePrintData
+            If factureId <= 0 Then Throw New ArgumentOutOfRangeException(NameOf(factureId))
             Dim entete As DataRow = ChargerEnteteFacture(factureId)
             If entete Is Nothing Then Throw New InvalidOperationException("Facture introuvable.")
 
-            Dim lignesTable As DataTable = New LigneFactureVenteRepository(ObtenirDAL()).ListerDetailsParFacture(factureId)
+            Dim lignesTable As DataTable = New LigneFactureVenteRepository(ObtenirDAL(), assurerSchema:=Not lectureSeule).ListerDetailsParFacture(factureId)
             Dim lignes As New List(Of FacturePrintLine)()
             For Each row As DataRow In lignesTable.Rows
                 Dim quantite As Decimal = If(row.IsNull("QuantiteSaisie"), Convert.ToDecimal(row("Quantite")), Convert.ToDecimal(row("QuantiteSaisie")))

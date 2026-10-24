@@ -3,6 +3,7 @@ Option Explicit On
 
 Imports System
 Imports System.Configuration
+Imports System.Collections.Generic
 Imports System.Data
 Imports System.Drawing
 Imports System.IO
@@ -704,8 +705,10 @@ Namespace DevCommerc8ak
                 Dim totalCopies As Integer = Math.Max(1, copies)
 
                 If afficherApercu AndAlso _param IsNot Nothing AndAlso _param.ApercuAvantImpression Then
-                    Using preview As New FormApercuTicket(CreerDocumentTicket(ticket, 1, totalCopies), Sub() ImprimerTicketsDistincts(ticket, totalCopies))
-                        preview.ShowDialog(Me)
+                    Using documentApercu As Printing.PrintDocument = CreerDocumentTicket(ticket, 1, totalCopies)
+                        Using preview As New FormApercuTicket(documentApercu, Sub() ImprimerTicketsDistincts(ticket, totalCopies))
+                            preview.ShowDialog(Me)
+                        End Using
                     End Using
                 Else
                     ImprimerTicketsDistincts(ticket, totalCopies)
@@ -729,278 +732,34 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Function CreerDocumentTicket(ticket As TicketData, copieCourante As Integer, totalCopies As Integer) As Printing.PrintDocument
-            Dim doc As New Printing.PrintDocument()
-            Dim largeurTicket As Integer = 315
-            _param = PrintConfigurationHelper.ChargerParametres()
-            Dim hauteurTicket As Integer = CalculerHauteurTicket(ticket, _param, largeurTicket)
-            _param = PrintConfigurationHelper.ConfigurerDocumentThermique(doc, Me, "CaisseForm", "ImprimerTicket", largeurTicket, hauteurTicket)
-            doc.PrinterSettings.Copies = 1S
-            doc.DefaultPageSettings.Color = If(_param IsNot Nothing, _param.ImpressionCouleur, True)
-            doc.DefaultPageSettings.Margins = New Printing.Margins(2, 2, 2, 2)
-
-            Dim numeroCopie As Integer = Math.Max(1, copieCourante)
-            Dim nombreCopies As Integer = Math.Max(1, totalCopies)
-            AddHandler doc.PrintPage,
-                Sub(s, eV)
-                    ImprimerPageTicket(eV, ticket, numeroCopie, nombreCopies)
-                    eV.HasMorePages = False
-                End Sub
-
-            Return doc
-        End Function
-
-        Private Shared Function CalculerHauteurTicket(ticket As TicketData, param As ParametreDTO, largeurPapier As Integer) As Integer
-            Using bmp As New Bitmap(1, 1)
-                Using g As Graphics = Graphics.FromImage(bmp)
-                    Dim margeInterne As Integer = Math.Max(4, CInt(Math.Round(g.DpiX * 3D / 25.4D)))
-                    Dim gauche As Integer = 2 + margeInterne
-                    Dim droite As Integer = largeurPapier - 2 - margeInterne
-                    Dim largeurDisponible As Integer = Math.Max(180, droite - gauche)
-                    Dim y As Integer = 3
-
-                    Using fontTitre As New Font("Segoe UI", 10, FontStyle.Bold),
-                          fontSection As New Font("Segoe UI", 7.5F, FontStyle.Bold),
-                          fontLigne As New Font("Segoe UI", 7.5F),
-                          fontTotal As New Font("Segoe UI", 8.5F, FontStyle.Bold)
-
-                        Dim logoPath As String = If(param Is Nothing, String.Empty, LogoPathHelper.GetLogoPath(param))
-                        If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
-                            y += 54
-                        End If
-
-                        y = MesurerTexteTicket(g, If(param Is Nothing OrElse param.NomMagasin = "", "MAGASIN", param.NomMagasin), fontTitre, largeurDisponible, y)
-                        If param IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(param.AdresseMagasin) Then
-                            y = MesurerTexteTicket(g, param.AdresseMagasin, fontLigne, largeurDisponible, y)
-                        End If
-                        If param IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(param.TelephoneMagasin) Then
-                            y = MesurerTexteTicket(g, param.TelephoneMagasin, fontLigne, largeurDisponible, y)
-                        End If
-                        y = MesurerTexteTicket(g, "TICKET DE CAISSE", fontSection, largeurDisponible, y + 2)
-                        y = MesurerSeparateurTicket(g, fontLigne, y)
-                        If ticket IsNot Nothing Then
-                            y = MesurerBlocTicket(g, ticket.Numero, fontLigne, droite - gauche, y)
-                            y = MesurerBlocTicket(g, ticket.DateFacture.ToString("dd/MM/yyyy HH:mm"), fontLigne, droite - gauche, y)
-                            y = MesurerBlocTicket(g, ticket.Caissier, fontLigne, droite - gauche, y)
-                            If Not String.IsNullOrWhiteSpace(ticket.Client) Then
-                                y = MesurerBlocTicket(g, ticket.Client, fontLigne, droite - gauche, y)
-                            End If
-                        End If
-                        y = MesurerBlocTicket(g, "2/2", fontLigne, droite - gauche, y)
-                        y = MesurerSeparateurTicket(g, fontLigne, y)
-
-                        If ticket IsNot Nothing AndAlso ticket.Lignes IsNot Nothing Then
-                            For Each row As DataRow In ticket.Lignes.Rows
-                                Dim libelle As String = Convert.ToString(row("Libelle"))
-                                Dim qte As Decimal = SafeDecimalTicket(row, "QuantiteSaisie")
-                                Dim prix As Decimal = SafeDecimalTicket(row, "PrixUnitaire")
-                                Dim total As Decimal = SafeDecimalTicket(row, "MontantLigne")
-                                Dim libelleType As String = GetLibelleTypeVentePourTicket(row, qte)
-                                y = MesurerTexteTicket(g, libelle, fontSection, largeurDisponible, y)
-                                y = MesurerLigneArticleTicket(g, FormaterQuantiteTicket(qte) & " " & libelleType & " (" & FormatMontantTicket(prix) & ")", FormatMontantTicket(total), fontLigne, droite - gauche - 4, y)
-                            Next
-                        End If
-
-                        y = MesurerSeparateurTicket(g, fontLigne, y)
-                        y = MesurerBlocTicket(g, If(ticket Is Nothing, String.Empty, FormatMontantTicket(ticket.Total)), fontLigne, droite - gauche, y)
-                        y = MesurerBlocTicket(g, If(ticket Is Nothing, String.Empty, FormatMontantTicket(ticket.Total)), fontTotal, droite - gauche, y)
-                        y = MesurerBlocTicket(g, If(ticket Is Nothing, String.Empty, FormaterMontantTicket(ticket.MontantRecu, ticket.Devise)), fontLigne, droite - gauche, y)
-                        y = MesurerBlocTicket(g, If(ticket Is Nothing, String.Empty, FormatMontantTicket(ticket.Monnaie)), fontLigne, droite - gauche, y)
-                        y = MesurerBlocTicket(g, If(ticket Is Nothing, String.Empty, ticket.ModePaiement), fontLigne, droite - gauche, y)
-                        If ticket IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(ticket.ReferencePaiement) Then
-                            y = MesurerBlocTicket(g, ticket.ReferencePaiement, fontLigne, droite - gauche, y)
-                        End If
-                        y = MesurerSeparateurTicket(g, fontLigne, y)
-                        y = MesurerTexteTicket(g, "ACHAT DÉFINITIF - Aucun échange ni reprise.", fontLigne, largeurDisponible, y)
-                        y = MesurerTexteTicket(g, "Merci pour votre confiance", fontSection, largeurDisponible, y)
-                        Dim nomApplication As String = If(String.IsNullOrWhiteSpace(Application.ProductName), "COMMERCIAL PRO", Application.ProductName)
-                        y = MesurerTexteTicket(g, nomApplication & " - v" & PrintConfigurationHelper.ObtenirVersionApplication(), fontLigne, largeurDisponible, y)
-                        y = MesurerTexteTicket(g, "Développé par : Andy NTANTA", fontLigne, largeurDisponible, y)
-                        y = MesurerTexteTicket(g, "Imprimé le " & Date.Now.ToString("dd/MM/yyyy HH:mm"), fontLigne, largeurDisponible, y)
-                    End Using
-
-                    Return Math.Max(420, Math.Min(5000, y + 90))
-                End Using
-            End Using
-        End Function
-
-        Private Shared Function MesurerSeparateurTicket(graphics As Graphics, font As Font, y As Integer) As Integer
-            Return y + CInt(Math.Ceiling(font.GetHeight(graphics))) + 2
-        End Function
-
-        Private Shared Function MesurerTexteTicket(graphics As Graphics, texte As String, font As Font, largeur As Integer, y As Integer) As Integer
-            If String.IsNullOrWhiteSpace(texte) Then
-                Return y
-            End If
-
-            Dim taille As SizeF = graphics.MeasureString(texte, font, New SizeF(largeur, 1000))
-            Return y + CInt(Math.Ceiling(taille.Height)) + 2
-        End Function
-
-        Private Shared Function MesurerBlocTicket(graphics As Graphics, valeur As String, font As Font, largeurTotale As Integer, y As Integer) As Integer
-            Dim largeurLibelle As Integer = Math.Min(82, Math.Max(58, CInt(largeurTotale * 0.38R)))
-            Dim largeurValeur As Integer = Math.Max(50, largeurTotale - largeurLibelle)
-            Dim tailleValeur As SizeF = graphics.MeasureString(If(valeur, String.Empty), font, New SizeF(largeurValeur, 1000))
-            Dim hauteur As Integer = Math.Max(CInt(Math.Ceiling(font.GetHeight(graphics))), CInt(Math.Ceiling(tailleValeur.Height))) + 3
-            Return y + hauteur
-        End Function
-
-        Private Shared Function MesurerLigneArticleTicket(graphics As Graphics, detail As String, montant As String, font As Font, largeurTotale As Integer, y As Integer) As Integer
-            Dim largeurMontant As Integer = Math.Min(CInt(largeurTotale * 0.45R), Math.Max(70, CInt(Math.Ceiling(graphics.MeasureString(If(montant, String.Empty), font).Width)) + 8))
-            Dim largeurDetail As Integer = Math.Max(60, largeurTotale - largeurMontant - 6)
-            Dim tailleDetail As SizeF = graphics.MeasureString(If(detail, String.Empty), font, New SizeF(largeurDetail, 1000))
-            Dim hauteur As Integer = Math.Max(CInt(Math.Ceiling(tailleDetail.Height)), CInt(Math.Ceiling(font.GetHeight(graphics)))) + 3
-            Return y + hauteur
-        End Function
-
-        Private Sub ConfigurerTicket80Mm(doc As Printing.PrintDocument)
-            Try
-                Dim largeur As Integer = CInt(Math.Round(80D / 25.4D * 100D))
-                Dim hauteur As Integer = 1200
-                doc.DefaultPageSettings.PaperSize = New Printing.PaperSize("Ticket80mm", largeur, hauteur)
-                doc.DefaultPageSettings.Margins = New Printing.Margins(5, 5, 5, 5)
-            Catch ex As Exception
-                Dim log As New ProductionLogService()
-                log.Warn("CaisseForm", "ConfigurerTicket80Mm", "Impossible de configurer le format ticket 80mm.")
-                log.Error("CaisseForm", "ConfigurerTicket80Mm", "Erreur configuration ticket 80mm.", ex)
-            End Try
-        End Sub
-
-        Private Sub ImprimerPageTicket(e As Printing.PrintPageEventArgs, ticket As TicketData, copieCourante As Integer, totalCopies As Integer)
-            Dim margeInterne As Integer = Math.Max(4, CInt(Math.Round(e.Graphics.DpiX * 3D / 25.4D)))
-            Dim gauche As Integer = e.MarginBounds.Left + margeInterne
-            Dim droite As Integer = e.MarginBounds.Right - margeInterne
-            If droite <= gauche Then
-                gauche = e.MarginBounds.Left
-                droite = e.MarginBounds.Right
-            End If
-
-            Dim largeurDisponible As Integer = Math.Max(180, droite - gauche)
-            Dim y As Integer = e.MarginBounds.Top + 1
-            Dim fontTitre As New Font("Segoe UI", 10, FontStyle.Bold)
-            Dim fontSection As New Font("Segoe UI", 7.5F, FontStyle.Bold)
-            Dim fontLigne As New Font("Segoe UI", 7.5F)
-            Dim fontTotal As New Font("Segoe UI", 8.5F, FontStyle.Bold)
-            Dim titre As String = If(_param Is Nothing OrElse _param.NomMagasin = "", "MAGASIN", _param.NomMagasin)
-
-            Dim logoPath As String = If(_param Is Nothing, String.Empty, LogoPathHelper.GetLogoPath(_param))
-            If Not String.IsNullOrWhiteSpace(logoPath) AndAlso File.Exists(logoPath) Then
-                Using image As Image = Image.FromFile(logoPath)
-                    Dim ratio As Decimal = If(image.Height <= 0, 1D, CDec(image.Width) / CDec(image.Height))
-                    Dim hauteurLogo As Integer = 50
-                    Dim largeurLogo As Integer = CInt(Math.Min(90D, hauteurLogo * CDbl(ratio)))
-                    Dim xLogo As Integer = gauche + ((largeurDisponible - largeurLogo) \ 2)
-                    e.Graphics.DrawImage(image, xLogo, y, largeurLogo, hauteurLogo)
-                    y += hauteurLogo + 4
-                End Using
-            End If
-
-            y = DessinerTexteCentre(e.Graphics, titre, fontTitre, gauche, largeurDisponible, y)
-            If _param IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(_param.AdresseMagasin) Then
-                y = DessinerTexteCentre(e.Graphics, _param.AdresseMagasin, fontLigne, gauche, largeurDisponible, y)
-            End If
-            If _param IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(_param.TelephoneMagasin) Then
-                y = DessinerTexteCentre(e.Graphics, _param.TelephoneMagasin, fontLigne, gauche, largeurDisponible, y)
-            End If
-            y = DessinerTexteCentre(e.Graphics, "TICKET DE CAISSE", fontSection, gauche, largeurDisponible, y + 2)
-            y = DessinerSeparateurTicket(e.Graphics, fontLigne, gauche, y, largeurDisponible)
-            y = DessinerBlocTicket(e.Graphics, "Facture", ticket.Numero, fontLigne, gauche, droite, y)
-            y = DessinerBlocTicket(e.Graphics, "Date", ticket.DateFacture.ToString("dd/MM/yyyy HH:mm"), fontLigne, gauche, droite, y)
-            y = DessinerBlocTicket(e.Graphics, "Caissier", ticket.Caissier, fontLigne, gauche, droite, y)
-            If Not String.IsNullOrWhiteSpace(ticket.Client) Then
-                y = DessinerBlocTicket(e.Graphics, "Client", ticket.Client, fontLigne, gauche, droite, y)
-            End If
-            y = DessinerBlocTicket(e.Graphics, "Exemplaire", copieCourante.ToString() & "/" & totalCopies.ToString(), fontLigne, gauche, droite, y)
-            y = DessinerSeparateurTicket(e.Graphics, fontLigne, gauche, y, largeurDisponible)
-
+            ' Adaptateur de presentation seulement : les montants du ticket sont
+            ' ceux deja produits par le parcours de caisse, sans nouvel encaissement.
+            Dim data As New FacturePrintData With {
+                .Numero = ticket.Numero, .DateDocument = ticket.DateFacture,
+                .Client = ticket.Client, .Telephone = ticket.Telephone,
+                .SousTotal = ticket.Total, .Total = ticket.Total,
+                .TitreThermique = "TICKET DE CAISSE", .LibelleTotalThermique = "Montant à payer",
+                .MasquerRemiseThermique = True,
+                .MentionThermique = "ACHAT DÉFINITIF - Aucun échange ni reprise.",
+                .Lignes = New List(Of FacturePrintLine)()}
+            data.InformationsThermiques.Add(New KeyValuePair(Of String, String)("Caissier", ticket.Caissier))
+            data.InformationsThermiques.Add(New KeyValuePair(Of String, String)("Exemplaire", Math.Max(1, copieCourante).ToString() & "/" & Math.Max(1, totalCopies).ToString()))
             If ticket.Lignes IsNot Nothing Then
                 For Each row As DataRow In ticket.Lignes.Rows
-                    Dim libelle As String = Convert.ToString(row("Libelle"))
-                    Dim qte As Decimal = SafeDecimalTicket(row, "QuantiteSaisie")
-                    Dim prix As Decimal = SafeDecimalTicket(row, "PrixUnitaire")
-                    Dim total As Decimal = SafeDecimalTicket(row, "MontantLigne")
-                    Dim libelleType As String = GetLibelleTypeVentePourTicket(row, qte)
-
-                    y = DessinerTexteGauche(e.Graphics, libelle, fontSection, gauche, largeurDisponible, y)
-                    y = DessinerLigneArticleTicket(e.Graphics, FormaterQuantiteTicket(qte) & " " & libelleType & " (" & FormatMontantTicket(prix) & ")", FormatMontantTicket(total), fontLigne, gauche + 4, droite, y)
+                    Dim quantite As Decimal = SafeDecimalTicket(row, "QuantiteSaisie")
+                    data.Lignes.Add(New FacturePrintLine With {
+                        .Produit = SafeStringTicket(row, "Libelle"),
+                        .Conditionnement = GetLibelleTypeVentePourTicket(row, quantite),
+                        .Quantite = quantite, .PrixUnitaire = SafeDecimalTicket(row, "PrixUnitaire"),
+                        .Montant = SafeDecimalTicket(row, "MontantLigne")})
                 Next
             End If
-
-            y = DessinerSeparateurTicket(e.Graphics, fontLigne, gauche, y, largeurDisponible)
-            y = DessinerBlocTicket(e.Graphics, "Sous-total", FormatMontantTicket(ticket.Total), fontLigne, gauche, droite, y)
-            y = DessinerBlocTicket(e.Graphics, "Montant à payer", FormatMontantTicket(ticket.Total), fontTotal, gauche, droite, y)
-            y = DessinerBlocTicket(e.Graphics, "Montant reçu", FormaterMontantTicket(ticket.MontantRecu, ticket.Devise), fontLigne, gauche, droite, y)
-            y = DessinerBlocTicket(e.Graphics, "Monnaie rendue", FormatMontantTicket(ticket.Monnaie), fontLigne, gauche, droite, y)
-            y = DessinerBlocTicket(e.Graphics, "Mode paiement", ticket.ModePaiement, fontLigne, gauche, droite, y)
-            If Not String.IsNullOrWhiteSpace(ticket.ReferencePaiement) Then
-                y = DessinerBlocTicket(e.Graphics, "Référence", ticket.ReferencePaiement, fontLigne, gauche, droite, y)
-            End If
-            y = DessinerSeparateurTicket(e.Graphics, fontLigne, gauche, y, largeurDisponible)
-            y = DessinerTexteCentre(e.Graphics, "ACHAT DÉFINITIF - Aucun échange ni reprise.", fontLigne, gauche, largeurDisponible, y)
-            y = DessinerTexteCentre(e.Graphics, "Merci pour votre confiance", fontSection, gauche, largeurDisponible, y)
-            Dim nomApplication As String = If(String.IsNullOrWhiteSpace(Application.ProductName), "COMMERCIAL PRO", Application.ProductName)
-            y = DessinerTexteCentre(e.Graphics, nomApplication & " - v" & PrintConfigurationHelper.ObtenirVersionApplication(), fontLigne, gauche, largeurDisponible, y)
-            y = DessinerTexteCentre(e.Graphics, "Développé par : Andy NTANTA", fontLigne, gauche, largeurDisponible, y)
-            y = DessinerTexteCentre(e.Graphics, "Imprimé le " & Date.Now.ToString("dd/MM/yyyy HH:mm"), fontLigne, gauche, largeurDisponible, y)
-        End Sub
-
-        Private Function DessinerSeparateurTicket(graphics As Graphics, font As Font, x As Integer, y As Integer, largeur As Integer) As Integer
-            graphics.DrawLine(Pens.Black, x, y + 3, x + largeur - 1, y + 3)
-            Return y + CInt(Math.Ceiling(font.GetHeight(graphics))) + 2
-        End Function
-
-        Private Function DessinerBlocTicket(graphics As Graphics, libelle As String, valeur As String, font As Font, xGauche As Integer, xDroite As Integer, y As Integer) As Integer
-            Dim largeurTotale As Integer = Math.Max(120, xDroite - xGauche)
-            Dim largeurLibelle As Integer = Math.Min(82, Math.Max(58, CInt(largeurTotale * 0.38R)))
-            Dim xValeur As Integer = xGauche + largeurLibelle
-            Dim largeurValeur As Integer = Math.Max(50, xDroite - xValeur)
-            Dim layoutValeur As New SizeF(largeurValeur, 1000)
-            Dim tailleValeur As SizeF = graphics.MeasureString(If(valeur, String.Empty), font, layoutValeur)
-            Dim hauteur As Integer = Math.Max(CInt(Math.Ceiling(font.GetHeight(graphics))), CInt(Math.Ceiling(tailleValeur.Height))) + 3
-
-            graphics.DrawString(libelle & " :", font, Brushes.Black, New RectangleF(xGauche, y, largeurLibelle, hauteur))
-            Using formatValeur As New StringFormat()
-                formatValeur.Alignment = StringAlignment.Far
-                graphics.DrawString(If(valeur, String.Empty), font, Brushes.Black, New RectangleF(xValeur, y, largeurValeur, hauteur), formatValeur)
-            End Using
-            Return y + hauteur
-        End Function
-
-        Private Function DessinerLigneArticleTicket(graphics As Graphics, detail As String, montant As String, font As Font, xGauche As Integer, xDroite As Integer, y As Integer) As Integer
-            Dim largeurTotale As Integer = Math.Max(120, xDroite - xGauche)
-            Dim largeurMontant As Integer = Math.Min(CInt(largeurTotale * 0.45R), Math.Max(70, CInt(Math.Ceiling(graphics.MeasureString(If(montant, String.Empty), font).Width)) + 8))
-            Dim largeurDetail As Integer = Math.Max(60, largeurTotale - largeurMontant - 6)
-            Dim tailleDetail As SizeF = graphics.MeasureString(If(detail, String.Empty), font, New SizeF(largeurDetail, 1000))
-            Dim hauteur As Integer = Math.Max(CInt(Math.Ceiling(tailleDetail.Height)), CInt(Math.Ceiling(font.GetHeight(graphics)))) + 3
-
-            graphics.DrawString(If(detail, String.Empty), font, Brushes.Black, New RectangleF(xGauche, y, largeurDetail, hauteur))
-            Using formatMontant As New StringFormat()
-                formatMontant.Alignment = StringAlignment.Far
-                graphics.DrawString(If(montant, String.Empty), font, Brushes.Black, New RectangleF(xDroite - largeurMontant, y, largeurMontant, hauteur), formatMontant)
-            End Using
-
-            Return y + hauteur
-        End Function
-
-        Private Function DessinerTexteCentre(graphics As Graphics, texte As String, font As Font, x As Integer, largeur As Integer, y As Integer) As Integer
-            If String.IsNullOrWhiteSpace(texte) Then
-                Return y
-            End If
-
-            Dim layout As New SizeF(largeur, 1000)
-            Dim taille As SizeF = graphics.MeasureString(texte, font, layout)
-            graphics.DrawString(texte, font, Brushes.Black, New RectangleF(x, y, largeur, taille.Height), New StringFormat With {.Alignment = StringAlignment.Center})
-            Return y + CInt(Math.Ceiling(taille.Height)) + 2
-        End Function
-
-        Private Function DessinerTexteGauche(graphics As Graphics, texte As String, font As Font, x As Integer, largeur As Integer, y As Integer) As Integer
-            If String.IsNullOrWhiteSpace(texte) Then
-                Return y
-            End If
-
-            Dim layout As New SizeF(largeur, 1000)
-            Dim taille As SizeF = graphics.MeasureString(texte, font, layout)
-            graphics.DrawString(texte, font, Brushes.Black, New RectangleF(x, y, largeur, taille.Height))
-            Return y + CInt(Math.Ceiling(taille.Height)) + 2
+            ' ConstruireTicketDepuisSelection fournit deja un montant normalise FC.
+            data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Montant reçu", FormatMontantTicket(ticket.MontantRecu)))
+            data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Monnaie rendue", FormatMontantTicket(ticket.Monnaie)))
+            data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Mode paiement", ticket.ModePaiement))
+            If Not String.IsNullOrWhiteSpace(ticket.ReferencePaiement) Then data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Référence", ticket.ReferencePaiement))
+            Return FacturePrintRenderer.CreerDocumentThermique(data, _param, Me, "CaisseForm", "ImprimerTicket")
         End Function
 
         Private Shared Function SafeDecimalTicket(row As DataRow, colonne As String) As Decimal

@@ -5,6 +5,9 @@ Imports System
 Imports System.Data
 Imports System.Data.SqlClient
 Imports System.Collections.Generic
+Imports System.Diagnostics
+Imports System.Threading
+Imports System.Threading.Tasks
 
 Namespace DevCommerc8ak
     Public Class SuperAdminRepository
@@ -163,6 +166,41 @@ Namespace DevCommerc8ak
                 New SqlParameter("@CodeInterface", codeInterface)
             }
             Return Convert.ToInt32(_dal.ExecuterScalaire(sql, CommandType.Text, p)) > 0
+        End Function
+
+        Public Async Function ListerCodesInterfacesAutoriseesAsync(nomRole As String, annulation As CancellationToken, correlation As Guid) As Task(Of HashSet(Of String))
+            ' Lecture groupee equivalente aux controles unitaires, sans DDL dans
+            ' le parcours d'affichage. Les migrations restent au demarrage.
+            Dim codes As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+            Dim chrono As Stopwatch = Stopwatch.StartNew()
+            Dim log As New ProductionLogService()
+            Dim ouverture As Boolean = True
+            Dim total As Stopwatch = Stopwatch.StartNew()
+            Try
+                Using cn As SqlConnection = _dal.CreerConnexion()
+                    Await cn.OpenAsync(annulation).ConfigureAwait(False)
+                    ouverture = False
+                    log.Info("Administration", "OuvertureSQL", "Correlation=" & correlation.ToString("D") & " | Ms=" & chrono.ElapsedMilliseconds.ToString())
+                    Using cmd As New SqlCommand("SELECT i.CodeInterface FROM dbo.RoleInterfaces ri " &
+                        "JOIN dbo.Roles r ON r.RoleId=ri.RoleId JOIN dbo.InterfacesApplication i ON i.InterfaceId=ri.InterfaceId " &
+                        "WHERE r.NomRole=@role AND ISNULL(r.EstActif,1)=1 AND i.EstActif=1", cn)
+                        cmd.Parameters.Add("@role", SqlDbType.NVarChar, 50).Value = nomRole
+                        chrono.Restart()
+                        Using reader As SqlDataReader = Await cmd.ExecuteReaderAsync(annulation).ConfigureAwait(False)
+                            log.Info("Administration", "RequetePermissions", "Correlation=" & correlation.ToString("D") & " | Ms=" & chrono.ElapsedMilliseconds.ToString())
+                            chrono.Restart()
+                            While Await reader.ReadAsync(annulation).ConfigureAwait(False)
+                                codes.Add(reader.GetString(0))
+                            End While
+                        End Using
+                        log.Info("Administration", "LecturePermissions", "Correlation=" & correlation.ToString("D") & " | Ms=" & chrono.ElapsedMilliseconds.ToString() & " | Codes=" & codes.Count.ToString())
+                    End Using
+                End Using
+            Catch ex As SqlException
+                SqlDiagnosticService.Signaler("AdministrationPermissions", ex, ouverture, Not ouverture, total.ElapsedMilliseconds, correlation)
+                Throw
+            End Try
+            Return codes
         End Function
 
         Public Sub EnregistrerRole(roleId As Integer?, nomRole As String, estActif As Boolean, interfaceIds As IEnumerable(Of Integer), motif As String, Optional versionAttendue As Byte() = Nothing)

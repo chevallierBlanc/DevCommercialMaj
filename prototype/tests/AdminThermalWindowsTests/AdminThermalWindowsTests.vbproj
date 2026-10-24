@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <RootNamespace></RootNamespace>
+    <OptionStrict>On</OptionStrict>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <ErpAssemblyPath Condition="'$(ErpAssemblyPath)'==''">../../WinFormsVB/DevCommerc8ak/bin/Release/DevCommerc8ak.exe</ErpAssemblyPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="DevCommerc8ak"><HintPath>$(ErpAssemblyPath)</HintPath></Reference>
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+</Project>
