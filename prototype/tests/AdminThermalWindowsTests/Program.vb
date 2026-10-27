@@ -2,6 +2,7 @@ Imports System
 Imports System.Collections
 Imports System.Collections.Generic
 Imports System.Drawing
+Imports System.Linq
 Imports System.Reflection
 Imports DevCommerc8ak.DevCommerc8ak
 
@@ -55,6 +56,44 @@ Module Program
             End Using
         End Using
         Verifier(data.Lignes(0).PrixUnitaire = 123D AndAlso data.Total = 490D AndAlso data.Lignes(0).Montant = 12345678901234567890D)
+        data.Statut = "PAYEE"
+        data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Montant payé", "490 FC"))
+        liste = Blocs(data)
+        Dim paiementVu As Boolean = False
+        For Each b As Object In liste
+            If Champ(b, "Texte") = "Montant payé" AndAlso Champ(b, "Valeur") = "490 FC" Then paiementVu = True
+        Next
+        Verifier(paiementVu)
+        ' Le jeu de diagnostic et le plan sont testes sans configuration SQL/imprimante.
+        Dim diagnostic As FacturePrintData = PrintConfigurationHelper.CreerDonneesTestThermique()
+        Verifier(diagnostic.DiagnosticThermique AndAlso Not diagnostic.ProformaThermique)
+        Verifier(diagnostic.Lignes.Count = 3 AndAlso diagnostic.Lignes.Sum(Function(l) l.Montant) = diagnostic.SousTotal)
+        Verifier(diagnostic.SousTotal - diagnostic.Remise = diagnostic.Total)
+        Verifier(diagnostic.Lignes.All(Function(l) l.Quantite * l.PrixUnitaire = l.Montant))
+        Verifier(String.IsNullOrEmpty(diagnostic.Client) AndAlso String.IsNullOrEmpty(diagnostic.Facturier) AndAlso String.IsNullOrEmpty(diagnostic.Statut))
+        diagnostic.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Paiement interdit dans un test", "FICTIF"))
+        liste = Blocs(diagnostic)
+        Dim titreTest As Boolean = False, mentionTest As Boolean = False, referenceTest As Boolean = False
+        For Each b As Object In liste
+            Verifier(Champ(b, "Valeur") <> "FICTIF")
+            Verifier(Champ(b, "Texte") <> "Facture")
+            If Champ(b, "Texte") = diagnostic.TitreThermique Then titreTest = True
+            If Champ(b, "Texte") = diagnostic.MentionThermique Then mentionTest = True
+            If Champ(b, "Texte") = "Diagnostic" AndAlso Champ(b, "Valeur") = "TEST-80MM" Then referenceTest = True
+        Next
+        Verifier(titreTest AndAlso mentionTest AndAlso referenceTest)
+        Using bitmap As New Bitmap(315, 5000)
+            bitmap.SetResolution(100, 100)
+            Using g As Graphics = Graphics.FromImage(bitmap)
+                For Each largeur As Single In New Single() {170.0F, 240.0F, 280.0F}
+                    For Each b As Object In liste
+                        Dim mesure As Single = CSng(dessiner.Invoke(Nothing, New Object() {g, b, 0.0F, 0.0F, largeur, False}))
+                        Dim rendu As Single = CSng(dessiner.Invoke(Nothing, New Object() {g, b, 0.0F, 0.0F, largeur, True}))
+                        Verifier(mesure > 0 AndAlso mesure = rendu)
+                    Next
+                Next
+            End Using
+        End Using
         Console.WriteLine("PASS : " & nombre.ToString() & " controles du vrai plan thermique/GDI. Aucune connexion SQL ni impression physique.")
     End Sub
 End Module

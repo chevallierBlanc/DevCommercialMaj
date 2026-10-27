@@ -96,9 +96,9 @@ Namespace DevCommerc8ak
             mainTableLayout = New TableLayoutPanel() With {
                 .Dock = DockStyle.Fill,
                 .ColumnCount = 2,
-                .RowCount = 4,
+                .RowCount = 3,
                 .AutoScroll = True,
-                .AutoScrollMinSize = New Size(980, 780),
+                .AutoScrollMinSize = New Size(980, 620),
                 .Padding = New Padding(20)
             }
             mainTableLayout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 62))
@@ -106,7 +106,6 @@ Namespace DevCommerc8ak
             mainTableLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 190)) ' Informations du compte
             mainTableLayout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
             mainTableLayout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))  ' Grilles
-            mainTableLayout.RowStyles.Add(New RowStyle(SizeType.Absolute, 150)) ' Sessions compactes
 
             ' --- Carte de Formulaire ---
             cardForm = New Panel() With {
@@ -209,6 +208,15 @@ Namespace DevCommerc8ak
 
             grid = CreateStyledGrid("Liste des Utilisateurs")
             gridConnectes = CreateStyledGrid("Sessions Actives (Temps Réel)")
+            gridConnectes.ScrollBars = ScrollBars.Both
+            gridConnectes.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True
+            gridConnectes.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+            AddHandler gridConnectes.DataBindingComplete, Sub(sender, e)
+                                                            For Each colonne As DataGridViewColumn In gridConnectes.Columns
+                                                                colonne.MinimumWidth = If(colonne.Name = "SessionId", 85, 155)
+                                                                colonne.FillWeight = If(colonne.Name = "SessionId", 12, If(colonne.Name = "DernierPing", 32, 28))
+                                                            Next
+                                                        End Sub
 
             ' Conteneurs pour titres de grilles
             Dim p1 As New Panel() With {.Dock = DockStyle.Fill, .Padding = New Padding(0, 0, 0, 10)}
@@ -228,10 +236,18 @@ Namespace DevCommerc8ak
             mainTableLayout.SetColumnSpan(flowButtons, 2)
             mainTableLayout.Controls.Add(splitGrids, 0, 2)
             mainTableLayout.Controls.Add(modesUtilisateur, 1, 2)
-            mainTableLayout.Controls.Add(p2, 0, 3)
-            mainTableLayout.SetColumnSpan(p2, 2)
-
-            Me.Controls.Add(mainTableLayout)
+            ' Les sessions restent visibles ; seul le panneau des comptes defile
+            ' quand la resolution ou le DPI ne permet pas d'afficher toute la fiche.
+            Dim volets As New SplitContainer With {
+                .Dock = DockStyle.Fill, .Orientation = Orientation.Horizontal,
+                .Size = New Size(1000, 650), .SplitterDistance = 430,
+                .Panel1MinSize = 200, .Panel2MinSize = 160,
+                .FixedPanel = FixedPanel.Panel2, .SplitterWidth = 6
+            }
+            volets.Panel1.Controls.Add(mainTableLayout)
+            p2.Padding = New Padding(20, 6, 20, 12)
+            volets.Panel2.Controls.Add(p2)
+            Me.Controls.Add(volets)
             Me.Controls.Add(panelHero)
 
             ' --- Liaison des événements (Logique conservée) ---

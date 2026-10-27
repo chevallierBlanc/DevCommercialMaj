@@ -261,6 +261,11 @@ Namespace DevCommerc8ak
             ThemeHelper1.StyliserEnteteCommerciale(grille)
             grille.RowTemplate.Height = 36
             grille.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI", 9.5F, FontStyle.Bold)
+            grille.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True
+            grille.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft
+            grille.ColumnHeadersHeight = 62
+            grille.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+            grille.ScrollBars = ScrollBars.Both
             grille.DefaultCellStyle.Padding = New Padding(6)
             grille.DefaultCellStyle.SelectionBackColor = Color.FromArgb(225, 239, 250)
             grille.DefaultCellStyle.SelectionForeColor = Color.FromArgb(32, 32, 32)
@@ -322,6 +327,8 @@ Namespace DevCommerc8ak
                 _total = resultat.Total : grille.DataSource = resultat.Lignes
                 grille.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
                 For Each colonne As DataGridViewColumn In grille.Columns
+                    colonne.AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+                    colonne.MinimumWidth = 125
                     colonne.Width = If(colonne.Name = "Produit", 190, If(colonne.Name = "Conditionnement", 145, 125))
                     If colonne.Name = "Motif" Then
                         colonne.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill : colonne.MinimumWidth = 200

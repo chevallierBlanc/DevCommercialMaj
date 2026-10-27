@@ -2,6 +2,7 @@ Option Strict On
 Option Explicit On
 
 Imports System
+Imports System.Collections.Generic
 Imports System.Configuration
 Imports System.Drawing
 Imports System.Drawing.Printing
@@ -144,34 +145,36 @@ Namespace DevCommerc8ak
         End Sub
 
         Public Shared Sub TesterImprimanteThermique(owner As IWin32Window)
-            Using doc As New PrintDocument()
-                ConfigurerDocumentThermique(doc, owner, "FormulaireParametres", "TesterImprimanteThermique", 315, 420)
-                AddHandler doc.PrintPage,
-                    Sub(sender As Object, e As PrintPageEventArgs)
-                        Using titre As New Font("Segoe UI", 9.0F, FontStyle.Bold),
-                              texte As New Font("Segoe UI", 7.5F)
-                            Dim x As Integer = e.MarginBounds.Left + 4
-                            Dim largeur As Integer = Math.Max(200, e.MarginBounds.Width - 8)
-                            Dim y As Integer = e.MarginBounds.Top + 4
-                            Using formatCentre As New StringFormat() With {.Alignment = StringAlignment.Center}
-                                e.Graphics.DrawString("COMMERCIAL PRO", titre, Brushes.Black, New RectangleF(x, y, largeur, 20), formatCentre)
-                                y += 22
-                                e.Graphics.DrawString("TEST IMPRIMANTE THERMIQUE", titre, Brushes.Black, New RectangleF(x, y, largeur, 20), formatCentre)
-                            End Using
-                            y += 24
-                            e.Graphics.DrawString("Imprimante : " & doc.PrinterSettings.PrinterName, texte, Brushes.Black, New RectangleF(x, y, largeur, 40))
-                            y += 42
-                            e.Graphics.DrawString("Date : " & Date.Now.ToString("dd/MM/yyyy HH:mm:ss"), texte, Brushes.Black, x, y)
-                            y += 20
-                            e.Graphics.DrawString("------------------------", texte, Brushes.Black, x, y)
-                            y += 20
-                            e.Graphics.DrawString("Impression OK", titre, Brushes.Black, x, y)
-                        End Using
-                        e.HasMorePages = False
-                    End Sub
-                doc.Print()
+            Dim param As ParametreDTO = ChargerParametres()
+            Dim data As FacturePrintData = CreerDonneesTestThermique()
+            Dim creerDocument As Func(Of PrintDocument) = Function() FacturePrintRenderer.CreerDocumentThermique(data, param, owner, "FormulaireParametres", "TesterImprimanteThermique")
+            Using doc As PrintDocument = creerDocument()
+                If param.ApercuAvantImpression Then
+                    Using apercu As New FormApercuTicket(doc, creerDocument)
+                        apercu.ShowDialog(owner)
+                    End Using
+                Else
+                    doc.Print()
+                End If
             End Using
         End Sub
+
+        ' Jeu de demonstration autonome : aucun document, paiement ou stock reel.
+        Public Shared Function CreerDonneesTestThermique() As FacturePrintData
+            Return New FacturePrintData With {
+                .DiagnosticThermique = True,
+                .Numero = "TEST-80MM", .DateDocument = Date.Now,
+                .TitreThermique = "TICKET DE TEST — IMPRIMANTE THERMIQUE",
+                .MentionThermique = "TEST SANS VALEUR COMMERCIALE — AUCUNE VENTE ENREGISTRÉE",
+                .LibelleTotalThermique = "TOTAL TEST",
+                .SousTotal = 128730D, .Remise = 1000D, .Total = 127730D,
+                .Lignes = New List(Of FacturePrintLine) From {
+                    New FacturePrintLine With {.Produit = "Démonstration : café, thé et céréales — désignation longue pour vérifier le retour à la ligne", .Conditionnement = "pièce", .Quantite = 2D, .PrixUnitaire = 2500D, .Montant = 5000D},
+                    New FacturePrintLine With {.Produit = "Article fictif — conditionnement personnalisé", .Conditionnement = "paquet 10+1", .Quantite = 1D, .PrixUnitaire = 23730D, .Montant = 23730D},
+                    New FacturePrintLine With {.Produit = "Contrôle des grands montants", .Conditionnement = "carton", .Quantite = 4D, .PrixUnitaire = 25000D, .Montant = 100000D}
+                }
+            }
+        End Function
 
         Public Shared Function ObtenirVersionApplication() As String
             Try

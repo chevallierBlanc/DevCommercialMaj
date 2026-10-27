@@ -47,10 +47,40 @@ Assert-Contract ($async -notmatch '(?i)AssurerInfrastructure|ALTER TABLE|INSERT 
 Assert-Contract ($async -match 'r.NomRole=@role' -and $async -match 'i.EstActif=1' -and $async -match 'ISNULL\(r.EstActif,1\)=1') 'Filtres RBAC actifs conserves'
 Assert-Contract ($caisse -notmatch 'Sub ImprimerPageTicket' -and $caisse -match 'FacturePrintRenderer.CreerDocumentThermique') 'Caisse utilise le renderer commun sans dessin inline'
 Assert-Contract ($facturation -match 'FormChoixImpressionDocument' -and $historique -match 'FormChoixImpressionDocument') 'Dialogue partage'
-Assert-Contract ($renderer -match 'If Not data.ProformaThermique Then' -and $renderer -match 'doc.BeginPrint') 'Paiements exclus proforma et pagination reinitialisee'
+Assert-Contract ($renderer -match 'If Not data.ProformaThermique AndAlso Not data.DiagnosticThermique Then' -and $renderer -match 'doc.BeginPrint') 'Paiements exclus proforma/diagnostic et pagination reinitialisee'
 $oldAdmin = Read-Baseline 'Forms/AdminForm.vb'
 $infrastructure = Method (Read-Baseline 'Repositories/SuperAdminRepository.vb') 'AssurerInfrastructure'
 $cards = [regex]::Matches($oldAdmin,'If VerifierPermission\(').Count
 $infraCommands = 1 + [regex]::Matches($infrastructure,'            AssurerRole\(').Count + [regex]::Matches($infrastructure,'            AssurerInterface\(').Count
 Assert-Contract ($cards -eq 13 -and $infraCommands -eq 21 -and $cards * (3 * $infraCommands + 2) -eq 845) 'Comptage statique ancien parcours valide : 845 commandes'
+
+# Contrats localises de cette correction, compares a la livraison precedente.
+function Read-Previous([string]$Path) {
+    $lines = @(& git -C $root show ('fcb041b:' + $prefix + $Path))
+    if ($LASTEXITCODE -ne 0) { throw 'Historique Git fcb041b requis.' }
+    return ($lines -join "`n").Replace("`r",'')
+}
+$users = Read-Current 'UI/FormulaireUtilisateurs.vb'
+$previousUsers = Read-Previous 'UI/FormulaireUtilisateurs.vb'
+foreach ($name in @('Charger','ChargerConnectes','ChargerSelectionUtilisateur','Ajouter','Modifier','DesactiverUtilisateur','ResetMdp','DeverrouillerUtilisateur','SupprimerUtilisateur')) {
+    Assert-Contract ((Method $users $name) -ceq (Method $previousUsers $name)) ('Utilisateurs/session metier inchange : ' + $name)
+}
+Assert-Contract ($users -match 'Orientation = Orientation.Horizontal' -and $users -match 'volets.Panel2.Controls.Add\(p2\)' -and $users -match 'Panel2MinSize = 160') 'Volet de sessions distinct et redimensionnable'
+Assert-Contract ($users -match 'Interval = 5000' -and $users -match 'gridConnectes.DataBindingComplete') 'Frequence et adaptation des colonnes conservees'
+$requests = Read-Current 'UI/CartesSecuriteAutorisations.vb'
+Assert-Contract ($requests -match 'ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True' -and $requests -match 'ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize') 'Entetes demandes multilignes et hauteur automatique'
+Assert-Contract ($requests -match 'colonne.MinimumWidth = 125' -and $requests -match 'grille.ScrollBars = ScrollBars.Both') 'Largeurs minimales et defilement horizontal'
+$printing = Read-Current 'Services/PrintConfigurationHelper.vb'
+Assert-Contract ((Method $printing 'TesterImprimanteA4') -ceq (Method (Read-Previous 'Services/PrintConfigurationHelper.vb') 'TesterImprimanteA4')) 'Test A4 strictement inchange'
+$test = Method $printing 'TesterImprimanteThermique'
+Assert-Contract ($test -match 'FacturePrintRenderer.CreerDocumentThermique' -and $test -match 'FormApercuTicket' -and $test -match 'param.ApercuAvantImpression') 'Test utilise le renderer et respecte apercu'
+Assert-Contract ($test -notmatch 'PrintPage|DrawString|SqlCommand|Repository|FactureService|PaiementService') 'Aucun rendu concurrent ni ecriture metier dans le test'
+$fixture = Method $printing 'CreerDonneesTestThermique'
+Assert-Contract ($fixture -notmatch 'Charger|Repository|Service|Sql|SessionUtilisateur' -and $fixture -match 'DiagnosticThermique = True') 'Donnees fictives autonomes sans lecture commerciale'
+foreach ($name in @('ConfigurerDocumentThermique','ChargerParametres','AppliquerImprimantesLocales','ResoudreImprimante')) {
+    Assert-Contract ((Method $printing $name) -ceq (Method (Read-Previous 'Services/PrintConfigurationHelper.vb') $name)) ('Configuration imprimantes conservee : ' + $name)
+}
+foreach ($name in @('TraiterBlocThermique','DessinerPageThermique')) {
+    Assert-Contract ((Method $renderer $name) -ceq (Method (Read-Previous 'Services/FacturePrintRenderer.vb') $name)) ('Geometrie thermique conservee : ' + $name)
+}
 Write-Host ('PASS : ' + $script:checks + ' contrats de source. Aucun essai Windows, SQL ou impression physique.')

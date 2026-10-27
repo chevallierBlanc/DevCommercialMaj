@@ -31,6 +31,7 @@ Namespace DevCommerc8ak
         Public Property Lignes As List(Of FacturePrintLine)
         ' Metadonnees exclusivement thermiques ; le rendu A4 n'en depend pas.
         Public Property ProformaThermique As Boolean
+        Public Property DiagnosticThermique As Boolean
         Public Property TitreThermique As String
         Public Property MentionThermique As String
         Public Property LibelleTotalThermique As String
@@ -83,7 +84,7 @@ Namespace DevCommerc8ak
                 End Using
                 doc.DefaultPageSettings.PaperSize = New PaperSize("Ticket80mm", 315, CInt(Math.Max(420, Math.Min(5000, Math.Ceiling(hauteur + 40)))))
                 Dim index As Integer = 0
-                Dim suite As String = If(EstAnnulee(data), "FACTURE ANNULÉE", If(data.ProformaThermique, "PROFORMA", "FACTURE")) & " " & Safe(data.Numero) & " (suite)"
+                Dim suite As String = If(data.DiagnosticThermique, "TICKET DE TEST", If(EstAnnulee(data), "FACTURE ANNULÉE", If(data.ProformaThermique, "PROFORMA", "FACTURE"))) & " " & Safe(data.Numero) & " (suite)"
                 AddHandler doc.BeginPrint, Sub(s, e) index = 0
                 AddHandler doc.PrintPage,
                     Sub(s, e)
@@ -246,7 +247,7 @@ Namespace DevCommerc8ak
             Dim titre As String = If(EstAnnulee(data), "FACTURE ANNULÉE", If(data.ProformaThermique, "PROFORMA", If(String.IsNullOrWhiteSpace(data.TitreThermique), "FACTURE", data.TitreThermique)))
             texte(titre, 1)
             separer()
-            paire("Facture", Safe(data.Numero))
+            paire(If(data.DiagnosticThermique, "Diagnostic", "Facture"), Safe(data.Numero))
             paire("Date", data.DateDocument.ToString("dd/MM/yyyy HH:mm"))
             If Not String.IsNullOrWhiteSpace(data.Facturier) Then paire("Facturier", data.Facturier)
             If Not String.IsNullOrWhiteSpace(data.Client) Then paire("Client", data.Client)
@@ -266,16 +267,16 @@ Namespace DevCommerc8ak
             paire("Sous-total", MontantThermique(data.SousTotal))
             If Not data.MasquerRemiseThermique Then paire("Remise", MontantThermique(data.Remise))
             blocs.Add(New BlocThermique With {.Genre = "PAIRE", .Texte = If(String.IsNullOrWhiteSpace(data.LibelleTotalThermique), "TOTAL", data.LibelleTotalThermique), .Valeur = MontantThermique(data.Total), .Police = 3})
-            ' Une proforma ne peut afficher aucun paiement, meme si un appelant
-            ' lui fournissait par erreur des metadonnees de reglement.
-            If Not data.ProformaThermique Then
+            ' Ni proforma ni diagnostic ne prouvent un paiement, meme si un
+            ' appelant fournissait par erreur des metadonnees de reglement.
+            If Not data.ProformaThermique AndAlso Not data.DiagnosticThermique Then
                 For Each reglement As KeyValuePair(Of String, String) In data.ReglementsThermiques
                     paire(reglement.Key, reglement.Value)
                 Next
             End If
             separer()
             texte(If(EstAnnulee(data), "FACTURE ANNULÉE", If(data.ProformaThermique, "DOCUMENT PROFORMA - NON ACQUITTÉ", If(String.IsNullOrWhiteSpace(data.MentionThermique), "DOCUMENT FACTURE", data.MentionThermique))), 1)
-            If Not data.ProformaThermique AndAlso Not EstAnnulee(data) Then texte("Merci pour votre confiance", 1)
+            If Not data.ProformaThermique AndAlso Not data.DiagnosticThermique AndAlso Not EstAnnulee(data) Then texte("Merci pour votre confiance", 1)
             texte(Application.ProductName & " - v" & PrintConfigurationHelper.ObtenirVersionApplication(), 2)
             texte("Développé par : Andy NTANTA", 2)
             texte("Imprimé le " & Date.Now.ToString("dd/MM/yyyy HH:mm"), 2)

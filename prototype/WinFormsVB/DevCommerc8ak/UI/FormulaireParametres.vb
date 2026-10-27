@@ -449,7 +449,7 @@ Namespace DevCommerc8ak
             Try
                 PrintConfigurationHelper.EnregistrerImprimantesLocales(cmbImprimanteA4.Text, cmbImprimanteTicket.Text)
                 PrintConfigurationHelper.TesterImprimanteThermique(Me)
-                MessageBox.Show("Test imprimante thermique envoyé.", "Imprimante thermique", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                MessageBox.Show("Test thermique terminé : aperçu ou envoi selon vos paramètres. Vérifiez le ticket si vous avez lancé l'impression.", "Imprimante thermique", MessageBoxButtons.OK, MessageBoxIcon.Information)
             Catch ex As Exception
                 MessageBox.Show(ex.Message, "Imprimante thermique", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             End Try
