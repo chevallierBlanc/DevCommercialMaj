@@ -77,26 +77,13 @@ Namespace DevCommerc8ak
         ' --- Données ---
         Private _param As ParametreDTO
         Private _totalCourant As Decimal
-        Private _dernierTicket As TicketData
+        Private _derniereFactureEncaissee As Integer
         Private _isRefreshingFromEvent As Boolean
         Private _dataMonitor As DataChangeMonitorService
         Private _encaissementEnCours As Boolean
         Private _dernierMessageErreurImpression As String
 
-        Private Class TicketData
-            Public Property Numero As String
-            Public Property Client As String
-            Public Property Telephone As String
-            Public Property DateFacture As Date
-            Public Property Total As Decimal
-            Public Property MontantRecu As Decimal
-            Public Property Monnaie As Decimal
-            Public Property Devise As String
-            Public Property ModePaiement As String
-            Public Property ReferencePaiement As String
-            Public Property Caissier As String
-            Public Property Lignes As DataTable
-        End Class
+
 
         Public Sub New()
             ' Configuration de la Form
@@ -279,7 +266,7 @@ Namespace DevCommerc8ak
             Dim btnSep1 As New Panel() With {.Dock = DockStyle.Top, .Height = 10}
 
             btnImprimer = New Button() With {
-                .Text = "IMPRIMER TICKET", .Dock = DockStyle.Fill,
+                .Text = "DERNIER TICKET", .Dock = DockStyle.Fill, .Enabled = False,
                 .FlatStyle = FlatStyle.Flat, .BackColor = ColorSecondary, .ForeColor = ColorWhite, .Font = FontBold, .Cursor = Cursors.Hand
             }
             btnImprimer.FlatAppearance.BorderSize = 0
@@ -592,7 +579,7 @@ Namespace DevCommerc8ak
                 End If
 
                 Dim monnaieFC As Decimal = montantFC - _totalCourant
-                Dim ticket As TicketData = ConstruireTicketDepuisSelection(montantFC, monnaieFC, devise)
+
 
                 Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
                 Dim dal As New DAL(cs)
@@ -600,12 +587,12 @@ Namespace DevCommerc8ak
                 service.EncaisserFacture(factureId, cmbMode.SelectedItem.ToString(), txtReference.Text.Trim(), montantFC, monnaieFC, devise, SessionUtilisateur.UtilisateurId,
                     montantSaisi, If(devise = "FC", 1D, If(_param Is Nothing, 0D, _param.TauxUsd)))
 
-                _dernierTicket = ticket
-                If Not ImprimerTicket(_dernierTicket, 2, True) Then
+                _derniereFactureEncaissee = factureId
+                If Not ImprimerTicket(factureId, 2, True) Then
                     Dim log As New ProductionLogService()
-                    log.Warn("CaisseForm", "Encaisser", "Le paiement a été validé, mais aucune imprimante ticket n'est configurée ou disponible.")
-                    MessageBox.Show("Le paiement a été validé, mais aucune imprimante ticket n'est configurée ou disponible." & Environment.NewLine &
-                                    "Le ticket n'a pas été imprimé.",
+                    log.Warn("CaisseForm", "Encaisser", "Paiement validé ; impression non effectuée. " & _dernierMessageErreurImpression)
+                    MessageBox.Show("Le paiement reste validé. Impression non effectuée : " & Environment.NewLine &
+                                    If(String.IsNullOrWhiteSpace(_dernierMessageErreurImpression), "Aucune imprimante ticket n'est configurée ou disponible.", _dernierMessageErreurImpression),
                                     "Impression",
                                     MessageBoxButtons.OK,
                                     MessageBoxIcon.Warning)
@@ -629,66 +616,25 @@ Namespace DevCommerc8ak
             End Try
         End Sub
 
-        Private Function ConstruireTicketDepuisSelection(montantRecuFc As Decimal, monnaieFc As Decimal, devise As String) As TicketData
-            Dim row As DataGridViewRow = Nothing
-            If Not TryGetSelectedFactureRow(row) Then
-                Throw New InvalidOperationException("Aucune facture valide sélectionnée pour construire le ticket.")
-            End If
 
-            Dim ticket As New TicketData()
-            ticket.Numero = SafeStringCell(CellValueByProperty(row, "NumeroFacture"))
-            ticket.Client = SafeStringCell(CellValueByProperty(row, "ClientNom"))
-            ticket.Telephone = SafeStringCell(CellValueByProperty(row, "Telephone"))
-            ticket.DateFacture = SafeDateCell(CellValueByProperty(row, "CreeLe"))
-            ticket.Total = SafeDecimalCell(CellValueByProperty(row, "MontantTotal"))
-            ticket.MontantRecu = montantRecuFc
-            ticket.Monnaie = monnaieFc
-            ticket.Devise = devise
-            ticket.ModePaiement = If(cmbMode.SelectedItem Is Nothing, String.Empty, cmbMode.SelectedItem.ToString())
-            ticket.ReferencePaiement = txtReference.Text.Trim()
-            ticket.Caissier = If(String.IsNullOrWhiteSpace(SessionUtilisateur.NomUtilisateur), "SYSTEM", SessionUtilisateur.NomUtilisateur)
-
-            Dim factureId As Integer = SafeIntegerCell(CellValueByProperty(row, "FactureVenteId"))
-            Dim cs As String = ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString
-            Dim dal As New DAL(cs)
-            Dim repo As New LigneFactureVenteRepository(dal)
-            ticket.Lignes = repo.ListerDetailsParFacture(factureId)
-            Return ticket
-        End Function
 
         Private Sub ImprimerTicket(sender As Object, e As EventArgs)
-            Try
-                Dim ticket As TicketData = Nothing
-                If HasFactureSelectionValide() Then
-                    Dim montantSaisi As Decimal
-                    Decimal.TryParse(If(txtMontantRecu.Text.Trim() = "", "0", txtMontantRecu.Text.Trim()), montantSaisi)
-                    Dim devise As String = cmbDevise.SelectedItem.ToString()
-                    Dim montantFC As Decimal = ConvertirMontant(montantSaisi, devise)
-                    Dim monnaieFC As Decimal = montantFC - _totalCourant
-                    ticket = ConstruireTicketDepuisSelection(montantFC, monnaieFC, devise)
-                ElseIf _dernierTicket IsNot Nothing Then
-                    ticket = _dernierTicket
-                End If
-
-                If ticket Is Nothing Then
-                    MessageBox.Show("Aucune facture a imprimer.")
-                    Return
-                End If
-
-                If Not ImprimerTicket(ticket, 2, True) Then
-                    MessageBox.Show(If(String.IsNullOrWhiteSpace(_dernierMessageErreurImpression),
-                                       "Aucune imprimante ticket n'est configurée ou disponible.",
-                                       _dernierMessageErreurImpression))
-                End If
-            Catch ex As Exception
-                MessageBox.Show("Erreur impression: " & ex.Message)
-            End Try
+            ' Le panier et les champs de paiement ne constituent jamais un recu.
+            If _encaissementEnCours OrElse _derniereFactureEncaissee <= 0 Then
+                MessageBox.Show("Validez d'abord un encaissement. Aucun ticket acquitté ne peut être construit depuis une saisie.")
+                Return
+            End If
+            If Not ImprimerTicket(_derniereFactureEncaissee, 2, True) Then
+                MessageBox.Show(If(String.IsNullOrWhiteSpace(_dernierMessageErreurImpression),
+                                   "Aucune imprimante ticket n'est configurée ou disponible.",
+                                   _dernierMessageErreurImpression))
+            End If
         End Sub
 
-        Private Function ImprimerTicket(ticket As TicketData, Optional copies As Integer = 1, Optional afficherApercu As Boolean = True) As Boolean
+        Private Function ImprimerTicket(ticket As Integer, Optional copies As Integer = 1, Optional afficherApercu As Boolean = True) As Boolean
             Try
                 _dernierMessageErreurImpression = String.Empty
-                If ticket Is Nothing Then
+                If ticket <= 0 Then
                     Return False
                 End If
 
@@ -722,7 +668,7 @@ Namespace DevCommerc8ak
             End Try
         End Function
 
-        Private Sub ImprimerTicketsDistincts(ticket As TicketData, totalCopies As Integer)
+        Private Sub ImprimerTicketsDistincts(ticket As Integer, totalCopies As Integer)
             Dim nombreCopies As Integer = Math.Max(1, totalCopies)
             For copie As Integer = 1 To nombreCopies
                 Using doc As Printing.PrintDocument = CreerDocumentTicket(ticket, copie, nombreCopies)
@@ -731,138 +677,13 @@ Namespace DevCommerc8ak
             Next
         End Sub
 
-        Private Function CreerDocumentTicket(ticket As TicketData, copieCourante As Integer, totalCopies As Integer) As Printing.PrintDocument
-            ' Adaptateur de presentation seulement : les montants du ticket sont
-            ' ceux deja produits par le parcours de caisse, sans nouvel encaissement.
-            Dim data As New FacturePrintData With {
-                .Numero = ticket.Numero, .DateDocument = ticket.DateFacture,
-                .Client = ticket.Client, .Telephone = ticket.Telephone,
-                .SousTotal = ticket.Total, .Total = ticket.Total,
-                .TitreThermique = "TICKET DE CAISSE", .LibelleTotalThermique = "Montant à payer",
-                .MasquerRemiseThermique = True,
-                .MentionThermique = "ACHAT DÉFINITIF - Aucun échange ni reprise.",
-                .Lignes = New List(Of FacturePrintLine)()}
-            data.InformationsThermiques.Add(New KeyValuePair(Of String, String)("Caissier", ticket.Caissier))
+        Private Function CreerDocumentTicket(ticket As Integer, copieCourante As Integer, totalCopies As Integer) As Printing.PrintDocument
+            ' Relire egalement apres un apercu : une revocation ou une annulation
+            ' ne doit pas etre contournee en conservant des donnees en memoire.
+            Dim dal As New DAL(ConfigurationManager.ConnectionStrings("CommercialMagDB").ConnectionString)
+            Dim data As FacturePrintData = New JustificatifCaisseService(dal).Lire(ticket)
             data.InformationsThermiques.Add(New KeyValuePair(Of String, String)("Exemplaire", Math.Max(1, copieCourante).ToString() & "/" & Math.Max(1, totalCopies).ToString()))
-            If ticket.Lignes IsNot Nothing Then
-                For Each row As DataRow In ticket.Lignes.Rows
-                    Dim quantite As Decimal = SafeDecimalTicket(row, "QuantiteSaisie")
-                    data.Lignes.Add(New FacturePrintLine With {
-                        .Produit = SafeStringTicket(row, "Libelle"),
-                        .Conditionnement = GetLibelleTypeVentePourTicket(row, quantite),
-                        .Quantite = quantite, .PrixUnitaire = SafeDecimalTicket(row, "PrixUnitaire"),
-                        .Montant = SafeDecimalTicket(row, "MontantLigne")})
-                Next
-            End If
-            ' ConstruireTicketDepuisSelection fournit deja un montant normalise FC.
-            data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Montant reçu", FormatMontantTicket(ticket.MontantRecu)))
-            data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Monnaie rendue", FormatMontantTicket(ticket.Monnaie)))
-            data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Mode paiement", ticket.ModePaiement))
-            If Not String.IsNullOrWhiteSpace(ticket.ReferencePaiement) Then data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Référence", ticket.ReferencePaiement))
             Return FacturePrintRenderer.CreerDocumentThermique(data, _param, Me, "CaisseForm", "ImprimerTicket")
-        End Function
-
-        Private Shared Function SafeDecimalTicket(row As DataRow, colonne As String) As Decimal
-            If row Is Nothing OrElse String.IsNullOrWhiteSpace(colonne) OrElse Not row.Table.Columns.Contains(colonne) OrElse row.IsNull(colonne) Then
-                Return 0D
-            End If
-
-            Dim valeur As Object = row(colonne)
-            If TypeOf valeur Is Decimal Then
-                Return DirectCast(valeur, Decimal)
-            End If
-
-            Dim texte As String = Convert.ToString(valeur).Trim().Replace(" ", String.Empty).Replace(","c, "."c)
-            Dim resultat As Decimal
-            If Decimal.TryParse(texte, Globalization.NumberStyles.Any, Globalization.CultureInfo.InvariantCulture, resultat) Then
-                Return resultat
-            End If
-
-            Return 0D
-        End Function
-
-        Private Shared Function SafeStringTicket(row As DataRow, colonne As String) As String
-            If row Is Nothing OrElse String.IsNullOrWhiteSpace(colonne) OrElse Not row.Table.Columns.Contains(colonne) OrElse row.IsNull(colonne) Then
-                Return String.Empty
-            End If
-
-            Return Convert.ToString(row(colonne)).Trim()
-        End Function
-
-        Private Shared Function FormatMontantTicket(montant As Decimal) As String
-            Return FormaterMontantTicket(montant, "FC")
-        End Function
-
-        Private Shared Function FormaterMontantTicket(montant As Decimal, devise As String) As String
-            Dim deviseAffichee As String = If(String.IsNullOrWhiteSpace(devise), "FC", devise.Trim())
-            Return montant.ToString("#,##0", Globalization.CultureInfo.GetCultureInfo("fr-FR")) & " " & deviseAffichee
-        End Function
-
-        Private Shared Function FormaterQuantiteTicket(quantite As Decimal) As String
-            If Decimal.Truncate(quantite) = quantite Then
-                Return quantite.ToString("N0", Globalization.CultureInfo.GetCultureInfo("fr-FR"))
-            End If
-
-            Return quantite.ToString("N2", Globalization.CultureInfo.GetCultureInfo("fr-FR")).TrimEnd("0"c).TrimEnd(","c)
-        End Function
-
-        Private Shared Function GetLibelleTypeVentePourTicket(row As DataRow, quantiteSaisie As Decimal) As String
-            Dim typeVente As String = SafeStringTicket(row, "TypeVente")
-            Dim unitePrincipale As String = SafeStringTicket(row, "UnitePrincipale")
-            Dim uniteSecondaire As String = SafeStringTicket(row, "UniteSecondaire")
-            Dim typeNormalise As String = typeVente.Trim().ToUpperInvariant()
-
-            If String.IsNullOrWhiteSpace(unitePrincipale) Then
-                unitePrincipale = "unité"
-            End If
-            If String.IsNullOrWhiteSpace(uniteSecondaire) Then
-                uniteSecondaire = "pièce"
-            End If
-
-            Select Case typeNormalise
-                Case "GROS"
-                    Return PluraliserUnite(unitePrincipale, quantiteSaisie)
-                Case "DETAIL", "DÉTAIL", "PIECE", "PIÈCE", "UNITE", "UNITÉ"
-                    Return PluraliserUnite(uniteSecondaire, quantiteSaisie)
-                Case "DEMI"
-                    Return PluraliserExpression("demi-" & unitePrincipale.ToLowerInvariant(), quantiteSaisie)
-                Case "QUART"
-                    Return PluraliserExpression("quart de " & unitePrincipale.ToLowerInvariant(), quantiteSaisie)
-                Case "DOUZAINE"
-                    Return PluraliserUnite("douzaine", quantiteSaisie)
-                Case Else
-                    If String.IsNullOrWhiteSpace(typeVente) Then
-                        Return PluraliserUnite(uniteSecondaire, quantiteSaisie)
-                    End If
-                    Return PluraliserExpression(typeVente, quantiteSaisie)
-            End Select
-        End Function
-
-        Private Shared Function PluraliserUnite(unite As String, quantite As Decimal) As String
-            Dim texte As String = If(String.IsNullOrWhiteSpace(unite), "unité", unite.Trim())
-            If Math.Abs(quantite - 1D) < 0.0001D Then
-                Return texte.ToLowerInvariant()
-            End If
-
-            Dim lower As String = texte.ToLowerInvariant()
-            If lower.EndsWith("s", StringComparison.OrdinalIgnoreCase) OrElse lower.EndsWith("x", StringComparison.OrdinalIgnoreCase) Then
-                Return lower
-            End If
-
-            Return lower & "s"
-        End Function
-
-        Private Shared Function PluraliserExpression(expression As String, quantite As Decimal) As String
-            Dim texte As String = If(String.IsNullOrWhiteSpace(expression), "unité", expression.Trim())
-            If Math.Abs(quantite - 1D) < 0.0001D Then
-                Return texte
-            End If
-
-            If texte.EndsWith("s", StringComparison.OrdinalIgnoreCase) OrElse texte.EndsWith("x", StringComparison.OrdinalIgnoreCase) Then
-                Return texte
-            End If
-
-            Return texte & "s"
         End Function
 
         Private Function CellValueByProperty(row As DataGridViewRow, propertyName As String) As Object
@@ -948,7 +769,8 @@ Namespace DevCommerc8ak
             Dim factureValide As Boolean = HasFactureSelectionValide() AndAlso _totalCourant > 0D
             btnEncaisser.Enabled = factureValide
             btnAnnulerFacture.Enabled = HasFactureSelectionValide()
-            btnImprimer.Enabled = HasFactureSelectionValide() OrElse _dernierTicket IsNot Nothing
+            btnImprimer.Enabled = Not _encaissementEnCours AndAlso _derniereFactureEncaissee > 0
+            btnImprimer.Text = "DERNIER TICKET"
         End Sub
 
         Private Sub AnnulerSelection(sender As Object, e As EventArgs)

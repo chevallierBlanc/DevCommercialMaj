@@ -624,6 +624,11 @@ Namespace DevCommerc8ak
         End Sub
 
         Private Sub CompleterTicketHistorique(factureId As Integer, data As FacturePrintData)
+            Dim dal As DAL = ObtenirDAL()
+            Using cn As System.Data.SqlClient.SqlConnection = dal.CreerConnexion()
+                cn.Open()
+                ConditionnementsHistoriquesService.Appliquer(New FactureImpressionRepository(dal).LireInstantaneConditionnements(cn, Nothing, factureId), data.Lignes)
+            End Using
             Dim infos As DataTable = New FactureImpressionRepository(ObtenirDAL()).LireReglementsEtAuteur(factureId)
             If infos.Rows.Count = 0 Then Throw New InvalidOperationException("Facture introuvable.")
             Dim auteur As DataRow = infos.Rows(0)
@@ -633,7 +638,7 @@ Namespace DevCommerc8ak
                 Dim devise As String = Convert.ToString(paiement("DeviseMontants"))
                 If String.IsNullOrWhiteSpace(devise) Then devise = "(devise historique non renseignée)"
                 Dim montant As String = Convert.ToDecimal(paiement("Montant")).ToString("N2") & " " & devise
-                data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Règlement #" & Convert.ToString(paiement("PaiementId")), montant))
+                data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Règlement", montant))
                 data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Mode paiement", Convert.ToString(paiement("ModePaiement"))))
                 data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Caissier", If(paiement.IsNull("Caissier"), "Utilisateur #" & Convert.ToString(paiement("PayePar")), Convert.ToString(paiement("Caissier")))))
                 If Not paiement.IsNull("PayeLe") Then data.ReglementsThermiques.Add(New KeyValuePair(Of String, String)("Payé le", Convert.ToDateTime(paiement("PayeLe")).ToString("dd/MM/yyyy HH:mm")))
@@ -651,6 +656,7 @@ Namespace DevCommerc8ak
             For Each row As DataRow In lignesTable.Rows
                 Dim quantite As Decimal = If(row.IsNull("QuantiteSaisie"), Convert.ToDecimal(row("Quantite")), Convert.ToDecimal(row("QuantiteSaisie")))
                 lignes.Add(New FacturePrintLine With {
+                    .ProduitId = Convert.ToInt32(row("ProduitId")),
                     .Produit = Convert.ToString(row("Libelle")),
                     .Conditionnement = Convert.ToString(row("TypeVente")),
                     .Quantite = quantite,

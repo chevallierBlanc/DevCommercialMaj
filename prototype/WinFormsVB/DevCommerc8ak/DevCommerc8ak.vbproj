@@ -61,6 +61,10 @@
       <LogicalName>TracabilitePaiementsMigration.sql</LogicalName>
     </EmbeddedResource>
     <Compile Include="Services\EncaissementAuditRegles.vb" />
+    <Compile Include="Services\ConditionnementCommercial.vb" />
+    <Compile Include="Services\ConditionnementsHistoriquesService.vb" />
+    <Compile Include="Services\JustificatifCaisseRegles.vb" />
+    <Compile Include="Services\JustificatifCaisseService.vb" />
     <Compile Include="Services\AuditPresentationService.vb" />
     <Compile Include="Services\ModeTravailRegles.vb" />
     <Compile Include="Services\ModeTravailService.vb" />

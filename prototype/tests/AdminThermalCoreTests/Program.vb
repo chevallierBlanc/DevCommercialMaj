@@ -38,6 +38,7 @@ Module Program
             Verifier(position <= 200)
         Next
         Verifier(pages = 25)
-        Console.WriteLine("PASS : " & nombre.ToString() & " controles de geometrie/pagination, sans Windows ni SQL.")
+        nombre += ThermiqueMetierTests.Executer()
+        Console.WriteLine("PASS : " & nombre.ToString() & " controles de geometrie, conditionnements et justificatifs, sans Windows ni SQL.")
     End Sub
 End Module

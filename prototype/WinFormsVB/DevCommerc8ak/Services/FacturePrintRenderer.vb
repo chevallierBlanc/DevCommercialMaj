@@ -11,8 +11,12 @@ Imports System.Windows.Forms
 
 Namespace DevCommerc8ak
     Public Class FacturePrintLine
+        Public Property ProduitId As Integer
         Public Property Produit As String
         Public Property Conditionnement As String
+        Public Property UnitePrincipaleImpression As String
+        Public Property UniteSecondaireImpression As String
+        Public Property TypePersonnaliseImpression As Boolean
         Public Property Quantite As Decimal
         Public Property PrixUnitaire As Decimal
         Public Property Montant As Decimal
@@ -252,7 +256,7 @@ Namespace DevCommerc8ak
             If Not String.IsNullOrWhiteSpace(data.Facturier) Then paire("Facturier", data.Facturier)
             If Not String.IsNullOrWhiteSpace(data.Client) Then paire("Client", data.Client)
             If Not String.IsNullOrWhiteSpace(data.Telephone) Then paire("Téléphone", data.Telephone)
-            If Not data.ProformaThermique AndAlso Not String.IsNullOrWhiteSpace(data.Statut) Then paire("Statut", StatutAffichage(data.Statut))
+            If Not data.ProformaThermique AndAlso Not String.IsNullOrWhiteSpace(data.Statut) Then blocs.Add(New BlocThermique With {.Genre = "PAIRE", .Texte = "STATUT", .Valeur = StatutAffichage(data.Statut), .Police = 1})
             For Each info As KeyValuePair(Of String, String) In data.InformationsThermiques
                 paire(info.Key, info.Value)
             Next
@@ -260,7 +264,7 @@ Namespace DevCommerc8ak
             For Each ligne As FacturePrintLine In data.Lignes
                 blocs.Add(New BlocThermique With {
                     .Genre = "ARTICLE", .Texte = Safe(ligne.Produit),
-                    .Detail = FormaterQuantite(ligne.Quantite) & " " & Safe(ligne.Conditionnement) & " (" & MontantThermique(ligne.PrixUnitaire) & ")",
+                    .Detail = FormaterQuantite(ligne.Quantite) & " " & ConditionnementCommercial.Libelle(ligne.Conditionnement, ligne.UnitePrincipaleImpression, ligne.UniteSecondaireImpression, ligne.Quantite, ligne.TypePersonnaliseImpression) & " (" & MontantThermique(ligne.PrixUnitaire) & ")",
                     .Valeur = MontantThermique(ligne.Montant)})
             Next
             separer()
@@ -275,7 +279,7 @@ Namespace DevCommerc8ak
                 Next
             End If
             separer()
-            texte(If(EstAnnulee(data), "FACTURE ANNULÉE", If(data.ProformaThermique, "DOCUMENT PROFORMA - NON ACQUITTÉ", If(String.IsNullOrWhiteSpace(data.MentionThermique), "DOCUMENT FACTURE", data.MentionThermique))), 1)
+            texte(If(EstAnnulee(data), "FACTURE ANNULÉE", If(data.ProformaThermique, "DOCUMENT PROFORMA — NON ACQUITTÉ", If(String.IsNullOrWhiteSpace(data.MentionThermique), "DOCUMENT FACTURE", data.MentionThermique))), 1)
             If Not data.ProformaThermique AndAlso Not data.DiagnosticThermique AndAlso Not EstAnnulee(data) Then texte("Merci pour votre confiance", 1)
             texte(Application.ProductName & " - v" & PrintConfigurationHelper.ObtenirVersionApplication(), 2)
             texte("Développé par : Andy NTANTA", 2)

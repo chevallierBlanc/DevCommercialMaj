@@ -4,6 +4,7 @@ Imports System.Collections.Generic
 Imports System.Drawing
 Imports System.Linq
 Imports System.Reflection
+Imports System.Web.Script.Serialization
 Imports DevCommerc8ak.DevCommerc8ak
 
 Module Program
@@ -94,6 +95,51 @@ Module Program
                 Next
             End Using
         End Using
-        Console.WriteLine("PASS : " & nombre.ToString() & " controles du vrai plan thermique/GDI. Aucune connexion SQL ni impression physique.")
+        For Each statut As String In New String() {"PAYEE", "EN_ATTENTE", "PARTIELLEMENT PAYÉE", "IMPAYÉE"}
+            data.Statut = statut
+            Dim statutVu As Boolean = False
+            For Each b As Object In Blocs(data)
+                If Champ(b, "Texte") = "STATUT" Then
+                    statutVu = Champ(b, "Valeur") = FacturePrintRenderer.StatutAffichage(statut) AndAlso Champ(b, "Police") = "1"
+                End If
+            Next
+            Verifier(statutVu)
+        Next
+        data.ProformaThermique = True
+        data.Lignes(0).Conditionnement = "DEMI"
+        data.Lignes(0).UnitePrincipaleImpression = "sac"
+        data.Lignes(0).Quantite = 1D
+        Dim demiSac As Boolean = False, mention As Boolean = False
+        For Each b As Object In Blocs(data)
+            Verifier(Champ(b, "Texte") <> "STATUT" AndAlso Champ(b, "Texte") <> "Montant payé")
+            If Champ(b, "Genre") = "ARTICLE" AndAlso Champ(b, "Detail").StartsWith("1 demi-sac") Then demiSac = True
+            If Champ(b, "Texte") = "DOCUMENT PROFORMA — NON ACQUITTÉ" Then mention = True
+        Next
+        Verifier(demiSac AndAlso mention)
+        ' Ancienne ligne sans instantane : aucune unite du catalogue injectee.
+        data.Lignes(0).UnitePrincipaleImpression = Nothing
+        Dim repli As Boolean = False
+        For Each b As Object In Blocs(data)
+            If Champ(b, "Genre") = "ARTICLE" AndAlso Champ(b, "Detail").StartsWith("1 DEMI") Then repli = True
+        Next
+        Verifier(repli)
+        Dim historique As New List(Of FacturePrintLine) From {New FacturePrintLine With {.ProduitId = 7, .Conditionnement = "GROS", .Quantite = 1D, .PrixUnitaire = 10D, .Montant = 10D}}
+        Dim snapshot As String = New JavaScriptSerializer().Serialize(New With {.Lignes = New Object() {New With {.ProduitId = 7, .TypeVente = "GROS", .Quantite = 1D, .QuantiteSaisie = 1D, .PrixUnitaire = 10D, .MontantLigne = 10D, .TypeTarifId = 0, .UnitePrincipaleImpression = "carton", .UniteSecondaireImpression = "pièce"}}})
+        ConditionnementsHistoriquesService.Appliquer(snapshot, historique)
+        Verifier(historique(0).UnitePrincipaleImpression = "carton")
+        historique(0).PrixUnitaire = 11D
+        ConditionnementsHistoriquesService.Appliquer(snapshot, historique)
+        Verifier(historique(0).UnitePrincipaleImpression Is Nothing)
+        historique(0).PrixUnitaire = 10D
+        historique(0).ProduitId = 8
+        ConditionnementsHistoriquesService.Appliquer(snapshot, historique)
+        Verifier(historique(0).UnitePrincipaleImpression Is Nothing)
+        historique(0).ProduitId = 7
+        For Each ancien As String In New String() {"", "{}", "{invalid", "{""Lignes"":[]}", "{""Lignes"":[{""ProduitId"":7}]}"}
+            ConditionnementsHistoriquesService.Appliquer(ancien, historique)
+            Verifier(historique(0).UnitePrincipaleImpression Is Nothing)
+        Next
+        IntegrationCaisse.ExecuterSiConfigure()
+        Console.WriteLine("PASS : " & nombre.ToString() & " controles du vrai plan thermique/GDI. Aucune impression physique.")
     End Sub
 End Module

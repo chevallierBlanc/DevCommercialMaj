@@ -169,7 +169,7 @@ Namespace DevCommerc8ak
             result.Add("Entete", entete(0))
             ' Les ID techniques recréés ne sont pas une différence commerciale.
             ' Les articles et leur ordre sont conservés pour comparer les vraies valeurs.
-            result.Add("Lignes", Lire(cn, tx, "SELECT l.ProduitId,p.Libelle AS Produit,l.TypeVente,l.Quantite,l.QuantiteSaisie,l.QuantiteBase,l.PrixUnitaire,l.MontantRemise,l.MontantLigne,l.CoutUnitaireBaseVente,l.MotifPrixException,l.DemandePrixId,l.ContextePrix,l.TypeTarifId FROM dbo.LignesFactureVente l LEFT JOIN dbo.Produits p ON p.ProduitId=l.ProduitId WHERE l.FactureVenteId=@id ORDER BY l.LigneFactureVenteId", id))
+            result.Add("Lignes", Lire(cn, tx, "SELECT l.ProduitId,p.Libelle AS Produit,l.TypeVente,l.Quantite,l.QuantiteSaisie,l.QuantiteBase,l.PrixUnitaire,l.MontantRemise,l.MontantLigne,l.CoutUnitaireBaseVente,l.MotifPrixException,l.DemandePrixId,l.ContextePrix,l.TypeTarifId,p.UnitePrincipale AS UnitePrincipaleImpression,p.UniteSecondaire AS UniteSecondaireImpression FROM dbo.LignesFactureVente l LEFT JOIN dbo.Produits p ON p.ProduitId=l.ProduitId WHERE l.FactureVenteId=@id ORDER BY l.LigneFactureVenteId", id))
             Return result
         End Function
 

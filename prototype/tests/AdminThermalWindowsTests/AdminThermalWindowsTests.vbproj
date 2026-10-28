@@ -10,6 +10,8 @@
   <ItemGroup>
     <Reference Include="DevCommerc8ak"><HintPath>$(ErpAssemblyPath)</HintPath></Reference>
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
 </Project>

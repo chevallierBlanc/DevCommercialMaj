@@ -101,6 +101,10 @@ Namespace DevCommerc8ak
             Public Property ProduitId As Integer
             Public Property Libelle As String
             Public Property Unite As String
+            <System.ComponentModel.Browsable(False)>
+            Public Property UnitePrincipaleImpression As String
+            <System.ComponentModel.Browsable(False)>
+            Public Property UniteSecondaireImpression As String
             Public Property PrixUnitaire As Decimal
             Public Property MotifPrixException As String
             Public Property DemandePrixId As Integer?
@@ -1065,6 +1069,10 @@ Namespace DevCommerc8ak
             Dim ligne As PanierLigne = _panier.Find(Function(x) x.ProduitId = produitId AndAlso x.Unite = unite AndAlso Nullable.Equals(x.TypeTarifId, typeTarifId))
             If ligne Is Nothing Then
                 ligne = New PanierLigne With {.ProduitId = produitId, .Libelle = libelle, .Unite = unite, .TypeTarifId = typeTarifId, .PrixUnitaire = prix, .Quantite = qte, .QuantiteBase = quantiteBase, .QuantiteEquivalente = quantiteEquivalent, .QuantiteReelle = quantiteBase, .Total = prix * qte}
+                ' Instantane de presentation du panier, sans changer TypeVente
+                ' ni recharger les unites actuelles pour une ancienne ligne.
+                ligne.UnitePrincipaleImpression = SafeString(CellValueByProperty(gridProduits.CurrentRow, "UnitePrincipale"))
+                ligne.UniteSecondaireImpression = SafeString(CellValueByProperty(gridProduits.CurrentRow, "UniteSecondaire"))
                 _panier.Add(ligne)
             Else
                 ligne.Quantite += qte
@@ -1708,6 +1716,9 @@ Namespace DevCommerc8ak
                 lignes.Add(New FacturePrintLine With {
                     .Produit = ligne.Libelle,
                     .Conditionnement = ligne.Unite,
+                    .UnitePrincipaleImpression = ligne.UnitePrincipaleImpression,
+                    .UniteSecondaireImpression = ligne.UniteSecondaireImpression,
+                    .TypePersonnaliseImpression = ligne.TypeTarifId.HasValue AndAlso ligne.TypeTarifId.Value > 0,
                     .Quantite = ligne.Quantite,
                     .PrixUnitaire = ligne.PrixUnitaire,
                     .Montant = ligne.Total

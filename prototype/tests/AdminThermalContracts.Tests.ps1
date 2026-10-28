@@ -31,7 +31,7 @@ foreach ($name in @('ValiderFacture','ImprimerProformaA4','ExporterPdf','Calcule
     Assert-Contract ((Method $facturation $name) -ceq (Method $oldFacturation $name)) ('Facturation inchangee : ' + $name)
 }
 $caisse = Read-Current 'Forms/CaisseForm.vb'; $oldCaisse = Read-Baseline 'Forms/CaisseForm.vb'
-foreach ($name in @('AutoriserSortie','SelectionnerFacture','ChargerFactures','ChargerDetails','ChargerLignes','ConvertirMontant','CalculerMonnaie','Encaisser','ConstruireTicketDepuisSelection','ImprimerTicketsDistincts','GetLibelleTypeVentePourTicket')) {
+foreach ($name in @('AutoriserSortie','SelectionnerFacture','ChargerFactures','ChargerDetails','ChargerLignes','ConvertirMontant','CalculerMonnaie')) {
     Assert-Contract ((Method $caisse $name) -ceq (Method $oldCaisse $name)) ('Caisse metier inchangee : ' + $name)
 }
 $historique = Read-Current 'UI/FormulaireFactures.vb'; $oldHistorique = Read-Baseline 'UI/FormulaireFactures.vb'
@@ -83,4 +83,24 @@ foreach ($name in @('ConfigurerDocumentThermique','ChargerParametres','Appliquer
 foreach ($name in @('TraiterBlocThermique','DessinerPageThermique')) {
     Assert-Contract ((Method $renderer $name) -ceq (Method (Read-Previous 'Services/FacturePrintRenderer.vb') $name)) ('Geometrie thermique conservee : ' + $name)
 }
+$justificatif = Read-Current 'Services/JustificatifCaisseService.vb'
+$lecture = Method $justificatif 'Lire'
+Assert-Contract ($lecture -match 'AutorisationActionService.Exiger\(cn, tx, "ENCAISSEMENT_CREER", "CAISSE"\)' -and $lecture -match 'JustificatifCaisseRegles.Verifier') 'Justificatif controle cote service et paiement persiste'
+Assert-Contract ($lecture -match 'IsolationLevel.Serializable' -and $lecture -match 'tx.Commit\(' -and $lecture -match 'propreEncaissement') 'Lecture coherente et portee de reimpression'
+$repoImpression = Read-Current 'Repositories/FactureImpressionRepository.vb'
+Assert-Contract ((Method $repoImpression 'LireJustificatif') -notmatch '(?i)NOLOCK|INSERT|UPDATE|DELETE|ALTER|EXEC ') 'Lecture justificatif sans DML ni lecture sale'
+Assert-Contract ($caisse -notmatch 'ConstruireTicketDepuisSelection|TicketData' -and $caisse -match 'New JustificatifCaisseService\(dal\).Lire\(ticket\)') 'Aucun recu construit depuis des champs temporaires'
+Assert-Contract ((Method $caisse 'CreerDocumentTicket') -notmatch 'txtMontantRecu|cmbMode|txtReference|Encaisser') 'Impression separee de la saisie et de la finance'
+Assert-Contract ($caisse -match 'btnImprimer.Enabled = Not _encaissementEnCours AndAlso _derniereFactureEncaissee > 0') 'Bouton indisponible sans encaissement confirme localement'
+foreach ($path in @('Services/FacturationService.vb','Services/AutorisationActionService.vb','Services/StockUnitConversionService.vb','Repositories/PaiementRepository.vb')) {
+    $previous = @(& git -C $root show ('a91dca8:' + $prefix + $path)) -join "`n"
+    if ($LASTEXITCODE -ne 0) { throw ('Baseline introuvable : ' + $path) }
+    Assert-Contract ((Read-Current $path).TrimEnd() -ceq $previous.Replace("`r",'').TrimEnd()) ('Moteur sensible inchange : ' + $path)
+}
+$operations = Read-Current 'Services/FactureOperationService.vb'
+$avantOperations = (@(& git -C $root show ('a91dca8:' + $prefix + 'Services/FactureOperationService.vb')) -join "`n").Replace("`r",'')
+$champsImpression = ',p.UnitePrincipale AS UnitePrincipaleImpression,p.UniteSecondaire AS UniteSecondaireImpression'
+Assert-Contract ($operations.Replace($champsImpression,'').TrimEnd() -ceq $avantOperations.TrimEnd()) 'Seuls deux champs descriptifs sont ajoutes au snapshot existant, sans changer les operations'
+Assert-Contract ($historique -notmatch 'Règlement #' -and $historique -match '"Règlement", montant') 'Identifiant de paiement non expose'
+Assert-Contract ($renderer -match '\.Texte = "STATUT".*\.Police = 1' -and $renderer -match 'ConditionnementCommercial.Libelle') 'Statut gras et libelle thermique commun'
 Write-Host ('PASS : ' + $script:checks + ' contrats de source. Aucun essai Windows, SQL ou impression physique.')
